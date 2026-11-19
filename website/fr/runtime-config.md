@@ -178,7 +178,7 @@ Un cast donné en chaîne l’emporte, la valeur restant du texte JSON : `param
 
 ### `upsertRequiresSameKeys` {#Config.upsertRequiresSameKeys}
 
-À partir de la 7.0.0. L’option vaut désormais `true` par défaut.
+À partir de la 7.0.0, l’option vaut `true` par défaut.
 
 ```ts
 upsertRequiresSameKeys?: boolean  // default: true
@@ -190,7 +190,7 @@ Avec `false`, une clé absente peut entraîner l’écrasement de la valeur stoc
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
-À partir de la 7.0.0. L’option vaut désormais `true` par défaut.
+À partir de la 7.0.0, l’option vaut `true` par défaut.
 
 ```ts
 undefinedMeansMissing?: boolean  // default: true
@@ -200,7 +200,7 @@ Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`upda
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
-À partir de la 7.0.0. L’option vaut désormais `true` par défaut.
+À partir de la 7.0.0, l’option vaut `true` par défaut.
 
 ```ts
 transactionRequiresCommit?: boolean  // default: true
@@ -217,7 +217,7 @@ Avec `false`, la promesse se résout avec la valeur renvoyée par le callback, s
 
 ### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
 
-À partir de la 7.0.0. L’option vaut désormais `true` par défaut.
+À partir de la 7.0.0, l’option vaut `true` par défaut.
 
 ```ts
 transactionRequiresIdleClient?: boolean  // default: true
@@ -240,7 +240,7 @@ Avec `false`, `transaction()` envoie `START TRANSACTION` sans vérifier de nouve
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
-À partir de la 7.0.0. L’option vaut désormais `true` par défaut.
+À partir de la 7.0.0, l’option vaut `true` par défaut.
 
 ```ts
 transactionRequiresSatisfyingLevel?: boolean  // default: true
@@ -265,8 +265,8 @@ selectExactlyOneChecksForSecondRow?: boolean  // default: false, in 7.0 too
 
 Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté seul demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> avec `2`, et `.run()` est rejetée avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) quand une deuxième ligne arrive : "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Sans l’option, il en demande une, `LIMIT 1`, et donne la première ligne qui correspond, comme dans Zapatos 6.6.1.
 
-- Imbriqué dans une autre requête, dans un `lateral` ou un template `sql`, il garde `LIMIT 1`, sauf si [`withTies`](/fr/select#order-limit-offset-and-withties) inclut les ex æquo. « Seul » dépend de la façon dont la requête est compilée : `.run()` et `.compile()` la compilent seule, une requête parente la compile dans son propre SQL.
-- Une [`.copy()`](/fr/sql-template#copy) de celui-ci se compile comme imbriquée : la même limite et la règle de `withTies` s’appliquent donc même si vous l’exécutez seule.
+- Imbriqué dans une autre requête, dans un `lateral` ou un template `sql`, il garde `LIMIT 1`, sauf si [`withTies`](/fr/select#order-limit-offset-and-withties) inclut les ex æquo. La distinction se joue à la compilation. `.run()` et `.compile()` compilent la requête seule. Une requête parente l’intègre à son propre SQL.
+- Une copie obtenue avec [`.copy()`](/fr/sql-template#copy) est compilée comme une requête imbriquée. La même limite et la règle de `withTies` s’appliquent même si vous exécutez la copie seule.
 - Avec un [`lock`](/fr/select#lock), `LIMIT $2` verrouille aussi la deuxième ligne : une fois `.run()` rejetée, les deux lignes restent verrouillées jusqu’à la fin de la transaction, et le `FOR UPDATE NOWAIT` d’une autre session sur l’une d’elles reçoit 55P03.
 - Sans l’option, aucun avertissement, et elle reste désactivée en 7.0 : « au moins une ligne », c’est ainsi que Zapatos lit `selectExactlyOne()`, imbriqué dans un `lateral` sur une clé étrangère `NOT NULL` ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Lue quand `selectExactlyOne()` est appelée, pas à `.run()`.
@@ -277,7 +277,7 @@ Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté se
 aggregatesTypedByColumn?: boolean  // default: true
 ```
 
-À partir de la 7.0.0. Par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour une valeur finie de type `timestamptz` et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
+À partir de la 7.0.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour une valeur finie de type `timestamptz` et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
 
 Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne `0`, une date finie lue comme un `Date` donne le nombre de millisecondes depuis l’époque Unix et un texte non numérique donne `NaN`. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
 
@@ -492,10 +492,10 @@ process.on('warning', (warning: Error & { code?: string }) => {
 | `tsrange`, `tstzrange`, `daterange` | [`DateRangeString`](#DateRangeString) | `DateRangeString` | `DateRangeString` |
 | `json`, `jsonb` | [`JSONValue`](#JSONValue) | `JSONValue` | `JSONValue` |
 
-- Dans un `Selectable`, `int8[]` donne `Int8String[]`. Un [tableau d’enums](/fr/generator#generate.enumArraysTypedAsText) brut est du texte par défaut.
+- Dans un `Selectable`, `int8[]` donne `Int8String[]`. Dans une ligne brute, un [tableau d’enums](/fr/generator#generate.enumArraysTypedAsText) est représenté par du texte par défaut.
 - Avec l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur, `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans un `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - Les raccourcis renvoient des `JSONSelectable`. Un `Selectable` est ce que `pg` renvoie pour un simple `SELECT` de la ligne.
-- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). Avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type vient du placeholder. Pour les domaines sur un tableau d’enums dans les lignes brutes, voir les [cas directs et imbriqués](/fr/switching#domain-and-parser-types). Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
+- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). Avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type vient du placeholder. Pour le type des domaines sur un tableau d’enums dans les lignes brutes, voir les [cas directs et imbriqués](/fr/switching#domain-and-parser-types). Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
 - Un `interval` donne un [`PostgresInterval`](#PostgresInterval) dans `Selectable`, une `string` en JSON et `string | PostgresInterval` dans une écriture. Avec [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects), les cinq interfaces utilisent `string`.
 
 Chaque type vérifie la forme d’une chaîne, pas sa valeur : `'2030-13-45'` est un `DateString`.

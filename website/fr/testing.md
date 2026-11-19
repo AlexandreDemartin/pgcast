@@ -147,7 +147,7 @@ Avec `strict` désactivé, `columns` laisse le type au `JSONSelectable` complet 
 
 ### Typer chaque résultat {#type-each-result}
 
-| Requête | Type du résultat du raccourci ou de la requête | Lignes brutes (`rows`) du faux client |
+| Requête | Type du résultat du raccourci ou de la requête | Lignes brutes (`rows`) du fake |
 |---|---|---|
 | [`select()`](/fr/select#select) | [`FullSelectReturnTypeForTable`](/fr/select#FullSelectReturnTypeForTable)`<T, C, L, E, M>`, `M` le mode | `[{ result }]`, tout le tableau dans une seule ligne ; `[{ result: [] }]` pour aucune, comme Postgres l’envoie (`[]` donne `undefined`) |
 | [`selectOne()`](/fr/select#selectOne), [`selectExactlyOne()`](/fr/select#selectExactlyOne) | le même | `[{ result }]` ; `[]` pour aucune : `undefined` de `selectOne()`, une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) de `selectExactlyOne()` |

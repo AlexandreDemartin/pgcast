@@ -340,7 +340,7 @@ Le type en accepte davantage, et chacune de ces valeurs lève une erreur à la c
 
 ## Les tableaux {#arrays}
 
-À partir de la 7.0.0. Chaque condition accepte un tableau, y compris en lecture seule, dont les éléments ont le même type que ceux de la colonne. Elle accepte aussi une [colonne parente](/fr/sql-template#parent). Pour `films.genres`, de type `text[]`, passez un tableau de chaînes. Avec TypeScript 4.1 ou 5.9, passez les labels d’un enum sous la forme `['director'] as const` ou dans un tableau de type `s.crew_job[]`.
+À partir de la 7.0.0, chaque condition accepte un tableau, y compris en lecture seule, dont les éléments ont le même type que ceux de la colonne. Elle accepte aussi une [colonne parente](/fr/sql-template#parent). Pour `films.genres`, de type `text[]`, passez un tableau de chaînes. Avec TypeScript 4.1 ou 5.9, passez les labels d’un enum sous la forme `['director'] as const` ou dans un tableau de type `s.crew_job[]`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
