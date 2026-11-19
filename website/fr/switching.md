@@ -49,7 +49,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 :::
 
 - `package.json` indique maintenant `"zapatos": "npm:@pgcast/pgcast@^…"`, et `node_modules/zapatos` contient pgcast.
-- Rien d’autre à ajouter : les peer dependencies de pgcast sont celles de Zapatos 6.6.1, `pg`, `@types/pg` et TypeScript 4.1 ou plus récent.
+- Gardez `pg` dans vos dépendances. À partir de la 7.0, si vous vérifiez les types, déclarez aussi `typescript` et `@types/pg` dans vos `devDependencies`. [Installation](/fr/install#requirements).
 - Pas sous le simple nom `@pgcast/pgcast` : vos imports `zapatos/*` ne se résoudraient plus ([Installation](/fr/install#add-the-package), § Pourquoi l’alias).
 
 ## 2. Régénérer le schéma {#regenerate-the-schema}

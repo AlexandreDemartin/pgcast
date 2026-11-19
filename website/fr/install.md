@@ -10,26 +10,25 @@ english: b740b272da24
 ## Prérequis {#requirements}
 
 - Postgres. La suite de tests tourne sur les versions 14, 16 et 18.
-- Node, et `pg` (node-postgres), avec `@types/pg` pour TypeScript.
-- TypeScript 5.7 ou plus récent. `@types/pg` installe aussi `@types/node` et `pg-protocol`, dont les types en ont désormais besoin ; c’est aussi le cas du type de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`, comme dans Zapatos 6.6.1.
-- TypeScript dans vos propres `devDependencies`, ce qui fixe la version avec laquelle vous compilez : Yarn n’installe pas pour vous la peer dependency de pgcast sur TypeScript. Un projet qui n’a pas encore `typescript` l’ajoute :
+- Node et `pg` (node-postgres). À partir de la 7.0, `pg` est la seule peer dependency requise pour exécuter les requêtes et le générateur en JavaScript.
+- Pour vérifier les types, ajoutez `typescript` et `@types/pg` à vos `devDependencies`. Utilisez TypeScript 5.7 ou plus récent pour vérifier les types de `@types/node` et de `pg-protocol`, qu’installe `@types/pg`, ainsi que le type de retour de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
 
 ::: code-group
 
 ```sh [npm]
-npm install --save-dev typescript
+npm install --save-dev typescript @types/pg
 ```
 
 ```sh [pnpm]
-pnpm add -D typescript
+pnpm add -D typescript @types/pg
 ```
 
 ```sh [yarn]
-yarn add -D typescript
+yarn add -D typescript @types/pg
 ```
 
 ```sh [bun]
-bun add -d typescript
+bun add -d typescript @types/pg
 ```
 
 :::
@@ -63,28 +62,26 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ## Ajouter le paquet {#add-the-package}
 
+Pour la 7.x, utilisez `@^7` là où les commandes Yarn ou bun ci-dessous indiquent une plage de versions 6.x pour l’alias.
+
 ### Sous son propre nom {#under-its-own-name}
 
 ::: code-group
 
 ```sh [npm]
 npm install pgcast@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add pgcast@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
 ```
 
 ```sh [yarn]
 yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg
-yarn add -D @types/pg
 ```
 
 ```sh [bun]
 bun add pgcast@npm:@pgcast/pgcast@^6.7 pg
-bun add -d @types/pg
 ```
 
 :::
@@ -101,22 +98,18 @@ Pour un projet qui vient de Zapatos, dont les imports restent `zapatos/*` :
 
 ```sh [npm]
 npm install zapatos@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add zapatos@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
 ```
 
 ```sh [yarn]
 yarn add zapatos@npm:@pgcast/pgcast@^6 pg
-yarn add -D @types/pg
 ```
 
 ```sh [bun]
 bun add zapatos@npm:@pgcast/pgcast@^6 pg
-bun add -d @types/pg
 ```
 
 :::
