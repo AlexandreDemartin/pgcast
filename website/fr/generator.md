@@ -456,7 +456,7 @@ Comparez `err.constraint` aux noms du type `Constraint` de la relation désigné
 
 Le type exclut les contraintes `NOT NULL` des tables. En cas de violation, Postgres indique la colonne concernée. Les contraintes de vérification d’un domaine appartiennent au domaine. Si la contrainte `NOT NULL` d’un domaine est violée, Postgres indique le domaine dans `err.dataType`.
 
-Si le générateur inclut une relation nommée `every` d’un schéma qui contient un enum nommé `Constraint`, ou un domaine de ce nom généré sous forme d’union, tous deux déclarent `every.Constraint`. L’option s’applique à toute l’exécution : pour la garder active, excluez cette relation ou renommez l’un des deux objets.
+Si le générateur inclut une relation nommée `every` et que son schéma contient un enum nommé `Constraint` ou un domaine du même nom généré sous forme d’union, les deux objets déclarent `every.Constraint`. L’option s’applique à toute l’exécution. Pour la garder active, excluez cette relation ou renommez l’un des deux objets.
 
 Le générateur exécute la requête supplémentaire au catalogue et déclare le type uniquement si `constraintNames` vaut `true` après fusion de la configuration (fichier, puis argument JSON). La valeur JSON `null` dans l’argument désactive l’option même si le fichier indique `true`.
 

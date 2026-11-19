@@ -39,7 +39,7 @@ And what the catalog can't see, such as a column a trigger fills in, you say in 
 
 ### What the generator doesn't read
 
-The generator reads names, types, nullability and defaults. Postgres also keeps each foreign key and `CHECK` constraint, in `pg_constraint`, but Zapatos 6.6.1 never read that table, nor the SQL inside views and functions. pgcast reads it to tell a unique index that `ON CONFLICT ON CONSTRAINT` takes from one it refuses ([`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly)); with [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), the values a domain's `CHECK` lists; and, with [`constraintNames`](/generator#generate.constraintNames), the names of each relation's constraints.
+The generator reads names, types, nullability and defaults. Postgres also keeps each foreign key and `CHECK` constraint, in `pg_constraint`, but Zapatos 6.6.1 never read that table, nor the SQL inside views and functions. pgcast reads it to tell a unique index that `ON CONFLICT ON CONSTRAINT` takes from one it refuses ([`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly)); with [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), the values a domain's `CHECK` lists; and, with [`constraintNames`](/generator#generate.constraintNames), the names the table above lists.
 
 So `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, is a `number`; a `seat_label` matching `'^[A-Z][0-9]{1,2}$'` is a `string`; and nothing tells TypeScript that `films.studio_id` points at a studio.
 
