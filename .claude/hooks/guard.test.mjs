@@ -32,6 +32,17 @@ test('refuses publishing', () => {
   }
 });
 
+for (const command of [
+  'git push origin @pgcast/adapter-postgres-js@0.1.0',
+  'git push origin refs/tags/@pgcast/adapter-pglite@0.1.0',
+  'git push origin HEAD:@pgcast/adapter-postgres-js@0.1.0',
+  'git push origin "HEAD:refs/tags/@pgcast/adapter-pglite@0.1.0"',
+  "git push origin '@pgcast/adapter-pglite@0.1.0'",
+  'git push origin --tags',
+]) {
+  test(`refuses ${command}`, () => assert.ok(bash(command), command));
+}
+
 test('refuses pushing a tag, which starts release.yml', () => {
   for (const command of [
     'git push origin v6.11.0',
