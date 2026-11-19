@@ -23,14 +23,14 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 The types pgcast generates describe values as `pg` parses them ([Parse like pg](#parse-like-pg)): the adapters below parse each column with `pg`'s own parsers. Whichever driver runs the queries, keep `pg` installed: `zapatos/db` loads it.
 
-::: info Coming
-The two adapters are packages of their own, `@pgcast/adapter-postgres-js` and `@pgcast/adapter-pglite`, not yet on npm ([#718](https://github.com/AlexandreDemartin/pgcast/issues/718)). Until then, each builds from its folder of the repository, [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters). Each adapter has its own changelog: [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) and [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
+::: info Adapters on npm
+[`@pgcast/adapter-postgres-js`](https://www.npmjs.com/package/@pgcast/adapter-postgres-js) and [`@pgcast/adapter-pglite`](https://www.npmjs.com/package/@pgcast/adapter-pglite) are available on npm. Both require pgcast 6.12.0 or later. Each adapter has its own changelog: [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) and [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
 :::
 
 ## postgres.js
 
 ```sh
-npm install @pgcast/adapter-postgres-js postgres
+npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-postgres-js postgres
 ```
 
 Give `asPool()` the `sql` that `postgres()` returns, imported as usual (`import postgres from 'postgres'`):
@@ -65,7 +65,7 @@ What it reads and writes, type by type, and how it differs from `pg`: [its READM
 ## PGlite
 
 ```sh
-npm install @pgcast/adapter-pglite @electric-sql/pglite
+npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-pglite @electric-sql/pglite
 ```
 
 Give `asPool()` a PGlite with your schema loaded, the one pgcast generated its types from:
