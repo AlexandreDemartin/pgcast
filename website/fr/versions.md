@@ -1,5 +1,5 @@
 ---
-english: f5eca798676c
+english: af187a0a2934
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -90,7 +90,9 @@ Tout au long de la série 7.x, `aggregatesTypedByColumn: false` dans `db.setConf
 
 La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux du générateur (plus bas), sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
-Si vous n’avez activé `aggregatesTypedByColumn` qu’à l’exécution en 6.x, lancez `tsc` pour repérer les utilisations incompatibles avec les nouveaux types. Un projet qui a activé chaque option, y compris le typage des agrégats dans `ConfigTypes`, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur n’a rien à changer, sauf s’il utilise les [types de clients en lecture seule élargis en 7.0](/fr/switching#from-7-0) ou les [types des conditions sur tableaux en 7.0](/fr/switching#array-condition-types), qui changent sans avertissement. Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements. Parmi les autres options, trois conservent leur ancienne valeur : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
+Si vous n’avez activé `aggregatesTypedByColumn` qu’à l’exécution en 6.x, lancez `tsc` pour repérer les utilisations incompatibles avec les nouveaux types. Si vous avez activé toutes les options, y compris le typage des agrégats dans `ConfigTypes`, et que vous ne voyez ni avertissement `PGCAST_DEP` ni note du générateur, vous n’avez rien à modifier dans votre code, sauf s’il dépend des [types de clients en lecture seule élargis en 7.0](/fr/switching#from-7-0) ou des [types des conditions sur tableaux en 7.0](/fr/switching#array-condition-types), qui changent sans avertissement. Si vous vérifiez les types, déclarez les deux [peer dependencies facultatives](/fr/install#requirements), `typescript` et `@types/pg`, dans vos `devDependencies`.
+
+Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements. Parmi les autres options, trois conservent leur ancienne valeur : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
 
 En 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` et `transactionRequiresSatisfyingLevel` valent aussi `true` par défaut. Passez une de ces options à `false` pour retrouver, sans avertissement, le [comportement des transactions en 6.x](/fr/switching#turn-on-the-opt-ins) qui correspond à cette option. Ces trois réglages disparaissent en 8.0.
 

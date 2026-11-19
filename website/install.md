@@ -6,26 +6,25 @@ From 6.7.0, you install pgcast under its own name and import `pgcast/db`. A proj
 ## Requirements
 
 - Postgres. The test suite runs against 14, 16 and 18.
-- Node, and `pg` (node-postgres), with `@types/pg` for TypeScript.
-- TypeScript 5.7 or later. `@types/pg` brings in `@types/node` and `pg-protocol`, whose types now need it; so does [`toBuffer()`](/runtime-config#toBuffer)'s, `Buffer<ArrayBuffer>`, as in Zapatos 6.6.1.
-- TypeScript in your own `devDependencies`, which picks the version you build with: Yarn doesn't install pgcast's peer dependency on it for you. A project with no `typescript` yet adds it:
+- Node and `pg` (node-postgres). From 7.0, `pg` is the only peer dependency required to run queries and the generator in JavaScript.
+- To check types, add `typescript` and `@types/pg` to your `devDependencies`. Use TypeScript 5.7 or later to check the declarations of `@types/node` and `pg-protocol`, which `@types/pg` brings in, and the return type of [`toBuffer()`](/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
 
 ::: code-group
 
 ```sh [npm]
-npm install --save-dev typescript
+npm install --save-dev typescript @types/pg
 ```
 
 ```sh [pnpm]
-pnpm add -D typescript
+pnpm add -D typescript @types/pg
 ```
 
 ```sh [yarn]
-yarn add -D typescript
+yarn add -D typescript @types/pg
 ```
 
 ```sh [bun]
-bun add -d typescript
+bun add -d typescript @types/pg
 ```
 
 :::
@@ -59,28 +58,26 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ## Add the package
 
+For 7.x, use `@^7` wherever a Yarn or bun command below specifies a 6.x alias range.
+
 ### Under its own name
 
 ::: code-group
 
 ```sh [npm]
 npm install pgcast@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add pgcast@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
 ```
 
 ```sh [yarn]
 yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg
-yarn add -D @types/pg
 ```
 
 ```sh [bun]
 bun add pgcast@npm:@pgcast/pgcast@^6.7 pg
-bun add -d @types/pg
 ```
 
 :::
@@ -97,22 +94,18 @@ For a project switching from Zapatos, whose imports stay `zapatos/*`:
 
 ```sh [npm]
 npm install zapatos@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add zapatos@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
 ```
 
 ```sh [yarn]
 yarn add zapatos@npm:@pgcast/pgcast@^6 pg
-yarn add -D @types/pg
 ```
 
 ```sh [bun]
 bun add zapatos@npm:@pgcast/pgcast@^6 pg
-bun add -d @types/pg
 ```
 
 :::
@@ -123,7 +116,7 @@ Here any 6.x will do: `@^6`.
 Your imports and the generated schema name the package by its folder in `node_modules`: `pgcast/db` or `zapatos/db`. Installed as plain `@pgcast/pgcast`, it lands in `node_modules/@pgcast/pgcast`, where neither resolves. The alias names the folder, and `moduleNames` must match it ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 :::
 
-Already on Zapatos? Switching is one line of `package.json`, then a look for the few calls whose result changes: [Switch from Zapatos](/switching).
+Already on Zapatos? One line of `package.json` swaps the package. From 7.0, if you check types, [add any missing dev dependencies](#requirements). For the few calls whose result changes, see [Switch from Zapatos](/switching).
 
 That's pgcast in your project. Next, [First query](/first-query) generates the types of a database, then runs a select and an insert with them.
 

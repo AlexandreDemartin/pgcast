@@ -1,11 +1,11 @@
 ---
-english: 414c12cd1863
-description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
+english: 57007bfa437f
+description: "Passez de Zapatos 6.6.1 à pgcast : changez le paquet, ajoutez les peer dependencies de types manquantes en 7.0, régénérez et vérifiez les appels qui changent."
 ---
 
 # Venir de Zapatos
 
-Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.json`, régénérez, puis laissez `tsc`, un coup d’œil à votre code et les avertissements de pgcast vous montrer les quelques appels dont le résultat change. La page suppose un projet qui tourne déjà sur Zapatos ; pour un nouveau, commencez par [Installation](/fr/install).
+Pour passer de Zapatos 6.6.1 à pgcast, remplacez le paquet. À partir de la 7.0, [ajoutez les dépendances de développement manquantes](/fr/install#requirements) si vous vérifiez les types. Régénérez le schéma, puis appuyez-vous sur `tsc`, les avertissements de pgcast et une relecture de votre code pour repérer les quelques appels dont le résultat change. Pour un nouveau projet, commencez par [Installation](/fr/install).
 {.lede}
 
 <AtAGlance>
@@ -26,7 +26,7 @@ Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.jso
 
 ## 1. Changer de paquet {#swap-the-package}
 
-Installez pgcast sous le nom qu’avait Zapatos :
+Installez pgcast sous le nom qu’avait Zapatos. Les commandes Yarn et bun ci-dessous installent la 6.x. Pour installer la 7.x, remplacez `@^6` par `@^7`.
 
 ::: code-group
 
@@ -49,7 +49,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 :::
 
 - `package.json` indique maintenant `"zapatos": "npm:@pgcast/pgcast@^…"`, et `node_modules/zapatos` contient pgcast.
-- Rien d’autre à ajouter : les peer dependencies de pgcast sont celles de Zapatos 6.6.1, `pg`, `@types/pg` et TypeScript 4.1 ou plus récent.
+- Gardez `pg` dans vos dépendances. À partir de la 7.0, si vous vérifiez les types, déclarez aussi `typescript` et `@types/pg` dans vos `devDependencies`. [Installation](/fr/install#requirements).
 - Pas sous le simple nom `@pgcast/pgcast` : vos imports `zapatos/*` ne se résoudraient plus ([Installation](/fr/install#add-the-package), § Pourquoi l’alias).
 
 ## 2. Régénérer le schéma {#regenerate-the-schema}

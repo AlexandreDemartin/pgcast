@@ -1,5 +1,5 @@
 ---
-english: b740b272da24
+english: 86c44b3f7136
 ---
 
 # Installation
@@ -10,26 +10,25 @@ english: b740b272da24
 ## Prérequis {#requirements}
 
 - Postgres. La suite de tests tourne sur les versions 14, 16 et 18.
-- Node, et `pg` (node-postgres), avec `@types/pg` pour TypeScript.
-- TypeScript 5.7 ou plus récent. `@types/pg` installe aussi `@types/node` et `pg-protocol`, dont les types en ont désormais besoin ; c’est aussi le cas du type de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`, comme dans Zapatos 6.6.1.
-- TypeScript dans vos propres `devDependencies`, ce qui fixe la version avec laquelle vous compilez : Yarn n’installe pas pour vous la peer dependency de pgcast sur TypeScript. Un projet qui n’a pas encore `typescript` l’ajoute :
+- Node et `pg` (node-postgres). À partir de la 7.0, en JavaScript, `pg` est la seule peer dependency nécessaire pour exécuter des requêtes et lancer le générateur.
+- Pour vérifier les types, ajoutez `typescript` et `@types/pg` à vos `devDependencies`. TypeScript 5.7 ou plus récent est nécessaire pour vérifier les déclarations de `@types/node` et de `pg-protocol`, qu’installe `@types/pg`, ainsi que le type de retour de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
 
 ::: code-group
 
 ```sh [npm]
-npm install --save-dev typescript
+npm install --save-dev typescript @types/pg
 ```
 
 ```sh [pnpm]
-pnpm add -D typescript
+pnpm add -D typescript @types/pg
 ```
 
 ```sh [yarn]
-yarn add -D typescript
+yarn add -D typescript @types/pg
 ```
 
 ```sh [bun]
-bun add -d typescript
+bun add -d typescript @types/pg
 ```
 
 :::
@@ -63,28 +62,26 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ## Ajouter le paquet {#add-the-package}
 
+Pour la 7.x, remplacez la plage de versions 6.x de l’alias par `@^7` dans les commandes Yarn ou bun ci-dessous.
+
 ### Sous son propre nom {#under-its-own-name}
 
 ::: code-group
 
 ```sh [npm]
 npm install pgcast@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add pgcast@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
 ```
 
 ```sh [yarn]
 yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg
-yarn add -D @types/pg
 ```
 
 ```sh [bun]
 bun add pgcast@npm:@pgcast/pgcast@^6.7 pg
-bun add -d @types/pg
 ```
 
 :::
@@ -101,22 +98,18 @@ Pour un projet qui vient de Zapatos, dont les imports restent `zapatos/*` :
 
 ```sh [npm]
 npm install zapatos@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add zapatos@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
 ```
 
 ```sh [yarn]
 yarn add zapatos@npm:@pgcast/pgcast@^6 pg
-yarn add -D @types/pg
 ```
 
 ```sh [bun]
 bun add zapatos@npm:@pgcast/pgcast@^6 pg
-bun add -d @types/pg
 ```
 
 :::
@@ -127,7 +120,7 @@ Ici, n’importe quelle 6.x convient : `@^6`.
 Vos imports et le schéma généré nomment le paquet par son dossier dans `node_modules` : `pgcast/db` ou `zapatos/db`. Installé sous son seul nom, `@pgcast/pgcast`, il atterrit dans `node_modules/@pgcast/pgcast`, où ni l’un ni l’autre ne se résout. L’alias nomme le dossier, et `moduleNames` doit lui correspondre ([décision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 :::
 
-Déjà sur Zapatos ? Le passage tient en une ligne de `package.json`, puis un coup d’œil aux quelques appels dont le résultat change : [Venir de Zapatos](/fr/switching).
+Déjà sur Zapatos ? Une ligne de `package.json` suffit pour remplacer le paquet. À partir de la 7.0, si vous vérifiez les types, [ajoutez les dépendances de développement manquantes](#requirements). Pour les quelques appels dont le résultat change, consultez [Venir de Zapatos](/fr/switching).
 
 Voilà pgcast dans votre projet. Ensuite, [Première requête](/fr/first-query) génère les types d’une base de données, puis exécute avec eux une lecture et une insertion.
 
