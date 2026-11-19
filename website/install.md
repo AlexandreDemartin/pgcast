@@ -1,6 +1,6 @@
 # Install
 
-From 6.7.0, you install pgcast under its own name and import `pgcast/db`. A project switching from Zapatos installs it under the `zapatos` alias instead, and keeps its imports.
+From 6.7.0, you install pgcast under its own name and import `pgcast/db`. A project switching from Zapatos [installs 6.x under the `zapatos` alias](/switching#swap-the-package), and keeps its imports.
 {.lede}
 
 ## Requirements
@@ -88,35 +88,11 @@ Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4
 
 ### Under the `zapatos` alias
 
-For a project switching from Zapatos, whose imports stay `zapatos/*`:
-
-::: code-group
-
-```sh [npm]
-npm install zapatos@npm:@pgcast/pgcast pg
-```
-
-```sh [pnpm]
-pnpm add zapatos@npm:@pgcast/pgcast pg
-```
-
-```sh [yarn]
-yarn add zapatos@npm:@pgcast/pgcast@^6 pg
-```
-
-```sh [bun]
-bun add zapatos@npm:@pgcast/pgcast@^6 pg
-```
-
-:::
-
-Here any 6.x will do: `@^6`.
+Starting from Zapatos 6.6.1? Use the [commands pinned to 6.x](/switching#swap-the-package) to see its migration warnings. Already on pgcast 6.x? Follow the [7.0 migration guide](/switching#from-7-0).
 
 ::: tip Why the alias
 Your imports and the generated schema name the package by its folder in `node_modules`: `pgcast/db` or `zapatos/db`. Installed as plain `@pgcast/pgcast`, it lands in `node_modules/@pgcast/pgcast`, where neither resolves. The alias names the folder, and `moduleNames` must match it ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 :::
-
-Starting from Zapatos 6.6.1? Use the [commands pinned to 6.x](/switching#swap-the-package) to see its migration warnings. Already on pgcast 6.x? Follow the [7.0 migration guide](/switching#from-7-0).
 
 That's pgcast in your project. Next, [First query](/first-query) generates the types of a database, then runs a select and an insert with them.
 
