@@ -287,7 +287,7 @@ const row: s.films.Insertable = {
 ```
 
 ::: tip Opt-in
-Omettez une clé pour obtenir la valeur par défaut de sa colonne. Une clé à `undefined` est envoyée comme `NULL`, comme dans Zapatos 6.6.1, et pgcast émet un avertissement, une seule fois (`PGCAST_DEP002`). Avec `db.setConfig({ undefinedMeansMissing: true })`, elle compte comme omise ; ce sera le comportement par défaut à partir de la 7.0 ([Versions](/fr/versions)).
+Omettez une clé ou donnez-lui la valeur `undefined` pour insérer la valeur par défaut de la colonne. Donnez `null` pour écrire `NULL` dans une colonne qui l’accepte ([Valeurs à l’écriture](/fr/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

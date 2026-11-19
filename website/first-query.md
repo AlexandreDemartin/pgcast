@@ -286,7 +286,7 @@ const row: s.films.Insertable = {
 ```
 
 ::: tip Opt-in
-Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions](/versions)).
+Leave a key out or set it to `undefined` to insert the column's default. Give `null` to store SQL `NULL` in a nullable column ([Write values](/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

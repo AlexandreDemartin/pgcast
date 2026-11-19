@@ -730,7 +730,7 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 | Thrown by | How | Messages |
 |---|---|---|
 | `select()`, `selectOne()`, `selectExactlyOne()` and the aggregates, given a bad `order`, `lock` or `aggregate` | the call throws | [`select()`, Errors](/select#errors) |
-| `upsert()` of rows with different keys, with `upsertRequiresSameKeys` | the call throws | [Rows with different keys](/insert#upsert-different-keys) |
+| `upsert()` where a missing key would overwrite a column on conflict (the default key check) | the call throws | [Rows with different keys](/insert#upsert-different-keys) |
 | `update()` with no column to set | the call throws | [`update()`](/insert#update) |
 | `truncate()` with another option | the call throws | [`truncate()`](/insert#truncate) |
 | an interpolation that has no meaning in SQL: a number, `null`, `db.all`, the global object; `db.all` as the filter of `deletes()` or `update()` | `.run()` rejects | [Interpolations](/sql-template#interpolations), [`all`](/sql-template#all) |

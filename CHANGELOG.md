@@ -9,6 +9,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ### Added
 - First releases of [`@pgcast/adapter-postgres-js`](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) and [`@pgcast/adapter-pglite`](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md), both at 0.1.0.
 
+### Changed
+
+- Breaking: Undefined write values count as missing keys and a batch upsert throws if a missing key would overwrite a stored column. Set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently in `db.setConfig()` to restore either 6.x behaviour without warnings through 7.x. Both legacy behaviours go in 8.0 (#767, Epic #766).
+
 ## [6.12.0] - 2026-11-19
 
 ### Added
