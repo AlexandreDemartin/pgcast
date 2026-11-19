@@ -2054,6 +2054,34 @@ describe('cursor()', () => {
     expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'COMMIT']);
   });
 
+  it('reuses a prepared inner query in an unnamed cursor declaration on the same client', async () => {
+    const inner = series(2).prepared('inner_series');
+    const outer = sql<db.SQL, G[]>`SELECT g FROM (${inner}) AS numbers ORDER BY g`.prepared('outer_series');
+    const declarations: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { if (q.text.startsWith('DECLARE ')) declarations.push(q); } });
+    await inner.run(t.client);
+    expect(await read(db.cursor(t.client, outer, { batchSize: 1 }))).toEqual([gs(1), gs(2)]);
+    expect(declarations).toEqual([{
+      text: 'DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT g FROM (SELECT g FROM generate_series(1, $1) AS g) AS numbers ORDER BY g',
+      values: [2],
+    }]);
+    expect(inner.compile().name).toBe('inner_series');
+    expect(outer.compile().name).toBe('outer_series');
+  });
+
+  it.each(['DECLARE', 'FETCH'])('closes the cursor when the result listener throws after %s', async command => {
+    const failure = new Error('listener failed');
+    const scan = () => db.cursor(t.client, series(1), { batchSize: 1 });
+    db.setConfig({ resultListener: (_rows, _id, _ms, q) => {
+      if (q!.text.startsWith(command)) throw failure;
+    } });
+    await expect(scan().next()).rejects.toBe(failure);
+    resetConfig();
+    const open = await t.client.query('SELECT name FROM pg_cursors');
+    expect(await read(scan())).toEqual([gs(1)]);
+    expect(open.rows).toEqual([]);
+  });
+
   it('sends CLOSE on a break: Postgres then holds no cursor', async () => {
     await db.readCommitted(t.pool, async c => {
       for await (const batch of db.cursor(c, series(7), { batchSize: 3 })) { expect(batch).toEqual(gs(1, 2, 3)); break; }
