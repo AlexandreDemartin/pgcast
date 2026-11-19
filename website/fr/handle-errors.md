@@ -40,7 +40,7 @@ try {
 
 <<< ../examples/plain/errors_named_constraint.ts{ts twoslash}
 
-Une faute de frappe dans la valeur de `bookingKey` provoque une erreur de compilation. Si vous supprimez la contrainte, la même erreur se produit après la régénération des types.
+TypeScript refuse un nom absent de `s.seat_bookings.Constraint`, comme une faute de frappe dans la valeur de `bookingKey`. Si vous supprimez la contrainte, la même erreur se produit après la régénération des types, à condition qu’aucune autre contrainte ni aucun autre index unique de la table ne porte son nom.
 
 ## Distinguer les refus {#tell-the-refusals-apart}
 

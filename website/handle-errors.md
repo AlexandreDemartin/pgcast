@@ -35,7 +35,7 @@ From 7.1.0. Enable [`constraintNames` (coverage and limits)](/generator#generate
 
 <<< ./examples/plain/errors_named_constraint.ts{ts twoslash}
 
-A typo in `bookingKey`'s value is a compile error. Dropping the constraint gives the same error after you regenerate the types.
+TypeScript rejects a name absent from `s.seat_bookings.Constraint`, such as a typo in `bookingKey`'s value. Dropping the constraint gives the same error after you regenerate the types, if no other constraint or unique index of the table has its name.
 
 ## Tell the refusals apart
 
