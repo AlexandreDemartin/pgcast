@@ -452,7 +452,7 @@ Check `err.constraint` against the names in `Constraint` for `err.schema` and `e
 
 Table `NOT NULL` constraints are excluded. For a not-null violation on a table's column, Postgres reports the column. Domain checks belong to the domain, and a domain's `NOT NULL` violation reports the domain in `err.dataType`.
 
-In a schema with a relation named `every`, an enum named `Constraint` or a domain of that name generated as a union also declares `every.Constraint`. The option applies to the whole run. To keep it on, exclude the relation or rename either object.
+If the generator includes a relation named `every` from a schema with an enum named `Constraint`, or a domain of that name generated as a union, both declare `every.Constraint`. The option applies to the whole run: to keep it on, exclude that relation or rename either object.
 
 The extra catalogue query and declaration are off unless the merged configuration (file, then JSON argument) sets `constraintNames` to `true`. A JSON `null` in the argument turns a file's `true` off.
 
