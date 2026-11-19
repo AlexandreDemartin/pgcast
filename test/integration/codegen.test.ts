@@ -1453,6 +1453,15 @@ describe('surprises, frozen as they are', () => {
   });
 });
 
+it.each([
+  { id: 1, seats: 1, code: '23505', constraint: 'bookings_first_pkey' },
+  { id: 2, seats: 0, code: '23514', constraint: 'seats_positive' },
+])('reports the partition for $code on a write through bookings', async ({ id, seats, code, constraint }) => {
+  await t.client.query('INSERT INTO cinema.bookings (id, seats) VALUES (1, 1)');
+  await expect(t.client.query('INSERT INTO cinema.bookings (id, seats) VALUES ($1, $2)', [id, seats]))
+    .rejects.toMatchObject({ code, table: 'bookings_first', constraint });
+});
+
 describe('UniqueIndex', () => {
   it("lists only the table's own unique indexes", async () => {
     const { ts: schema } = await codegen({ ...main, uniqueIndexConstraintsOnly: false });
