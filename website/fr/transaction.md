@@ -99,7 +99,7 @@ Avec le client d’une transaction que `transaction()` a ouverte, elle n’envoi
 Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, les deux `INSERT`, `COMMIT`.
 
 - Le callback s’exécute au niveau de la transaction extérieure, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de celle-ci exécutée. Le type ne vérifie pas ce niveau : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`, comme dans Zapatos 6.6.1, avec un avertissement, une fois, `PGCAST_DEP007`.
-- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), quand le niveau extérieur ne vaut pas pour celui demandé ([`IsolationSatisfying`](#IsolationSatisfying)), `transaction()` est rejetée avant d’appeler le callback, et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Si le niveau extérieur offre les garanties demandées, l’appel transmet le client avec ou sans l’option.
+- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), `transaction()` vérifie que le niveau de la transaction extérieure offre les garanties du niveau demandé ([`IsolationSatisfying`](#IsolationSatisfying)). Si cette vérification échoue, la promesse est rejetée avant l’appel au callback et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Si le niveau extérieur offre les garanties demandées, l’appel transmet le client avec ou sans l’option.
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.
@@ -153,7 +153,7 @@ Le SQL de la requête du callback : [`count()`](/fr/select#count).
   Ne donnez jamais le pool à l’appel imbriqué. L’appel ouvre une seconde transaction sur un client du pool. Si le pool n’a qu’une connexion, comme celui de PGlite, il attend indéfiniment que la première transaction libère son client avec `release()`.
 - Un paramètre qui accepte un `pg.Pool` ou le pool d’un autre driver se type `db.PoolLike`, ce qu’est un `pg.Pool` : `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typé comme une union, `pg.Pool | typeof showPool`, il donne au callback le client de l’autre driver, alors que celui de `pg` est un `pg.PoolClient`. Si le type est une union entre un client marqué d’un autre driver et un pool, affinez-le avant l’appel, sauf si le client lui-même est compatible avec le paramètre `PoolLike`. Dans ce cas, l’union compile. À l’exécution, un client qui possède sa propre propriété `_zapatos` est transmis au niveau d’isolation de la transaction extérieure. Affinez aussi le type si l’union combine des types de clients distincts, comme dans `db.TxnClientForSerializable | db.TxnClientLike<ShowClient, …>`.
 - En fournissant un argument de type explicite pour le client, comme dans `readCommitted<T, C, Serial>(…)`, vous affirmez son type, comme avec un cast. Si une fonction accepte un client et que vous lui passez en réalité un pool, ce pool ouvre sa propre transaction au niveau d’isolation demandé par l’appel.
-- Depuis la 6.12.0, le type du premier paramètre accepte aussi un `PoolLike`. Cela affecte deux usages :
+- Depuis la 6.12.0, le premier paramètre accepte aussi un `PoolLike`. Ce changement de type a deux effets.
   - `Parameters<typeof db.serializable>[0]`, ou le premier paramètre tel qu’un `infer` le lit : `.query('SELECT 1')` dessus donne TS2339 ;
   - une fonction fléchée donnée là où `typeof db.serializable` est attendu, `async (_, callback) => callback(txnClient)`, donne TS2345, et une fonction typée avec les paramètres de Zapatos 6.6.1 donne TS2322.
 
@@ -587,7 +587,7 @@ await db.serializable(pool, txnClient => countBookings(txnClient));
 await db.readCommitted(pool, txnClient => countBookings(txnClient));
 ```
 
-Depuis la 7.0, une fonction qui demande l’un des trois autres niveaux en lecture seule accepte le client de `serializableRODeferrable()`. Pour que la fonction de l’exemple ci-dessous compile aussi en 6.x, typez son paramètre avec l’union `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable`.
+À partir de la 7.0, une fonction qui attend un client de l’un des trois autres niveaux en lecture seule accepte celui de `serializableRODeferrable()`. Si vous utilisez la fonction ci-dessous aussi avec la 6.x, donnez à son paramètre le type `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';

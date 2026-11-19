@@ -109,7 +109,7 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 
 | Votre code | Zapatos 6.6.1 et pgcast 6.x | pgcast 7.0 | Que faire |
 |---|---|---|---|
-| `db.serializableRO(pool, countSeats)`, où le paramètre de `countSeats` est de type `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compile | TS2345 avec `strict` : le callback peut aussi recevoir le niveau `SerializableRODeferrable` | Typez le paramètre [`db.TxnClientForSerializableRO`](/fr/transaction#TxnClientForSerializableRO). Si la fonction examine `_zapatos.isolationLevel`, traitez aussi le cas `SerializableRODeferrable`. |
+| `db.serializableRO(pool, countSeats)`, où le paramètre de `countSeats` est de type `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compile | TS2345 avec `strict`, car le callback peut aussi recevoir un client de niveau `SerializableRODeferrable` | Donnez au paramètre le type [`db.TxnClientForSerializableRO`](/fr/transaction#TxnClientForSerializableRO). Si la fonction examine `_zapatos.isolationLevel`, traitez aussi le cas `SerializableRODeferrable`. |
 
 </div>
 
