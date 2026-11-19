@@ -31,6 +31,12 @@ try {
 }
 ```
 
+From 7.1.0. Enable [`constraintNames` (coverage and limits)](/generator#generate.constraintNames) to check the name at compile time. In the `catch` above, rethrow unless `err instanceof pg.DatabaseError && seatTaken(err)`.
+
+<<< ./examples/plain/errors_named_constraint.ts{ts twoslash}
+
+A typo in `bookingKey`'s value is a compile error. Dropping the constraint gives the same error after you regenerate the types.
+
 ## Tell the refusals apart
 
 Three refusals a booking can meet on the docs schema, each with its `code` and the constraint that `err.constraint` names, which tells two constraints of the same kind apart:
