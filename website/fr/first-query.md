@@ -1,5 +1,5 @@
 ---
-english: c79d772e091a
+english: 7c8d521b9e57
 description: "À la fin de cette page, vous aurez généré les types d’une base, demandé des films et ajouté un film, avec sous les yeux le SQL et le type de chaque requête."
 ---
 

@@ -1,5 +1,5 @@
 ---
-english: 610a348f86d0
+english: 879316085090
 description: "Écrivez beaucoup de lignes d’un coup : découpez-les sous la limite de paramètres, ignorez celles déjà là, additionnez des comptes, ne récupérez que l’utile."
 ---
 
