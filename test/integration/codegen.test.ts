@@ -8,12 +8,11 @@
 //   * the CLI with --check: those files compared with the disk, nothing written.
 // Update after an intended change: `npx vitest run -u test/integration/codegen.test.ts`.
 // -u never deletes a file: a stale snapshot is removed by hand (the orphan test names it).
-// Without rejectOnQueryError, tsForConfig() calls process.exit(1) on a failed query: a test that causes one
-// mocks process.exit (§ generate() on a failed query).
+// The CLI and rejectOnQueryError: false exit on a failed query (tested in child processes).
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +30,14 @@ import { useTestDatabase } from '../helpers/db';
 import { pgError } from '../helpers/pgError';
 
 const t = useTestDatabase();
+
+// The catalogue's first relations query sorts on lower(table_name).
+const trapPath = '-c search_path=query_trap,pg_catalog';
+const queryTrap = `
+  CREATE SCHEMA query_trap;
+  CREATE FUNCTION query_trap.lower(name) RETURNS text LANGUAGE plpgsql
+    AS $$ BEGIN RAISE EXCEPTION 'introspection fails on purpose'; END $$;
+`;
 
 const snapshotDir = '../__snapshots__/codegen';
 const generatedDir = fileURLToPath(new URL('../generated', import.meta.url));
@@ -4175,10 +4182,13 @@ describe('generate()', () => {
     expect(read(outDir, 'zapatos/custom/PgAddress.d.ts')).toBe(read(generatedDir, 'zapatos/custom/PgAddress.d.ts'));
   });
 
-  it('writes the same files on a second run', async () => {
-    await run();
+  it('writes identical files with rejectOnQueryError omitted or false', async () => {
+    expect(await run()).toBeUndefined();
     const first = contents(outDir);
     await run();
+    expect(contents(outDir)).toEqual(first);
+    rmSync(join(outDir, 'zapatos'), { recursive: true });
+    expect(await generate({ ...main, ...quiet, db: db(), outDir, rejectOnQueryError: false })).toBeUndefined();
     expect(contents(outDir)).toEqual(first);
   });
 
@@ -4234,108 +4244,26 @@ describe('generate()', () => {
         c.query(`CREATE SCHEMA queued; CREATE TYPE queued.pair AS (a int, b int);\n${tables}`));
       const timeout = 1000;
       await throwsThenDrops({
-        schemas: { queued: all }, customTypesTransform: () => { throw failed; },
+        schemas: { queued: all }, rejectOnQueryError: false, customTypesTransform: () => { throw failed; },
       }, { max: 2, connectionTimeoutMillis: timeout }, timeout * 2);
     }, dropWait);
 
-    describe('on a failed query', () => {
-      // the relations query, the first of a run, sorts on lower(table_name): a lower(name) ahead of pg_catalog in
-      // search_path takes the call, and raises
-      beforeEach(() => withAdminClient(urlForDatabase(server().url, name), c => c.query(`
-        CREATE SCHEMA query_trap;
-        CREATE FUNCTION query_trap.lower(name) RETURNS text LANGUAGE plpgsql
-          AS $$ BEGIN RAISE EXCEPTION 'introspection fails on purpose'; END $$;
-      `)));
+    it('ends its pool after a catalogue query fails', async () => {
+      const connectionString = urlForDatabase(server().url, name);
+      await withAdminClient(connectionString, c => c.query(queryTrap));
+      await expect(generate({
+        ...main, ...quiet, db: { connectionString, options: trapPath }, outDir, rejectOnQueryError: true,
+      })).rejects.toBeInstanceOf(pg.DatabaseError);
+      await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));
+    });
 
-      const
-        trapped = () => ({ connectionString: urlForDatabase(server().url, name), options: '-c search_path=query_trap,pg_catalog' }),
-        failures = [
-          ['a refused connection', () => unreachable, { code: 'ECONNREFUSED' }],
-          ['a failing introspection query', trapped, { code: 'P0001', message: 'introspection fails on purpose' }],
-        ] as const,
-        exited = new Error('process.exit() called'),
-        note = 'Note: a query failed, so generate() ends the process with process.exit(1), and its promise never ' +
-          'settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the ' +
-          'default in pgcast 7.0.';
-
-      /** A run of one schema on `db`, notes printed, process.exit mocked to throw: what it rejected with and did. */
-      const failedRun = async (config: Config, db: pg.ClientConfig) => {
-        const
-          exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never),
-          log = vi.spyOn(console, 'log').mockImplementation(() => undefined),
-          unhandled: unknown[] = [],
-          onUnhandled = (e: unknown) => void unhandled.push(e);
-        process.on('unhandledRejection', onUnhandled);
-        try {
-          const rejection = await generate({
-            ...quiet, warningListener: true, schemas: { public: only('users') }, outDir, ...config, db,
-          }).then(() => new Error('resolved'), (e: unknown) => e);
-          await new Promise(resolve => setTimeout(resolve, 0));
-          return { rejection, exits: exit.mock.calls, printed: log.mock.calls, unhandled, written: files(outDir) };
-        } finally {
-          process.off('unhandledRejection', onUnhandled);
-          exit.mockRestore();
-          log.mockRestore();
-        }
-      };
-
-      it.each(failures)('rejects with the error of %s with rejectOnQueryError: no exit, no output, nothing written', async (_, db, error) => {
-        // two schemas: the queries of the other are in flight when the first fails
-        const run = await failedRun({ ...main, rejectOnQueryError: true }, db());
-        expect(run.rejection).toMatchObject(error);
-        expect(run).toMatchObject({ exits: [], printed: [], unhandled: [], written: [] });
-        if (db === trapped) {
-          expect(run.rejection).toBeInstanceOf(pg.DatabaseError);
-          await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));  // its pool has ended
-        }
-      });
-
-      it.each(failures)('prints %s, notes rejectOnQueryError once, then exits with 1, as Zapatos 6.6.1 exits', async (_, db, error) => {
-        const run = await failedRun({}, db());
-        expect(run.rejection).toBe(exited);
-        expect(run.exits).toEqual([[1]]);
-        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(error)], [note]]);
-        expect(run.written).toEqual([]);
-      });
-
-      it('exits with no note with rejectOnQueryError: false', async () => {
-        const run = await failedRun({ rejectOnQueryError: false }, trapped());
-        expect(run.exits).toEqual([[1]]);
-        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
-      });
-
-      it('notes rejectOnQueryError: null, from a JSON config, as when it is left out', async () => {
-        const run = await failedRun(JSON.parse('{"rejectOnQueryError": null}') as Config, trapped());
-        expect(run.exits).toEqual([[1]]);
-        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])], [note]]);
-      });
-
-      it('still exits when warningListener throws at the note', async () => {
-        const run = await failedRun({ warningListener: () => { throw new Error('a listener that throws'); } }, trapped());
-        expect(run.rejection).toBe(exited);
-        expect(run.exits).toEqual([[1]]);
-      });
-
-      it("exits with no note from the CLI's config, even given rejectOnQueryError: true", async () => {
-        const dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-'));
-        try {
-          writeFileSync(join(dir, 'pgcastconfig.json'), '{"rejectOnQueryError": true}');
-          const run = await failedRun(cliConfig('{"rejectOnQueryError": true}', dir), trapped());
-          expect(run.exits).toEqual([[1]]);
-          expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
-        } finally {
-          rmSync(dir, { recursive: true, force: true });
-        }
-      });
-
-      it('is optional in Config, read as false when absent', () => {
-        expect(finaliseConfig({}).rejectOnQueryError).toBeUndefined();
-        const right: Config = { rejectOnQueryError: true };
-        void right;
-        // @ts-expect-error a boolean
-        const wrong: Config = { rejectOnQueryError: 'yes' };
-        void wrong;
-      });
+    it('keeps rejectOnQueryError as supplied when finalising the config', () => {
+      expect(Object.prototype.hasOwnProperty.call(finaliseConfig({}), 'rejectOnQueryError')).toBe(false);
+      expect(finaliseConfig(JSON.parse('{"rejectOnQueryError": null}')).rejectOnQueryError).toBeNull();
+      expect(finaliseConfig({ rejectOnQueryError: false }).rejectOnQueryError).toBe(false);
+      // @ts-expect-error a boolean
+      const wrong: Config = { rejectOnQueryError: 'yes' };
+      void wrong;
     });
   });
 });
@@ -4626,6 +4554,15 @@ describe('the CLI with --check (#556)', () => {
       return { result, progress, warnings: warnings.filter(line => !bigintNote(line)), printed: printed().filter(line => !bigintNote(line)) };
     };
 
+    it('checks missing, current and stale files with an explicit false', async () => {
+      const config = { rejectOnQueryError: false };
+      expect((await checked(config)).result).toBe(false);
+      await generated();
+      expect((await checked(config)).result).toBe(true);
+      writeFileSync(join(outDir, schemaFile), 'stale schema');
+      expect((await checked(config)).result).toBe(false);
+    });
+
     it('resolves to true when the files are up to date, with one line through progressListener', async () => {
       await generated();
       expect(await checked()).toEqual({ result: true, progress: [upToDate], warnings: [], printed: [] });
@@ -4680,66 +4617,139 @@ describe('the CLI with --check (#556)', () => {
       });
       expect((await checked()).warnings[0]).toBe(`Missing: <out>/${schemaFile}`);
     });
-
-    describe('on a failed query', () => {
-      const exited = new Error('process.exit() called');
-
-      /** A check on a server that refuses every connection, process.exit mocked to throw: what it rejected with and did. */
-      const failedCheck = async (config: Config) => {
-        const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never), warnings: string[] = [];
-        const rejection = await checkFiles({
-          outDir, schemas: { generate_check: all }, warningListener: line => void warnings.push(line), ...config, db: unreachable,
-        }).then(() => new Error('resolved'), (e: unknown) => e);
-        return { rejection, exits: exit.mock.calls, warnings, printed: log.mock.calls, outDir: existsSync(outDir) };
-      };
-
-      // no Zapatos 6.6.1 behaviour to keep: it rejects as 7.0's generate() will, with no note (#559)
-      it.each([
-        ['left out', {}],
-        ['null, from a JSON config', JSON.parse('{"rejectOnQueryError": null}') as Config],
-        ['true', { rejectOnQueryError: true }],
-      ])('rejects with the error, rejectOnQueryError %s: no exit, no note, nothing printed or written', async (_, config) => {
-        const run = await failedCheck(config);
-        expect(run.rejection).toMatchObject({ code: 'ECONNREFUSED' });
-        expect(run).toMatchObject({ exits: [], warnings: [], printed: [], outDir: false });
-      });
-
-      it('prints the error and exits with 1, with no note, given rejectOnQueryError: false, as generate() does', async () => {
-        const run = await failedCheck({ rejectOnQueryError: false });
-        expect(run.rejection).toBe(exited);
-        expect(run).toMatchObject({
-          exits: [[1]], warnings: [], printed: [['*** error 0 ***', expect.objectContaining({ code: 'ECONNREFUSED' })]], outDir: false,
-        });
-      });
-    });
   });
 
   // cli.ts as npm runs it, in a child process, built by tsc with the build's tsconfig: its exit code is the check's
-  describe('the built CLI', () => {
+  describe('the built generator and its CLI', () => {
     const root = fileURLToPath(new URL('../..', import.meta.url));
     let build: string;
-    beforeAll(() => {
+    beforeAll(async () => {
       build = mkdtempSync(join(tmpdir(), 'pgcast-cli-build-'));
-      execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', root, '--outDir', build, '--declaration', 'false']);
+      execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', root, '--outDir', join(build, 'dist'), '--declaration', 'false']);
+      const { bin } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { bin: Record<string, string> };
+      for (const name of ['pgcast', 'zapatos']) symlinkSync(join(build, bin[name]), join(build, name));
+      await t.pool.query(queryTrap);
     });
-    afterAll(() => rmSync(build, { recursive: true, force: true }));
+    afterAll(async () => {
+      rmSync(build, { recursive: true, force: true });
+      await t.pool.query('DROP SCHEMA query_trap CASCADE');
+    });
 
-    /** The CLI's exit code and output; the URL reaches it through the environment, never an argument (#67). */
-    const run = (...args: string[]) => {
-      const { status, stdout, stderr } = spawnSync(process.execPath, [join(build, 'generate/cli.js'), ...args], {
-        cwd: dir, encoding: 'utf8', env: { ...process.env, NODE_PATH: join(root, 'node_modules') },  // pg, from outside the repo
+    /** The URL reaches the child through the environment, never an argument (#67). */
+    const child = (args: string[]) => {
+      const { status, stdout, stderr } = spawnSync(process.execPath, args, {
+        cwd: dir, encoding: 'utf8', env: { ...process.env, NODE_PATH: join(root, 'node_modules') },
       });
       return { status, stdout: stdout.split(outDir).join('<out>'), stderr };
     };
+    const run = (...args: string[]) => child([join(build, 'pgcast'), ...args]);
 
-    it('exits with 1 on a stale schema, and 0 when up to date or after writing', () => {
-      expect(run(json())).toEqual({ status: 0, stdout: '', stderr: '' });
-      expect(run('--check', json())).toEqual({ status: 0, stdout: `${upToDate}\n`, stderr: '' });
-      writeFileSync(join(outDir, schemaFile), readFileSync(join(outDir, schemaFile), 'utf8') + '\n');
-      expect(run(json(), '--check')).toEqual({
+    const failures = [
+      { code: 'ECONNREFUSED', db: unreachable },
+      { code: 'P0001', db: { connectionString: '{{PGCAST_CHECK_URL}}', options: trapPath } },
+    ];
+    const expectExit = (result: ReturnType<typeof child>, code: string) => {
+      expect(result).toMatchObject({ status: 1, stderr: '' });
+      expect(result.stdout).toMatch(/^\*\*\* error \d+ \*\*\*/);
+      expect(result.stdout).toContain(code);
+      if (code === 'P0001') expect(result.stdout).toContain('introspection fails on purpose');
+      expect(result.stdout).not.toMatch(/PGCAST_DEP006|handler ran/);
+    };
+
+    describe.each(['generate', 'tsForConfig', 'check'])('%s on a failed query', method => {
+      it.each([undefined, null, true, false])('preserves the driver error or exits with rejectOnQueryError = %s', option => {
+        mkdirSync(dirname(join(outDir, schemaFile)), { recursive: true });
+        writeFileSync(join(outDir, schemaFile), 'previous schema');
+        const before = tree();
+        for (const { code, db } of failures) {
+          const script = `
+            const assert = require('node:assert/strict'), pg = require('pg');
+            const lib = require(process.argv[1]), method = process.argv[2], code = process.argv[3];
+            const config = JSON.parse(process.argv[4]);
+            if (config.db.options) config.db.connectionString = process.env.PGCAST_CHECK_URL;
+            const query = pg.Pool.prototype.query;
+            let original;
+            pg.Pool.prototype.query = function (...args) {
+              return query.apply(this, args).catch(error => { original = error; throw error; });
+            };
+            const complete = lib.finaliseConfig(config);
+            delete complete.rejectOnQueryError;
+            process.exitCode = 2;  // an unsettled promise cannot pass the rejection test
+            const result = method === 'tsForConfig' ? lib.tsForConfig({ ...complete, ...config }, () => {}) : lib[method](config);
+            result.then(() => assert.fail('resolve handler ran'), error => {
+              assert.notEqual(config.rejectOnQueryError, false, 'reject handler ran');
+              assert.equal(error, original);
+              assert.equal(error.code, code);
+              if (code === 'P0001') {
+                assert.ok(error instanceof pg.DatabaseError);
+                assert.equal(error.message, 'introspection fails on purpose');
+              }
+              process.exitCode = 0;
+            });
+          `;
+          const result = child(['-e', script, join(build, 'dist/generate'), method, code,
+            JSON.stringify({ db, outDir, schemas: { generate_check: all }, warningListener: true, rejectOnQueryError: option })]);
+          if (option === false) expectExit(result, code);
+          else expect(result).toEqual({ status: 0, stdout: '', stderr: '' });
+          expect(tree()).toEqual(before);
+        }
+      });
+    });
+
+    it('exits on a refused connection when a check() config getter returns false', () => {
+      const script = `
+        class Config { get rejectOnQueryError() { return false; } }
+        const config = new Config();
+        config.db = JSON.parse(process.argv[2]);
+        require(process.argv[1]).check(config).catch(() => console.log('reject handler ran'));
+      `;
+      expectExit(child(['-e', script, join(build, 'dist/generate'), JSON.stringify(unreachable)]), 'ECONNREFUSED');
+    });
+
+    it.each(['pgcast', 'zapatos'])('%s exits on either database error, including with --check', name => {
+      for (const { code, db } of failures) {
+        writeFileSync(join(dir, 'pgcastconfig.json'), json({ db, warningListener: true, rejectOnQueryError: true }));
+        for (const flags of [[], ['--check']]) {
+          for (const args of [[], ['{"rejectOnQueryError":true}'], ['{"rejectOnQueryError":false}']]) {
+            expectExit(child([join(build, name), ...flags, ...args]), code);
+            expect(existsSync(outDir)).toBe(false);
+          }
+        }
+      }
+    }, 30_000);
+
+    it.each([{}, { rejectOnQueryError: false }])('checks missing, current and stale files with %j', config => {
+      const args = json(config);
+      expect(run('--check', args)).toEqual({ status: 1, stderr: '', stdout: [
+        ...[schemaFile, indexFile, placeholderFile].map(f => `Missing: <out>/${f}`),
+        'Run the generator without --check to write them.', '',
+      ].join('\n') });
+      expect(existsSync(outDir)).toBe(false);
+      expect(run(args)).toEqual({ status: 0, stdout: '', stderr: '' });
+      const before = tree();
+      expect(run('--check', args)).toEqual({ status: 0, stdout: `${upToDate}\n`, stderr: '' });
+      expect(tree()).toEqual(before);
+      writeFileSync(join(outDir, schemaFile), 'out of date');
+      const stale = tree();
+      expect(run(args, '--check')).toEqual({
         status: 1, stdout: `Out of date: <out>/${schemaFile}\nRun the generator without --check to write it.\n`, stderr: '',
       });
+      expect(tree()).toEqual(stale);
     }, 30_000);
+
+    it('keeps schema rule and filesystem errors catchable, with a stack on stderr from the CLI', async () => {
+      const invalid = { schemas: { generate_check: null } } as unknown as Config;
+      const config = { db: db(), outDir, ...quiet };
+      await expect(generate({ ...config, ...invalid })).rejects.toBeInstanceOf(TypeError);
+      const rule = run(json(invalid));
+      expect(rule).toMatchObject({ status: 1, stdout: '' });
+      expect(rule.stderr).toMatch(/TypeError: [^\n]+\n    at /);
+      writeFileSync(outDir, 'a file');
+      await expect(generate({ ...config, schemas: { generate_check: all } })).rejects.toMatchObject({ code: 'ENOTDIR' });
+      const file = run(json());
+      expect(file).toMatchObject({ status: 1, stdout: '' });
+      expect(file.stderr).toMatch(/Error: ENOTDIR[^\n]*\n    at /);
+    });
 
     // without a flag, as Zapatos 6.6.1 runs it (#688): the output and exit code a --help must not change
     it('reads the config file alone, with no argument, printing nothing', () => {
