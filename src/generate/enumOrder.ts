@@ -13,7 +13,7 @@ import type { EnumData } from './enums';
 type EnumOrder = NonNullable<CompleteConfig['enumOrder']>;
 export type EnumOrders = Record<EnumOrder, EnumData>;
 
-/** The `enumOrder` of a config, `'declared'` when absent. Any other value throws. */
+/** Accept `'declared'` or `'alphabetical'`, defaulting to `'declared'` when `enumOrder` is absent or `null`. Any other value throws. */
 export const enumOrderOf = (config: CompleteConfig): EnumOrder => {
   const order = config.enumOrder ?? 'declared';
   if (order !== 'alphabetical' && order !== 'declared') {

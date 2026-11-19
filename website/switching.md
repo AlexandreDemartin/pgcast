@@ -123,6 +123,18 @@ For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.condi
 - For `xs: T[]` with `T extends number[]`, let the wrapper infer its return type. Its old `db.SQLFragment<boolean | null, T>` annotation fails.
 - For an enum array on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
 
+### Enum types in 7.0 {#enum-types}
+
+With the 7.0 defaults, a foreign enum supplies its own labels, even when the relation's schema has an enum of the same name. The `every.<name>` tuple follows Postgres declaration order. Regenerate and run `tsc` to find writes with invalid labels and code that depends on a label's position.
+
+- Fresh output omits foreign enum placeholders such as `PgStatus` and `Pg_mood` from `zapatos/custom`. Existing files remain, but their columns no longer use them. Replace each import with the column type, such as `products.Selectable['status']`, or set `typeEnumsAcrossSchemas: false` in 7.x.
+- A foreign composite named like a local enum now gets its own placeholder. Type it for your parser, or set `typeEnumsAcrossSchemas: false` in 7.x.
+- If you pass `columnsTypedByEnumName` to `definitionForRelationInSchema()`, only `typeEnumsAcrossSchemas: false` fills it.
+
+To update an existing domain placeholder over a foreign enum, generate into a fresh directory with `outDir`. Diff the two files, merge the new labels with your local edits, then run `tsc` again.
+
+Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0.
+
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
 pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6.6.1: a call that Postgres or the type refused, that did the opposite of its name, or that let a string splice SQL. A few such calls did run, and now give other rows, or throw.
@@ -317,12 +329,6 @@ To keep a 6.x write behaviour through 7.x, set its option to `false` in `db.setC
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
 In 6.x, run `npx zapatos` to see which generator options would change the types for your schema.
-
-In 7.0 a foreign enum supplies its own labels, even when the relation's schema has an enum of the same name. The `every.<name>` tuple follows Postgres declaration order. Regenerate and run `tsc` to find writes with invalid labels and code that depends on a label's position.
-
-To update an existing domain placeholder over a foreign enum, generate into a fresh directory with `outDir`. Diff the two files, merge the new labels with your local edits, then run `tsc` again.
-
-Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0.
 
 The note of [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) names each unique index that `ON CONFLICT ON CONSTRAINT` refuses, though `UniqueIndex` lists it: an index with no constraint, a materialised view's among them, the index of a `DEFERRABLE` constraint or, on Postgres 18, of a `WITHOUT OVERLAPS` key, and a constraint's index not yet valid. Turn it on and regenerate: `tsc` shows each `constraint()` that names one, which Postgres refused anyway (42704, 55000, 42809 or 42P10), and any code of yours that takes `UniqueIndex` for every unique index, such as a `Record` keyed by it.
 

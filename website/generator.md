@@ -136,7 +136,7 @@ await generate({
 - A connection or query error rejects the promise before any files are written. You can catch the original `pg` error or set [`rejectOnQueryError: false`](#generate.rejectOnQueryError) to keep the 6.x exit.
 - Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2353, or TS2561 with a suggestion for a near-miss such as `outdir`).
-- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others), with no entry here.
+- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others). `definitionForRelationInSchema()` fills the `columnsTypedByEnumName` array only with `typeEnumsAcrossSchemas: false`.
 
 ## Options {#options}
 
@@ -318,7 +318,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-Omit this option or set it to `null` in JSON to use the 7.0 default, `true`. The generator looks up an enum in its own schema and writes its labels. Set `false` for the 6.x lookup by name in the relation's schema.
+The 7.0 default, `true`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. The generator looks up an enum in its own schema and writes its labels. Set `false` for the 6.x lookup by name in the relation's schema.
 
 ```sql
 CREATE SCHEMA archive;
@@ -334,11 +334,12 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
 - The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In the order of [`enumOrder`](#generate.enumOrder), as for every enum.
-- A domain over such an enum stays a custom type, `c.<name>`; its new placeholder gets the labels rather than `any`, with no import, even when a relation of the enum's own schema uses the domain as well. An existing placeholder is never overwritten.
+- The generator matches foreign enums by name, so a name shared with a built-in type or another type's Postgres array can give the column the wrong type.
+- A domain over such an enum stays a custom type, `c.<name>`. Unless another type shares its placeholder name, a fresh placeholder gets the labels without an import, even when a relation of the enum's own schema uses the domain as well. An existing placeholder is never overwritten.
 
 ### `enumOrder` {#generate.enumOrder}
 
-Omit this option or set it to `null` in JSON to use the 7.0 default, `"declared"`. Labels follow the declaration order that Postgres uses for `ORDER BY`, comparisons and `enum_range()`. Set `"alphabetical"` for the 6.x sort order.
+The 7.0 default, `"declared"`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. Labels follow the declaration order that Postgres uses for `ORDER BY`, comparisons and `enum_range()`. Set `"alphabetical"` for the 6.x sort order.
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
@@ -350,7 +351,7 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 | `every.crew_job` | `['cinematographer', 'composer', 'director', 'editor', 'writer']` | `['director', 'writer', 'editor', 'cinematographer', 'composer']` |
 
 - A label added by `ALTER TYPE … ADD VALUE … BEFORE` or `AFTER` takes its place in that order, as `enum_range()` gives it.
-- For TypeScript, only `every.<name>` changes: a union is the same type in any order. With [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), the labels written out for an enum of another schema, and the new placeholder of a domain over one, take the same order.
+- For TypeScript, only `every.<name>` changes: a union is the same type in any order. With [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), the labels written out for a foreign enum follow that order, including in a fresh domain placeholder unless another type shares its name.
 - Another value stops the generator before any query, and writes nothing: `enumOrder must be 'declared' (the default) or 'alphabetical', not 'declard'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
 
 ### `moduleNames` {#generate.moduleNames}
@@ -476,7 +477,7 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 - `false` types both as their placeholder, `any`, in all five interfaces, as Zapatos 6.6.1 does.
 - `pg` parses a domain over a domain as its innermost domain's base type, but returns an array of a domain as its text, since it doesn't know that array's type: so does a domain over such an array, directly or through other domains. An array of a domain over an array stays `any`, and so does a domain over one, or a base type the generator can't map, such as `point`.
-- An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another, with or without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas): never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a new placeholder follows `typeEnumsAcrossSchemas`: the enum's labels by default; with `false`, the enum of the same name in the relation's schema, or `any` if that schema has none.
+- An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another, with or without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas): never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a fresh placeholder with an unshared name follows `typeEnumsAcrossSchemas`: the enum's labels by default; with `false`, the enum of the same name in the relation's schema, or `any` if that schema has none.
 - A placeholder you edit keeps its type in all five, `unknown` included. One you edit to `any` counts as left as generated: write `unknown`, or leave the option off, to keep such a column untyped.
 - `false` notes, through [`warningListener`](#generate.warningListener), each such column, in a note of its own.
 

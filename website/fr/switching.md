@@ -124,6 +124,18 @@ Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.condi
 - Si votre fonction appelle la condition avec `xs: T[]` et `T extends number[]`, laissez TypeScript inférer son type de retour. L’ancienne annotation `db.SQLFragment<boolean | null, T>` est refusée.
 - Avec TypeScript 4.1 ou 5.9, passez les labels d’un enum sous la forme `['director'] as const` ou dans un tableau de type `s.crew_job[]`.
 
+### Types des enums en 7.0 {#enum-types}
+
+Avec les réglages par défaut de la 7.0, un enum d’un autre schéma fournit ses propres labels, même si un enum du schéma de la relation porte le même nom. Le tuple `every.<name>` suit l’ordre de déclaration des labels dans Postgres. Régénérez les types et lancez `tsc` pour repérer les écritures qui utilisent des labels invalides et le code qui dépend de la position d’un label.
+
+- Dans un nouveau dossier, le générateur omet de `zapatos/custom` les placeholders d’enums d’autres schémas comme `PgStatus` et `Pg_mood`. Les fichiers existants restent sur disque, mais leurs colonnes ne les utilisent plus. Remplacez chaque import par le type de la colonne, par exemple `products.Selectable['status']`, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
+- Un type composite d’un autre schéma qui porte le nom d’un enum local reçoit désormais son propre placeholder. Donnez-lui le type que renvoie votre parser, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
+- Si vous passez le tableau `columnsTypedByEnumName` à `definitionForRelationInSchema()`, seul le réglage `typeEnumsAcrossSchemas: false` le remplit.
+
+Pour mettre à jour le placeholder existant d’un domaine sur un enum d’un autre schéma, générez les types dans un nouveau dossier avec `outDir`. Comparez les deux fichiers, reportez les nouveaux labels en conservant vos modifications, puis relancez `tsc`.
+
+Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements.
+
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
 pgcast corrige, sans option à activer, ce sur quoi aucun code ne pouvait compter dans Zapatos 6.6.1 : un appel que Postgres ou le type refusait, qui faisait le contraire de son nom, ou qui laissait une chaîne injecter du SQL. Quelques-uns de ces appels s’exécutaient bel et bien, et donnent maintenant d’autres lignes, ou lèvent une erreur.
@@ -318,12 +330,6 @@ Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
 En 6.x, lancez `npx zapatos` pour voir quelles options du générateur changeraient les types de votre schéma.
-
-En 7.0, un enum d’un autre schéma fournit ses propres labels, même si un enum du schéma de la relation porte le même nom. Le tuple `every.<name>` suit l’ordre de déclaration des labels dans Postgres. Régénérez les types et lancez `tsc` pour repérer les écritures qui utilisent des labels invalides et le code qui dépend de la position d’un label.
-
-Pour mettre à jour le placeholder existant d’un domaine sur un enum d’un autre schéma, générez les types dans un nouveau dossier avec `outDir`. Comparez les deux fichiers, reportez les nouveaux labels en conservant vos modifications, puis relancez `tsc`.
-
-Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements.
 
 La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
