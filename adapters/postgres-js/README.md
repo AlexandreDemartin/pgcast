@@ -1,6 +1,6 @@
 # @pgcast/adapter-postgres-js
 
-Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [postgres.js](https://github.com/porsager/postgres) `sql`, 3.4 or 4.x. Values are read and written as `pg` reads and writes them, so the types pgcast generates from your schema hold: a `timestamptz` is a `Date`, a `bigint` a string, a `jsonb` its parsed value.
+Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [postgres.js](https://github.com/porsager/postgres) `sql`, 3.4 or 4.x. Values are read with `pg`'s parsers and written as `pg` writes them, with [exceptions](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-writes), so the types pgcast generates from your schema hold: a `timestamptz` is a `Date`, a `bigint` a string, a `jsonb` its parsed value.
 
 [Changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md). MIT licence.
 
@@ -52,7 +52,7 @@ Each column is parsed by its type with `pg`'s own parsers ([pg-types](https://gi
 | `date` | local midnight | UTC midnight | UTC midnight |
 | `interval` | an object (`db.PostgresInterval`) | its text | its text |
 | `point`, `circle` | `{ x, y }`, `{ x, y, radius }` | their text | their text |
-| an array with a `NULL` | `null` | `'NULL'`, `false` for a `bool[]`, an empty Buffer for a `bytea[]`; a `json[]` throws | `null` |
+| a `NULL` array element | `null` | `'NULL'`, `NaN` for an `int4[]`, `false` for a `bool[]`, an empty Buffer for a `bytea[]`; a `json[]` throws | `null` |
 | `numeric[]` | numbers, as `pg` parses them | strings | strings |
 | `interval[]`, `point[]` | objects | strings | strings |
 | an array of an enum, a domain or a composite | its text, `'{writer,editor}'` (see `enumArraysTypedAsText`) | an array | an array |
@@ -61,11 +61,11 @@ The others (`int2`, `int4`, `float8`, `int8` and `numeric` as strings, `bool`, `
 
 ## What it writes
 
-The adapter always serialises a `Date` in local time with its offset. This matches `pg`'s default, `pg.defaults.parseInputDatesAsUTC = false`.
+The adapter writes a `Date` parameter or Postgres array element in local time with its offset, matching `pg`'s default (`pg.defaults.parseInputDatesAsUTC = false`). A `Date` inside a JSON object becomes an ISO string in UTC.
 
 Like `pg`'s `prepareValue()`, the adapter writes arrays as array literals, objects as JSON, `toPostgres()` as its return value and `undefined` as `NULL`.
 
-It sends each parameter with type `unknown`, including `NULL`. Postgres infers the type from the query, as it does for `pg`. By default, postgres.js writes each value for the type Postgres asks for instead:
+It sends each parameter with type `unknown`, including `NULL`. Postgres infers the type from the query, as it does for `pg`. A Buffer is sent as [hex text](#how-it-differs-from-pg). By default, postgres.js writes each value for the type Postgres asks for instead:
 
 | Value | `pg`, and the adapter | postgres.js 3.4 | postgres.js 4.x |
 |---|---|---|---|

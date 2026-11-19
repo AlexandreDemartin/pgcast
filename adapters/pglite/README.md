@@ -1,6 +1,6 @@
 # @pgcast/adapter-pglite
 
-Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [PGlite](https://pglite.dev/) 0.5.x, the Postgres that runs in Node or in a page. Values are read and written as `pg` reads and writes them, so the types pgcast generates from your schema hold: a `timestamptz` is a `Date`, a `bigint` a string, an `interval` an object.
+Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [PGlite](https://pglite.dev/) 0.5.x, the Postgres that runs in Node or in a page. Values are read with `pg`'s parsers and written as `pg` writes them, with [exceptions](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-writes), so the types pgcast generates from your schema hold: a `timestamptz` is a `Date`, a `bigint` a string, an `interval` an object.
 
 [Changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md). MIT licence.
 
@@ -42,7 +42,7 @@ await db.serializable(pool, async txn => {
 - `run(pool)` sends each query as `pg` sends it, through `execProtocol()`: with no value and no name, a simple `Query`, which may hold several statements; otherwise `Parse`, `Bind`, `Describe`, `Execute` and `Sync`. `.prepared(name)` parses the query once on that PGlite, as `pg` does once on a connection, whichever `asPool()` gave the pool; an empty name is no name, as in `pg`.
 - `COPY … FROM STDIN` gets `pg`'s answer, a `CopyFail`, so it rejects with 57014 and the next query runs.
 - The pool has the PGlite's one connection. `transaction()` and its shortcuts (`serializable()`…) take it with `connect()`, in turn, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end. Meanwhile a query on the pool waits, as with a `pg.Pool` with `max: 1`.
-- In a page, the adapter imports no Node built-in, but `pg`'s parser for a `bytea` reads a global `Buffer` as it loads: set `globalThis.Buffer` (the `buffer` package's) in a module imported before the adapter.
+- In a page, the adapter imports no Node built-in, but `pg`'s parser for a `bytea` reads a global `Buffer` as it loads: set `globalThis.Buffer` (the `buffer` package's) in a module imported before the adapter. For `zapatos/db`, follow the [core browser setup](https://pgcast.dev/drivers#pglite).
 
 ## What it reads
 
@@ -65,11 +65,11 @@ The others (`int2`, `int4`, `float8`, `numeric` as a string, `bool`, `json`, `js
 
 ## What it writes
 
-The adapter always serialises a `Date` in local time with its offset. This matches `pg`'s default, `pg.defaults.parseInputDatesAsUTC = false`.
+The adapter writes a `Date` parameter or Postgres array element in local time with its offset, matching `pg`'s default (`pg.defaults.parseInputDatesAsUTC = false`). A `Date` inside a JSON object becomes an ISO string in UTC.
 
 Like `pg`'s `prepareValue()`, the adapter writes arrays as array literals, objects as JSON, `toPostgres()` as its return value and `undefined` as `NULL`.
 
-It sends a Buffer or a Uint8Array in binary and other non-null values in text. Postgres infers each type from the query. PGlite's `query()` serialises each value for the type Postgres asks for instead:
+It sends a prepared value in binary if it is an `ArrayBuffer` view (including a `DataView`), and other non-null values in text. Postgres infers each type from the query. PGlite's `query()` serialises each value for the type Postgres asks for instead:
 
 | Value | `pg`, and the adapter | PGlite's `query()` |
 |---|---|---|
