@@ -431,6 +431,14 @@ describe('conditions', () => {
     expect(compile()).toEqual(expected);
   });
 
+  it.each([
+    ['@>', dc.arrayContains], ['<@', dc.arrayContainedIn], ['&&', dc.arrayOverlaps],
+  ] as const)('keeps the dimensions of the array parameter for %s', (operator, condition) => {
+    const text = `(("col" ${operator} $1))`;
+    expect(show(condition([1, 2]))).toEqual({ text, values: [[1, 2]] });
+    expect(show(condition<number[]>([[1, 2]]))).toEqual({ text, values: [[[1, 2]]] });
+  });
+
   it('array operators: the array is one parameter', () => {
     expect({
       arrayContains: show(dc.arrayContains([1, 2])), arrayContainedIn: show(dc.arrayContainedIn(['a'])),
@@ -1307,7 +1315,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
 
   it('an array condition given an array holding db.all, at any depth, throws when compiled, not when called', () => {
     // 6.6.1 sent it as '{"Symbol(all)"}': no row, the empty arrays with arrayContainedIn(), 22P02 on an int4[] (#633);
-    // the typed form on an int4[] column nests, arrayContains<number[]>([[1]])
+    // the 6.6.1 spelling on an int4[] column nests, arrayContains<number[]>([[1]])
     const arrays = { arrayContains: dc.arrayContains, arrayContainedIn: dc.arrayContainedIn, arrayOverlaps: dc.arrayOverlaps };
     expect(new Set(Object.values(arrays).flatMap(f => [[db.all], ['x', db.all], [['x'], [db.all]], [[[db.all]]]].map(a => thrown(f(a as any))))))
       .toEqual(new Set([
