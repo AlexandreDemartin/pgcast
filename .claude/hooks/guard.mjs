@@ -58,8 +58,11 @@ const commandRefusals = [
     refuses: (command, unquoted) => {
       const {options, words: [subcommand, ...words]} = gitOptionsAndWordsOf(unquoted);
       return subcommand === 'push' && (options.some(option => /^push\.followtags\b/i.test(option)) ||
-        words.some(word => /^--(tags|follow-tags|mirror)$/.test(word) || word === 'tag' ||
-          /refs\/tags\//.test(word) || /(^|:)\+?(v\d|@pgcast\/[^/:@]+@[^/:@]+)/.test(word)));
+        words.some(word => {
+          if (/^--(tags|follow-tags|mirror)$/.test(word) || word === 'tag') return true;
+          const destination = word.slice(word.lastIndexOf(':') + 1);
+          return /^\+?(refs\/tags\/|(tags\/)?(v\d|@pgcast\/[^/:@]+@[^/:@]+))/.test(destination);
+        }));
     },
     reason: 'A pushed release tag starts release.yml: the owner pushes it, after the version PR (AGENTS.md § Stop points, docs/WORKFLOW.md § Releases).',
   },
