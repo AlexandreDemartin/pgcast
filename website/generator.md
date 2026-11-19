@@ -452,7 +452,7 @@ Each partition or inheritance child gets its own names, including inherited chec
 
 Table `NOT NULL` constraints are excluded. For a not-null violation on a table's column, Postgres reports the column. Domain checks belong to the domain, and a domain's `NOT NULL` violation reports the domain in `err.dataType`.
 
-If a schema has a relation named `every` and an enum named `Constraint`, both declare `every.Constraint`, so leave the option off when generating that schema or rename one of them.
+If the generator includes a relation named `every` from a schema with an enum named `Constraint`, both declare `every.Constraint`: exclude that relation, leave the option off for that schema or rename one of them.
 
 The extra catalogue query and declaration are off unless the merged configuration (file, then JSON argument) sets `constraintNames` to `true`. A JSON `null` in the argument turns a file's `true` off.
 
