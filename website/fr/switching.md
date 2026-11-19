@@ -319,11 +319,11 @@ Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Con
 
 En 6.x, lancez `npx zapatos` pour voir quelles options du générateur changeraient les types de votre schéma.
 
-En 7.0, un enum d’un autre schéma fournit ses propres labels, même si un enum du schéma de la relation porte le même nom. Le tuple `every.<name>` suit l’ordre déclaré dans Postgres. Régénérez et lancez `tsc` pour repérer les écritures dont les labels sont refusés et le code qui dépend de la position d’un label.
+En 7.0, un enum d’un autre schéma fournit ses propres labels, même si un enum du schéma de la relation porte le même nom. Le tuple `every.<name>` suit l’ordre de déclaration des labels dans Postgres. Régénérez les types et lancez `tsc` pour repérer les écritures qui utilisent des labels invalides et le code qui dépend de la position d’un label.
 
-Pour mettre à jour le placeholder existant d’un domaine sur un tel enum, générez les types dans un nouveau dossier avec `outDir`. Comparez les deux fichiers, reportez les nouveaux labels en conservant vos modifications, puis relancez `tsc`.
+Pour mettre à jour le placeholder existant d’un domaine sur un enum d’un autre schéma, générez les types dans un nouveau dossier avec `outDir`. Comparez les deux fichiers, reportez les nouveaux labels en conservant vos modifications, puis relancez `tsc`.
 
-Pendant toute la 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique. Chaque option agit indépendamment, sans note de migration. La 8.0 retire ces deux comportements.
+Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements.
 
 La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
