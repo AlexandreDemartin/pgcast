@@ -718,6 +718,16 @@ describe('type surprises', () => {
     db.select('users', { tags: containedIn });
     db.select('extra.type_zoo', { c_text_array: overlaps, c_point: contains });
     db.select('accounts', { scores: c.arrayContains<number[]>([[1]]) });
+    db.select('accounts', { scores: c.arrayContains([[1]] as const) });
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContains([1]) });
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContainedIn([1]) });
+    db.select('extra.type_zoo', { c_jsonb: c.arrayOverlaps([1]) });
+    // @ts-expect-error Date is not a JSON value
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContains([new Date()]) });
+    // @ts-expect-error Date is not a JSON value
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContainedIn([new Date()]) });
+    // @ts-expect-error Date is not a JSON value
+    db.select('extra.type_zoo', { c_jsonb: c.arrayOverlaps([new Date()]) });
     const scores: readonly number[] = [1];
     db.select('accounts', { scores: c.arrayOverlaps(scores) });
     // @ts-expect-error a string on an int4[] column
@@ -750,6 +760,29 @@ describe('type surprises', () => {
     // @ts-expect-error the 6.6.1 mock cannot implement the new overloads
     const mock: typeof c.arrayContains = oldMock;
     void [oldResult, mock];
+  });
+
+  test('array conditions on enum labels', () => {
+    const happy: db.SQLFragment<boolean | null, s.mood[]> = c.arrayContains(['happy'] as const);
+    // @ts-expect-error 'glad' is not a mood
+    const glad: typeof happy = c.arrayContains(['glad'] as const);
+    void glad;
+  });
+
+  test('array condition operand and wrapper migrations', () => {
+    type Operand = Parameters<typeof c.arrayContains>[0];
+    // @ts-expect-error Parameters reads the array overload
+    const oldOperand: Operand = db.parent('scores');
+    const operand: Operand | db.ParentColumn = db.parent('scores');
+    const contains = <T extends number[]>(xs: T[]) => {
+      const condition = c.arrayContains(xs);
+      // @ts-expect-error the conditional return type is deferred for T
+      const oldResult: db.SQLFragment<boolean | null, T> = condition;
+      void oldResult;
+      return condition;
+    };
+    db.select('accounts', { scores: contains([[1]]) });
+    void [oldOperand, operand];
   });
 
   test('characterization: {}, { value } and param() of a column name pass an array condition as its ParentColumn', () => {
