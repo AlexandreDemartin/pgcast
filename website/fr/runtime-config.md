@@ -86,7 +86,7 @@ interface Config {
 }
 ```
 
-Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours ; `getConfig()` les type `boolean | undefined`, bien qu’elle donne toujours une valeur. Si vous réglez `aggregatesTypedByColumn` sur `false`, déclarez-le aussi dans [`ConfigTypes`](#ConfigTypes).
+Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours. Le type que renvoie `getConfig()` pour ces clés est `boolean | undefined`, même si chacune a toujours une valeur. Si vous réglez `aggregatesTypedByColumn` sur `false`, déclarez aussi cette valeur dans [`ConfigTypes`](#ConfigTypes).
 
 <div class="stack">
 
@@ -102,7 +102,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | un client à vous déjà dans un bloc de transaction : être rejetée avant son `START TRANSACTION`, pas terminer votre transaction | à chaque `transaction()` qui reçoit un tel client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `false` | le client d’une transaction à un niveau qui ne vaut pas pour celui demandé : être rejetée, pas exécuter le callback à ce niveau | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
-| [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne, pas son `Number()` | à chaque `run()` de l’un d’eux |
+| [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
 | [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque retry | à chaque `transaction()` |
@@ -268,12 +268,12 @@ Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté se
 aggregatesTypedByColumn?: boolean  // default: true
 ```
 
-Depuis la 7.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : un `Date` pour un `timestamptz`, une chaîne pour un `text` ou un enum. Le SQL ne change pas, ni [`count()`](/fr/select#count).
+À partir de la 7.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : un `Date` pour un `timestamptz`, une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
 
-Avec `false`, `.run()` applique `Number()` au résultat : `0` pour un ensemble vide, les millisecondes d’une date, `NaN` pour un texte non numérique. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
+Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne `0`, une date donne le nombre de millisecondes depuis l’époque Unix et un texte non numérique donne `NaN`. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
 
-- Pour retrouver les types de la 6.x, déclarez aussi `false` dans [`ConfigTypes`](#ConfigTypes). Une déclaration existante à `true` reste valide.
-- Imbriquée dans un `lateral`, ou donnée comme valeur d’`extras`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; par défaut, elle est typée comme le `JSONSelectable` de sa colonne.
+- Pour retrouver les types de la 6.x, déclarez aussi `false` dans [`ConfigTypes`](#ConfigTypes). Si vous avez déjà déclaré l’option à `true`, cette déclaration reste valide.
+- Qu’il soit imbriqué dans un `lateral` ou utilisé comme valeur d’`extras`, le résultat de l’agrégat revient en JSON quel que soit le réglage et vaut `null` quand aucune ligne ne correspond. Par défaut, il est typé comme le `JSONSelectable` de sa colonne.
   - Pour un [`lateral` transmis](/fr/select#lateral), appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou `selectRows()` pour obtenir la colonne telle que `pg` la parse. Un `select()` extérieur renvoie du JSON. [`selectRows()`](/fr/select#selectRows) refuse à la compilation un fragment numérique transmis directement, comme `count()`.
 - `.run()` lit l’option même si la requête a été construite avant `setConfig()`. Réglez l’option sur `null` ou `undefined` pour rétablir la valeur par défaut. Une requête qui ne renvoie aucune ligne donne alors `null`.
 - Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
@@ -383,7 +383,7 @@ Ce que prend [`setConfig()`](#setConfig) : n’importe quelles clés de `Config
 interface ConfigTypes { }
 ```
 
-À partir de la 6.7.0. Les options de `Config` qui changent un type, déclarées comme vous les réglez, puisque TypeScript ne peut pas lire `setConfig()`. Une interface vide reprend les valeurs par défaut de la 7.0. Pour retrouver les agrégats numériques de la 6.x, déclarez l’option une fois, dans un module que votre `tsconfig.json` inclut, un fichier avec un `import` ou un `export`, et réglez l’option de la même façon :
+À partir de la 6.7.0, déclarez dans cette interface les options de `Config` qui changent un type, avec les mêmes valeurs qu’à l’exécution, puisque TypeScript ne peut pas lire `setConfig()`. Une interface vide reprend les valeurs par défaut de la 7.0. Pour retrouver les résultats numériques des agrégats de la 6.x, déclarez l’option une seule fois dans un module inclus par votre `tsconfig.json` (un fichier avec un `import` ou un `export`) et donnez-lui la même valeur à l’exécution.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -455,7 +455,7 @@ Un opt-in n’a pas d’avertissement et ne devient pas le comportement par déf
 
 Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0. Son [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) n’a pas de note, et reste désactivé en 7.0.
 
-Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION` ; `PGCAST_DEP007` : quand `transaction()` est appelée, avant son callback), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
+Node.js émet chaque `DeprecationWarning` une fois par processus et par code, uniquement si l’appel au raccourci utilise l’ancien comportement. Pour `PGCAST_DEP003`, c’est quand la promesse de `transaction()` se résout. Pour `PGCAST_DEP005` et `PGCAST_DEP007`, c’est à l’appel de `transaction()`, avant son `START TRANSACTION` et avant son callback, respectivement. Le message nomme l’option. Node l’affiche sur `stderr` :
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
