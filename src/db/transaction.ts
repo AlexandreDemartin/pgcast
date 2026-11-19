@@ -184,9 +184,9 @@ type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
  * query, reject before `START TRANSACTION`. Set
  * `transactionRequiresIdleClient: false` to skip the recheck and run, ending the caller's block.
  *
- * When the outer transaction's isolation level does not satisfy the nested
- * request (`IsolationSatisfying`), reject before its callback. With
- * `transactionRequiresSatisfyingLevel: false`, run it at the outer level.
+ * Open the outer helper at the level you need. A later `SET TRANSACTION` leaves
+ * its marker unchanged. If the marked level does not satisfy the nested request
+ * (`IsolationSatisfying`), reject before its callback unless `transactionRequiresSatisfyingLevel: false`.
  *
  * Given a `PoolLike` of another driver, the callback gets its client, a
  * `TxnClientLike`, released once the transaction ends. Passed to a nested

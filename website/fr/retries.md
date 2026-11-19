@@ -52,9 +52,9 @@ Si ce travail passe dans le callback, une réservation réessayée envoie deux e
 
 ## Laisser passer l’erreur {#let-the-error-through}
 
-pgcast ne réessaie que ce qui lui parvient. N’avalez pas une erreur de la base dans le callback : ensuite, Postgres refuse chaque requête de la transaction avec 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), et si le callback se termine normalement, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, que Postgres transforme en rollback sans erreur.
+pgcast ne réessaie que si l’erreur lui parvient. Après une erreur de requête, les requêtes ordinaires échouent avec 25P02 (`current transaction is aborted, commands ignored until end of transaction block`) jusqu’au rollback. Si le callback se termine normalement, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->.
 
-La promesse est rejetée sans retry et rien n’est enregistré. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Quel que soit le réglage, une erreur 40001 ou 40P01 interceptée dans le callback ne déclenche aucun retry.
+Si Postgres répond à ce `COMMIT` par `ROLLBACK`, la promesse est rejetée sans retry et rien n’est enregistré. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Une nouvelle erreur 40001 au `COMMIT` peut encore déclencher un retry.
 
 Si vous en interceptez une à l’intérieur, relancez-la.
 
@@ -71,7 +71,7 @@ Interceptez-la hors de la transaction, une fois que pgcast a abandonné, avec [`
 
 ## Réserver dans une transaction plus large {#book-inside-a-larger-transaction}
 
-Quand on lui donne le `txnClient` d’une transaction déjà ouverte, `bookSeats()` la rejoint : `serializable()` n’envoie rien qui lui soit propre et appelle aussitôt le callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)). Un couple réserve deux places, les deux ou aucune :
+Avec le `txnClient` d’une transaction ouverte, `bookSeats()` la rejoint si le niveau marqué satisfait `serializable()`. L’appel imbriqué n’envoie alors aucune requête SQL de son côté ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)). Un couple réserve deux places, les deux ou aucune :
 
 <<< ../examples/plain/retries_larger.ts{ts twoslash}
 

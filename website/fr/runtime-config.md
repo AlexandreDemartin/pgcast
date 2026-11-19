@@ -99,7 +99,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. | à chaque `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : la traiter comme une clé absente | à chaque appel de l’une d’elles |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | rejeter la promesse si Postgres répond au `COMMIT` par `ROLLBACK` | à chaque `transaction()` |
-| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | rejeter la promesse avant `START TRANSACTION` si votre client est déjà dans un bloc de transaction, qui reste ouvert | à chaque `transaction()` qui reçoit un tel client |
+| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | rejeter la promesse avant `START TRANSACTION` uniquement si votre client sans marqueur signale `T` ou `E` avant et après la requête vide. Sans statut, l’appel se poursuit | à chaque `transaction()` qui reçoit un tel client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne, pas son `Number()` | à chaque `run()` de l’un d’eux |
@@ -200,7 +200,7 @@ Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`upda
 transactionRequiresCommit?: boolean  // default: true
 ```
 
-Quand le callback de [`transaction()`](/fr/transaction#transaction) intercepte l’erreur d’une requête et se termine normalement, Postgres a interrompu la transaction : il répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> par le command tag `ROLLBACK`, pas par une erreur, et rien n’est enregistré.
+Si Postgres répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> de [`transaction()`](/fr/transaction#transaction) par le command tag `ROLLBACK`, rien n’est enregistré.
 
 Avec `true`, `transaction()` est alors rejetée, sans retry, avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
 
@@ -223,12 +223,12 @@ Avec `false`, `transaction()` envoie `START TRANSACTION` sans vérifier de nouve
 
 - pg dit si un client est dans un bloc à partir de pg 8.21 (`getTransactionStatus()`). Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, avec ou sans l’option, sans avertissement.
 - Avec `true`, quand pg signale un bloc, `transaction()` envoie d’abord une requête vide, pour relire le statut ; [`queryListener`](#Config.queryListener) et [`resultListener`](#Config.resultListener) la reçoivent, avec l’id de la transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
-- Avec `true`, une `transaction()` lancée au même moment sur ce client est transmise, comme dans la 6.6.1, et ne valide ni n’annule rien : ses requêtes s’exécutent dans votre bloc, ou, quand pg signalait un bloc déjà terminé, comme le dit le dernier point.
+- Pendant la vérification, le marqueur du premier appel contient le niveau demandé. Par défaut, un second appel n’exécute son callback sur ce client que si le niveau marqué satisfait sa demande. Si un bloc est ouvert, les requêtes du callback s’exécutent au niveau de ce bloc.
 - Seul un client que vous passez est vérifié : un client emprunté au pool, libéré alors qu’il était encore dans un bloc, ne l’est pas.
 - Un `BEGIN` envoyé sans `await` n’est pas encore vu : le client paraît hors de tout bloc.
 - Un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue peut lui aussi paraître hors de tout bloc : `transaction()` s’exécute alors comme dans la 6.6.1, sans avertissement.
 - Non testé avec `pg-native`.
-- Avec `true`, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est commitée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
+- Si pg signale encore un bloc après l’échec d’un `COMMIT`, la vérification peut trouver le client hors transaction. Les écritures du second callback peuvent être commitées séparément avant le `START TRANSACTION` du premier appel ou après la fin de sa transaction.
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 

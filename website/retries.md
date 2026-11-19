@@ -51,9 +51,9 @@ Moved into the callback, a retried booking sends two confirmation emails, and pu
 
 ## Let the error through
 
-pgcast retries only what reaches it. Don't swallow a database error inside the callback: after it, Postgres refuses every query of the transaction with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error.
+pgcast retries only what reaches it. After a query error, ordinary queries fail with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`) until rollback. If the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->.
 
-The promise rejects without a retry, and nothing is saved. With [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit), it resolves with the callback result. A swallowed 40001 or 40P01 cannot trigger a retry under either setting.
+If Postgres answers that `COMMIT` with `ROLLBACK`, the promise rejects without a retry and nothing is saved. With [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit), it resolves with the callback result. A fresh 40001 at `COMMIT` can still trigger a retry.
 
 If you catch one inside, rethrow it.
 
@@ -70,7 +70,7 @@ Catch it outside the transaction, once pgcast has given up, with [`isDatabaseErr
 
 ## Book inside a larger transaction
 
-Given the `txnClient` of a transaction already open, `bookSeats()` joins it: `serializable()` sends nothing of its own and calls the callback at once ([Passing a transaction through](/transaction#passing-a-transaction-through)). A couple books two seats, both or neither:
+Given an open transaction's `txnClient`, `bookSeats()` joins it if its marked level satisfies `serializable()`. The nested call then sends no SQL of its own ([Passing a transaction through](/transaction#passing-a-transaction-through)). A couple books two seats, both or neither:
 
 <<< ./examples/plain/retries_larger.ts{ts twoslash}
 

@@ -7,7 +7,7 @@
 
 - Only the queries you `.run(txnClient)` are in the transaction; one run on the pool is not.
 - On 40001 or 40P01, the whole callback runs again, five attempts in all by default: write it so it can.
-- A query error that the callback catches turns `COMMIT` into `ROLLBACK`, and nothing is saved: let the error out.
+- If Postgres answers the helper's `COMMIT` with `ROLLBACK`, the promise rejects without a retry and nothing is saved. Let query errors out of the callback.
 
 </AtAGlance>
 
@@ -60,7 +60,7 @@ The two `count()`s run on `client`, outside the transaction: after the block, `b
 - These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per transaction opened, kept across retries; a transaction passed through keeps the outer one's.
 - No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)). To nest a unit of work that can fail alone: [`savepoint()`](#savepoint).
 - If the callback catches a query error and Postgres answers `COMMIT` with `ROLLBACK`, nothing is saved. The promise rejects without a retry. With [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit), it resolves with the callback result.
-- If pg reports that your client is already in a transaction, pgcast rechecks its status before starting one. See [Your own `BEGIN`](#your-own-begin).
+- With the idle check on, if pg reports that your unmarked client is already in a transaction, pgcast rechecks its status before starting one. See [Your own `BEGIN`](#your-own-begin).
 
 ### Retries
 
@@ -182,9 +182,9 @@ client.release();
 
 - pg reports the block from pg 8.21. Before, `transaction()` runs as in 6.6.1, with no warning. Not tested with `pg-native`.
 - By default, when pg reports one, `transaction()` first sends an empty query, so as to read the status again: pg can still report a block just after a `COMMIT` that failed. Postgres counts it as no query of yours. [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) get it, with the transaction's id, as they get its `START TRANSACTION`.
-- By default, a `transaction()` at the same moment on that client is passed through, as in 6.6.1, and neither commits nor rolls back: its queries run in your block, or, when pg's report of a block was stale, as the last point says.
+- During the recheck, the first call's marker holds its requested level. By default, a second call runs its callback on that client only if the marked level satisfies its request. In an open block, its queries run at that block's level.
 - Not caught: a client the pool hands out still in a block, as one released before its `ROLLBACK`; a `BEGIN` sent without `await`; a `BEGIN` sent in one query string with a statement that fails (`'BEGIN; …; SELECT 1/0'`), which pg can still report as outside a block, so `transaction()` runs as in 6.6.1, with no warning.
-- By default, just after a `COMMIT` that failed, two `transaction()` calls at the same moment on one client: when pg still reports the block, the first sends its empty query, then goes on, and the second, passed through, sends its first query, and any sent with it, before the first's `START TRANSACTION`, outside any transaction, so each is committed on its own. Its later queries run in the first call's transaction.
+- If pg still reports a block after a failed `COMMIT`, the recheck can find the client idle. Writes from a second callback can commit separately before the first call's `START TRANSACTION` or after its transaction ends.
 
 ### Errors
 

@@ -94,7 +94,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. | at each `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | an `undefined` value in `insert()`, `update()` and `upsert()`: treat it as a missing key | at each call of those |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
-| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | a client of yours already inside a transaction block: reject before its `START TRANSACTION`, not end your transaction | at each `transaction()` given such a client |
+| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | reject before `START TRANSACTION` only if your unmarked client reports `T` or `E` both before and after the empty query. Without a status, the call proceeds | at each `transaction()` given such a client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | the client of a transaction at a level that doesn't satisfy the one asked for: reject, not run the callback at that level | at each `transaction()` given such a client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a `selectExactlyOne()` run on its own: `LIMIT 2`, and a second row rejects | at each `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` and `max()`: `null` when no row matches, and `min()` and `max()` the column's value, not `Number()` of it | at each `run()` of those |
@@ -195,7 +195,7 @@ With `true`, an `undefined` value in [`insert()`](/insert#insert), [`update()`](
 transactionRequiresCommit?: boolean  // default: true
 ```
 
-When the callback of [`transaction()`](/transaction#transaction) catches a query's error and returns, Postgres has aborted the transaction: it answers the `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> with the command tag `ROLLBACK`, not an error, and nothing is saved.
+If Postgres answers the `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> of [`transaction()`](/transaction#transaction) with the command tag `ROLLBACK`, nothing is saved.
 
 With `true`, `transaction()` then rejects, without a retry, with "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
 
@@ -218,12 +218,12 @@ With `false`, it skips the status recheck and sends `START TRANSACTION` without 
 
 - pg says whether a client is in a block from pg 8.21 (`getTransactionStatus()`). On older versions, `transaction()` runs as in 6.6.1, option or not, with no warning.
 - With `true`, when pg reports a block, `transaction()` first sends an empty query, to read the status again; [`queryListener`](#Config.queryListener) and [`resultListener`](#Config.resultListener) get it, with the transaction's id ([Your own `BEGIN`](/transaction#your-own-begin)).
-- With `true`, a `transaction()` at the same moment on that client is passed through, as in 6.6.1, and neither commits nor rolls back: its queries run in your block, or, when pg's report of a block was stale, as the last point says.
+- During the recheck, the first call's marker holds its requested level. By default, a second call runs its callback on that client only if the marked level satisfies its request. In an open block, its queries run at that block's level.
 - Only a client you pass is checked: one the pool hands out, released while still in a block, is not.
 - A `BEGIN` you sent without `await` is not seen yet: the client reads as outside a block.
 - A `BEGIN` sent in one query string with a statement that fails can read as outside a block too: `transaction()` then runs as in 6.6.1, with no warning.
 - Not tested with `pg-native`.
-- With `true`, just after a `COMMIT` that failed, two `transaction()` calls at the same moment on one client: when pg still reports the block, the first sends its empty query, then goes on, and the second, passed through, sends its first query, and any sent with it, before the first's `START TRANSACTION`, outside any transaction, so each is committed on its own. Its later queries run in the first call's transaction.
+- If pg still reports a block after a failed `COMMIT`, the recheck can find the client idle. Writes from a second callback can commit separately before the first call's `START TRANSACTION` or after its transaction ends.
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
