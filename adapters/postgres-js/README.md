@@ -81,7 +81,7 @@ Each value is prepared as `pg` prepares it (its `prepareValue()`: a `Date` in lo
 - **A column, value or row `transform`** (`postgres.camel`) makes `asPool()` throw: pgcast reads the columns under the names Postgres gives them, and their values with `pg`'s parsers. Give pgcast a `postgres()` of its own.
 - **A connection killed inside `transaction()`** (`pg_terminate_backend()`), on postgres.js 3.4 with `max: 1`: the next `transaction()` waits forever (3.4.0, 3.4.1, 3.4.5, 3.4.7) or the process crashes with an uncaught `TypeError` (the other 3.4 releases; `sql.begin()` crashes too, except on 3.4.6). These are postgres.js's own `reserve()` and `begin()`; 4.x recovers.
 - **`pg.types.setTypeParser()`** changes the adapter's parsing too when npm installs one `pg-types` for both.
-- **A nested transaction**: `transaction()` passes the client of a transaction given to it through, but TypeScript wants it cast to the level's `TxnClient…` (#696).
+- **A nested transaction**: `transaction()` passes the client of a transaction given to it through, with no cast from pgcast 6.12.0, its callback getting that client at the outer transaction's level (#702).
 
 ## Development
 

@@ -227,11 +227,11 @@ describe('transaction() on a pool that is not pg’s', () => {
     expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);
   });
 
-  // the types refuse another driver's client here (test/types/transaction.test-d.ts): run time passes it through
+  // #702: typed with no cast, its callback getting the same client (test/types/transaction.test-d.ts)
   it('passes its client through to a nested call, which neither checks out another client nor commits', async () => {
     const pool = otherPool();
     const nested = await db.serializable(pool, c =>
-      db.readCommitted(c as unknown as db.TxnClientForReadCommitted, async inner => { await db.sql`SELECT 1`.run(inner); return inner; }));
+      db.readCommitted(c, async inner => { await db.sql`SELECT 1`.run(inner); return inner; }));
     expect(nested).toBe(pool.client);
     expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'COMMIT', 'release()']);
   });
