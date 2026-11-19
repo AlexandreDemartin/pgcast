@@ -157,7 +157,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`enumOrder`](#generate.enumOrder) | `"declared"` | the order of an enum's labels |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | whether a failed query rejects, or ends the process |
-| [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | the names in each relation's `UniqueIndex` |
+| [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | the names in each relation's `UniqueIndex` |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, outside `Selectable`, and of a domain over a domain or an array of a domain |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | none: an array, with a note | the `Selectable` type of an array of an enum |
 | [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | none: the text, with a note | the type of an `interval` in `Selectable` and in a write |
@@ -410,7 +410,7 @@ try {
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
-`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions](/versions)). The names in each relation's `UniqueIndex`, which [`constraint()`](/insert#constraint) takes. `false`, as in Zapatos 6.6.1, lists every unique index; `true` lists only the index of each `UNIQUE` or `PRIMARY KEY` constraint that isn't `DEFERRABLE`, the names Postgres takes in `ON CONFLICT ON CONSTRAINT`:
+From 7.0, this boolean defaults to `true`, including for JSON `null`. Each relation's `UniqueIndex` contains the constraint names [`constraint()`](/insert#constraint) can use in `ON CONFLICT ON CONSTRAINT … DO UPDATE`. With `false`, the generator lists all of the relation's unique indexes.
 
 ```sql
 CREATE TABLE festival_entries (
@@ -432,10 +432,10 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 | `festival_entries_slot_key`, `DEFERRABLE` | yes | no | 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters` |
 | `festival_entries_live_idx`, an index and no constraint | yes | no | 42704, `constraint "festival_entries_live_idx" for table "festival_entries" does not exist` |
 
-- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint: 42809 with `DO UPDATE`. An `EXCLUDE` constraint is in neither list, since its index isn't unique.
+- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint. It accepts that key with `DO NOTHING` and returns 42809 with `DO UPDATE`. An `EXCLUDE` constraint is in neither list, since its index isn't unique.
 - `true` leaves out, too, a constraint whose index isn't valid yet: a partitioned table's, added with `ALTER TABLE ONLY`, until each partition's index is attached ([Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html#DDL-PARTITIONING-DECLARATIVE-MAINTENANCE)). Postgres answers 42P10 meanwhile, `there is no unique or exclusion constraint matching the ON CONFLICT specification`; regenerate once they are.
 - A relation left with none gets `never`. `UniqueIndexForTable` and the aggregate `UniqueIndex` types follow.
-- `false` notes, through [`warningListener`](#generate.warningListener), each unique index `true` would leave out.
+- In 7.x, `false` restores the 6.x union without a migration note. The override goes in 8.0.
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
@@ -580,8 +580,6 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: the schemas rule of "public" gives include as a string, "films", so it is read as the list ["films"]. Zapatos 6.6.1 also matched each relation whose name is part of the string. Write the list to silence this note.`
   - after writing, for each `include` or `exclude` of a rule of [`schemas`](#generate.schemas) given as a string other than `"*"`;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
-- `Note: UniqueIndex lists public.festival_entries.festival_entries_live_idx and public.festival_entries.festival_entries_slot_key, unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ... DO NOTHING except a WITHOUT OVERLAPS key. Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.`
-  - once per run, without [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), when a generated relation has a unique index it would leave out; one as `lists public.festival_entries.festival_entries_live_idx, a unique index of no UNIQUE or PRIMARY KEY constraint`;
 - `Note: public.seat_bookings.ticket (public.ticket_no) has a domain over a type typed by context, such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a write takes more and, except for money, the shortcuts' JSON gives another type. Set domainsTypedByContext: true to type it by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.`
   - once per run, without [`domainsTypedByContext`](#generate.domainsTypedByContext), when a generated column has such a domain; several as `public.screenings.premiere (public.premiere_day) and public.seat_bookings.ticket (public.ticket_no) have domains over a type typed by context`;
 - `` Note: public.seat_bookings.tickets (public.ticket_no[]) and public.seat_bookings.vip_ticket (public.vip_ticket_no) have domains over a domain, or arrays of a domain: as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0. ``
