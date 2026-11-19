@@ -17,3 +17,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [011](./011-several-databases.md) | Several databases: how a program types queries on more than one | accepted (2026-11-17), by delegation: not built in the core; one database per project, documented |
 | [012](./012-raw-sql-types.md) | Raw SQL types: how a hand-written `sql` query gets its types from Postgres | accepted (2026-11-18), by delegation: a separate tool, `@pgcast/typegen`; Parse / Describe over `pg`, nullable unless proven, a committed file under `--check` |
 | [013](./013-package-model.md) | The package model: one core, extensions under `@pgcast` | accepted (2026-11-18), by delegation |
+| [014](./014-constraint-violations.md) | Tell which constraint Postgres refused a write for | accepted (2026-11-19), under the owner's delegation |
