@@ -416,7 +416,7 @@ try {
 
 À partir de la 7.0, cette option booléenne vaut `true` par défaut, y compris si la configuration JSON indique `null`. Pour chaque relation, `UniqueIndex` liste les contraintes `UNIQUE` et `PRIMARY KEY` non différables qui s’appuient sur un index valide autre qu’un index d’exclusion. Avec `false`, le générateur liste tous les index uniques de la relation.
 
-[`constraint()`](/fr/insert#constraint) traite un nom tel que `screenings.id` comme un identifiant qualifié : la compilation produit `"screenings"."id"`, que Postgres refuse avec le code 42601. Écrivez une requête `sql` explicite avec `ON CONSTRAINT "screenings.id"`.
+Pour un nom tel que `screenings.id`, [`constraint()`](/fr/insert#constraint) produit l’identifiant qualifié `"screenings"."id"`, que Postgres refuse avec le code 42601. Écrivez une requête `sql` explicite avec `ON CONSTRAINT "screenings.id"`.
 
 ```sql
 CREATE TABLE festival_entries (
