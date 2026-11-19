@@ -11,7 +11,7 @@ english: b2816ae478b4
 
 - Seules les requêtes que vous lancez avec `.run(txnClient)` sont dans la transaction ; une requête lancée sur le pool n’y est pas.
 - Sur 40001 ou 40P01, tout le callback s’exécute de nouveau, cinq tentatives en tout par défaut : écrivez-le pour qu’il puisse être rejoué.
-- Si Postgres répond au `COMMIT` du raccourci par `ROLLBACK`, la promesse est rejetée sans retry et rien n’est enregistré. Laissez les erreurs de requête remonter hors du callback.
+- Si Postgres répond au `COMMIT` du raccourci par `ROLLBACK`, la promesse est rejetée sans retry et rien n’est enregistré. Laissez les erreurs de requête se propager hors du callback.
 
 </AtAGlance>
 
@@ -64,7 +64,7 @@ Les deux `count()` s’exécutent sur `client`, hors de la transaction : après
 - Ces trois-là s’exécutent sur le client de la transaction, comme les requêtes du callback. Chacune passe par [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) avec l’id de la transaction : un compteur à partir de 0, un par transaction ouverte, conservé d’une tentative à l’autre ; une transaction transmise garde celui de la transaction extérieure.
 - Pas de `SAVEPOINT` : une transaction dans une autre est la transaction extérieure ([Transmettre une transaction](#passing-a-transaction-through)). Pour imbriquer une unité de travail qui peut échouer seule : [`savepoint()`](#savepoint).
 - Si le callback intercepte une erreur de requête et que Postgres répond au `COMMIT` par `ROLLBACK`, rien n’est enregistré. La promesse est rejetée sans retry. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback.
-- Si la vérification du statut est activée et que pg signale que votre client sans marqueur est déjà dans une transaction, pgcast vérifie de nouveau son statut avant d’en ouvrir une. Voir [Votre propre `BEGIN`](#your-own-begin).
+- Lorsque `transactionRequiresIdleClient` est activée, pgcast vérifie de nouveau le statut de votre client sans marqueur si pg le signale déjà dans une transaction. Cette seconde vérification précède l’ouverture d’une transaction. Voir [Votre propre `BEGIN`](#your-own-begin).
 
 ### Retries {#retries}
 
@@ -186,9 +186,9 @@ client.release();
 
 - pg signale le bloc à partir de pg 8.21. Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, sans avertissement. Non testé avec `pg-native`.
 - Par défaut, si pg signale un bloc, `transaction()` envoie d’abord une requête vide pour vérifier de nouveau le statut du client. En effet, pg peut encore signaler un bloc juste après l’échec d’un `COMMIT`. Postgres ne compte pas cette requête parmi les vôtres. [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) la reçoivent avec l’id de la transaction, comme pour `START TRANSACTION`.
-- Pendant la vérification, le marqueur du premier appel contient le niveau demandé. Par défaut, un second appel n’exécute son callback sur ce client que si le niveau marqué satisfait sa demande. Si un bloc est ouvert, les requêtes du callback s’exécutent au niveau de ce bloc.
+- Pendant cette seconde vérification, le marqueur du premier appel contient le niveau d’isolation demandé par cet appel. Par défaut, un second appel n’exécute son callback sur ce client que si le niveau enregistré satisfait le niveau qu’il demande. Si un bloc de transaction est ouvert, les requêtes du callback s’exécutent au niveau d’isolation de ce bloc.
 - Non détectés : un client récupéré du pool alors qu’il est encore dans un bloc, comme un client libéré avant son `ROLLBACK` ; un `BEGIN` envoyé sans `await` ; un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue (`'BEGIN; …; SELECT 1/0'`), que pg peut encore signaler hors de tout bloc, si bien que `transaction()` s’exécute comme dans la 6.6.1, sans avertissement.
-- Si pg signale encore un bloc après l’échec d’un `COMMIT`, la vérification peut trouver le client hors transaction. Les écritures du second callback peuvent être commitées séparément avant le `START TRANSACTION` du premier appel ou après la fin de sa transaction.
+- Si pg signale encore un bloc après l’échec d’un `COMMIT`, la seconde vérification peut indiquer que le client est hors transaction. Les écritures du second callback peuvent être commitées séparément avant le `START TRANSACTION` du premier appel ou après la fin de sa transaction.
 
 ### Erreurs {#errors}
 

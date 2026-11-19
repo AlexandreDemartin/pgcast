@@ -71,7 +71,7 @@ Interceptez-la hors de la transaction, une fois que pgcast a abandonné, avec [`
 
 ## Réserver dans une transaction plus large {#book-inside-a-larger-transaction}
 
-Avec le `txnClient` d’une transaction ouverte, `bookSeats()` la rejoint si le niveau marqué satisfait `serializable()`. L’appel imbriqué n’envoie alors aucune requête SQL de son côté ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)). Un couple réserve deux places, les deux ou aucune :
+Avec le `txnClient` d’une transaction ouverte, `bookSeats()` la rejoint si le niveau d’isolation enregistré pour cette transaction satisfait le niveau demandé par `serializable()`. L’appel imbriqué n’envoie alors aucune requête SQL qui lui soit propre ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)). Un couple réserve deux places, les deux ou aucune :
 
 <<< ../examples/plain/retries_larger.ts{ts twoslash}
 

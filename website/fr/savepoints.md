@@ -46,7 +46,7 @@ Le `catch` traite le code 23505 et relance toute autre erreur. Si le callback la
 - Sur un même client, attendez la fin de chaque appel à `savepoint()` avec `await`, comme le fait la boucle. pgcast ne vérifie pas si les appels se chevauchent. Si le savepoint englobant est libéré en premier, Postgres supprime aussi le savepoint imbriqué. Le `RELEASE` du savepoint imbriqué échoue alors avec le code 3B001 ([`savepoint()`](/fr/transaction#savepoint)).
 - Interceptez l’erreur d’une requête autour de `savepoint()`, comme le fait l’exemple : si le callback l’intercepte et se termine, `savepoint()` est rejetée avec 25P02, donc un 40001 qu’il intercepte n’est pas réessayé à cet endroit ; avec le `catch` de l’exemple, la transaction est rejetée avec ce 25P02 ([`savepoint()`](/fr/transaction#savepoint)).
 - Appelez `savepoint()` sur le client d’une transaction : hors d’une transaction, Postgres refuse son `SAVEPOINT` avec 25P01 ([`savepoint()`](/fr/transaction#savepoint)).
-- Une `transaction()` appelée avec le client du callback n’est pas un savepoint : par défaut, elle ne rejoint la transaction extérieure que si le niveau marqué de celle-ci satisfait la demande ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+- Une `transaction()` appelée avec le client du callback n’est pas un savepoint : par défaut, elle ne rejoint la transaction extérieure que si le niveau d’isolation enregistré pour cette transaction satisfait le niveau demandé ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 
 ## Voir aussi {#see-also}
 

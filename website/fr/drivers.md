@@ -124,7 +124,7 @@ Elle envoie ce qu’elle envoie sur un `pg.Pool` ([Le SQL envoyé](/fr/transacti
 
 - Sur PGlite, ou sur tout pool d’une seule connexion (`max: 1` pour un `pg.Pool` ou un `sql` de postgres.js), une requête sur le pool attend que la transaction libère la connexion. Avec un `await` dans le callback, `.run(pool)` attend indéfiniment : lancez les requêtes du callback sur `txnClient`.
 - Les `query()` et `exec()` de PGlite lui-même n’attendent pas : dans la transaction, ils s’y exécutent ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
-- Une transaction imbriquée prend le client du callback sans cast. Par défaut, son callback ne reçoit ce client que si le niveau marqué de la transaction extérieure satisfait la demande ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
+- Vous pouvez passer le client du callback à une transaction imbriquée sans cast. Par défaut, le callback imbriqué ne reçoit ce client que si le niveau d’isolation enregistré pour la transaction extérieure satisfait le niveau demandé ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
 
 ## Un driver à vous {#a-driver-of-your-own}
 
