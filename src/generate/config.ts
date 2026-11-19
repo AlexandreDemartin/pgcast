@@ -27,10 +27,9 @@ export interface OptionalConfig {
   schemaJSDoc: boolean;
   unprefixedSchema: string | null;
   customJSONParsingForLargeNumbers: boolean;
-  // optional, so a CompleteConfig written for 6.6.1 still compiles; read it with ?? false, deprecated: true in 7.0
-  typeEnumsAcrossSchemas?: boolean;  // an enum of another schema is typed by its own labels, not by its name in the relation's schema
-  // optional too; read it with ?? 'alphabetical', as Zapatos 6.6.1 sorts labels, deprecated: 'declared' in 7.0
-  enumOrder?: 'alphabetical' | 'declared';  // the order of an enum's labels: 'declared' is Postgres's, by which it sorts and compares them
+  // optional, so a CompleteConfig written for 6.6.1 still compiles
+  typeEnumsAcrossSchemas?: boolean;  // look up an enum in its own schema by default; false uses the relation's schema
+  enumOrder?: 'alphabetical' | 'declared';  // Postgres's declared order by default; 'alphabetical' sorts the labels
   // optional too; read it with ?? 'zapatos'
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
   // optional for a CompleteConfig written for 6.6.1; the CLI sets false

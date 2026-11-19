@@ -13,11 +13,11 @@ import type { EnumData } from './enums';
 type EnumOrder = NonNullable<CompleteConfig['enumOrder']>;
 export type EnumOrders = Record<EnumOrder, EnumData>;
 
-/** The `enumOrder` of a config, `'alphabetical'` when absent. Any other value throws. */
+/** The `enumOrder` of a config, `'declared'` when absent. Any other value throws. */
 export const enumOrderOf = (config: CompleteConfig): EnumOrder => {
-  const order = config.enumOrder ?? 'alphabetical';
+  const order = config.enumOrder ?? 'declared';
   if (order !== 'alphabetical' && order !== 'declared') {
-    throw new Error(`enumOrder must be 'alphabetical' (the default) or 'declared', not '${order}'`);
+    throw new Error(`enumOrder must be 'declared' (the default) or 'alphabetical', not '${order}'`);
   }
   return order;
 };
@@ -51,26 +51,4 @@ export const enumOrdersForSchema = async (schemaName: string, queryFn: (q: pg.Qu
   for (const row of [...rows].sort((a, b) => a.sortorder - b.sortorder)) (declared[row.name] ??= []).push(row.value);
 
   return { alphabetical, declared } as EnumOrders;
-};
-
-/** The names of the enums whose declared order is not alphabetical. */
-export const enumsOutOfOrder = ({ alphabetical, declared }: EnumOrders) =>
-  Object.keys(alphabetical).filter(name => alphabetical[name].some((value, i) => value !== declared[name][i]));
-
-/**
- * Without `enumOrder: 'declared'`, note the enums it would write otherwise, once per run: the `every.<name>` tuple
- * of each lists its labels in alphabetical order, not in the order Postgres declares, sorts and compares them in.
- */
-export const warnAboutEnumOrder = (enums: { schema: string; name: string }[], config: CompleteConfig) => {
-  if (enums.length === 0) return;
-
-  const
-    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
-    sorted = enums.map(({ schema, name }) => `${schema}.${name}`).sort(),
-    one = enums.length === 1,
-    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-
-  warn(`Note: every.${one ? enums[0].name : '<name>'} lists the labels of ${one ? 'enum' : 'enums'} ${list} ` +
-    `in alphabetical order, not in their declared order, by which Postgres sorts and compares them. ` +
-    `Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.`);
 };

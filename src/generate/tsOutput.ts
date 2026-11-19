@@ -8,8 +8,8 @@ import * as path from 'path';
 import * as pg from 'pg';
 
 import { enumTypesForEnumData } from './enums';
-import { enumOrderOf, enumOrdersForSchema, enumsOutOfOrder, warnAboutEnumOrder } from './enumOrder';
-import type { EnumOrders } from './enumOrder';
+import type { EnumData } from './enums';
+import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
 import { domainRootsInDatabase } from './domainRoots';
 import type { DomainRoots } from './domainRoots';
 import { domainUnionsInDatabase, unionTypesForDomains, warnAboutPlaceholdersOnDisk } from './domainUnions';
@@ -154,24 +154,6 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
         (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
     }
   }
-};
-
-/**
- * Without `typeEnumsAcrossSchemas`, note the columns it would type otherwise, once per run: their type is of
- * another schema, and its enum is looked up by name in the schema of the relation.
- */
-const warnAboutEnumsAcrossSchemas = (columns: string[], config: CompleteConfig) => {
-  if (columns.length === 0) return;
-
-  const
-    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
-    sorted = [...columns].sort(),
-    one = sorted.length === 1,
-    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-
-  warn(`Note: ${list} ${one ? 'has' : 'have'} a type of another schema, which is looked up by name in the schema of ` +
-    `${one ? 'its' : 'their'} relation: an enum becomes an \`any\` custom type, or the enum of the same name there. ` +
-    `Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.`);
 };
 
 /**
@@ -370,10 +352,9 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     customTypeOrigins: CustomTypeOrigins = Object.create(null),
     customTypeImports: Record<string, string | null> = Object.create(null),
     customTypeHolders = Object.create(null),
-    enumsBySchema: Record<string, Promise<EnumOrders>> = Object.create(null),
-    enumOrdersFor = (schema: string) => enumsBySchema[schema] ??= enumOrdersForSchema(schema, queryFn),
-    enumsForSchema = async (schema: string) => (await enumOrdersFor(schema))[enumOrder],
-    columnsTypedByEnumName: string[] = [],
+    enumsBySchema: Record<string, Promise<EnumData>> = Object.create(null),
+    enumsForSchema = (schema: string) => enumsBySchema[schema] ??=
+      enumOrdersForSchema(schema, queryFn).then(orders => orders[enumOrder]),
     uniqueIndexesNotArbiters: string[] = [],
     domainsNotByContext: string[] = [],
     domainRootsOnce: Promise<DomainRoots>[] = [],
@@ -396,12 +377,10 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
             rules.include
               .filter(name => !relations.some(rel => rel.name === name))
               .map(name => ({ schema, name })),
-          enumOrders = await enumOrdersFor(schema),
-          enums = enumOrders[enumOrder],
-          outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => ({ schema, name })),
+          enums = await enumsForSchema(schema),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
-              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
+              enumsForSchema, undefined, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
               domainRoots, domainsUnderDomains, enumArraysNotAsText, intervalsAsText, customTypeHolders))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           schemaUnions = unions.filter(union => union.schema === schema),
@@ -431,7 +410,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
             ...schemaIsUnprefixed ? [] : [{ as: 'namespace' as const, names: relationNames }]],
           topLevelNames = schemaIsUnprefixed ? relationNames : [],
           topLevelTypes = schemaIsUnprefixed ? identifierGroups[0].names.map(({ name }) => tsIdentifier(name, 'type')) : [];
-        return { schemaDef, tables, unmatched, outOfOrder, identifierGroups, topLevelNames, topLevelTypes };
+        return { schemaDef, tables, unmatched, identifierGroups, topLevelNames, topLevelTypes };
       }))
     ),
     schemaDefs = schemaData.map(r => r.schemaDef),
@@ -471,8 +450,6 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   // as 6.10.0 wrote them: with the import of a placeholder's own name, which a type of zapatos/schema may take too
   warnAboutPlaceholdersOnDisk(unionPlaceholders, customTypeSourceFiles, config,
     sourceFilesForCustomTypes(customTypes, names, customTypeImports, new Set()));
-  warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
-  warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
   warnAboutDomainsNotByContext(domainsNotByContext, config);
   warnAboutDomainsUnderDomains(domainsUnderDomains, config);

@@ -20,9 +20,9 @@ declare module 'zapatos/schema' {
 
   /* --- enums --- */
 
-  export type mood = 'happy' | 'ok' | 'sad';
+  export type mood = 'sad' | 'ok' | 'happy';
   export namespace every {
-    export type mood = ['happy', 'ok', 'sad'];
+    export type mood = ['sad', 'ok', 'happy'];
   }
 
   /* --- tables --- */
@@ -75,7 +75,7 @@ declare module 'zapatos/schema' {
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status: c.Custom_status;
+      status: ('draft' | 'published' | 'archived');
       /**
       * **products.title**
       * - `text` in database
@@ -143,7 +143,7 @@ declare module 'zapatos/schema' {
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status: c.Custom_status;
+      status: ('draft' | 'published' | 'archived');
       /**
       * **products.title**
       * - `text` in database
@@ -211,7 +211,7 @@ declare module 'zapatos/schema' {
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: c.Custom_status | db.Parameter<c.Custom_status> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.Custom_status | db.Parameter<c.Custom_status> | db.SQLFragment | db.ParentColumn>;
+      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.SQLFragment | db.ParentColumn>;
       /**
       * **products.title**
       * - `text` in database
@@ -267,7 +267,7 @@ declare module 'zapatos/schema' {
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: c.Custom_status | db.Parameter<c.Custom_status> | db.DefaultType | db.SQLFragment<any>;
+      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **products.title**
       * - `text` in database
@@ -323,7 +323,7 @@ declare module 'zapatos/schema' {
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: c.Custom_status | db.Parameter<c.Custom_status> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.Custom_status | db.Parameter<c.Custom_status> | db.DefaultType | db.SQLFragment>;
+      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment>;
       /**
       * **products.title**
       * - `text` in database
@@ -679,9 +679,9 @@ declare module 'zapatos/schema' {
   
     /* --- enums --- */
   
-    export type status = 'archived' | 'draft' | 'published';
+    export type status = 'draft' | 'published' | 'archived';
     export namespace every {
-      export type status = ['archived', 'draft', 'published'];
+      export type status = ['draft', 'published', 'archived'];
     }
   
     /* --- tables --- */
@@ -746,7 +746,7 @@ declare module 'zapatos/schema' {
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array: c.Custom__mood | null;
+        c_enum_array: ('sad' | 'ok' | 'happy')[] | null;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
@@ -1000,7 +1000,7 @@ declare module 'zapatos/schema' {
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array: c.Custom__mood | null;
+        c_enum_array: ('sad' | 'ok' | 'happy')[] | null;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
@@ -1254,7 +1254,7 @@ declare module 'zapatos/schema' {
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: c.Custom__mood | db.Parameter<c.Custom__mood> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.Custom__mood | db.Parameter<c.Custom__mood> | db.SQLFragment | db.ParentColumn>;
+        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | db.SQLFragment | db.ParentColumn>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
@@ -1508,7 +1508,7 @@ declare module 'zapatos/schema' {
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: c.Custom__mood | db.Parameter<c.Custom__mood> | null | db.DefaultType | db.SQLFragment<any>;
+        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
@@ -1756,7 +1756,7 @@ declare module 'zapatos/schema' {
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: c.Custom__mood | db.Parameter<c.Custom__mood> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.Custom__mood | db.Parameter<c.Custom__mood> | null | db.DefaultType | db.SQLFragment>;
+        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database

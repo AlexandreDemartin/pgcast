@@ -20,9 +20,9 @@ declare module 'zapatos/schema' {
 
   /* --- enums --- */
 
-  export type mood = 'happy' | 'ok' | 'sad';
+  export type mood = 'sad' | 'ok' | 'happy';
   export namespace every {
-    export type mood = ['happy', 'ok', 'sad'];
+    export type mood = ['sad', 'ok', 'happy'];
   }
 
   /* --- tables --- */
