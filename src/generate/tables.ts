@@ -156,7 +156,7 @@ export const definitionForRelationInSchema = async (
   columnsTypedByEnumName?: string[],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
-  uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
+  uniqueIndexesNotArbiters?: string[],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
   domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
   domainRoots: () => Promise<DomainRoots> = () => domainRootsInDatabase(queryFn),
   domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
@@ -383,10 +383,10 @@ export const definitionForRelationInSchema = async (
         ORDER BY i.indexname`,
       values: [rel.name, schemaName]
     }),
-    constraintsOnly = config.uniqueIndexConstraintsOnly ?? false,
+    constraintsOnly = config.uniqueIndexConstraintsOnly ?? true,
     uniqueIndexes = result.rows.filter(ui => ui.isArbiter || !constraintsOnly);
 
-  if (!constraintsOnly) {
+  if (uniqueIndexesNotArbiters && !constraintsOnly) {
     uniqueIndexesNotArbiters.push(...result.rows.filter(ui => !ui.isArbiter).map(ui => `${schemaName}.${rel.name}.${ui.indexname}`));
   }
 

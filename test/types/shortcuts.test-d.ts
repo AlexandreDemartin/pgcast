@@ -763,12 +763,22 @@ describe('upsert', () => {
   test("constraint() refuses another schema's unique index of the same name", () => {
     // shared_name_idx: unique on extra.articles, a plain index on public.transfers
     const transfer = { from_account: 1, to_account: 2, amount: 1 };
+    // @ts-expect-error a unique index without a constraint
     db.upsert('extra.articles', { author_id: 1, body: 'b' }, db.constraint('shared_name_idx'));
     // @ts-expect-error shared_name_idx is not a unique index of transfers
     db.upsert('transfers', transfer, db.constraint('shared_name_idx'));
-    // @ts-expect-error the same; given to the upsert of a table whose constraint has that name, 6.6.1 ran it
+    // @ts-expect-error naming the table explicitly also rules out the borrowed index
     const k = db.constraint<'transfers'>('shared_name_idx');
     db.upsert('extra.articles', { author_id: 1, body: 'b' }, k);
+  });
+
+  test('takes a named unique constraint as the conflict target', () => {
+    const product = { sku: 'x', price_cents: 1, status: 'draft' } as const;
+    db.upsert('products', product, db.constraint('products_sku_variant_key'));
+    // @ts-expect-error an ordinary unique index
+    db.upsert('products', product, db.constraint('products_status_sku_key'));
+    // @ts-expect-error a partial expression index
+    db.upsert('products', product, db.constraint('products_title_lower_key'));
   });
 
   test('characterization: upsert accepts the constraint of another table', () => {

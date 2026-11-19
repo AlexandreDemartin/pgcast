@@ -66,7 +66,7 @@ A materialised view keeps no `NOT NULL` at all, not even a domain's, so its colu
 
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
-- `UniqueIndex` lists every unique index, those `ON CONFLICT ON CONSTRAINT` refuses included, unless [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) is on.
+- `UniqueIndex` lists constraints usable with `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restores all of the relation's unique indexes.
 - A domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, is typed by its placeholder in all five interfaces, which, as generated, holds what `pg` returns, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
 - A domain over a domain, or an array of a domain, is `any`, its placeholder's type as generated, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
 - An array of an enum is an array in `Selectable`, though `pg` returns its text, `'{writer,editor}'`, unless [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) is on.

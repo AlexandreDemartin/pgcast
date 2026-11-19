@@ -67,7 +67,7 @@ const variants: [string, Config][] = [
   // pgcast/schema, pgcast/custom and pgcast/db, and the zapatos/schema that src/db's declarations import
   ['moduleNames-pgcast', { schemas: customTypesSchemas, moduleNames: 'pgcast' }],
   // main, whose output is test/generated/: only the UniqueIndex of products, extra.articles and account_totals differ
-  ['uniqueIndexConstraintsOnly', { ...main, uniqueIndexConstraintsOnly: true }],
+  ['uniqueIndexConstraintsOnly-false', { ...main, uniqueIndexConstraintsOnly: false }],
   // only extra.type_zoo's c_int8_domain differs, in the four interfaces but Selectable; the placeholders are the same
   ['domainsTypedByContext', { schemas: customTypesSchemas, domainsTypedByContext: true }],
   // extra.type_zoo's c_enum_array in Selectable is the text pg returns
@@ -127,14 +127,10 @@ const warningsOf = async (config: Config) => {
   return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
 };
 
-/**
- * The same, but the notes on unique indexes, domains, arrays of an enum and intervals, which have their own
- * tests (§ uniqueIndexConstraintsOnly, § domainsTypedByContext,
- * § enumArraysTypedAsText, § intervalsTypedAsObjects).
- */
+/** Omit the domain, enum array and interval notes, which have their own tests. */
 const warningsFor = async (schemas: Schemas, config: Config = {}) =>
-  (await warningsOf({ ...config, schemas })).filter(w => !w.includes('uniqueIndexConstraintsOnly') &&
-    !w.includes('domainsTypedByContext') && !w.includes('enumArraysTypedAsText') && !w.includes('intervalsTypedAsObjects'));
+  (await warningsOf({ ...config, schemas })).filter(w => !w.includes('domainsTypedByContext') &&
+    !w.includes('enumArraysTypedAsText') && !w.includes('intervalsTypedAsObjects'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -241,26 +237,20 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
         ${refused} a partial unique index on an expression, refused too
         db.upsert('products', row, db.constraint('products_title_lower_key')),
       ];
-      // a Record keyed by UniqueIndex, which lists every unique index without the option
+      // a Record keyed by UniqueIndex, which lists every unique index on false
       export const labels: Record<s.products.UniqueIndex, string> = {
         products_pkey: 'id', products_sku_variant_key: 'sku and variant',
         ${refused} no longer keys of the Record
         products_status_sku_key: 'status, sku and variant', products_title_lower_key: 'title',
       };`;
 
-  // one codegen and one compile per `it`: the three in one took more than the 5 s default on CI
-  it('uniqueIndexConstraintsOnly: constraint() takes a constraint, and no other unique index', async () => {
-    expect(await probeErrors({ ...main, uniqueIndexConstraintsOnly: true }, constraintProbe('// @ts-expect-error')))
-      .toEqual([]);
-  });
-
-  it('uniqueIndexConstraintsOnly off: constraint() takes all four unique indexes, as in Zapatos 6.6.1', async () => {
-    expect(await probeErrors(main, constraintProbe('//'))).toEqual([]);
-  });
-
-  it('uniqueIndexConstraintsOnly off: each refusal of the key-on probe is an unused directive', async () => {
-    expect(await probeErrors(main, constraintProbe('// @ts-expect-error'))).toEqual(Array(3).fill(
-      "probe.ts TS2578 Unused '@ts-expect-error' directive."));
+  it.each([false, true])('checks constraint calls and the migrated Record by default, skipLibCheck %s', async skipLibCheck => {
+    const migrated = constraintProbe('// @ts-expect-error') + `
+      export const arbiters: Record<s.products.UniqueIndex, string> = {
+        products_pkey: 'id', products_sku_variant_key: 'sku and variant',
+      };`;
+    expect(await probeErrors(main, migrated, { skipLibCheck })).toEqual([]);
+    expect(await probeErrors({ ...main, uniqueIndexConstraintsOnly: false }, constraintProbe('//'), { skipLibCheck })).toEqual([]);
   });
 
   it('enumOrder-declared: every.<enum> takes the declared order, and only it', async () => {
@@ -629,9 +619,9 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
         // @ts-expect-error the backslash is part of the label
         export const toneLost: s.quoting_probe.takes.Insertable['tone'] = 'backslash';
       `;
-      expect.soft(await probeErrors({ schemas: { quoting_probe: all }, typeEnumsAcrossSchemas: false }, probe)).toEqual([]);
-      expect.soft(await probeErrors({ schemas: { quoting_probe: all }, typeEnumsAcrossSchemas: true }, probe + acrossSchemas))
-        .toEqual([]);
+      const config = { schemas: { quoting_probe: all }, uniqueIndexConstraintsOnly: false };
+      expect.soft(await probeErrors({ ...config, typeEnumsAcrossSchemas: false }, probe)).toEqual([]);
+      expect.soft(await probeErrors({ ...config, typeEnumsAcrossSchemas: true }, probe + acrossSchemas)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA quoting_probe, tone_types CASCADE');
     }
@@ -645,7 +635,7 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       CREATE TABLE "probe-names"."it's\here" ("back\slash" int, "say ""cut""" int);
       CREATE UNIQUE INDEX "idx\back" ON "probe-names"."it's\here" ("back\slash");`);
     try {
-      expect(await probeErrors({ schemas: { 'probe-names': all } }, String.raw`
+      expect(await probeErrors({ schemas: { 'probe-names': all }, uniqueIndexConstraintsOnly: false }, String.raw`
         import type * as s from 'zapatos/schema';
         export const str: s.probe_names.keyof_.Selectable['s'] = 'a';
         // @ts-expect-error not a label of "probe-names"."as"
@@ -1372,7 +1362,7 @@ describe('surprises, frozen as they are', () => {
 
 describe('UniqueIndex', () => {
   it("lists only the table's own unique indexes", async () => {
-    const { ts: schema } = await codegen(main);
+    const { ts: schema } = await codegen({ ...main, uniqueIndexConstraintsOnly: false });
     // shared_name_idx is unique on extra.articles, and a plain index on public.transfers
     expect(tableBlock(schema, 'articles')).toContain(`export type UniqueIndex = 'articles_pkey' | 'shared_name_idx';`);
     expect(tableBlock(schema, 'transfers')).toContain(`export type UniqueIndex = 'transfers_pkey';`);
@@ -1408,7 +1398,8 @@ describe('UniqueIndex', () => {
       CREATE UNIQUE INDEX events_k_key ON part_b.events_3 (k, id);  -- the parent's name, in the partition's schema
       ALTER TABLE part_a.events ATTACH PARTITION part_b.events_3 FOR VALUES FROM (200) TO (300);`);
     try {
-      const { ts: schema } = await codegen({ schemas: { part_a: all, part_b: all } });
+      const schemas = { part_a: all, part_b: all };
+      const { ts: schema } = await codegen({ schemas, uniqueIndexConstraintsOnly: false });
       const { rows } = await t.pool.query<{ relname: string; names: string[] }>(`
         SELECT c.relname, coalesce(array_agg(i.relname::text ORDER BY i.relname) FILTER (WHERE i.oid IS NOT NULL), '{}') AS names
         FROM pg_class c
@@ -1428,6 +1419,9 @@ describe('UniqueIndex', () => {
         events_2: "'events_2_k_id_key' | 'events_2_own'",
         events_3: "'events_3_k_id_key' | 'events_k_key'",
       });
+      const { ts: defaults } = await codegen({ schemas });
+      expect(tableBlock(defaults, 'events_2')).toContain("UniqueIndex = 'events_2_k_id_key';");
+      expect(tableBlock(defaults, 'events_3')).toContain("UniqueIndex = 'events_3_k_id_key';");
     } finally {
       await t.pool.query('DROP SCHEMA part_a, part_b CASCADE');
     }
@@ -1466,7 +1460,9 @@ describe('uniqueIndexConstraintsOnly', () => {
       CREATE UNIQUE INDEX item_counts_id_key ON arb.item_counts (id);` +
       (version >= 150000 ? `CREATE TABLE arb.nnd (id int, CONSTRAINT nnd_id_key UNIQUE NULLS NOT DISTINCT (id));` : '') +
       // an exclusion constraint to Postgres, whose index is unique: range columns, so no btree_gist
-      (version >= 180000 ? `CREATE TABLE arb.spans (id int4range, valid daterange, CONSTRAINT spans_pkey PRIMARY KEY (id, valid WITHOUT OVERLAPS));` : ''));
+      (version >= 180000 ? `
+        CREATE TABLE arb.spans (id int4range, valid daterange, PRIMARY KEY (id, valid WITHOUT OVERLAPS));
+        CREATE TABLE arb.deferred_spans (id int4range, valid daterange, PRIMARY KEY (id, valid WITHOUT OVERLAPS) DEFERRABLE);` : ''));
     // a failed CREATE UNIQUE INDEX CONCURRENTLY leaves its index behind, invalid; outside a transaction block
     await t.pool.query('CREATE UNIQUE INDEX CONCURRENTLY dupes_id_idx ON arb.dupes (id)')
       .then(() => { throw new Error('dupes_id_idx was built'); }, (e: pg.DatabaseError) => { if (e.code !== '23505') throw e; });
@@ -1474,11 +1470,6 @@ describe('uniqueIndexConstraintsOnly', () => {
   afterAll(() => t.pool.query('DROP SCHEMA arb CASCADE'));
 
   const arb = { schemas: { arb: all }, schemaJSDoc: false };
-  const notesFor = async (config: Config) => {
-    const warnings: string[] = [];
-    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
-    return warnings.filter(w => w.includes('uniqueIndexConstraintsOnly'));
-  };
   /** Each relation's `UniqueIndex`, as written: a relation's namespace starts with its `Table`, a schema's doesn't. */
   const uniqueIndexes = async (config: Config) => {
     const { ts: schema } = await codegen(config);
@@ -1486,14 +1477,14 @@ describe('uniqueIndexConstraintsOnly', () => {
       /export namespace (\w+) \{\s*export type Table = [^;]*;[^]*?export type UniqueIndex = ([^;]*);/g)]
       .map(([, rel, type]) => [rel, type]));
   };
-  /** By version: the relation that Postgres 15 and 18 add, and its `UniqueIndex`. */
-  const gated = (nnd: string, spans: string) => ({
+  /** Relations available from Postgres 15 and 18, and their `UniqueIndex` types. */
+  const gated = (nnd: string, spans: string, deferred_spans: string) => ({
     ...version >= 150000 ? { nnd } : {},
-    ...version >= 180000 ? { spans } : {},
+    ...version >= 180000 ? { spans, deferred_spans } : {},
   });
 
-  it('is off by default: UniqueIndex lists every unique index, as in Zapatos 6.6.1', async () => {
-    expect(await uniqueIndexes(arb)).toEqual({
+  it('lists every unique index with explicit false', async () => {
+    expect(await uniqueIndexes({ ...arb, uniqueIndexConstraintsOnly: false })).toEqual({
       dupes: "'dupes_id_idx'",
       halves: "'halves_id_k_key'",
       halves_1: 'never',
@@ -1503,12 +1494,12 @@ describe('uniqueIndexConstraintsOnly', () => {
       parts: "'parts_id_k_key'",
       parts_1: "'parts_1_id_k_key'",
       renamed: "'renamed_new_key'",
-      ...gated("'nnd_id_key'", "'spans_pkey'"),
+      ...gated("'nnd_id_key'", "'spans_pkey'", "'deferred_spans_pkey'"),
     });
   });
 
   it('lists only the non-deferrable UNIQUE and PRIMARY KEY constraints', async () => {
-    expect(await uniqueIndexes({ ...arb, uniqueIndexConstraintsOnly: true })).toEqual({
+    expect(await uniqueIndexes(arb)).toEqual({
       dupes: 'never',
       halves: 'never',
       halves_1: 'never',
@@ -1518,17 +1509,18 @@ describe('uniqueIndexConstraintsOnly', () => {
       parts: "'parts_id_k_key'",
       parts_1: "'parts_1_id_k_key'",
       renamed: "'renamed_new_key'",
-      ...gated("'nnd_id_key'", 'never'),
+      ...gated("'nnd_id_key'", 'never', 'never'),
     });
   });
 
   it('keeps each name that ON CONFLICT ON CONSTRAINT takes, and only them, as Postgres answers', async () => {
     const answers: Record<string, string | null> = {}, nothing: Record<string, string | null> = {};
-    const off = await uniqueIndexes(arb);
+    const off = await uniqueIndexes({ ...arb, uniqueIndexConstraintsOnly: false });
     // a row, since Postgres refuses a deferrable arbiter only once it inserts one
+    const span = "(id, valid) VALUES ('[1,2)', '[2026-01-01,2026-02-01)')";
     const rows: Record<string, string> = {
       parts: '(id, k) VALUES (1, 1)', parts_1: '(id, k) VALUES (1, 1)', halves: '(id, k) VALUES (1, 1)',
-      spans: "(id, valid) VALUES ('[1,2)', '[2026-01-01,2026-02-01)')",
+      spans: span, deferred_spans: span,
     };
     for (const [rel, type] of Object.entries(off)) {
       for (const name of type === 'never' ? [] : type.slice(1, -1).split("' | '")) {
@@ -1558,11 +1550,11 @@ describe('uniqueIndexConstraintsOnly', () => {
       parts_1_id_k_key: null,
       renamed_new_key: null,
       ...version >= 150000 ? { nnd_id_key: null } : {},
-      ...version >= 180000 ? { spans_pkey: '42809' } : {},  // ON CONFLICT DO UPDATE not supported with exclusion constraints
+      ...version >= 180000 ? { spans_pkey: '42809', deferred_spans_pkey: '42809' } : {},
     });
-    // DO NOTHING refuses each of them with the same code, and takes a WITHOUT OVERLAPS key, as any exclusion constraint
-    expect(nothing).toEqual({ ...answers, ...version >= 180000 ? { spans_pkey: null } : {} });
-    const on = Object.values(await uniqueIndexes({ ...arb, uniqueIndexConstraintsOnly: true }))
+    // DO NOTHING accepts a non-deferrable WITHOUT OVERLAPS key.
+    expect(nothing).toEqual({ ...answers, ...version >= 180000 ? { spans_pkey: null, deferred_spans_pkey: '55000' } : {} });
+    const on = Object.values(await uniqueIndexes(arb))
       .flatMap(type => type === 'never' ? [] : type.slice(1, -1).split("' | '"));
     expect(on.sort()).toEqual(Object.keys(answers).filter(name => answers[name] === null).sort());
   });
@@ -1576,39 +1568,39 @@ describe('uniqueIndexConstraintsOnly', () => {
     }
   });
 
-  it('is off by default, with one note per run that names each unique index it would leave out', async () => {
-    expect(await notesFor(arb)).toEqual([
-      'Note: UniqueIndex lists arb.dupes.dupes_id_idx, arb.halves.halves_id_k_key, ' +
-      'arb.item_counts.item_counts_id_key, arb.items.items_ab_key, arb.items.items_code_idx, ' +
-      'arb.items.items_slug_live_idx' + (version >= 180000 ? ', arb.items.items_title_lower_idx and arb.spans.spans_pkey' :
-        ' and arb.items.items_title_lower_idx') +
-      ', unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: ' +
-      'db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ' +
-      '... DO NOTHING except a WITHOUT OVERLAPS key. ' +
-      'Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.',
-    ]);
-    expect(await notesFor({ schemas: { extra: only('articles') } })).toEqual([
-      'Note: UniqueIndex lists extra.articles.shared_name_idx, a unique index of no UNIQUE or PRIMARY KEY constraint, ' +
-      'of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes it, and Postgres refuses it in ' +
-      'ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ... DO NOTHING except a WITHOUT OVERLAPS key. ' +
-      'Set uniqueIndexConstraintsOnly: true to leave it out; ' +
-      'it will be the default in pgcast 7.0.',
-    ]);
+  const settings: Config[] = [
+    {}, JSON.parse('{"uniqueIndexConstraintsOnly":null}'), { uniqueIndexConstraintsOnly: true }, { uniqueIndexConstraintsOnly: false },
+  ];
+  it.each(settings)('matches the owning catalog entries for %j', async setting => {
+    const broad = setting.uniqueIndexConstraintsOnly === false;
+    const { rows } = await t.pool.query<{ relation: string; names: string }>(`
+      SELECT r.relname AS relation, coalesce(string_agg(quote_literal(i.relname), ' | ' ORDER BY i.relname)
+        FILTER (WHERE x.indisunique AND ($1 OR (c.contype IN ('p', 'u') AND NOT c.condeferrable
+          AND x.indisvalid AND NOT x.indisexclusion))), 'never') AS names
+      FROM pg_class r JOIN pg_namespace n ON n.oid = r.relnamespace
+      LEFT JOIN pg_index x ON x.indrelid = r.oid
+      LEFT JOIN pg_class i ON i.oid = x.indexrelid
+      LEFT JOIN pg_constraint c ON c.conrelid = r.oid AND c.conindid = i.oid AND c.contype IN ('p', 'u', 'x')
+      WHERE n.nspname = 'arb' AND r.relkind IN ('r', 'p', 'm')
+      GROUP BY r.oid`, [broad]);
+    expect(await uniqueIndexes({ ...arb, ...setting })).toEqual(Object.fromEntries(rows.map(r => [r.relation, r.names])));
+    expect(await warningsOf({ ...arb, ...setting })).toEqual([]);
   });
 
-  it('gives no note with the option on, or when no unique index would be left out', async () => {
-    expect(await notesFor({ ...arb, uniqueIndexConstraintsOnly: true })).toEqual([]);
-    expect(await notesFor({ ...main, uniqueIndexConstraintsOnly: true })).toEqual([]);
-    expect(await notesFor({ schemas: { public: only('users', 'accounts') } })).toEqual([]);
+  it('preserves the excluded-index out-parameter of definitionForRelationInSchema()', async () => {
+    const q = (query: pg.QueryConfig) => t.pool.query(query);
+    const articles = (await relationsInSchema('extra', q)).find(rel => rel.name === 'articles')!;
+    for (const setting of settings) {
+      const excluded: string[] = [];
+      const definition = await definitionForRelationInSchema(articles, 'extra', {}, {}, finaliseConfig(setting), q,
+        undefined, undefined, undefined, undefined, excluded);
+      const broad = setting.uniqueIndexConstraintsOnly === false;
+      expect(definition).toContain(broad ? "UniqueIndex = 'articles_pkey' | 'shared_name_idx';" : "UniqueIndex = 'articles_pkey';");
+      expect(excluded).toEqual(broad ? ['extra.articles.shared_name_idx'] : []);
+    }
   });
 
-  it('leaves the output as it was without the option, or with false', async () => {
-    const { ts: absent } = await codegen(main);
-    expect((await codegen({ ...main, uniqueIndexConstraintsOnly: false })).ts).toBe(absent);
-    expect(absent).toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
-  });
-
-  it('is optional in Config, read as false when absent', () => {
+  it('keeps the option optional in a finalised config', () => {
     expect(finaliseConfig({}).uniqueIndexConstraintsOnly).toBeUndefined();
     const right: Config = { uniqueIndexConstraintsOnly: true };
     void right;
@@ -2974,7 +2966,7 @@ describe('quotes and */', () => {
   });
 
   it('escapes a quote and a backslash in a label, an index and a column name, and */ in a type name', async () => {
-    const { ts: schema } = await codegen({ schemas: { quoting: all } });
+    const { ts: schema } = await codegen({ schemas: { quoting: all }, uniqueIndexConstraintsOnly: false });
     expect.soft(schema).toContain(`export type marks = 'back\\\\slash' | 'trail\\\\' | 'it\\'s';`);
     expect.soft(schema).toContain(`export type marks = ['back\\\\slash', 'trail\\\\', 'it\\'s'];`);
     expect.soft(schema).toContain('"back\\\\slash": number | null;');
@@ -3655,15 +3647,7 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the unique indexes, domains, enum arrays and intervals notes', async () => {
-    const uniqueNote = (list: string, one = false) => `Note: UniqueIndex lists ${list}, ` +
-      `${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or ` +
-      `WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes ${one ? 'it' : 'them'}, and Postgres refuses ${one ? 'it' : 'them'} ` +
-      'in ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ... DO NOTHING except a WITHOUT OVERLAPS key. ' +
-      `Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} ` +
-      'out; it will be the default in pgcast 7.0.';
-    const articlesNote = uniqueNote('extra.articles.shared_name_idx', true);
-    const productsNote = uniqueNote('public.products.products_status_sku_key and public.products.products_title_lower_key');
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the domain, enum array and interval notes', async () => {
     const domainsNote = 'Note: extra.type_zoo.c_int8_domain (public.ticket_no) has a domain over a type typed by context, ' +
       'such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a ' +
       'write takes more and, except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it ' +
@@ -3677,27 +3661,26 @@ describe('include entries that match no relation', () => {
       'type it as pg parses it; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of ' +
       'yours returns it.';
     const expected: Record<string, string[]> = {
-      main: [uniqueNote('extra.articles.shared_name_idx, public.account_totals.account_totals_owner_key, ' +
-        'public.products.products_status_sku_key and public.products.products_title_lower_key'), domainsNote, enumArraysNote, intervalsNote],
-      'unprefixedSchema-null': [articlesNote],
+      main: [domainsNote, enumArraysNote, intervalsNote],
+      'unprefixedSchema-null': [],
       'schemaJSDoc-false': [],
-      'customTypesTransform-PgMy_type': [productsNote, domainsNote, enumArraysNote, intervalsNote],
-      'customTypesTransform-my_type': [productsNote, domainsNote, enumArraysNote, intervalsNote],
-      'customTypesTransform-PgMyType': [productsNote, domainsNote, enumArraysNote, intervalsNote],
-      'customTypesTransform-function': [productsNote, domainsNote, enumArraysNote, intervalsNote],
-      'typeEnumsAcrossSchemas-false': [productsNote, domainsNote, intervalsNote],
-      'enumOrder-alphabetical': [productsNote, domainsNote, enumArraysNote, intervalsNote],
-      'moduleNames-pgcast': [productsNote, domainsNote, enumArraysNote, intervalsNote],
-      uniqueIndexConstraintsOnly: [domainsNote, enumArraysNote, intervalsNote],
-      domainsTypedByContext: [productsNote, enumArraysNote, intervalsNote],
-      enumArraysTypedAsText: [productsNote, domainsNote, intervalsNote],
-      intervalsTypedAsObjects: [productsNote, domainsNote, enumArraysNote],
+      'customTypesTransform-PgMy_type': [domainsNote, enumArraysNote, intervalsNote],
+      'customTypesTransform-my_type': [domainsNote, enumArraysNote, intervalsNote],
+      'customTypesTransform-PgMyType': [domainsNote, enumArraysNote, intervalsNote],
+      'customTypesTransform-function': [domainsNote, enumArraysNote, intervalsNote],
+      'typeEnumsAcrossSchemas-false': [domainsNote, intervalsNote],
+      'enumOrder-alphabetical': [domainsNote, enumArraysNote, intervalsNote],
+      'moduleNames-pgcast': [domainsNote, enumArraysNote, intervalsNote],
+      'uniqueIndexConstraintsOnly-false': [domainsNote, enumArraysNote, intervalsNote],
+      domainsTypedByContext: [enumArraysNote, intervalsNote],
+      enumArraysTypedAsText: [domainsNote, intervalsNote],
+      intervalsTypedAsObjects: [domainsNote, enumArraysNote],
       domainsTypedAsUnions: ['Note: unions.books.digital_format (unions.digital_format) ' +
         'and unions.books.formats (unions.book_format[]) have domains over a domain, or arrays of a domain: as generated, ' +
         'their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base type of the ' +
         'innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0.'],
-      columnOptions: [articlesNote],
-      'include-exclude-lists': [unmatched('no_such_table', 'public'), articlesNote],
+      columnOptions: [],
+      'include-exclude-lists': [unmatched('no_such_table', 'public')],
       'exclude-star': [],  // exclude: '*' still generates the enums
       edge: [],
     };
@@ -4380,6 +4363,21 @@ describe('the CLI with --check (#556)', () => {
     expect((await check(['--check', defaults])).code).toBe(0);
     expect(await checkFiles({ ...main, ...quiet, db: db(), outDir })).toBe(true);
     expect(readFileSync(join(outDir, schemaFile), 'utf8')).toContain("status: ('draft' | 'published' | 'archived');");
+  });
+
+  it('checks the arbiter default and JSON null against files generated with false', async () => {
+    writeFileSync(join(dir, 'pgcastconfig.json'), json({ ...main, uniqueIndexConstraintsOnly: false }));
+    expect(await runCli([], dir)).toBe(0);
+    expect((await check(['--check'])).code).toBe(0);
+    const defaults = '{"uniqueIndexConstraintsOnly":null}';
+    expect((await check(['--check', defaults])).code).toBe(1);
+    expect(await runCli([defaults], dir)).toBe(0);
+    expect((await check(['--check', defaults])).code).toBe(0);
+    const config = { ...main, ...quiet, db: db(), outDir };
+    expect(await checkFiles(config)).toBe(true);
+    await generate({ ...config, uniqueIndexConstraintsOnly: true });
+    expect(await checkFiles({ ...config, uniqueIndexConstraintsOnly: false })).toBe(false);
+    expect(await checkFiles(config)).toBe(true);
   });
 
   it('without --check, writes the files and exits with 0, as generate() does', async () => {

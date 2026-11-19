@@ -684,7 +684,7 @@ declare module 'zapatos/schema' {
         */
         status?: status | db.Parameter<status> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, status | db.Parameter<status> | db.DefaultType | db.SQLFragment>;
       }
-      export type UniqueIndex = 'articles_pkey' | 'shared_name_idx';
+      export type UniqueIndex = 'articles_pkey';
       export type Column = keyof Selectable;
       export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
       export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;

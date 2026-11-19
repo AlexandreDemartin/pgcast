@@ -1,5 +1,5 @@
 ---
-english: 7c69d6cd1e79
+english: 34107932f207
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -58,7 +58,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 npx zapatos
 ```
 
-Le générateur de pgcast est celui de Zapatos 6.6.1, avec trois corrections dans ce qu’il écrit. Un `git diff` sur votre dossier `zapatos/` ne montre rien, sauf si :
+Avec pgcast 6.x, lancez `git diff` sur votre dossier `zapatos/` régénéré pour voir les éventuelles différences avec Zapatos 6.6.1. En voici quelques exemples.
 
 - un commentaire de colonne s’étend sur plusieurs lignes : chaque ligne commence maintenant par ` * ` ;
 - une table a un index simple nommé comme l’index unique d’un autre schéma : son `UniqueIndex` n’emprunte plus ce nom ;
@@ -148,6 +148,16 @@ Avec les réglages par défaut de la 7.0, un enum d’un autre schéma fournit s
 Pour mettre à jour le placeholder existant d’un domaine sur un enum d’un autre schéma, générez les types dans un nouveau dossier avec `outDir`. Comparez les deux fichiers, reportez les nouveaux labels en conservant vos modifications, puis relancez `tsc`.
 
 Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements.
+
+### Cibles de conflit nommées en 7.0 {#named-conflict-targets}
+
+Régénérez le schéma puis lancez `tsc`. Pour [la table `festival_entries`](/fr/generator#generate.uniqueIndexConstraintsOnly), `constraint()` accepte encore `festival_entries_pkey` et `festival_entries_film_festival_key`. Dans un objet littéral de type `Record<s.festival_entries.UniqueIndex, string>`, gardez ces deux clés et retirez `festival_entries_live_idx` et `festival_entries_slot_key`. Si un upsert cible l’un de ces noms, choisissez une contrainte compatible avec `DO UPDATE`.
+
+Si le type `UniqueIndex` d’une relation devient `never`, TypeScript accepte encore l’ancienne clé dans un objet littéral de type `Record` dont les clés sont définies par cette union. Vérifiez ces objets à la main.
+
+Sur Postgres 18, un upsert qui cible par son nom une clé `WITHOUT OVERLAPS` non différable avec `updateColumns: db.doNothing` compilait et fonctionnait en 6.x. Avec le réglage par défaut de la 7.0, le compilateur refuse ce nom. Pour conserver `DO NOTHING`, écrivez une requête `sql` explicite qui nomme la clé ou utilisez `uniqueIndexConstraintsOnly: false` en 7.x.
+
+Ce réglage rétablit le type union de la 6.x sans note de migration. C’est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
@@ -345,8 +355,6 @@ En 7.x, les trois vérifications de transaction sont activées par défaut. Dans
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
 En 6.x, lancez `npx zapatos` pour voir quelles options du générateur changeraient les types de votre schéma.
-
-La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
 La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, que son placeholder, tel que généré, type dans les cinq interfaces telle que `pg` la renvoie. Un placeholder écrit par Zapatos 6.6.1 sur `bigint` ou `numeric` n’a pas d’import, donc sa colonne vaut `any`, même avec l’option : ajoutez d’abord l’import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Activez l’option et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant. La seconde note de l’option nomme chaque colonne d’un domaine sur un domaine, ou d’un tableau d’un domaine, que son placeholder type comme `any` : une fois activée, l’option les type par le type de base du domaine le plus intérieur, et `tsc` montre le code qui y écrivait une valeur d’un autre type.
 

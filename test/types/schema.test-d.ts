@@ -290,7 +290,9 @@ describe('*ForTable<T> lookups', () => {
     expectTypeOf<s.ColumnForTable<'users'>>().toEqualTypeOf<keyof s.users.Selectable>();
     expectTypeOf<s.UniqueIndexForTable<'users'>>().toEqualTypeOf<'users_email_key' | 'users_pkey'>();
     // shared_name_idx: unique on extra.articles, a plain index on public.transfers
-    expectTypeOf<s.UniqueIndexForTable<'extra.articles'>>().toEqualTypeOf<'articles_pkey' | 'shared_name_idx'>();
+    expectTypeOf<s.UniqueIndexForTable<'extra.articles'>>().toEqualTypeOf<'articles_pkey'>();
+    expectTypeOf<s.products.UniqueIndex>().toEqualTypeOf<'products_pkey' | 'products_sku_variant_key'>();
+    expectTypeOf<s.account_totals.UniqueIndex>().toBeNever();
     expectTypeOf<s.UniqueIndexForTable<'transfers'>>().toEqualTypeOf<'transfers_pkey'>();
   });
 

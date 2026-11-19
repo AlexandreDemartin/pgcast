@@ -57,7 +57,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 npx zapatos
 ```
 
-pgcast's generator is Zapatos 6.6.1's, with three fixes to what it writes. A `git diff` on your `zapatos/` folder shows nothing, unless:
+In pgcast 6.x, `git diff` on your regenerated `zapatos/` folder can show differences from Zapatos 6.6.1, for example when
 
 - a column comment runs over several lines: each line now starts with ` * `;
 - a table has a plain index named like another schema's unique index: its `UniqueIndex` no longer borrows that name;
@@ -147,6 +147,16 @@ With the 7.0 defaults, a foreign enum supplies its own labels, even when the rel
 To update an existing domain placeholder over a foreign enum, generate into a fresh directory with `outDir`. Diff the two files, merge the new labels with your local edits, then run `tsc` again.
 
 Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0.
+
+### Named conflict targets in 7.0 {#named-conflict-targets}
+
+Regenerate the schema and run `tsc`. For [the `festival_entries` table](/generator#generate.uniqueIndexConstraintsOnly), `constraint()` still accepts `festival_entries_pkey` and `festival_entries_film_festival_key`. Keep these two keys in a `Record<s.festival_entries.UniqueIndex, string>` object literal. Remove `festival_entries_live_idx` and `festival_entries_slot_key`. If an upsert targets either name, choose a constraint usable with `DO UPDATE`.
+
+If a relation's `UniqueIndex` becomes `never`, a `Record` literal typed with that union still compiles with the old key. Check those records by hand.
+
+On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColumns: db.doNothing` compiled and worked in 6.x. The 7.0 default rejects the name at compile time. To keep `DO NOTHING`, write an explicit `sql` statement naming the key, or set `uniqueIndexConstraintsOnly: false` through 7.x.
+
+This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
 
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
@@ -344,8 +354,6 @@ In 7.x, each transaction check defaults to `true`. Set only the check you need t
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
 In 6.x, run `npx zapatos` to see which generator options would change the types for your schema.
-
-The note of [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) names each unique index that `ON CONFLICT ON CONSTRAINT` refuses, though `UniqueIndex` lists it: an index with no constraint, a materialised view's among them, the index of a `DEFERRABLE` constraint or, on Postgres 18, of a `WITHOUT OVERLAPS` key, and a constraint's index not yet valid. Turn it on and regenerate: `tsc` shows each `constraint()` that names one, which Postgres refused anyway (42704, 55000, 42809 or 42P10), and any code of yours that takes `UniqueIndex` for every unique index, such as a `Record` keyed by it.
 
 The note of [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) names each column of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, which its placeholder, as generated, types as `pg` returns it in all five interfaces. A placeholder Zapatos 6.6.1 wrote over `bigint` or `numeric` has no import, so its column is `any`, with the option too: add the import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Turn it on and regenerate: a placeholder left as generated now types its column by context, and `tsc` shows the code that took the shortcuts' JSON for the placeholder's type, a `Date` for a date or a string for a `bigint`. A placeholder you edited keeps its type, as before. Its second note names each column of a domain over a domain, or of an array of a domain, which its placeholder types as `any`: turned on, it types them by the base type of the innermost domain, and `tsc` shows the code that wrote a value of another type there.
 

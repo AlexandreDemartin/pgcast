@@ -162,13 +162,11 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_pkey'))
 db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_key'));
 ```
 
-- The type takes every unique index of the table, and Postgres only a constraint. An index made with `CREATE UNIQUE INDEX`, which is no constraint, type-checks, and Postgres refuses it: 42704, `constraint "…" for table "…" does not exist`.
-- For such an index, pass its columns as the `conflictTarget`: `'code'` for a unique index on `code`.
-- A `DEFERRABLE` unique constraint type-checks too, and Postgres refuses it as an arbiter, by its name or by its columns: 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters`.
-- Two more type-check, and Postgres refuses them: on Postgres 18, a `WITHOUT OVERLAPS` key with `DO UPDATE`, which Postgres treats as an exclusion constraint (42809), and a constraint whose index isn't valid yet, such as a partitioned table's, added with `ALTER TABLE ONLY`: Postgres refuses it with `doNothing` too, and by its columns as the `conflictTarget` (42P10).
-- Generate with [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) and none of these names compiles: `UniqueIndex` then lists only what Postgres takes here. It becomes the default in 7.0.
+By default, `constraint()` takes the `UNIQUE` and `PRIMARY KEY` constraints usable with `DO UPDATE`. For an ordinary unique index on `code`, pass the column `'code'` as the `conflictTarget`. Postgres refuses a deferrable constraint (55000), a constraint whose index is still invalid (42P10), and, from Postgres 18, a `WITHOUT OVERLAPS` key with `DO UPDATE` (42809). In 7.x, [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restores the 6.x type check. Postgres still applies the same rules.
 
-The type does not check that a constraint belongs to the upsert's table, and Postgres refuses another table's: 42704. Only inside the call does `constraint()` take the table's names, as above. Held in a variable, `const k = db.constraint('tags_pkey')` takes any table's name, so `db.upsert('ratings', …, k)` compiles. Give the table, `db.constraint<'ratings'>('ratings_pkey')`, and the type checks the name against it:
+Postgres looks up the name on the target table, even if another table shares it. A missing constraint gives 42704. A constraint with no arbiter index, such as a `CHECK` sharing a bare index's name, gives 42809.
+
+Only inside the call does `constraint()` take the table's names, as above. Held in a variable, `const k = db.constraint('tags_pkey')` takes any table's name, so `db.upsert('ratings', …, k)` compiles. Give the table, `db.constraint<'ratings'>('ratings_pkey')`, and the type checks the name against it:
 
 ```ts twoslash
 import * as db from 'zapatos/db';

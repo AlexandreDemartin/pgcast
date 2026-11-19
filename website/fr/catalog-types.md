@@ -1,5 +1,5 @@
 ---
-english: 7edbc1bd6d3b
+english: 683fe68e5878
 ---
 
 # Le catalogue
@@ -70,7 +70,7 @@ Une vue matérialisée ne garde aucun `NOT NULL`, pas même celui d’un domaine
 
 Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos : une nullabilité que la base ne déclare pas serait une supposition, et une supposition est la seule chose qu’un type généré ne doit pas être. Certaines lacunes de ce que lit le générateur sont connues, et décrites ici telles qu’elles sont aujourd’hui :
 
-- `UniqueIndex` liste chaque index unique, y compris ceux que refuse `ON CONFLICT ON CONSTRAINT`, sauf si [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) est activé.
+- `UniqueIndex` liste les contraintes utilisables avec `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la liste de tous les index uniques de la relation.
 - Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, est typé dans les cinq interfaces par son placeholder, qui, tel que généré, contient ce que renvoie `pg`, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
 - Un domaine sur un domaine, ou un tableau d’un domaine, vaut `any`, le type de son placeholder tel que généré, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
 - Un tableau d’un enum est un tableau dans `Selectable`, bien que `pg` renvoie son texte, `'{writer,editor}'`, sauf si [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) est activé.

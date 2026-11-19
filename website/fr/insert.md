@@ -1,5 +1,5 @@
 ---
-english: ce062edf3a5a
+english: 35cbcccce19e
 ---
 
 # Écritures
@@ -166,13 +166,11 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_pkey'))
 db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_key'));
 ```
 
-- Le type accepte chaque index unique de la table, et Postgres seulement une contrainte. Un index créé avec `CREATE UNIQUE INDEX`, qui n’est pas une contrainte, passe la vérification de types, et Postgres le refuse : 42704, `constraint "…" for table "…" does not exist`.
-- Pour un tel index, passez ses colonnes comme `conflictTarget` : `'code'` pour un index unique sur `code`.
-- Une contrainte unique `DEFERRABLE` passe aussi la vérification de types, et Postgres la refuse comme arbitre, par son nom comme par ses colonnes : 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters`.
-- Deux autres passent aussi la vérification de types, et Postgres les refuse : sur Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE`, que Postgres traite comme une contrainte d’exclusion (42809), et une contrainte dont l’index n’est pas encore valide, comme celle d’une table partitionnée, ajoutée avec `ALTER TABLE ONLY` : Postgres la refuse avec `doNothing` aussi, et par ses colonnes comme `conflictTarget` (42P10).
-- Générez avec [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) et aucun de ces noms ne compile : `UniqueIndex` ne liste alors que ce que Postgres accepte ici. Ce sera le comportement par défaut en 7.0.
+Par défaut, `constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la vérification de types de la 6.x. Postgres applique toujours les mêmes règles.
 
-Le type ne vérifie pas qu’une contrainte appartient à la table de l’upsert, et Postgres refuse celle d’une autre table : 42704. `constraint()` ne prend les noms de la table qu’à l’intérieur de l’appel, comme ci-dessus. Contenu dans une variable, `const k = db.constraint('tags_pkey')` accepte le nom de n’importe quelle table, donc `db.upsert('ratings', …, k)` compile. Donnez la table, `db.constraint<'ratings'>('ratings_pkey')`, et le type vérifie le nom par rapport à elle :
+Postgres cherche la contrainte sur la table cible, même si une autre table a une contrainte du même nom. Si la contrainte est absente, Postgres renvoie 42704. Si aucun index de la contrainte ne peut servir d’arbitre, Postgres renvoie 42809, par exemple pour une contrainte `CHECK` qui porte le même nom qu’un index sans contrainte.
+
+TypeScript déduit la table cible lorsque vous appelez `constraint()` directement dans `upsert()`, comme ci-dessus. Si vous stockez le résultat dans une variable avec `const k = db.constraint('tags_pkey')`, `constraint()` accepte un nom de contrainte de n’importe quelle table et `db.upsert('ratings', …, k)` compile. Indiquez la table avec `db.constraint<'ratings'>('ratings_pkey')` pour que TypeScript vérifie que la contrainte appartient à `ratings`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
