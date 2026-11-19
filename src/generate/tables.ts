@@ -21,6 +21,8 @@ type DomainRoots = Record<string, { schema: string; name: string; isArray: boole
 // TypeScript's own types that an enum may be named after: a placeholder naming one compiles without an import
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
 const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
+const isEnumArray = (name: string, enums: EnumData) =>
+  name.startsWith('_') && !hasOwn(enums, name) && hasOwn(enums, name.slice(1));
 const contexts = ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable'] as const;
 // pg_catalog's interval or its array: a type of yours of that name is typed by its name, as in 6.6.1, whatever the key
 const isInterval = (type: { schema: string; name: string } | undefined) =>
@@ -239,8 +241,7 @@ export const definitionForRelationInSchema = async (
     // The enum is looked up in the schema of its type, which a built-in's array names too (pg_catalog)
     const
       ownEnums = acrossSchemas ? otherEnums[udtSchema] : enums,
-      enumArray = selectableType !== 'any' && udtName.charAt(0) === '_' && !hasOwn(ownEnums, udtName) &&
-        hasOwn(ownEnums, udtName.slice(1));
+      enumArray = selectableType !== 'any' && isEnumArray(udtName, ownEnums);
     if (enumArraysNotAsText && enumArray && config.enumArraysTypedAsText == null) {  // left out, or null from JSON
       enumArraysNotAsText.push([`${schemaName}.${rel.name}.${column} (${domainName === null ?
         `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`})`,
@@ -325,9 +326,11 @@ export const definitionForRelationInSchema = async (
         placeholder = 'c.' + prefixedCustomType,
         root = rootOf(row),
         inlineRoot = root !== undefined && root.schema !== schemaName,
-        rootTypes = root && contexts.map(context => context === 'Selectable' && root.isArray ? 'string' :
-          tsTypeForPgType((root.isArray ? '_' : '') + root.name, inlineRoot ? rootEnums[root.schema] : enums, context, configIn(root.schema),
-            inlineRoot)),
+        // root.isArray marks an array of domains. A domain over an enum array has the array's own name at its root.
+        enumsAtRoot = inlineRoot ? rootEnums[root.schema] : enums,
+        rootTypes = root && contexts.map(context => context === 'Selectable' &&
+          (root.isArray || enumArraysAsText && isEnumArray(root.name, enumsAtRoot)) ? 'string' :
+          tsTypeForPgType((root.isArray ? '_' : '') + root.name, enumsAtRoot, context, configIn(root.schema), inlineRoot)),
         underDomains = rootTypes && rootTypes[1] !== 'any' ? rootTypes : undefined,
         byContext = domainName !== null && selectableType !== 'any' &&
           [JSONSelectableType, whereableType, insertableType, updatableType].some(type => type !== selectableType),
