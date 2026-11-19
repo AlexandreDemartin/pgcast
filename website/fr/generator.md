@@ -456,7 +456,7 @@ Pour chaque partition ou table qui hérite d’une autre table, le type reprend 
 
 Le type exclut les contraintes `NOT NULL` des tables. En cas de violation, Postgres indique la colonne concernée. Les contraintes de vérification d’un domaine appartiennent au domaine. Si la contrainte `NOT NULL` d’un domaine est violée, Postgres indique le domaine dans `err.dataType`.
 
-Si le générateur inclut une relation nommée `every` d’un schéma qui contient un enum nommé `Constraint`, tous deux déclarent `every.Constraint`. Excluez cette relation, désactivez l’option pour ce schéma ou renommez l’un des deux.
+Si le générateur inclut une relation nommée `every` et que le même schéma contient un enum nommé `Constraint`, la relation et l’enum déclarent tous deux `every.Constraint`. Excluez cette relation, désactivez l’option pour ce schéma ou renommez l’un des deux.
 
 Le générateur exécute la requête supplémentaire au catalogue et déclare le type uniquement si `constraintNames` vaut `true` après fusion de la configuration (fichier, puis argument JSON). La valeur JSON `null` dans l’argument désactive l’option même si le fichier indique `true`.
 
