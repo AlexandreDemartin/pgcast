@@ -1,5 +1,5 @@
 ---
-english: e38e80b6e988
+english: 45e8357ecf16
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 

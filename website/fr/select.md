@@ -1,5 +1,5 @@
 ---
-english: b6ac380f19e8
+english: 7f152c939b66
 ---
 
 # Lectures {#select-and-the-aggregates}
