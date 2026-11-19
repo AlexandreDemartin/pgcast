@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Changed
+
+- Breaking: `TxnClientForSerializableRO`, `TxnClientForRepeatableReadRO` and `TxnClientForReadCommittedRO` now accept the client of `serializableRODeferrable()` (#694). If `db.serializableRO(pool, countSeats)` fails under `strict`, type the callback parameter as `db.TxnClientForSerializableRO` and handle `SerializableRODeferrable` wherever you enumerate its levels. The same migration applies to the other two shortcuts with their respective aliases.
+
 ## [6.12.0] - 2026-11-19
 
 ### Added

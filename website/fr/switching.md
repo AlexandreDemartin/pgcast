@@ -103,6 +103,16 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 - À partir de la 6.11.0, une fois le schéma régénéré, une table dont une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`search` typée `any`, comme l’est un `tsvector`, ou `length` un nombre), n’accepte plus n’importe quelle chaîne comme nom dans son type `SQL` (2345) : `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 acceptait la chaîne comme un nom, `"titel"`, que Postgres refuse quand aucune colonne ne le porte (42703). Pour un nom connu seulement à l’exécution, vérifiez-le, puis typez-le comme le `Column` de la table.
 - À partir de la 6.11.0, sur une telle table, le `where` d’un raccourci, le `having` de `select()`, `exists()` et `isInSelect()`, ainsi que les lignes d’`insert()`, d’`upsert()` et d’`update()`, n’acceptent plus une chaîne, un `String` ni un tableau, quel que soit le schéma (2345, 2769) : `db.select('films', 'titel')`. Zapatos 6.6.1 exécutait la chaîne comme une colonne, `WHERE "titel"` (42703 quand aucune colonne ne porte ce nom ; quand elle nommait une colonne booléenne, la requête filtrait par cette colonne), et envoyait une ligne donnée en chaîne comme ses caractères, `("0", "1", …)` (42703). Écrivez un Whereable, `{ subtitled: true }`, ou un fragment, `` db.sql<s.screenings.SQL>`${'subtitled'}` `` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). Sur une table dont toutes les colonnes sont optionnelles, l’une nommée `length`, `[]`, un tableau de lignes contenu dans une variable, un tableau `readonly` et un tableau `as const`, contenu dans une variable ou écrit dans l’appel, donnés à `insert()` ou à `upsert()`, sont désormais typés comme un tableau, comme ils s’exécutent, et non comme une seule ligne ([#683](https://github.com/AlexandreDemartin/pgcast/issues/683)).
 
+### À partir de la 7.0 {#from-7-0}
+
+<div class="stack">
+
+| Votre code | Zapatos 6.6.1 et pgcast 6.x | pgcast 7.0 | Que faire |
+|---|---|---|---|
+| `db.serializableRO(pool, countSeats)`, où le paramètre de `countSeats` est de type `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compile | TS2345 avec `strict` : le callback peut aussi recevoir le niveau `SerializableRODeferrable` | Typez le paramètre [`db.TxnClientForSerializableRO`](/fr/transaction#TxnClientForSerializableRO). Si la fonction examine `_zapatos.isolationLevel`, traitez aussi le cas `SerializableRODeferrable`. |
+
+</div>
+
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
 pgcast corrige, sans option à activer, ce sur quoi aucun code ne pouvait compter dans Zapatos 6.6.1 : un appel que Postgres ou le type refusait, qui faisait le contraire de son nom, ou qui laissait une chaîne injecter du SQL. Quelques-uns de ces appels s’exécutaient bel et bien, et donnent maintenant d’autres lignes, ou lèvent une erreur.
