@@ -32,7 +32,7 @@ Quand vous lancez `npx pgcast`, le générateur pose à ces tables quelques ques
 | son `COMMENT ON COLUMN` | `pg_description` | la JSDoc que votre éditeur affiche pour la colonne, avec son type Postgres et sa valeur par défaut |
 | chaque enum et ses labels | `pg_enum` | une union de chaînes, et le tuple `every.<name>` |
 | chaque index unique, et la contrainte à laquelle il appartient | `pg_indexes`, `pg_namespace`, `pg_class`, `pg_index`, `pg_constraint` | `UniqueIndex`, les noms qu’accepte [`constraint()`](/fr/insert#constraint) |
-| avec [`constraintNames`](/fr/generator#generate.constraintNames), les noms de contraintes et d’index uniques de chaque relation | `pg_constraint` et les index uniques ci-dessus | le type `Constraint` de la relation |
+| avec [`constraintNames`](/fr/generator#generate.constraintNames), les noms des contraintes et des index uniques de chaque relation | `pg_constraint` et les index uniques ci-dessus | le type `Constraint` de la relation |
 | avec [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), chaque domaine sur `text`, son `CHECK` et son `COMMENT ON DOMAIN` | `pg_type`, `pg_constraint`, `pg_description` | l’union des valeurs que liste le `CHECK`, et le tuple `every.<name>` |
 
 Avec les réglages par défaut de la 7.0, le générateur lit chaque enum dans son propre schéma. Le premier label de `every.crew_job` est `director`, comme dans la déclaration `CREATE TYPE crew_job`. Voir [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder).
@@ -43,7 +43,7 @@ Et ce que le catalogue ne voit pas, comme une colonne qu’un trigger remplit, v
 
 ### Ce que le générateur ne lit pas {#what-the-generator-doesn-t-read}
 
-Le générateur lit les noms, les types, la nullabilité et les valeurs par défaut. Postgres conserve les clés étrangères et les contraintes `CHECK` dans `pg_constraint`, mais Zapatos 6.6.1 ne lisait ni cette table ni le SQL des vues et des fonctions. pgcast y lit les index qu’accepte `ON CONFLICT ON CONSTRAINT` ([`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly)), les valeurs que liste le `CHECK` d’un domaine ([`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions)) et les noms des contraintes d’une relation ([`constraintNames`](/fr/generator#generate.constraintNames)).
+Le générateur lit les noms, les types, la nullabilité et les valeurs par défaut. Postgres conserve les clés étrangères et les contraintes `CHECK` dans `pg_constraint`, mais Zapatos 6.6.1 ne lisait ni cette table ni le SQL des vues et des fonctions. pgcast consulte cette table pour identifier les index qu’accepte `ON CONFLICT ON CONSTRAINT` ([`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly`)), relever les valeurs énumérées dans le `CHECK` d’un domaine ([`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions)) et retrouver les noms des contraintes d’une relation ([`constraintNames`](/fr/generator#generate.constraintNames)).
 
 Ainsi `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, est un `number` ; un `seat_label` qui respecte `'^[A-Z][0-9]{1,2}$'` est une `string` ; et rien ne dit à TypeScript que `films.studio_id` pointe vers un studio.
 
