@@ -7,10 +7,10 @@ Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [PGlite](https
 ## Install
 
 ```sh
-npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-pglite @electric-sql/pglite
+npm install zapatos@npm:@pgcast/pgcast@^7 @pgcast/adapter-pglite @electric-sql/pglite
 ```
 
-For `pgcast/db`, install `pgcast@npm:@pgcast/pgcast@^6.12.0` in place of the `zapatos` alias. Set [`moduleNames`](https://pgcast.dev/generator#generate.moduleNames) to `"pgcast"`. Generate the types from a Postgres database with your schema. The adapter imports neither pgcast nor PGlite. Its types fit either alias.
+For `pgcast/db`, install `pgcast@npm:@pgcast/pgcast@^7` in place of the `zapatos` alias. Set [`moduleNames`](https://pgcast.dev/generator#generate.moduleNames) to `"pgcast"`. Generate the types from a Postgres database with your schema. The adapter imports neither pgcast nor PGlite. Its types fit either alias.
 
 ## Use
 
