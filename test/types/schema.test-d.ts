@@ -97,26 +97,30 @@ describe('domain (users.email, accounts.overdraft_limit, users.tags)', () => {
     expectTypeOf<s.users.Selectable['tags']>().toEqualTypeOf<string[] | null>();
   });
 
-  test('characterization: a domain over int8 (extra.type_zoo.c_int8_domain) is pg\'s string in all five, without domainsTypedByContext', () => {
-    type Int8 = db.Int8String;
-    expectTypeOf<s.extra.type_zoo.Selectable['c_int8_domain']>().toEqualTypeOf<Int8 | null>();
-    // the shortcuts give a number
-    expectTypeOf<s.extra.type_zoo.JSONSelectable['c_int8_domain']>().toEqualTypeOf<Int8 | null>();
-    expectTypeOf<s.extra.type_zoo.Whereable['c_int8_domain']>().toEqualTypeOf<Where<Int8> | undefined>();
-    // Postgres takes a number
+  test('types a bigint domain by context', () => {
+    type Input = number | db.Int8String | bigint;
+    expectTypeOf<s.extra.type_zoo.Selectable['c_int8_domain']>().toEqualTypeOf<db.Int8String | null>();
+    expectTypeOf<s.extra.type_zoo.JSONSelectable['c_int8_domain']>().toEqualTypeOf<number | null>();
+    expectTypeOf<s.extra.type_zoo.Whereable['c_int8_domain']>().toEqualTypeOf<Where<Input> | undefined>();
     expectTypeOf<s.extra.type_zoo.Insertable['c_int8_domain']>()
-      .toEqualTypeOf<Int8 | db.Parameter<Int8> | null | db.DefaultType | db.SQLFragment<any> | undefined>();
+      .toEqualTypeOf<Input | db.Parameter<Input> | null | db.DefaultType | db.SQLFragment<any> | undefined>();
   });
 });
 
-describe('interval (extra.type_zoo.c_interval), without intervalsTypedAsObjects', () => {
-  test('characterization: the text in all five, though pg parses it into an object for a query of your own', () => {
-    expectTypeOf<s.extra.type_zoo.Selectable['c_interval']>().toEqualTypeOf<string | null>();
-    expectTypeOf<s.extra.type_zoo.JSONSelectable['c_interval']>().toEqualTypeOf<string | null>();
-    expectTypeOf<s.extra.type_zoo.Whereable['c_interval']>().toEqualTypeOf<Where<string> | undefined>();
-    expectTypeOf<s.extra.type_zoo.Insertable['c_interval']>()
-      .toEqualTypeOf<string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any> | undefined>();
-  });
+test('reads enum arrays and intervals as pg parses them', () => {
+  type Input = string | db.PostgresInterval;
+  type Row = s.extra.type_zoo.Selectable;
+  expectTypeOf<Row['c_enum_array']>().toEqualTypeOf<string | null>();
+  expectTypeOf<Row['c_interval']>().toEqualTypeOf<db.PostgresInterval | null>();
+  expectTypeOf<s.extra.type_zoo.JSONSelectable['c_interval']>().toEqualTypeOf<string | null>();
+  expectTypeOf<s.extra.type_zoo.Whereable['c_interval']>().toEqualTypeOf<Where<Input> | undefined>();
+  expectTypeOf<s.extra.type_zoo.Insertable['c_interval']>()
+    .toEqualTypeOf<Input | db.Parameter<Input> | null | db.DefaultType | db.SQLFragment<any> | undefined>();
+  const row = {} as Row;
+  // @ts-expect-error pg returns the enum array as text
+  row.c_enum_array?.map(String);
+  // @ts-expect-error writes take an array of enum labels
+  db.insert('extra.type_zoo', { c_enum_array: row.c_enum_array });
 });
 
 describe('PostgresInterval, the type intervalsTypedAsObjects writes', () => {

@@ -60,6 +60,19 @@ describe('cliConfig()', () => {
     expect(cliConfig('{"uniqueIndexConstraintsOnly":false}', dir).uniqueIndexConstraintsOnly).toBe(false);
   });
 
+  it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays domain and parser settings by key in %s', name => {
+    for (const key of ['domainsTypedByContext', 'enumArraysTypedAsText', 'intervalsTypedAsObjects']) {
+      const setting = (value: boolean | null) => JSON.stringify({ [key]: value });
+      expect(cliConfig(setting(false), dir)).toEqual({ [key]: false, ...exits });
+      write(name, JSON.stringify({ [key]: true, schemaJSDoc: false }));
+      expect(cliConfig(undefined, dir)).toEqual({ [key]: true, schemaJSDoc: false, ...exits });
+      expect(cliConfig(setting(false), dir)).toEqual({ [key]: false, schemaJSDoc: false, ...exits });
+      write(name, JSON.stringify({ [key]: false, schemaJSDoc: false }));
+      expect(cliConfig(setting(null), dir)).toEqual({ [key]: null, schemaJSDoc: false, ...exits });
+      fs.unlinkSync(path.join(dir, name));
+    }
+  });
+
   it('reads pgcastconfig.json alone', () => {
     write('pgcastconfig.json', '{"db": {"connectionString": "{{ PGCAST_FILMS_URL }}"}, "moduleNames": "pgcast"}');
     expect(cliConfig('{"outDir": "./src"}', dir))

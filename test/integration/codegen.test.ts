@@ -20,7 +20,7 @@ import ts from 'typescript';
 import * as pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi, type MockInstance } from 'vitest';
 import {
-  check as checkFiles, definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig,
+  check as checkFiles, definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, tsTypeForPgType,
   type Config,
 } from '../../src/generate';
 import * as runtime from '../../src/db';
@@ -69,11 +69,11 @@ const variants: [string, Config][] = [
   // main, whose output is test/generated/: only the UniqueIndex of products, extra.articles and account_totals differ
   ['uniqueIndexConstraintsOnly-false', { ...main, uniqueIndexConstraintsOnly: false }],
   // only extra.type_zoo's c_int8_domain differs, in the four interfaces but Selectable; the placeholders are the same
-  ['domainsTypedByContext', { schemas: customTypesSchemas, domainsTypedByContext: true }],
-  // extra.type_zoo's c_enum_array in Selectable is the text pg returns
-  ['enumArraysTypedAsText', { schemas: customTypesSchemas, enumArraysTypedAsText: true }],
+  ['domainsTypedByContext-false', { schemas: customTypesSchemas, domainsTypedByContext: false }],
+  // extra.type_zoo's c_enum_array in Selectable is the label array a custom parser returns
+  ['enumArraysTypedAsText-false', { schemas: customTypesSchemas, enumArraysTypedAsText: false }],
   // only extra.type_zoo's c_interval differs, in the four interfaces but JSONSelectable; the placeholders are the same
-  ['intervalsTypedAsObjects', { schemas: customTypesSchemas, intervalsTypedAsObjects: true }],
+  ['intervalsTypedAsObjects-false', { schemas: customTypesSchemas, intervalsTypedAsObjects: false }],
   // the fixture's schema unions, which only this variant reads, beside public.users: a domains section in each schema,
   // the unions of unions.book_format, cover, edition, quirk and shelf, and their placeholders naming them
   ['domainsTypedAsUnions', { schemas: { public: only('users'), unions: all }, domainsTypedAsUnions: true }],
@@ -127,10 +127,7 @@ const warningsOf = async (config: Config) => {
   return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
 };
 
-/** Omit the domain, enum array and interval notes, which have their own tests. */
-const warningsFor = async (schemas: Schemas, config: Config = {}) =>
-  (await warningsOf({ ...config, schemas })).filter(w => !w.includes('domainsTypedByContext') &&
-    !w.includes('enumArraysTypedAsText') && !w.includes('intervalsTypedAsObjects'));
+const warningsFor = (schemas: Schemas, config: Config = {}) => warningsOf({ ...config, schemas });
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -216,9 +213,9 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       export const ok: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'draft' };
       // @ts-expect-error not a label of extra.status
       export const ko: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'nope' };
-      export const moods: s.extra.type_zoo.Selectable['c_enum_array'] = ['happy', 'sad'];
+      export const moods: s.extra.type_zoo.JSONSelectable['c_enum_array'] = ['happy', 'sad'];
       // @ts-expect-error not a label of public.mood
-      export const meh: s.extra.type_zoo.Selectable['c_enum_array'] = ['meh'];
+      export const meh: s.extra.type_zoo.JSONSelectable['c_enum_array'] = ['meh'];
     `, { skipLibCheck })).toEqual([]);
   });
 
@@ -310,14 +307,14 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
     afterAll(() => t.pool.query('DROP SCHEMA ctx_probe CASCADE'));
 
     const config = { schemas: { extra: only('type_zoo'), ctx_probe: all } };
-    const on = { ...config, domainsTypedByContext: true };
+    const off = { ...config, domainsTypedByContext: false };
     const edited = (name: string, type: string) => ({
       [name]: `declare module 'zapatos/custom' {\n  import type * as db from 'zapatos/db';\n  export type ${name} = ${type};\n}\n`,
     });
 
     /**
      * Each context of a placeholder left as generated, one line after each marker: `byContext` before what only the
-     * option lets through, `once` before what only its absence does; the last call is refused either way.
+     * option lets through, `once` before what only false does; the last call is refused either way.
      */
     const generatedProbe = (byContext: string, once: string) => `
       import * as db from 'zapatos/db';
@@ -358,18 +355,18 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       ];`;
 
     it('types each context as its base type, while the placeholder holds what the generator wrote', async () => {
-      expect(await probeErrors(on, generatedProbe('//', '// @ts-expect-error'))).toEqual([]);
+      expect(await probeErrors(config, generatedProbe('//', '// @ts-expect-error'))).toEqual([]);
     });
 
-    it('is off by default: the placeholder\'s type in all five, as in Zapatos 6.6.1', async () => {
-      expect(await probeErrors(config, generatedProbe('// @ts-expect-error', '//'))).toEqual([]);
+    it('with false: the placeholder\'s type in all five, as in Zapatos 6.6.1', async () => {
+      expect(await probeErrors(off, generatedProbe('// @ts-expect-error', '//'))).toEqual([]);
     });
 
     it('each refusal of one probe is an unused directive in the other', async () => {
       const both = generatedProbe('// @ts-expect-error', '// @ts-expect-error');
       const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
-      expect(await probeErrors(on, both)).toEqual(Array(9).fill(unused));
-      expect(await probeErrors(config, both)).toEqual(Array(2).fill(unused));
+      expect(await probeErrors(config, both)).toEqual(Array(9).fill(unused));
+      expect(await probeErrors(off, both)).toEqual(Array(2).fill(unused));
     });
 
     /** An edited placeholder, with or without the option: its type in all five; `refused` marks what it refuses. */
@@ -399,13 +396,13 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
     it('the edited probe\'s refusals are unused with the placeholder left as generated, or edited to any', async () => {
       const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
       // as generated, typed by context: a number, a bigint; 'abc' is refused still
-      expect(await probeErrors(on, editedProbe('// @ts-expect-error'))).toEqual(Array(2).fill(unused));
+      expect(await probeErrors(config, editedProbe('// @ts-expect-error'))).toEqual(Array(2).fill(unused));
       // any stays any, with the option too
-      expect(await probeErrors(on, editedProbe('// @ts-expect-error'), {}, edited('PgTicket_no', 'any')))
+      expect(await probeErrors(config, editedProbe('// @ts-expect-error'), {}, edited('PgTicket_no', 'any')))
         .toEqual(Array(3).fill(unused));
     });
 
-    it('keeps a brand, refusing the base type\'s values', async () => {
+    it.each([false, true])('keeps a brand, refusing unbranded values, skipLibCheck %s', async skipLibCheck => {
       const brand = edited('PgTicket_no', "db.Int8String & { readonly __brand: 'ticket_no' }");
       const probe = `
         import * as db from 'zapatos/db';
@@ -413,8 +410,8 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
         export const plain = db.insert('extra.type_zoo', { c_int8_domain: '1' });
         // @ts-expect-error not branded
         export const number = db.insert('extra.type_zoo', { c_int8_domain: 1 });`;
-      expect(await probeErrors(on, probe, {}, brand)).toEqual([]);
-      expect(await probeErrors(on, probe)).toEqual(Array(2).fill("probe.ts TS2578 Unused '@ts-expect-error' directive."));
+      expect(await probeErrors(config, probe, { skipLibCheck }, brand)).toEqual([]);
+      expect(await probeErrors(config, probe)).toEqual(Array(2).fill("probe.ts TS2578 Unused '@ts-expect-error' directive."));
     });
   });
 
@@ -435,7 +432,7 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
     afterAll(() => t.pool.query('DROP SCHEMA nest_probe CASCADE'));
 
     const config = { schemas: { nest_probe: all } };
-    const on = { ...config, domainsTypedByContext: true };
+    const off = { ...config, domainsTypedByContext: false };
     const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
 
     /** Each context of the placeholders left as generated, `any`: `refused` marks what only the option refuses. */
@@ -478,12 +475,12 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       ];`;
 
     it('types each context by the base type of the innermost domain', async () => {
-      expect(await probeErrors(on, generatedProbe('// @ts-expect-error'))).toEqual([]);
+      expect(await probeErrors(config, generatedProbe('// @ts-expect-error'))).toEqual([]);
     });
 
-    it('is off by default: any in all five, as in Zapatos 6.6.1, so that each refusal is the option\'s', async () => {
-      expect(await probeErrors(config, generatedProbe('//'))).toEqual([]);
-      expect(await probeErrors(config, generatedProbe('// @ts-expect-error'))).toEqual(Array(8).fill(unused));
+    it('with false: any in all five, as in Zapatos 6.6.1, so that each refusal is the option\'s', async () => {
+      expect(await probeErrors(off, generatedProbe('//'))).toEqual([]);
+      expect(await probeErrors(off, generatedProbe('// @ts-expect-error'))).toEqual(Array(8).fill(unused));
     });
 
     /** Edited placeholders, with or without the option: their type in all five; `refused` marks what they refuse. */
@@ -518,12 +515,12 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
 
     it('the edited probe\'s refusals are unused with the placeholders left as generated', async () => {
       // typed by the innermost domain: a number, a bigint, pg's text for the array; 'horror' is refused still
-      expect(await probeErrors(on, editedProbe('// @ts-expect-error'))).toEqual([
+      expect(await probeErrors(config, editedProbe('// @ts-expect-error'))).toEqual([
         "probe.ts TS1360 Type 'string | null' does not satisfy the expected type 'genre[] | null'.   " +
           "Type 'string' is not assignable to type 'genre[]'.",
         ...Array(2).fill(unused),
       ]);
-      expect(await probeErrors(config, editedProbe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
+      expect(await probeErrors(off, editedProbe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
     });
   });
 
@@ -536,7 +533,7 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
     afterAll(() => t.pool.query('DROP SCHEMA arr_probe CASCADE'));
 
     const config = { schemas: { arr_probe: all } };
-    const on = { ...config, enumArraysTypedAsText: true };
+    const off = { ...config, enumArraysTypedAsText: false };
     const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
 
     /** Each context with the placeholder left as generated: `refused` marks what only the option refuses. */
@@ -567,14 +564,14 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       export const domainText: string | null = sel.dmoods;`;
 
     it('types the text pg returns in Selectable, and only there', async () => {
-      expect(await probeErrors(on, probe('// @ts-expect-error'))).toEqual([]);
-      expect(await probeErrors(on, asText)).toEqual([]);
+      expect(await probeErrors(config, probe('// @ts-expect-error'))).toEqual([]);
+      expect(await probeErrors(config, asText)).toEqual([]);
     });
 
-    it('is off by default: an array, as in Zapatos 6.6.1, so that each refusal is the option\'s', async () => {
-      expect(await probeErrors(config, probe('//'))).toEqual([]);
-      expect(await probeErrors(config, probe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
-      expect((await probeErrors(config, asText)).map(e => e.slice(0, 15))).toEqual(Array(2).fill('probe.ts TS2322'));
+    it('with false: an array, as in Zapatos 6.6.1, so that each refusal is the option\'s', async () => {
+      expect(await probeErrors(off, probe('//'))).toEqual([]);
+      expect(await probeErrors(off, probe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
+      expect((await probeErrors(off, asText)).map(e => e.slice(0, 15))).toEqual(Array(2).fill('probe.ts TS2322'));
     });
 
     it('keeps an edited placeholder\'s type in Selectable', async () => {
@@ -583,7 +580,7 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
         import type * as s from 'zapatos/schema';
         declare const sel: s.arr_probe.films.Selectable;
         export const moods = sel.dmoods satisfies string[] | null;`;
-      expect(await probeErrors(on, edited, {}, edits)).toEqual([]);
+      expect(await probeErrors(config, edited, {}, edits)).toEqual([]);
     });
   });
 
@@ -689,13 +686,13 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       expect.soft(schema).toContain('u: unique_[] | null;');
       for (const skipLibCheck of [false, true]) expect.soft(await probeErrors({ schemas: { array_ops: all } }, `
         import type * as s from 'zapatos/schema';
-        export const k: s.array_ops.takes.Selectable['k'] = ['a'];
-        export const r: s.array_ops.takes.Selectable['r'] = ['a'];
-        export const u: s.array_ops.takes.Selectable['u'] = ['a'];
+        export const k: s.array_ops.takes.JSONSelectable['k'] = ['a'];
+        export const r: s.array_ops.takes.JSONSelectable['r'] = ['a'];
+        export const u: s.array_ops.takes.JSONSelectable['u'] = ['a'];
         // @ts-expect-error an array's key, not a label
-        export const key: s.array_ops.takes.Selectable['k'] = 'length';
+        export const key: s.array_ops.takes.JSONSelectable['k'] = 'length';
         // @ts-expect-error not an array of labels
-        export const text: s.array_ops.takes.Selectable['u'] = 'some text';
+        export const text: s.array_ops.takes.JSONSelectable['u'] = 'some text';
       `, { skipLibCheck })).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA array_ops CASCADE');
@@ -808,9 +805,9 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         export const genre: Sale['genre'] = 'drama';
         // @ts-expect-error not a label of genre
         export const western: Sale['genre'] = 'western';
-        export const genres: Sale['genres'] = ['comedy'];
+        export const genres: ${table}.JSONSelectable['genres'] = ['comedy'];
         // @ts-expect-error not an array of labels
-        export const genreList: Sale['genres'] = ['western'];
+        export const genreList: ${table}.JSONSelectable['genres'] = ['western'];
       `)).toEqual([]);
     });
 
@@ -848,7 +845,7 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         import type * as s from 'zapatos/schema';
         import { expectTypeOf } from 'expect-type';
         expectTypeOf<s.films.Selectable['genre']>().toEqualTypeOf<'comedy' | 'drama' | null>();
-        expectTypeOf<s.films.Selectable['moods']>().toEqualTypeOf<('tense' | 'calm')[] | null>();
+        expectTypeOf<s.films.JSONSelectable['moods']>().toEqualTypeOf<('tense' | 'calm')[] | null>();
         // @ts-expect-error not a label of genre
         db.insert('films', { id: 1, genre: 'western' });
         // @ts-expect-error not an array of labels of mood
@@ -973,9 +970,9 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
             export const genre: ${reels}.Selectable['genre'] = 'drama';
             // @ts-expect-error not a label of placeholder_home.genre
             export const western: ${reels}.Selectable['genre'] = 'western';
-            export const genres: ${reels}.Selectable['genres'] = ['comedy'];
+            export const genres: ${reels}.JSONSelectable['genres'] = ['comedy'];
             // @ts-expect-error not an array of its labels
-            export const silent: ${reels}.Selectable['genres'] = ['silent'];
+            export const silent: ${reels}.JSONSelectable['genres'] = ['silent'];
           `)).toEqual([]);
         });
 
@@ -1181,7 +1178,7 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
   describe('intervalsTypedAsObjects, compiled (#499)', () => {
     const config = { schemas: { extra: only('type_zoo') } };
 
-    /** extra.type_zoo.c_interval: `asObjects` before what only the option lets through, `asText` before what only its absence does. */
+    /** extra.type_zoo.c_interval: `asObjects` before what only the option lets through, `asText` before what only false does. */
     const intervalProbe = (asObjects: string, asText: string) => `
       import * as db from 'zapatos/db';
       import type * as s from 'zapatos/schema';
@@ -1214,13 +1211,49 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         db.upsert('extra.type_zoo', { c_interval: read }, 'id', { updateValues: { c_interval: db.vals(read) } });
       };`;
 
+    beforeAll(() => t.pool.query(`
+      CREATE SCHEMA old_iv;
+      CREATE DOMAIN old_iv.span AS interval;
+      CREATE DOMAIN old_iv.spans AS interval[];
+      CREATE DOMAIN old_iv.outer_span AS old_iv.span;
+      CREATE TABLE old_iv.takes (i old_iv.span, a old_iv.spans, n old_iv.outer_span);`));
+    afterAll(() => t.pool.query('DROP SCHEMA old_iv CASCADE'));
+
+    it.each([false, true])('compiles fresh and existing interval placeholders, skipLibCheck %s', async skipLibCheck => {
+      const config = { schemas: { old_iv: all } };
+      const probe = (i: string, a: string, n: string) => `
+        import type * as s from 'zapatos/schema';
+        import { expectTypeOf } from 'expect-type';
+        type Row = s.old_iv.takes.Selectable;
+        expectTypeOf<Row['i']>().toEqualTypeOf<${i} | null>();
+        expectTypeOf<Row['a']>().toEqualTypeOf<${a} | null>();
+        expectTypeOf<Row['n']>().toEqualTypeOf<${n} | null>();
+      `;
+      const interval = "import('zapatos/db').PostgresInterval";
+      expect(await probeErrors(config, probe(interval, interval + '[]', interval), { skipLibCheck })).toEqual([]);
+
+      const outDir = mkdtempSync(join(declarationDir, 'existing-'));
+      const disk = { ...config, ...quiet, db: db(), outDir };
+      await generate({ ...disk, intervalsTypedAsObjects: false });
+      const custom = join(outDir, 'zapatos/custom');
+      const edits = {
+        PgSpan: readFileSync(join(custom, 'PgSpan.d.ts'), 'utf8'),
+        PgSpans: "declare module 'zapatos/custom' { export type PgSpans = any[]; }",
+        PgOuter_span: "declare module 'zapatos/custom' { export type PgOuter_span = unknown; }",
+      };
+      for (const [name, text] of Object.entries(edits)) writeFileSync(join(custom, name + '.d.ts'), text);
+      await generate(disk);
+      for (const [name, text] of Object.entries(edits)) expect(readFileSync(join(custom, name + '.d.ts'), 'utf8')).toBe(text);
+      expect(await probeErrors(config, probe('string', 'any[]', 'unknown'), { skipLibCheck }, edits)).toEqual([]);
+    });
+
     it('types Selectable as pg parses it, takes it back in a write, and refuses a plain object', async () => {
-      expect(await probeErrors({ ...config, intervalsTypedAsObjects: true }, intervalProbe('//', '// @ts-expect-error')))
+      expect(await probeErrors(config, intervalProbe('//', '// @ts-expect-error')))
         .toEqual([]);
     });
 
-    it.each([undefined, false])('is the text in all five, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
-      const keyed = { ...config, ...key === undefined ? {} : { intervalsTypedAsObjects: key } };
+    it('uses text in all five with false, as in Zapatos 6.6.1', async () => {
+      const keyed = { ...config, intervalsTypedAsObjects: false };
       expect(await probeErrors(keyed, intervalProbe('// @ts-expect-error', '//'))).toEqual([]);
     });
 
@@ -1228,7 +1261,7 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       const both = intervalProbe('// @ts-expect-error', '// @ts-expect-error');
       const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
       expect(await probeErrors({ ...config, intervalsTypedAsObjects: true }, both)).toEqual(Array(2).fill(unused));
-      expect(await probeErrors(config, both)).toEqual([unused]);
+      expect(await probeErrors({ ...config, intervalsTypedAsObjects: false }, both)).toEqual([unused]);
     });
   });
 
@@ -1664,11 +1697,6 @@ describe('domainsTypedByContext', () => {
 
   const ctx = { schemas: { ctx: all }, schemaJSDoc: false, unprefixedSchema: 'ctx' };
   const on = { ...ctx, domainsTypedByContext: true };
-  const notesFor = async (config: Config) => {
-    const warnings: string[] = [];
-    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
-    return warnings.filter(w => w.includes('domainsTypedByContext'));
-  };
   /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
   const linesOf = (schema: string, table: string, column: string) =>
     tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
@@ -1687,8 +1715,8 @@ describe('domainsTypedByContext', () => {
     ];
   };
 
-  it('is off by default: a domain takes its placeholder in all five interfaces, as in Zapatos 6.6.1', async () => {
-    const { ts: schema } = await codegen(ctx);
+  it('with false: a domain takes its placeholder in all five interfaces, as in Zapatos 6.6.1', async () => {
+    const { ts: schema } = await codegen({ ...ctx, domainsTypedByContext: false });
     expect(linesOf(schema, 'tickets', 'no')).toEqual([
       'no: c.PgTicket_no;',
       'no: c.PgTicket_no;',
@@ -1779,8 +1807,8 @@ describe('domainsTypedByContext', () => {
         .toEqual(nullable('arr', arr('string'), arr('number[]'), arr('(number | db.Int8String | bigint)[]')).slice(0, 3));
     });
 
-    it('is off by default: the placeholder in all five, as in Zapatos 6.6.1', async () => {
-      const { ts: schema } = await codegen(ctx);
+    it('with false: the placeholder in all five, as in Zapatos 6.6.1', async () => {
+      const { ts: schema } = await codegen({ ...ctx, domainsTypedByContext: false });
       for (const [column, placeholder] of [['vip', 'c.PgVip_ticket_no'], ['arr', 'c.Pg_ticket_no'], ['list', 'c.PgTicket_list'],
         ['vip_list', 'c.PgVip_ticket_list']]) {
         expect.soft(linesOf(schema, 'nested', column), column).toEqual(nullable(column, placeholder, placeholder, placeholder));
@@ -1815,47 +1843,15 @@ describe('domainsTypedByContext', () => {
   });
 
   it('writes the same placeholders, and leaves the domains typed alike in every context, or any, as they were', async () => {
-    const off = await codegen(ctx), typed = await codegen(on);
+    const off = await codegen({ ...ctx, domainsTypedByContext: false }), typed = await codegen(on);
     expect(typed.customTypeSourceFiles).toEqual(off.customTypeSourceFiles);
     expect(tableBlock(typed.ts, 'quiet')).toBe(tableBlock(off.ts, 'quiet'));
   });
 
-  it('notes each column it would change, once per run, without the option', async () => {
-    expect(await notesFor(ctx)).toEqual([
-      'Note: ctx.ticket_days.day (ctx.release_day), ctx.tickets.amount (ctx.amount), ctx.tickets.at (ctx.starts), ' +
-      'ctx.tickets.cost (ctx.cost), ctx.tickets.data (ctx.blob), ctx.tickets.day (ctx.release_day), ' +
-      'ctx.tickets.no (ctx.ticket_no), ctx.tickets.nos (ctx.ticket_nos) and ctx.tickets.ts (ctx.local_ts) have domains ' +
-      'over a type typed by context, such as int8 or date: as generated, their placeholders type them in all five ' +
-      'interfaces as pg returns them, though a write takes more and, except for money, the shortcuts\' JSON gives ' +
-      'another type. ' +
-      'Set domainsTypedByContext: true to type them by context while their placeholders hold what the generator ' +
-      'wrote for them; it will be the default in pgcast 7.0.',
-      'Note: ctx.nested.arr (ctx.ticket_no[]), ctx.nested.day (ctx.vip_day), ctx.nested.genre (ctx.vip_genre), ' +
-      'ctx.nested.label (ctx.vip_label), ctx.nested.labels (ctx.label[]), ctx.nested.list (ctx.ticket_list), ' +
-      'ctx.nested.premium (ctx.premium_ticket_no), ctx.nested.tone (ctx.vip_tone), ctx.nested.vip (ctx.vip_ticket_no), ' +
-      'ctx.nested.vip_list (ctx.vip_ticket_list), ctx.nested_days.arr ' +
-      '(ctx.ticket_no[]) and ctx.nested_days.day (ctx.vip_day) have domains over a domain, or arrays of a domain: ' +
-      'as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base ' +
-      'type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0.',
-    ]);
-    expect(await notesFor({ ...ctx, schemas: { ctx_box: all } })).toEqual([
-      'Note: ctx_box.films.tones (ctx_box.tone_d[]) has a domain over a domain, or an array of a domain: as generated, ' +
-      'its placeholder types it as `any`. Set domainsTypedByContext: true to type it by the base type of the innermost ' +
-      'domain while its placeholder holds `any`; it will be the default in pgcast 7.0.',
-    ]);
-    expect(await notesFor({ ...ctx, schemas: { ctx: only('ticket_days') } })).toEqual([
-      'Note: ctx.ticket_days.day (ctx.release_day) has a domain over a type typed by context, such as int8 or date: ' +
-      'as generated, its placeholder types it in all five interfaces as pg returns it, though a write takes more and, ' +
-      'except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it by context while ' +
-      'its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.',
-    ]);
-  });
-
-  it('gives no note with the option on, or when no domain would change', async () => {
-    expect(await notesFor(on)).toEqual([]);
-    expect(await notesFor({ ...ctx, schemas: { ctx: only('quiet') } })).toEqual([]);
-    expect(await notesFor({ schemas: { public: only('users', 'products') } })).toEqual([]);
-  });
+  it.each([{}, { domainsTypedByContext: true }, { domainsTypedByContext: false }, JSON.parse('{"domainsTypedByContext":null}')])(
+    'emits no migration note with %j', async setting => {
+      expect(await warningsOf({ ...ctx, ...setting })).toEqual([]);
+    });
 
   it('types what Postgres and the shortcuts give: a write it takes, a row as JSON', async () => {
     const row = await runtime.insert('ctx.tickets' as any, {
@@ -1868,13 +1864,13 @@ describe('domainsTypedByContext', () => {
     expect(row.data).toBe('\\xdead');
   });
 
-  it('leaves the output as it was without the option, or with false', async () => {
-    const { ts: absent } = await codegen(main);
-    expect((await codegen({ ...main, domainsTypedByContext: false })).ts).toBe(absent);
-    expect(absent).toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  it('reads omission and JSON null as true', async () => {
+    const typed = await codegen({ ...ctx, domainsTypedByContext: true });
+    expect(await codegen(ctx)).toEqual(typed);
+    expect(await codegen({ ...ctx, ...JSON.parse('{"domainsTypedByContext":null}') })).toEqual(typed);
   });
 
-  it('is optional in Config, read as false when absent', () => {
+  it('is optional in Config', () => {
     expect(finaliseConfig({}).domainsTypedByContext).toBeUndefined();
     const right: Config = { domainsTypedByContext: true };
     void right;
@@ -1922,11 +1918,6 @@ describe('enumArraysTypedAsText', () => {
 
   const config = { schemas: { arr: all, arr_box: all, arr_solo: all }, schemaJSDoc: false, unprefixedSchema: 'arr', typeEnumsAcrossSchemas: false };
   const on = { ...config, enumArraysTypedAsText: true };
-  const notesFor = async (given: Config) => {
-    const warnings: string[] = [];
-    await tsForConfig(finaliseConfig({ ...given, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
-    return warnings.filter(w => w.includes('enumArraysTypedAsText'));
-  };
   /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
   const linesOf = (schema: string, table: string, column: string) =>
     tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
@@ -1947,8 +1938,8 @@ describe('enumArraysTypedAsText', () => {
     ];
   };
 
-  it('is off by default: an array of an enum is an array in Selectable, as in Zapatos 6.6.1', async () => {
-    const { ts: schema } = await codegen(config);
+  it('with false: an array of an enum is an array in Selectable, as in Zapatos 6.6.1', async () => {
+    const { ts: schema } = await codegen({ ...config, enumArraysTypedAsText: false });
     expect(linesOf(schema, 'films', 'moods')).toEqual(nullable('moods', 'mood[]', 'mood[]'));
     expect(readsOf(schema, 'films', 'dmoods')).toEqual(['dmoods: c.PgMoods | null;', 'dmoods: c.PgMoods | null;']);
   });
@@ -1982,7 +1973,7 @@ describe('enumArraysTypedAsText', () => {
   });
 
   it('leaves the placeholders, any, and the columns that are no array of an enum as they were', async () => {
-    const off = await codegen(config), typed = await codegen(on);
+    const off = await codegen({ ...config, enumArraysTypedAsText: false }), typed = await codegen(on);
     expect(typed.customTypeSourceFiles).toEqual(off.customTypeSourceFiles);
     for (const column of ['id', 'mood', 'texts', 'omoods']) {
       expect(linesOf(typed.ts, 'films', column)).toEqual(linesOf(off.ts, 'films', column));
@@ -1995,7 +1986,7 @@ describe('enumArraysTypedAsText', () => {
   it('leaves an array of a built-in as it was, though its relation\'s schema has an enum of the built-in\'s name', async () => {
     const edge = { schemas: { arr_edge: all }, schemaJSDoc: false };
     for (const given of [{}, { typeEnumsAcrossSchemas: true }, { unprefixedSchema: null }, { domainsTypedByContext: true }]) {
-      const off = (await codegen({ ...edge, ...given })).ts, typed = (await codegen({ ...edge, ...given, enumArraysTypedAsText: true })).ts;
+      const off = (await codegen({ ...edge, ...given, enumArraysTypedAsText: false })).ts, typed = (await codegen({ ...edge, ...given, enumArraysTypedAsText: true })).ts;
       for (const column of ['id', 'nums', 'words']) {
         expect(linesOf(tableBlock(typed, 'arr_edge'), 'films', column)).toEqual(linesOf(tableBlock(off, 'arr_edge'), 'films', column));
       }
@@ -2003,54 +1994,23 @@ describe('enumArraysTypedAsText', () => {
       expect(readsOf(tableBlock(typed, 'arr_edge'), 'films', 'words')).toEqual(['words: string[] | null;', 'words: string[] | null;']);
       // the enum's own array, typed number[] by the built-in's name as in Zapatos 6.6.1, is the text pg returns
       expect(readsOf(tableBlock(typed, 'arr_edge'), 'films', 'own')).toEqual(['own: string | null;', 'own: number[] | null;']);
-      expect(await notesFor({ ...edge, ...given })).toEqual(['Note: arr_edge.films.own (arr_edge.int4[]) is an array of an ' +
-        'enum, which pg returns as its text, such as \'{a,b}\', though Selectable types it as an array. Set ' +
-        'enumArraysTypedAsText: true to type it as a string there, or false to keep the array if pg.types.setTypeParser ' +
-        'parses it; true will be the default in pgcast 7.0.']);
+      expect(await warningsOf({ ...edge, ...given })).toEqual([]);
     }
   });
 
-  it('notes each column it would change, once per run, with the option left out', async () => {
-    expect(await notesFor(config)).toEqual([
-      'Note: arr.films.dmoods (arr.moods), arr.films.grid (arr.mood[]), arr.films.moods (arr.mood[]), ' +
-      'arr.films.moods_nn (arr.mood[]), arr.films.tones (arr.tone[]), arr.films_m.moods (arr.mood[]), ' +
-      'arr.films_v.moods (arr.mood[]), arr_box.films.moods (arr.mood[]) and arr_box.films.own (arr_box.mood[]) are ' +
-      'arrays of an enum, which pg returns as their text, such as \'{a,b}\', though Selectable types them as arrays. ' +
-      'Set enumArraysTypedAsText: true to type them as strings there, or false to keep the arrays if ' +
-      'pg.types.setTypeParser parses them; true will be the default in pgcast 7.0.',
-    ]);
-    const viewNote = 'Note: arr.films_v.moods (arr.mood[]) is an array of an enum, which pg returns as its text, such ' +
-      'as \'{a,b}\', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string ' +
-      'there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.';
-    expect(await notesFor({ ...config, schemas: { arr: only('films_v') } })).toEqual([viewNote]);
-    // null, as a JSON config may hold, is the key left out
-    expect(await notesFor({ ...config, schemas: { arr: only('films_v') }, enumArraysTypedAsText: null as any })).toEqual([viewNote]);
-    // with typeEnumsAcrossSchemas, arr_solo's column takes the labels' array, no longer any
-    expect((await notesFor({ ...config, schemas: { arr_solo: all }, typeEnumsAcrossSchemas: true }))[0])
-      .toMatch(/^Note: arr_solo\.films\.moods \(arr\.mood\[\]\) is an array of an enum/);
-  });
-
-  it('notes no column of a domain whose placeholder ends any, which stays any with the option', async () => {
+  it('keeps a shared any placeholder for a domain over an enum array', async () => {
     const both = { schemas: { arr_dom: all, arr_none: all }, schemaJSDoc: false, typeEnumsAcrossSchemas: false };
     const typed = await codegen({ ...both, enumArraysTypedAsText: true });
     expect(typed.customTypeSourceFiles.PgMoods).toContain('export type PgMoods = any;');
     expect(readsOf(tableBlock(typed.ts, 'arr_dom'), 'films', 'dmoods'))
       .toEqual(['dmoods: db.DomainInContext<c.PgMoods, mood[], string> | null;', 'dmoods: c.PgMoods | null;']);
-    const note = (columns: string) => `Note: ${columns} is an array of an enum, which pg returns as its text, such as ` +
-      '\'{a,b}\', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string there, or ' +
-      'false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.';
-    expect(await notesFor(both)).toEqual([note('arr_dom.films.moods (arr_dom.mood[])')]);
-    // without arr_none, the placeholder holds mood[], which the option changes
-    expect((await notesFor({ ...both, schemas: { arr_dom: all } }))[0])
-      .toMatch(/^Note: arr_dom\.films\.dmoods \(arr_dom\.moods\) and arr_dom\.films\.moods \(arr_dom\.mood\[\]\) are arrays/);
+    expect(await warningsOf(both)).toEqual([]);
   });
 
-  it('gives no note with true or false, or when no column would change', async () => {
-    expect(await notesFor(on)).toEqual([]);
-    expect(await notesFor({ ...config, enumArraysTypedAsText: false })).toEqual([]);
-    expect(await notesFor({ ...config, schemas: { arr_solo: all } })).toEqual([]);
-    expect(await notesFor({ ...main, typeEnumsAcrossSchemas: false })).toEqual([]);
-  });
+  it.each([{}, { enumArraysTypedAsText: true }, { enumArraysTypedAsText: false }, JSON.parse('{"enumArraysTypedAsText":null}')])(
+    'emits no migration note with %j', async setting => {
+      expect(await warningsOf({ ...config, ...setting })).toEqual([]);
+    });
 
   it('types what pg and the shortcuts give: an array of an enum as its text, and as JSON', async () => {
     const row = await runtime.insert('arr.films' as any, { id: 1, moods: ['happy', 'sad'], dmoods: ['ok'] })
@@ -2062,15 +2022,13 @@ describe('enumArraysTypedAsText', () => {
     expect(fromView).toEqual({ moods: '{happy,sad}' });
   });
 
-  it('leaves the output as it was without the option, or with false', async () => {
-    const absent = await codegen(config), off = await codegen({ ...config, enumArraysTypedAsText: false });
-    expect(off.ts).toBe(absent.ts);
-    expect(off.customTypeSourceFiles).toEqual(absent.customTypeSourceFiles);
-    expect((await codegen({ ...main, enumArraysTypedAsText: false })).ts)
-      .toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  it('reads omission and JSON null as true', async () => {
+    const typed = await codegen({ ...config, enumArraysTypedAsText: true });
+    expect(await codegen(config)).toEqual(typed);
+    expect(await codegen({ ...config, ...JSON.parse('{"enumArraysTypedAsText":null}') })).toEqual(typed);
   });
 
-  it('is optional in Config, read as false when absent', () => {
+  it('is optional in Config', () => {
     expect(finaliseConfig({}).enumArraysTypedAsText).toBeUndefined();
     const right: Config = { enumArraysTypedAsText: true };
     void right;
@@ -2093,19 +2051,16 @@ describe('intervalsTypedAsObjects', () => {
     CREATE DOMAIN iv.span_set AS iv.span[];
     -- an array of a domain over interval[], and a domain over one: any, even with domainsTypedByContext
     CREATE DOMAIN iv.list_set AS iv.span_list[];
-    CREATE TABLE iv.lists (list iv.span_list, set iv.span_set, lists iv.span_list[], list_set iv.list_set);
+    CREATE TYPE iv.cut AS ENUM ('rough', 'final');
+    CREATE DOMAIN iv.cuts AS iv.cut[];
+    CREATE TABLE iv.lists (cuts iv.cuts, list iv.span_list, set iv.span_set, lists iv.span_list[], list_set iv.list_set);
     CREATE TABLE iv.gaps (gap interval);
     CREATE TABLE iv.quiet (id int PRIMARY KEY, label text);
   `));
   afterAll(() => t.pool.query('DROP SCHEMA iv CASCADE'));
 
   const iv = { schemas: { iv: all }, schemaJSDoc: false, unprefixedSchema: 'iv' };
-  const on = { ...iv, intervalsTypedAsObjects: true };
-  const notesFor = async (config: Config) => {
-    const warnings: string[] = [];
-    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
-    return warnings.filter(w => w.includes('intervalsTypedAsObjects'));
-  };
+  const on = { ...iv, intervalsTypedAsObjects: true, domainsTypedByContext: false };
   /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
   const linesOf = (schema: string, table: string, column: string) =>
     tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
@@ -2127,8 +2082,65 @@ describe('intervalsTypedAsObjects', () => {
   const object = 'db.PostgresInterval', input = '(string | db.PostgresInterval)';
   const inContext = (custom: string, generated: string) => (type: string) => `db.DomainInContext<${custom}, ${generated}, ${type}>`;
 
-  it.each([undefined, false])('is the text in all five by default, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
-    const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...iv, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
+  for (const domainsTypedByContext of [false, true]) for (const intervalsTypedAsObjects of [false, true]) {
+    it.each([false, true])(`domain contexts ${domainsTypedByContext}, interval objects ${intervalsTypedAsObjects}, enum text %s`,
+      async enumArraysTypedAsText => {
+        const flags = { domainsTypedByContext, intervalsTypedAsObjects, enumArraysTypedAsText };
+        const read = async (schemas: Schemas) => {
+          const queries: string[] = [];
+          const result = await tsForConfig(finaliseConfig({ ...iv, ...flags, schemas, ...quiet, db: db() }), s => queries.push(s));
+          expect(queries.filter(s => s.startsWith('>>> query ') && s.includes('WITH RECURSIVE bases AS'))).toHaveLength(1);
+          expect(queries.some(s => s.includes('pg_constraint c ON c.contypid'))).toBe(false);
+          return result;
+        };
+        const extra = only('type_zoo'), forward = await read({ iv: all, extra }), reverse = await read({ extra, iv: all });
+        expect(reverse.customTypeSourceFiles).toEqual(forward.customTypeSourceFiles);
+        for (const table of ['gaps', 'lists', 'runs', 'quiet', 'type_zoo']) {
+          expect(tableBlock(reverse.ts, table)).toBe(tableBlock(forward.ts, table));
+        }
+        const span = 'c.PgSpan', vip = 'c.PgVip_span', spans = 'c.Pg_span';
+        const raw = intervalsTypedAsObjects ? object : 'string', write = intervalsTypedAsObjects ? input : 'string';
+        const domain = (type: string) => domainsTypedByContext && intervalsTypedAsObjects ? inContext(span, raw)(type) : span;
+        const nested = (name: string, type: string) => domainsTypedByContext ? inContext(name, 'any')(type) : name;
+        expect(linesOf(forward.ts, 'runs', 'span')).toEqual(nullable('span', span, domain('string'), domain(write)));
+        expect(linesOf(forward.ts, 'runs', 'vip')).toEqual(nullable('vip', nested(vip, raw), nested(vip, 'string'), nested(vip, write)));
+        expect(linesOf(forward.ts, 'runs', 'spans')).toEqual(nullable('spans', nested(spans, 'string'),
+          nested(spans, 'string[]'), nested(spans, write + '[]')));
+        const list = 'c.PgSpan_list', generated = intervalsTypedAsObjects ? `${object}[]` : 'string[]';
+        const typed = (type: string) => domainsTypedByContext && intervalsTypedAsObjects ? inContext(list, generated)(type) : list;
+        expect(linesOf(forward.ts, 'lists', 'list')).toEqual(nullable('list', list, typed('string[]'), typed(`${input}[]`)));
+        const cuts = 'c.PgCuts';
+        expect(linesOf(forward.ts, 'lists', 'cuts')).toEqual(nullable('cuts',
+          enumArraysTypedAsText ? inContext(cuts, 'cut[]')('string') : cuts, cuts, cuts));
+      });
+  }
+
+  it('reads the three settings in the public generator helpers', async () => {
+    const q = (query: pg.QueryConfig) => t.pool.query(query);
+    const rel = (await relationsInSchema('iv', q)).find(r => r.name === 'lists')!;
+    for (const value of [undefined, null, true, false]) {
+      const setting = value === undefined ? {} : JSON.parse(JSON.stringify({
+        domainsTypedByContext: value, enumArraysTypedAsText: value, intervalsTypedAsObjects: value,
+      }));
+      const config = finaliseConfig({ ...iv, ...quiet, ...setting });
+      const domainColumns: string[] = [], nestedColumns: string[] = [], intervals: string[] = [];
+      const enumArrays: [string, string | null][] = [];
+      const def = await definitionForRelationInSchema(rel, 'iv', { cut: ['rough', 'final'] }, {}, config, q,
+        undefined, undefined, undefined, undefined, undefined, domainColumns, undefined, nestedColumns, enumArrays, intervals);
+      expect(enumArrays).toEqual(value == null ? [['iv.lists.cuts (iv.cuts)', 'PgCuts']] : []);
+      expect(intervals).toEqual(value == null ? ['iv.lists.list (iv.span_list)', 'iv.lists.set (iv.span_set)'] : []);
+      expect(nestedColumns).toEqual(value === false ? ['iv.lists.set (iv.span_set)'] : []);
+      expect(domainColumns).toEqual([]);
+      expect(linesOf(def, 'lists', 'cuts')[0]).toBe(value === false ? 'cuts: c.PgCuts | null;' :
+        'cuts: db.DomainInContext<c.PgCuts, cut[], string> | null;');
+      expect(linesOf(def, 'lists', 'list')[1]).toBe(value === false ? 'list: c.PgSpan_list | null;' :
+        'list: db.DomainInContext<c.PgSpan_list, db.PostgresInterval[], string[]> | null;');
+      expect(tsTypeForPgType('_interval', {}, 'Selectable', config)).toBe(value === false ? 'string[]' : 'db.PostgresInterval[]');
+    }
+  });
+
+  it('uses text in all five with false, as in Zapatos 6.6.1', async () => {
+    const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...iv, intervalsTypedAsObjects: false });
     expect(linesOf(schema, 'runs', 'runtime')).toEqual(nullable('runtime', 'string', 'string', 'string'));
     expect(linesOf(schema, 'runs', 'breaks')).toEqual(nullable('breaks', 'string[]', 'string[]', 'string[]'));
     expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
@@ -2157,31 +2169,11 @@ describe('intervalsTypedAsObjects', () => {
   });
 
   it('leaves a domain over one alike in every context with domainsTypedByContext alone', async () => {
-    const { ts: schema } = await codegen({ ...iv, domainsTypedByContext: true });
+    const { ts: schema } = await codegen({ ...iv, domainsTypedByContext: true, intervalsTypedAsObjects: false });
     const vip = inContext('c.PgVip_span', 'any'), spans = inContext('c.Pg_span', 'any');
     expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
     expect(linesOf(schema, 'runs', 'vip')).toEqual(nullable('vip', vip('string'), vip('string'), vip('string')));
     expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', spans('string'), spans('string[]'), spans('string[]')));
-  });
-
-  const note = (list: string, one = false) => `Note: ${list} ${one ? 'is' : 'are'} of interval or of a type that wraps it ` +
-    `in arrays or domains: as generated, ${one ? 'it is typed as its' : 'they are typed as their'} ` +
-    `text, though pg's default type parser returns an interval from a query of your own as an object, a PostgresInterval. ` +
-    `Set intervalsTypedAsObjects: true to type ${one ? 'it' : 'them'} as pg parses ${one ? 'it' : 'them'}; it will be the ` +
-    `default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.`;
-
-  it('notes each column it would change, once per run, when left out', async () => {
-    // interval, an array of it, and a domain over either
-    expect(await notesFor(iv)).toEqual([note('iv.gaps.gap (interval), iv.lists.list (iv.span_list), ' +
-      'iv.runs.breaks (interval[]), iv.runs.runtime (interval) and iv.runs.span (iv.span)')]);
-    // left out, or null from JSON
-    expect(await notesFor({ ...iv, intervalsTypedAsObjects: null as unknown as boolean, schemas: { iv: only('gaps') } }))
-      .toEqual([note('iv.gaps.gap (interval)', true)]);
-    // under other domains too, which only domainsTypedByContext types by their base type: an array of a domain, a domain
-    // over a domain, a domain over an array of a domain
-    expect(await notesFor({ ...iv, domainsTypedByContext: true, schemas: { iv: only('runs', 'lists') } })).toEqual([
-      note('iv.lists.list (iv.span_list), iv.lists.set (iv.span_set), iv.runs.breaks (interval[]), iv.runs.runtime (interval), ' +
-        'iv.runs.span (iv.span), iv.runs.spans (iv.span[]) and iv.runs.vip (iv.vip_span)')]);
   });
 
   it('leaves out an array of a domain over interval[], or a domain over one, whose types it never changes', async () => {
@@ -2192,15 +2184,13 @@ describe('intervalsTypedAsObjects', () => {
       const absent = types(await keyed());
       expect(types(await keyed(true))).toEqual(absent);
       expect(types(await keyed(false))).toEqual(absent);
-      expect((await notesFor({ ...iv, domainsTypedByContext: byContext })).join()).not.toMatch(/iv\.lists\.(lists|list_set) /);
     }
   });
 
-  it('gives no note with true or false, or when no column would change', async () => {
-    expect(await notesFor(on)).toEqual([]);
-    expect(await notesFor({ ...iv, intervalsTypedAsObjects: false })).toEqual([]);
-    expect(await notesFor({ ...iv, schemas: { iv: only('quiet') } })).toEqual([]);
-  });
+  it.each([{}, { intervalsTypedAsObjects: true }, { intervalsTypedAsObjects: false }, JSON.parse('{"intervalsTypedAsObjects":null}')])(
+    'emits no migration note with %j', async setting => {
+      expect(await warningsOf({ ...iv, ...setting })).toEqual([]);
+    });
 
   describe('a type of yours named interval', () => {
     // an enum, a composite and a domain over text, each named interval, next to pg_catalog's interval and its array
@@ -2231,7 +2221,7 @@ describe('intervalsTypedAsObjects', () => {
           await codegen({ ...named, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
         // by its name, as text, as in Zapatos 6.6.1, whatever the key
         expect(linesOf(schema, 'cuts', 'a')).toEqual(alike('a', 'string'));
-        expect(linesOf(schema, 'cuts', 'b')).toEqual(alike('b', 'string[]'));
+        expect(linesOf(schema, 'cuts', 'b')).toEqual(nullable('b', 'string', 'string[]', 'string[]'));
         expect(linesOf(schema, 'cuts', 'w2'))
           .toEqual(alike('w2', byContext ? 'db.DomainInContext<c.PgEnum_wrap2, any, string>' : 'c.PgEnum_wrap2'));
         expect(linesOf(schema, 'takes', 'a')).toEqual(alike('a', 'c.PgInterval'));
@@ -2246,25 +2236,12 @@ describe('intervalsTypedAsObjects', () => {
         ]);
         // pg_catalog's, by the key
         for (const table of ['cuts', 'takes', 'reels']) {
-          expect(linesOf(schema, table, 'c')).toEqual(key ? nullable('c', object, 'string', input) : alike('c', 'string'));
+          expect(linesOf(schema, table, 'c')).toEqual(key !== false ? nullable('c', object, 'string', input) : alike('c', 'string'));
         }
         for (const table of ['cuts', 'takes']) {
           expect(linesOf(schema, table, 'd'))
-            .toEqual(key ? nullable('d', `${object}[]`, 'string[]', `${input}[]`) : alike('d', 'string[]'));
+            .toEqual(key !== false ? nullable('d', `${object}[]`, 'string[]', `${input}[]`) : alike('d', 'string[]'));
         }
-      }
-    });
-
-    it.each([false, true])('is left out of the note, which names pg_catalog\'s (domainsTypedByContext: %s)', async byContext => {
-      expect(await notesFor({ ...named, domainsTypedByContext: byContext })).toEqual([note('iv_domain.takes.c (interval), ' +
-        'iv_domain.takes.d (interval[]), iv_enum.cuts.c (interval), iv_enum.cuts.d (interval[]) and iv_row.reels.c (interval)')]);
-      for (const key of [false, true]) {
-        expect(await notesFor({ ...named, domainsTypedByContext: byContext, intervalsTypedAsObjects: key })).toEqual([]);
-      }
-      // nor named by the note of typeEnumsAcrossSchemas, whatever the key
-      for (const key of [undefined, false, true]) {
-        const keyed = { ...named, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } };
-        expect((await warningsOf(keyed)).filter(w => w.includes('takes.x'))).toEqual([]);
       }
     });
   });
@@ -2304,13 +2281,13 @@ describe('intervalsTypedAsObjects', () => {
     else expect((await plain as any[]).map(row => row.runtime)).toEqual(['00:00:01', '00:00:15']);
   });
 
-  it('leaves the output as it was without the option, or with false', async () => {
-    const { ts: absent } = await codegen(main);
-    expect((await codegen({ ...main, intervalsTypedAsObjects: false })).ts).toBe(absent);
-    expect(absent).toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  it('reads omission and JSON null as true', async () => {
+    const typed = await codegen({ ...iv, intervalsTypedAsObjects: true });
+    expect(await codegen(iv)).toEqual(typed);
+    expect(await codegen({ ...iv, ...JSON.parse('{"intervalsTypedAsObjects":null}') })).toEqual(typed);
   });
 
-  it('is optional in Config, read as false when absent', () => {
+  it('is optional in Config', () => {
     expect(finaliseConfig({}).intervalsTypedAsObjects).toBeUndefined();
     const right: Config = { intervalsTypedAsObjects: true };
     void right;
@@ -3647,46 +3624,10 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the domain, enum array and interval notes', async () => {
-    const domainsNote = 'Note: extra.type_zoo.c_int8_domain (public.ticket_no) has a domain over a type typed by context, ' +
-      'such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a ' +
-      'write takes more and, except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it ' +
-      'by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.';
-    const enumArraysNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) is an array of an enum, which pg returns ' +
-      'as its text, such as \'{a,b}\', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it ' +
-      'as a string there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.';
-    const intervalsNote = 'Note: extra.type_zoo.c_interval (interval) is of interval or of a type that wraps it in arrays ' +
-      'or domains: as generated, it is typed as its text, though pg\'s default type parser ' +
-      'returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to ' +
-      'type it as pg parses it; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of ' +
-      'yours returns it.';
-    const expected: Record<string, string[]> = {
-      main: [domainsNote, enumArraysNote, intervalsNote],
-      'unprefixedSchema-null': [],
-      'schemaJSDoc-false': [],
-      'customTypesTransform-PgMy_type': [domainsNote, enumArraysNote, intervalsNote],
-      'customTypesTransform-my_type': [domainsNote, enumArraysNote, intervalsNote],
-      'customTypesTransform-PgMyType': [domainsNote, enumArraysNote, intervalsNote],
-      'customTypesTransform-function': [domainsNote, enumArraysNote, intervalsNote],
-      'typeEnumsAcrossSchemas-false': [domainsNote, intervalsNote],
-      'enumOrder-alphabetical': [domainsNote, enumArraysNote, intervalsNote],
-      'moduleNames-pgcast': [domainsNote, enumArraysNote, intervalsNote],
-      'uniqueIndexConstraintsOnly-false': [domainsNote, enumArraysNote, intervalsNote],
-      domainsTypedByContext: [enumArraysNote, intervalsNote],
-      enumArraysTypedAsText: [domainsNote, intervalsNote],
-      intervalsTypedAsObjects: [domainsNote, enumArraysNote],
-      domainsTypedAsUnions: ['Note: unions.books.digital_format (unions.digital_format) ' +
-        'and unions.books.formats (unions.book_format[]) have domains over a domain, or arrays of a domain: as generated, ' +
-        'their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base type of the ' +
-        'innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0.'],
-      columnOptions: [],
-      'include-exclude-lists': [unmatched('no_such_table', 'public')],
-      'exclude-star': [],  // exclude: '*' still generates the enums
-      edge: [],
-    };
-    const warnings: Record<string, string[]> = {};
-    for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);
-    expect(warnings).toEqual(expected);
+  it('reports only the unmatched include across main and the snapshot variants', async () => {
+    for (const [name, config] of [['main', main] as const, ...variants]) {
+      expect(await warningsOf(config), name).toEqual(name === 'include-exclude-lists' ? [unmatched('no_such_table', 'public')] : []);
+    }
   });
 });
 
@@ -4379,6 +4320,21 @@ describe('the CLI with --check (#556)', () => {
     expect(await checkFiles({ ...config, uniqueIndexConstraintsOnly: false })).toBe(false);
     expect(await checkFiles(config)).toBe(true);
   });
+
+  it.each(['domainsTypedByContext', 'enumArraysTypedAsText', 'intervalsTypedAsObjects'])(
+    'checks the %s default against declarations on disk', async key => {
+      const legacy = { ...main, [key]: false };
+      writeFileSync(join(dir, 'pgcastconfig.json'), json(legacy));
+      expect(await runCli([], dir)).toBe(0);
+      expect((await check(['--check'])).code).toBe(0);
+      const defaults = JSON.stringify({ [key]: null });
+      expect((await check(['--check', defaults])).code).toBe(1);
+      expect(await runCli([defaults], dir)).toBe(0);
+      const config = { ...main, ...quiet, db: db(), outDir };
+      expect(await checkFiles(config)).toBe(true);
+      await generate({ ...config, [key]: false });
+      expect(await checkFiles(config)).toBe(false);
+    });
 
   it('without --check, writes the files and exits with 0, as generate() does', async () => {
     expect(await runCli([json()], dir)).toBe(0);
