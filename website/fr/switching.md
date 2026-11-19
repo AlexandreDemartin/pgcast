@@ -12,7 +12,7 @@ Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.jso
 
 - Une ligne de `package.json` remplace le paquet ; imports, configuration et fichiers générés restent tels quels.
 - Quelques appels donnent d’autres lignes, ou lèvent une erreur : [l’étape 4](#find-the-calls-whose-result-changes) les liste, avec ce qu’il faut faire.
-- Ce sur quoi du code peut compter est gardé, avec un avertissement, jusqu’à ce que vous activiez son opt-in.
+- Les comportements sur lesquels votre code peut compter à l’exécution sont conservés, avec un avertissement, jusqu’à ce que vous activiez leur opt-in. Les [types des conditions sur tableaux en 7.0](#array-condition-types) changent sans avertissement.
 
 </AtAGlance>
 
@@ -102,6 +102,17 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 - Un range sélectionné peut désormais valoir `'empty'`, puisque Postgres écrit ainsi un range vide ([`RangeString`](/fr/runtime-config#RangeString)) : il n’est donc plus assignable à un type qui commence par un crochet, `` `[${string}` | `(${string}` `` (2322). Vérifiez d’abord ce cas, `if (range !== 'empty')` ; dans un type, écrivez `Exclude<db.DateRangeString, 'empty'>`.
 - À partir de la 6.11.0, une fois le schéma régénéré, une table dont une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`search` typée `any`, comme l’est un `tsvector`, ou `length` un nombre), n’accepte plus n’importe quelle chaîne comme nom dans son type `SQL` (2345) : `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 acceptait la chaîne comme un nom, `"titel"`, que Postgres refuse quand aucune colonne ne le porte (42703). Pour un nom connu seulement à l’exécution, vérifiez-le, puis typez-le comme le `Column` de la table.
 - À partir de la 6.11.0, sur une telle table, le `where` d’un raccourci, le `having` de `select()`, `exists()` et `isInSelect()`, ainsi que les lignes d’`insert()`, d’`upsert()` et d’`update()`, n’acceptent plus une chaîne, un `String` ni un tableau, quel que soit le schéma (2345, 2769) : `db.select('films', 'titel')`. Zapatos 6.6.1 exécutait la chaîne comme une colonne, `WHERE "titel"` (42703 quand aucune colonne ne porte ce nom ; quand elle nommait une colonne booléenne, la requête filtrait par cette colonne), et envoyait une ligne donnée en chaîne comme ses caractères, `("0", "1", …)` (42703). Écrivez un Whereable, `{ subtitled: true }`, ou un fragment, `` db.sql<s.screenings.SQL>`${'subtitled'}` `` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). Sur une table dont toutes les colonnes sont optionnelles, l’une nommée `length`, `[]`, un tableau de lignes contenu dans une variable, un tableau `readonly` et un tableau `as const`, contenu dans une variable ou écrit dans l’appel, donnés à `insert()` ou à `upsert()`, sont désormais typés comme un tableau, comme ils s’exécutent, et non comme une seule ligne ([#683](https://github.com/AlexandreDemartin/pgcast/issues/683)).
+
+### Les types des conditions sur tableaux en 7.0 {#array-condition-types}
+
+Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.conditions`) :
+
+- Un mock de la 6.6.1 doit implémenter les deux surcharges, pour une colonne parente et pour un tableau.
+- Remplacez `.map(c.arrayContains)` par `.map(xs => c.arrayContains(xs))` pour conserver le type des éléments. Un `c.arrayContains([1])` stocké dans une variable a pour contrainte `number[]`.
+- Omettez l’argument de type dans `c.arrayContains(db.parent('genres'))`. Pour une union d’un tableau et d’une colonne parente, affinez le type avant l’appel.
+- Pour inclure les colonnes parentes dans le type dérivé de l’opérande, utilisez `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
+- Pour `xs: T[]` avec `T extends number[]`, laissez TypeScript inférer le type de retour de la fonction. L’ancienne annotation `db.SQLFragment<boolean | null, T>` est refusée.
+- Pour un tableau d’enum avec TypeScript 4.1 ou 5.9, utilisez `['director'] as const` ou un tableau de type `s.crew_job[]`.
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 

@@ -340,7 +340,7 @@ Le type en accepte davantage, et chacune de ces valeurs lève une erreur à la c
 
 ## Les tableaux {#arrays}
 
-À partir de la 7.0, chaque condition accepte un tableau, y compris en lecture seule, dont les éléments ont le même type que ceux de la colonne. Elle accepte aussi une [colonne parente](/fr/sql-template#parent). Pour `films.genres`, de type `text[]`, passez un tableau de chaînes.
+À partir de la 7.0, chaque condition accepte un tableau, y compris en lecture seule, dont les éléments ont le même type que ceux de la colonne. Elle accepte aussi une [colonne parente](/fr/sql-template#parent). Pour `films.genres`, de type `text[]`, passez un tableau de chaînes. Pour les labels d’un enum avec TypeScript 4.1 ou 5.9, utilisez `['director'] as const` ou un tableau de type `s.crew_job[]`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -376,7 +376,7 @@ Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) 
 
 Comme dans Zapatos 6.6.1, le type accepte aussi `{}`, `{ value: … }` et `db.param()` d’un nom de colonne, qui passent pour un `ParentColumn`, dont tous les membres sont optionnels ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` est envoyé en `'{}'`, le tableau vide : `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> trouve chaque ligne dont le tableau n’est pas `NULL`, `arrayContainedIn({})` les tableaux vides, et `arrayOverlaps({})` aucune ligne. Postgres refuse `{ value: 'title' }` et `db.param('title')` (22P02, `malformed array literal`), et, avec [`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson) activé, `{}` et `{ value: … }` aussi (42883).
 
-Le tableau est un seul paramètre, donc chaque élément, à toute profondeur, est une valeur simple, comme dans [`eqAny()`](#conditions.eqAny) : `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête ([valeurs refusées](#refused-values)). Sur `genres`, TypeScript refuse chacun de ces éléments (TS2322). Zapatos 6.6.1 envoyait `Default` en `'{"Symbol(DEFAULT)"}'` et `self` en `'{"Symbol(self)"}'`, les autres en leur JSON : aucune ligne, les tableaux vides avec `arrayContainedIn()`, chaque ligne sous `not()`, 22P02 sur un `int4[]`. Pour du SQL, écrivez la valeur en fragment `sql` ci-dessus.
+Le tableau est un seul paramètre, donc chaque élément, à toute profondeur, est une valeur simple, comme dans [`eqAny()`](#conditions.eqAny) : `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête ([valeurs refusées](#refused-values)). Sur `genres`, TypeScript refuse chacun de ces éléments (TS2322). Zapatos 6.6.1 envoyait `Default` en `'{"Symbol(DEFAULT)"}'`, `self` en `'{"Symbol(self)"}'` et `db.all` en `'{"Symbol(all)"}'`. Il envoyait les autres éléments en JSON. Parmi `NULL`, `{}` et `{drama}`, `arrayContainedIn([db.all])` ne trouvait que `{}`, et sous `not()` que `{drama}`. Les deux autres opérateurs ne trouvaient aucune ligne. Sur un `int4[]`, Postgres refusait ces éléments (22P02). Pour du SQL, écrivez la valeur en fragment `sql` ci-dessus.
 
 ### `arrayContains()` {#conditions.arrayContains}
 

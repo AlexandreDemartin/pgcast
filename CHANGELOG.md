@@ -8,7 +8,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Changed
 
-- Breaking: `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` constrain the array column. Replace `arrayContains<number[]>([[1]])`<!-- tsc: export const saved: db.SQLFragment<boolean | null, number[]> = db.conditions.…; --> with `arrayContains([1])`<!-- tsc: export const saved: db.SQLFragment<boolean | null, number[]> = db.conditions.…; --> and use `number[]` as the constraint on a saved fragment (#705).
+- Breaking: `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` constrain the array column. Replace `arrayContains<number[]>([[1]])`<!-- tsc: export const saved: db.SQLFragment<boolean | null, number[]> = db.conditions.…; --> with `arrayContains([1])`<!-- tsc: export const saved: db.SQLFragment<boolean | null, number[]> = db.conditions.…; --> and use `number[]` as the constraint on a saved fragment. See the [type migrations](https://pgcast.dev/switching#array-condition-types) (#705).
 
 ## [6.12.0] - 2026-11-19
 

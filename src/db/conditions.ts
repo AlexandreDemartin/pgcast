@@ -332,20 +332,21 @@ const arrayParam = (fn: string, a: unknown) => {
 
 type ArrayCondition = {
   (a: ParentColumn): SQLFragment<boolean | null, never>;
-  <T>(a: readonly T[]): SQLFragment<boolean | null, [T] extends [readonly any[]] ? T : T[]>;
+  <T>(a: readonly T[]): SQLFragment<boolean | null,
+    [T] extends [readonly any[]] ? ([T] extends [any[]] ? T : [...T]) : T[]>;
 };
 
 /**
- * Match an array column containing every supplied element. On an `int4[]` column, `arrayContains([1])` gives `"col" @> $1`.
+ * Match an array column containing every supplied element. On an `int4[]` column with `castArrayParamsToJson` off (default), `arrayContains([1])` gives `"col" @> $1`.
  * An item, at any depth, that is `db.Default`, `db.self`, `db.all`, `db.raw()`, `db.cols()`, `db.vals()`, `db.param()`,
  * `db.parent()` or a `sql` fragment throws as the query compiles.
  */
 export const arrayContains: ArrayCondition = (a: readonly unknown[] | ParentColumn) =>
   sql<SQL, boolean | null>`${self} @> ${arrayParam('arrayContains', a)}`;
-/** Match an array column whose elements all occur in the supplied array. `arrayContainedIn([1, 2])` gives `"col" <@ $1`. Refuses the items `arrayContains()` refuses. */
+/** Match an array column whose elements all occur in the supplied array. With `castArrayParamsToJson` off (default), `arrayContainedIn([1, 2])` gives `"col" <@ $1`. Refuses the items `arrayContains()` refuses. */
 export const arrayContainedIn: ArrayCondition = (a: readonly unknown[] | ParentColumn) =>
   sql<SQL, boolean | null>`${self} <@ ${arrayParam('arrayContainedIn', a)}`;
-/** Match an array column sharing an element with the supplied array. `arrayOverlaps([1, 2])` gives `"col" && $1`. Refuses the items `arrayContains()` refuses. */
+/** Match an array column sharing an element with the supplied array. With `castArrayParamsToJson` off (default), `arrayOverlaps([1, 2])` gives `"col" && $1`. Refuses the items `arrayContains()` refuses. */
 export const arrayOverlaps: ArrayCondition = (a: readonly unknown[] | ParentColumn) =>
   sql<SQL, boolean | null>`${self} && ${arrayParam('arrayOverlaps', a)}`;
 

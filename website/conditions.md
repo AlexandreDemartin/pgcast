@@ -335,7 +335,7 @@ The type takes more than that, and each of these throws as the query compiles, b
 
 ## Arrays {#arrays}
 
-From 7.0, each condition takes an array of the column's elements, including a readonly array, or a [parent column](/sql-template#parent). On `films.genres`, a `text[]`, pass an array of strings.
+From 7.0, each condition takes an array of the column's elements, including a readonly array, or a [parent column](/sql-template#parent). On `films.genres`, a `text[]`, pass an array of strings. For enum labels on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -371,7 +371,7 @@ With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on,
 
 As in Zapatos 6.6.1, the type also takes `{}`, `{ value: … }` and `db.param()` of a column's name, which pass as a `ParentColumn`, whose members are all optional ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` is sent as `'{}'`, the empty array: `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> matches every row whose array is not `NULL`, `arrayContainedIn({})` the empty arrays, and `arrayOverlaps({})` no row. Postgres refuses `{ value: 'title' }` and `db.param('title')` (22P02, `malformed array literal`), and under [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson), `{}` and `{ value: … }` too (42883).
 
-The array is one parameter, so each item, at any depth, is a plain value, as in [`eqAny()`](#conditions.eqAny): `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` throws as the query compiles ([refused values](#refused-values)). On `genres`, TypeScript refuses each of these items (TS2322). Zapatos 6.6.1 sent `Default` as `'{"Symbol(DEFAULT)"}'` and `self` as `'{"Symbol(self)"}'`, the others as their JSON: no row, the empty arrays with `arrayContainedIn()`, every row under `not()`, 22P02 on an `int4[]`. For SQL, write the `sql` fragment value above.
+The array is one parameter, so each item, at any depth, is a plain value, as in [`eqAny()`](#conditions.eqAny): `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` throws as the query compiles ([refused values](#refused-values)). On `genres`, TypeScript refuses each of these items (TS2322). Zapatos 6.6.1 sent `Default` as `'{"Symbol(DEFAULT)"}'`, `self` as `'{"Symbol(self)"}'` and `db.all` as `'{"Symbol(all)"}'`. It sent the other items as their JSON. Among `NULL`, `{}` and `{drama}`, `arrayContainedIn([db.all])` matched only `{}`, and under `not()` only `{drama}`. The other two operators matched no row. On an `int4[]`, Postgres refused these items (22P02). For SQL, write the `sql` fragment value above.
 
 ### `arrayContains()` {#conditions.arrayContains}
 

@@ -11,7 +11,7 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 
 - One line of `package.json` swaps the package; imports, config and generated files stay as they are.
 - A few calls give other rows, or throw: [step 4](#find-the-calls-whose-result-changes) lists them, with what to do.
-- What code may rely on is kept, with a warning, until you turn on its opt-in.
+- What code may rely on at runtime is kept, with a warning, until you turn on its opt-in. The [7.0 array condition types](#array-condition-types) change without a warning.
 
 </AtAGlance>
 
@@ -101,6 +101,17 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 - A selected range may now be `'empty'`, as Postgres writes an empty range ([`RangeString`](/runtime-config#RangeString)), so it no longer assigns to a type that starts with a bracket, `` `[${string}` | `(${string}` `` (2322). Check for it first, `if (range !== 'empty')`; in a type, write `Exclude<db.DateRangeString, 'empty'>`.
 - From 6.11.0, once the schema is regenerated, a table with a column named like a member of `String`, of a type that member fits (`search` typed `any`, as a `tsvector` is, or a `length` number), no longer takes any string as a name in its `SQL` type (2345): `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 took the string as a name, `"titel"`, which Postgres refuses when no column has it (42703). For a name known only at run time, check it, then type it as the table's `Column`.
 - From 6.11.0, on such a table, a shortcut's `where`, `select()`'s `having`, `exists()` and `isInSelect()`, and the rows of `insert()`, `upsert()` and `update()`, no longer take a string, a `String` or an array, whatever the schema (2345, 2769): `db.select('films', 'titel')`. Zapatos 6.6.1 ran the string as a column, `WHERE "titel"` (42703 when no column has that name; when it named a boolean column, the query filtered by that column), and sent a string row as its characters, `("0", "1", …)` (42703). Write a Whereable, `{ subtitled: true }`, or a fragment, `` db.sql<s.screenings.SQL>`${'subtitled'}` `` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). On a table whose columns are all optional, one named `length`, `[]`, an array of rows held in a variable, a `readonly` one and an array `as const`, held in a variable or written in the call, given to `insert()` or `upsert()`, are now typed as an array, as they run, not as one row ([#683](https://github.com/AlexandreDemartin/pgcast/issues/683)).
+
+### Array condition types in 7.0 {#array-condition-types}
+
+For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.conditions`):
+
+- A 6.6.1 mock must implement both the parent and array overloads.
+- Replace `.map(c.arrayContains)` with `.map(xs => c.arrayContains(xs))` to keep the element type. A saved `c.arrayContains([1])` constrains `number[]`.
+- Drop the type argument on `c.arrayContains(db.parent('genres'))`. Narrow an array-or-parent union before calling.
+- To include parents in a derived operand type, use `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
+- For `xs: T[]` with `T extends number[]`, let the wrapper infer its return type. Its old `db.SQLFragment<boolean | null, T>` annotation fails.
+- For an enum array on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
 
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
