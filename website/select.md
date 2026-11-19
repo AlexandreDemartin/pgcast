@@ -115,9 +115,30 @@ A read shortcut is a subquery there: `select()`, `selectOne()`, `selectExactlyOn
 
 - **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`, or `null` when its query returns no row ([`count()`](#count)). A `count()` whose `groupBy` gives several groups brings the parent row back once per group under an outer `select()`; under `selectOne()` or `selectExactlyOne()`, once, with one group's count, though with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) `selectExactlyOne()` rejects with `NotExactlyOneError`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
 - **One subquery**: its result is passed through in place of each row. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
-  - When the query run is a `selectOne()` or `selectExactlyOne()` that passes it through, directly or by another such passthrough, a [`count()`](#count), or a `sum()` or `avg()` of an integer or `numeric` column, is a string (`"3"`), as `pg` reads `bigint` and `numeric`, though typed `number`, or `number | null` for `sum()` and `avg()` with [`aggregatesTypedByColumn`](#typed-by-column) declared. Under a key or an outer `select()`, it comes back as JSON, a number.
-  - Pass that string, not the other values, to `Number()`: the aggregate is `null` when its query returns no row (a `groupBy` with no group), and for `sum()` and `avg()` when no row matches; `selectOne()` gives `undefined` with no parent row.
+  - When you call `.run()` on the outer `selectOne()`, `selectExactlyOne()` or [`selectRows()`](#selectRows), `pg` reads the passed-through `result` column with its configured type parser. An outer `select()` returns the values in a JSON array. A `sql` template keeps its result annotation in both cases.
+  - By default, `pg` reads a [`count()`](#count) of two rows as `"2"`. It also reads `bigint` or `numeric` results from `sum()` and `avg()` as strings. With `Number` as its `int8` parser, the same count gives `2`. The aggregate is typed as `number`, or `number | null` for `sum()` and `avg()` with [`aggregatesTypedByColumn`](#typed-by-column) declared.
+  - Apply `Number()` only to a string. A missing aggregate row gives `null`, as do `sum()` and `avg()` when no rows match. With no parent row, `selectOne()` gives `undefined`.
 - **`null`**: `lateral: null`, or a key whose subquery is `null` or `undefined`, throws while compiling, so `.run()` rejects before any query: "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", or "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 threw a `TypeError` at the call.
+
+Give the count a key to read it as JSON. The ungrouped count below returns one row, giving `{ n: 2 }`. A grouped count that returns no row gives `{ n: null }`.
+
+<<< ./examples/plain/lateral_keyed_count.ts{ts twoslash}
+
+<!-- probe: db.selectExactlyOne('studios', { id: 1000 }, { columns: [], lateral: { n: db.count('films', { studio_id: db.parent('id') }) } }) -->
+```sql
+SELECT jsonb_build_object() || jsonb_build_object($1::text, "lateral_n".result) AS result FROM "studios" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_n" ON true WHERE ("id" = $2) LIMIT $3
+-- ["n", 1000, 1]
+```
+
+For a string with each selector, convert the timestamp to JSON in the subquery and annotate its result as `string`.
+
+<<< ./examples/plain/lateral_json_timestamp.ts{ts twoslash}
+
+<!-- probe: db.select('studios', { id: 1000 }, { lateral: db.sql`SELECT to_jsonb(now()) AS result` }) -->
+```sql
+SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "studios" LEFT JOIN LATERAL (SELECT to_jsonb(now()) AS result) AS "lateral_passthru" ON true WHERE ("id" = $1)) AS "sq_studios"
+-- [1000]
+```
 
 Steps, nesting and self-joins: [Joins](/lateral). Since pgcast 6.6.2, a key or an `alias` with a `"` in it stays one identifier; in Zapatos 6.6.1 it could close its quotes ([changelog](/changelog#6.6.2-security)).
 
@@ -240,7 +261,7 @@ Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran, or, for 
 db.selectRows(table, where, options?)
 ```
 
-From 6.12.0. The query [`select()`](#select) wraps in `jsonb_agg`, as a fragment of its own, one row per result: for [`cursor()`](/transaction#cursor), which runs exactly the fragment it is given, and so reads a `select()` as one row, its whole array. It takes `select()`'s `table`, `where` and [options](#options), and `.run(pool)` gives what `select()` gives, `[]` when none match.
+From 6.12.0. The query [`select()`](#select) wraps in `jsonb_agg`, as a fragment of its own, one row per result: for [`cursor()`](/transaction#cursor), which runs exactly the fragment it is given, and so reads a `select()` as one row, its whole array. It takes `select()`'s `table`, `where` and [options](#options), and `.run(pool)` returns an array with one element per result row, or `[]` when none match.
 
 | Call | SQL |
 |---|---|
@@ -261,8 +282,8 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-- Each row is typed as `select()` types it. A single `lateral` subquery is passed through as [`selectOne()`](#selectOne) passes it, as `pg` parses its column, and typed so: with [`aggregatesTypedByColumn`](#typed-by-column), a `min()` of a `date` is a `Date`, where `select()` gives its JSON string.
-- A `lateral` passed through and typed `number` does not compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by column, alone or in a union, `cond ? count() : select()`. The error is TS2322 on `lateral`, `… is not assignable to type 'undefined'.` Their type is `Number()`'s or JSON's, where `pg` gives a `bigint` or a `numeric` as a string and a `date` as a `Date` ([#749](https://github.com/AlexandreDemartin/pgcast/issues/749)). A `sql` template typed `number` is refused with them, as its type cannot be told from theirs. Under a `lateral` key, the value is JSON and its type holds: `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. A `lateral` whose type is a type parameter, an object of subqueries included, or a fragment typed by an unconstrained one, `db.SQLFragment<R>`, does not compile either: `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` gives TS2345. The forwarder can call `select()` or cast the map with `l as db.SQLFragmentMap`. For a `db.SQLFragment<R>`, use `l as db.SQLFragment<any>` (the map cast gives TS2352). Past the type, from JavaScript, `run()` gives `pg`'s value.
+- With [`aggregatesTypedByColumn`](#typed-by-column) enabled and declared, a passed-through `min()` of a `date` is typed as `Date | null` per row. For a matching date, the default parser gives a `Date`.
+- A `lateral` passed through and typed `number` does not compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by column, alone or in a union, `cond ? count() : select()`. The error is TS2322 on `lateral`, `… is not assignable to type 'undefined'.` A `sql` template typed `number` is refused with them, as its type cannot be told from theirs. Use a key for an [ungrouped count](#lateral), as in `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. A count subquery that returns no row gives JSON `null` under that key. A `lateral` whose type is a type parameter, an object of subqueries included, or a fragment typed by an unconstrained one, `db.SQLFragment<R>`, does not compile either: `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` gives TS2345. The forwarder can call `select()` or cast the map with `l as db.SQLFragmentMap`. For a `db.SQLFragment<R>`, use `l as db.SQLFragment<any>` (the map cast gives TS2352).
 - A `lock` locks each row as its batch is fetched, not before.
 - Nested, it is a set of rows, not one value. A `sql` template takes it, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, and so do [`withCTEs()`](/sql-template#withCTEs) and `cursor()`. As a `lateral`, an `extras` value, a `where` or the Whereable value of a typed column, it does not compile: its type, a [`RowsQuery`](#RowsQuery), says so. Its type takes it as `order.by`, and as the Whereable value of a column typed `any`, where Postgres refuses it. Past the type, from JavaScript, a `lateral` key repeats the parent row once per row, and an `extras` value gets 21000 from Postgres.
 

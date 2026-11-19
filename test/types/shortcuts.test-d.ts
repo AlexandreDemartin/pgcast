@@ -404,6 +404,18 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf<NonNullable<Run<typeof q>>['first']>().toEqualTypeOf<number>();
   });
 
+  test('a single SQL lateral keeps its result annotation under each selector', () => {
+    const native = db.sql<db.SQL, Date>`SELECT now() AS result`,
+      json = db.sql<db.SQL, string>`SELECT to_jsonb(now()) AS result`;
+    expectTypeOf(db.selectOne('users', db.all, { lateral: native }).run(pool)).resolves.toEqualTypeOf<Date | undefined>();
+    expectTypeOf(db.selectExactlyOne('users', db.all, { lateral: native }).run(pool)).resolves.toEqualTypeOf<Date>();
+    // select() reads JSON here, though the fragment declares Date.
+    expectTypeOf(db.select('users', db.all, { lateral: native }).run(pool)).resolves.toEqualTypeOf<Date[]>();
+    expectTypeOf(db.selectOne('users', db.all, { lateral: json }).run(pool)).resolves.toEqualTypeOf<string | undefined>();
+    expectTypeOf(db.selectExactlyOne('users', db.all, { lateral: json }).run(pool)).resolves.toEqualTypeOf<string>();
+    expectTypeOf(db.select('users', db.all, { lateral: json }).run(pool)).resolves.toEqualTypeOf<string[]>();
+  });
+
   test('characterization: nested, a count() whose query can return no row is a number, as in 6.6.1, though it gives null (#420)', () => {
     const n = db.count('accounts', { owner_id: db.parent('id') }, { groupBy: 'owner_id' });
     const many = db.select('users', db.all, {
@@ -531,6 +543,8 @@ describe('selectRows', () => {
     db.selectRows('users', db.all, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
     // @ts-expect-error a sql template typed number: the type cannot tell it from count()
     db.selectRows('users', db.all, { lateral: db.sql<db.SQL, number>`SELECT 7::int8 AS result` });
+    // @ts-expect-error even an int4, which pg parses as a number, has the same fragment type as count()
+    db.selectRows('users', db.all, { lateral: db.sql<db.SQL, number>`SELECT 7::int4 AS result` });
     // @ts-expect-error a selectOne() passing a count() through, typed number | undefined
     db.selectRows('users', db.all, { lateral: db.selectOne('accounts', { owner_id: p }, { lateral: db.count('events', db.all) }) });
     // @ts-expect-error count() or select() by a condition: each member is checked, and count()'s is typed number
