@@ -36,11 +36,11 @@ try {
 }
 ```
 
-À partir de la 7.1.0, activez [`constraintNames` (contraintes couvertes et limites)](/fr/generator#generate.constraintNames) pour vérifier le nom à la compilation. Dans le `catch` ci-dessus, relancez l’erreur sauf si `err instanceof pg.DatabaseError && seatTaken(err)`.
+À partir de la 7.1.0, activez [`constraintNames` (contraintes couvertes et limites)](/fr/generator#generate.constraintNames) pour vérifier le nom de la contrainte à la compilation. Dans le `catch` ci-dessus, relancez l’erreur sauf si `err instanceof pg.DatabaseError && seatTaken(err)`.
 
 <<< ../examples/plain/errors_named_constraint.ts{ts twoslash}
 
-Une faute de frappe dans la valeur de `bookingKey` provoque une erreur de compilation. Si vous supprimez la contrainte, vous obtiendrez la même erreur après avoir régénéré les types.
+Une faute de frappe dans la valeur de `bookingKey` provoque une erreur de compilation. Si vous supprimez la contrainte, la même erreur se produit après la régénération des types.
 
 ## Distinguer les refus {#tell-the-refusals-apart}
 
