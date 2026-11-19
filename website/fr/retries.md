@@ -54,7 +54,7 @@ Si ce travail passe dans le callback, une réservation réessayée envoie deux e
 
 pgcast ne réessaie que ce qui lui parvient. N’avalez pas une erreur de la base dans le callback : ensuite, Postgres refuse chaque requête de la transaction avec 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), et si le callback se termine normalement, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, que Postgres transforme en rollback sans erreur.
 
-La promesse est rejetée sans retry et rien n’est enregistré. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Dans les deux cas, une erreur 40001 ou 40P01 interceptée dans le callback ne déclenche aucun retry.
+La promesse est rejetée sans retry et rien n’est enregistré. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Quel que soit le réglage, une erreur 40001 ou 40P01 interceptée dans le callback ne déclenche aucun retry.
 
 Si vous en interceptez une à l’intérieur, relancez-la.
 
@@ -95,7 +95,7 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-Un paramètre de type [`db.Queryable`](/fr/sql-template#Queryable) accepte ce client. L’appel ci-dessous compile, puis sa promesse est rejetée avant le callback de réservation. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), la réservation s’exécuterait en `READ COMMITTED`.
+Un paramètre de type [`db.Queryable`](/fr/sql-template#Queryable) accepte ce client. L’appel ci-dessous compile, puis sa promesse est rejetée avant que le callback de réservation soit appelé. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), la réservation s’exécuterait en `READ COMMITTED`.
 
 <<< ../examples/plain/retries_lower_level.ts{ts twoslash}
 

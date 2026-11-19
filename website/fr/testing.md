@@ -69,12 +69,12 @@ Un id se lit donc, il ne s’écrit jamais en dur ; et un nom préparé désign
 
 ### Donner le pool au code qui commite {#give-code-that-commits-the-pool}
 
-Avec pg 8.21 ou plus récent, [`transaction()`](/fr/transaction#your-own-begin) est rejetée si le client du test signale encore son propre `BEGIN` après la requête vide. Les seeds restent dans la transaction du test jusqu’à son `ROLLBACK`. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), pgcast envoie `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) --> et peut mettre fin à la transaction du test :
+À partir de pg 8.21, la promesse de [`transaction()`](/fr/transaction#your-own-begin) est rejetée si, après la requête vide, le client du test signale encore que le bloc ouvert par `BEGIN` est actif. Les seeds restent dans la transaction du test jusqu’à son `ROLLBACK`. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), pgcast envoie `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) --> et peut mettre fin à la transaction du test :
 
 - Si le test n’a encore lancé aucune requête, ou au niveau propre à la session (`readCommitted()`, sur un serveur par défaut), son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commite la transaction du test, lignes comprises.
 - À un autre niveau, après n’importe quelle requête, seeds du test compris, Postgres refuse avec 25001 (« <span lang="en">SET TRANSACTION ISOLATION LEVEL must be called before any query</span> ») : son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> annule les seeds, et l’appel est rejeté.
 
-Passez le pool au code qui commite et supprimez ce qu’il a écrit :
+Passez le pool au code qui commite, puis supprimez les données qu’il a enregistrées.
 
 <<< ../examples/plain/testing_commits.ts{ts twoslash}
 

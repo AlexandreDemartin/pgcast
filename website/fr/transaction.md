@@ -92,14 +92,14 @@ Le callback peut s’exécuter plusieurs fois : [Retries](/fr/retries).
 
 ### Transmettre une transaction {#passing-a-transaction-through}
 
-Avec un client marqué par `transaction()` dont le niveau satisfait la demande, l’appel imbriqué n’envoie rien : elle appelle le callback avec ce client, aussitôt, et renvoie sa promesse. Ni `START TRANSACTION`, ni `COMMIT`, ni `ROLLBACK`, ni retry qui lui soit propre ; la transaction extérieure s’en charge. Une fonction peut ainsi s’exécuter dans sa propre transaction, ou dans celle de l’appelant :
+Si le client est marqué par `transaction()` et que son niveau d’isolation satisfait le niveau demandé, l’appel imbriqué transmet aussitôt ce client au callback et renvoie sa promesse sans envoyer de requête. La transaction extérieure se charge de `START TRANSACTION`, du `COMMIT` ou du `ROLLBACK` et des retries. Une fonction peut ainsi s’exécuter dans sa propre transaction ou dans celle de l’appelant.
 
 <<< ../examples/plain/pass_through.ts{ts twoslash}
 
 Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, les deux `INSERT`, `COMMIT`.
 
 - Chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable). TypeScript accepte donc `serializable()` avec le client de `readCommitted()`. Par défaut, pgcast rejette cet appel à l’exécution, avant d’appeler le callback.
-- La transaction extérieure est annulée, sauf si son callback intercepte l’erreur. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), le callback imbriqué s’exécute au niveau extérieur. Si [ce niveau satisfait la demande](#IsolationSatisfying), le même client est transmis dans les deux cas.
+- La transaction extérieure est annulée, sauf si son callback intercepte l’erreur. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), le callback imbriqué s’exécute au niveau d’isolation de la transaction extérieure. Si [ce niveau satisfait le niveau demandé](#IsolationSatisfying), le même client est transmis dans les deux cas.
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.
@@ -159,9 +159,9 @@ Le SQL de la requête du callback : [`count()`](/fr/select#count).
 
 ### Votre propre `BEGIN` {#your-own-begin}
 
-Si pg signale un bloc, le comportement par défaut laisse votre transaction ouverte. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), pgcast envoie son propre `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> et peut mettre fin à la vôtre. Si le bloc est encore actif, Postgres émet l’avis 25001.
+Si pg signale un bloc de transaction, pgcast laisse par défaut votre transaction ouverte. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), pgcast envoie son propre `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> et peut mettre fin à la vôtre. Si le bloc est encore actif, Postgres émet l’avis 25001.
 
-| Votre transaction | Zapatos 6.6.1 ou `false` explicite | Par défaut en 7.0 |
+| Votre transaction | Zapatos 6.6.1 ou option à `false` | Par défaut en 7.0 |
 |---|---|---|
 | pas encore de requête, ou au niveau propre à la session (`readCommitted()`, sur un serveur par défaut) | son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commite la vôtre, lignes comprises | rejetée avant d’envoyer son `START TRANSACTION` ; la vôtre reste ouverte |
 | un autre niveau, après une requête | Postgres refuse (25001), et son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> annule vos lignes | rejetée avant son `START TRANSACTION` ; la vôtre reste ouverte |
@@ -185,10 +185,10 @@ client.release();
 ```
 
 - pg signale le bloc à partir de pg 8.21. Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, sans avertissement. Non testé avec `pg-native`.
-- Par défaut, quand pg en signale un, `transaction()` envoie d’abord une requête vide, afin de relire le statut : pg peut encore signaler un bloc juste après un `COMMIT` qui a échoué. Postgres ne la compte pas comme une de vos requêtes. [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) la reçoivent, avec l’id de la transaction, comme ils reçoivent son `START TRANSACTION`.
-- Par défaut, une `transaction()` lancée au même moment sur ce client est transmise, comme dans la 6.6.1, et ne commite ni n’annule rien : ses requêtes s’exécutent dans votre bloc, ou, quand pg signalait un bloc déjà terminé, comme le dit le dernier point.
+- Par défaut, si pg signale un bloc, `transaction()` envoie d’abord une requête vide pour vérifier de nouveau le statut du client. En effet, pg peut encore signaler un bloc juste après l’échec d’un `COMMIT`. Postgres ne compte pas cette requête parmi les vôtres. [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) la reçoivent avec l’id de la transaction, comme pour `START TRANSACTION`.
+- Par défaut, comme en 6.6.1, un appel concurrent à `transaction()` sur le même client transmet directement celui-ci à son callback. Les requêtes du second appel s’exécutent dans votre bloc, que cet appel laisse ouvert. Si le bloc signalé est déjà terminé, le dernier point décrit où s’exécutent les requêtes.
 - Non détectés : un client récupéré du pool alors qu’il est encore dans un bloc, comme un client libéré avant son `ROLLBACK` ; un `BEGIN` envoyé sans `await` ; un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue (`'BEGIN; …; SELECT 1/0'`), que pg peut encore signaler hors de tout bloc, si bien que `transaction()` s’exécute comme dans la 6.6.1, sans avertissement.
-- Par défaut, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est commitée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
+- Par défaut, si deux appels à `transaction()` se font en même temps sur le même client juste après l’échec d’un `COMMIT` et que pg signale encore le bloc, le premier envoie la requête vide, puis poursuit. Le second reçoit directement le client et envoie sa première requête, ainsi que celles lancées avec elle, avant le `START TRANSACTION` du premier. Chacune s’exécute hors de toute transaction et est commitée séparément. Les requêtes suivantes du second appel s’exécutent dans la transaction du premier.
 
 ### Erreurs {#errors}
 
@@ -557,7 +557,7 @@ Le deuxième argument de [`transaction()`](#transaction). Chaque valeur est écr
 type IsolationSatisfying<T extends IsolationLevel>
 ```
 
-Les niveaux extérieurs qui satisfont un appel imbriqué au niveau `T`. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), tout niveau extérieur est accepté.
+Les niveaux d’isolation de la transaction extérieure qui satisfont le niveau `T` demandé par un appel imbriqué. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), tout niveau extérieur est accepté.
 
 | `T` | `IsolationSatisfying<T>` |
 |---|---|
