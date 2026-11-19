@@ -168,9 +168,9 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_k
 
 Par défaut, `constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la vérification de types de la 6.x. Postgres applique toujours les mêmes règles.
 
-Postgres cherche la contrainte sur la table cible, même si une autre table a une contrainte du même nom. Si la contrainte est absente, Postgres renvoie 42704. Une contrainte sans index pouvant arbitrer le conflit, comme un `CHECK` qui porte le même nom qu’un index unique ordinaire, donne l’erreur 42809.
+Postgres cherche la contrainte sur la table cible, même si une autre table a une contrainte du même nom. Si la contrainte est absente, Postgres renvoie 42704. Si aucun index de la contrainte ne peut servir d’arbitre, Postgres renvoie 42809, par exemple pour une contrainte `CHECK` qui porte le même nom qu’un index sans contrainte.
 
-`constraint()` ne prend les noms de la table qu’à l’intérieur de l’appel, comme ci-dessus. Contenu dans une variable, `const k = db.constraint('tags_pkey')` accepte le nom de n’importe quelle table, donc `db.upsert('ratings', …, k)` compile. Donnez la table, `db.constraint<'ratings'>('ratings_pkey')`, et le type vérifie le nom par rapport à elle :
+TypeScript déduit la table cible lorsque vous appelez `constraint()` directement dans `upsert()`, comme ci-dessus. Si vous stockez le résultat dans une variable avec `const k = db.constraint('tags_pkey')`, `constraint()` accepte un nom de contrainte de n’importe quelle table et `db.upsert('ratings', …, k)` compile. Indiquez la table avec `db.constraint<'ratings'>('ratings_pkey')` pour que TypeScript vérifie que la contrainte appartient à `ratings`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';

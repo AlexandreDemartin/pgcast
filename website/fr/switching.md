@@ -58,7 +58,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 npx zapatos
 ```
 
-En 6.x, un `git diff` sur votre dossier `zapatos/` régénéré peut montrer des différences avec Zapatos 6.6.1, par exemple si
+Avec pgcast 6.x, lancez `git diff` sur votre dossier `zapatos/` régénéré pour voir les éventuelles différences avec Zapatos 6.6.1. En voici quelques exemples.
 
 - un commentaire de colonne s’étend sur plusieurs lignes : chaque ligne commence maintenant par ` * ` ;
 - une table a un index simple nommé comme l’index unique d’un autre schéma : son `UniqueIndex` n’emprunte plus ce nom ;
@@ -153,9 +153,9 @@ Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#ge
 
 Régénérez le schéma puis lancez `tsc`. Pour [la table `festival_entries`](/fr/generator#generate.uniqueIndexConstraintsOnly), `constraint()` accepte encore `festival_entries_pkey` et `festival_entries_film_festival_key`. Dans un objet littéral de type `Record<s.festival_entries.UniqueIndex, string>`, gardez ces deux clés et retirez `festival_entries_live_idx` et `festival_entries_slot_key`. Si un upsert cible l’un de ces noms, choisissez une contrainte compatible avec `DO UPDATE`.
 
-Si le type `UniqueIndex` d’une relation devient `never`, un objet littéral de type `Record` indexé par ce type compile encore avec l’ancienne clé. Vérifiez ces objets à la main.
+Si le type `UniqueIndex` d’une relation devient `never`, TypeScript accepte encore l’ancienne clé dans un objet littéral de type `Record` dont les clés sont définies par cette union. Vérifiez ces objets à la main.
 
-Sur Postgres 18, un upsert qui nomme une clé `WITHOUT OVERLAPS` non différable avec `updateColumns: db.doNothing` compilait et fonctionnait en 6.x. Avec les réglages par défaut de la 7.0, le compilateur refuse ce nom. Pour conserver `DO NOTHING`, écrivez une requête `sql` explicite qui nomme la clé, ou réglez `uniqueIndexConstraintsOnly: false` en 7.x.
+Sur Postgres 18, un upsert qui cible par son nom une clé `WITHOUT OVERLAPS` non différable avec `updateColumns: db.doNothing` compilait et fonctionnait en 6.x. Avec le réglage par défaut de la 7.0, le compilateur refuse ce nom. Pour conserver `DO NOTHING`, écrivez une requête `sql` explicite qui nomme la clé ou utilisez `uniqueIndexConstraintsOnly: false` en 7.x.
 
 Ce réglage rétablit le type union de la 6.x sans note de migration. C’est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
 
