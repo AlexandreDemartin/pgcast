@@ -93,11 +93,11 @@ Ajoutez ensuite les votes de chaque ligne à ceux déjà stockés : calculez `v
 </CastPanel>
 
 - La première exécution insère les trois lignes. La seconde les passe à 4, 2 et 6 votes, chacune avec `$action: 'UPDATE'`.
-- Un `undefined` dans `updateValues` donne à `votes` le compte du batch, puisque les lignes l’insèrent : `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, avec les deux réglages ([Une valeur `undefined`](/fr/insert#undefined-values)).
+- Un `undefined` dans `updateValues` donne à `votes` le nombre de votes inséré par le batch : `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, quel que soit le réglage ([Une valeur `undefined`](/fr/insert#undefined-values)).
 
 ## Lignes aux clés différentes {#rows-with-different-keys}
 
-Vous corrigez les noms sur deux réservations, et une seule ligne contient `booked_at`. Un upsert sans option lève une erreur avant l’envoi du SQL : en cas de conflit, la cellule manquante écraserait l’heure de l’autre réservation avec `DEFAULT` (`now()`).
+Supposons que vous corrigiez les noms de deux réservations et qu’une seule ligne contienne `booked_at`. Un upsert sans option lève une erreur avant l’envoi du SQL : en cas de conflit, la cellule manquante écraserait l’heure de l’autre réservation en lui donnant la valeur `DEFAULT` (`now()`).
 
 Nommez la colonne à modifier dans [`updateColumns`](/fr/insert#upsert-options) :
 
@@ -113,7 +113,7 @@ Nommez la colonne à modifier dans [`updateColumns`](/fr/insert#upsert-options)�
 
 ### Un `undefined` dans une ligne {#an-undefined-in-a-row}
 
-Si le formulaire donne à F8 `booked_at: undefined`, la même règle s’applique. Avec `updateColumns: 'customer'`, la cellule prend la valeur par défaut, `(DEFAULT, $5, $6, $7)`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' }) -->, et une réservation existante garde son heure. Voir [Une valeur `undefined`](/fr/insert#undefined-values).
+Si le formulaire fournit `booked_at: undefined` pour F8, la même règle s’applique. Avec `updateColumns: 'customer'`, la cellule prend la valeur par défaut, `(DEFAULT, $5, $6, $7)`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' }) -->, et une réservation existante garde son heure. Voir [Une valeur `undefined`](/fr/insert#undefined-values).
 
 ## Choisir ce qui revient {#choose-what-comes-back}
 

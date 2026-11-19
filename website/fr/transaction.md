@@ -734,7 +734,7 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 | Levée par | Comment | Messages |
 |---|---|---|
 | `select()`, `selectOne()`, `selectExactlyOne()` et les agrégats, avec un `order`, un `lock` ou un `aggregate` invalide | l’appel lève | [`select()`, Erreurs](/fr/select#errors) |
-| `upsert()` dont une clé absente écraserait une colonne en cas de conflit (vérification par défaut) | l’appel lève | [Lignes aux clés différentes](/fr/insert#upsert-different-keys) |
+| `upsert()` dont une clé absente entraînerait l’écrasement d’une valeur en cas de conflit (vérification des clés activée par défaut) | l’appel lève une erreur | [Lignes aux clés différentes](/fr/insert#upsert-different-keys) |
 | `update()` sans colonne à fixer | l’appel lève | [`update()`](/fr/insert#update) |
 | `truncate()` avec une autre option | l’appel lève | [`truncate()`](/fr/insert#truncate) |
 | une interpolation qui n’a pas de sens en SQL : un nombre, `null`, `db.all`, l’objet global ; `db.all` comme filtre de `deletes()` ou d’`update()` | `.run()` est rejetée | [Interpolations](/fr/sql-template#interpolations), [`all`](/fr/sql-template#all) |

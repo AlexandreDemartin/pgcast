@@ -55,11 +55,11 @@ Prenez un `update()` avec une valeur `undefined` :
 
 <<< ../examples/plain/versions_undefined.ts{ts twoslash}
 
-Zapatos 6.6.1 envoie `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> avec `null`, et le film perd son slogan. C’est peut-être un bug, une clé copiée d’un champ de formulaire jamais rempli ; c’est peut-être aussi la façon dont un projet vide une colonne.
+Zapatos 6.6.1 envoie `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> avec `null`, et le film perd son accroche. C’est peut-être un bug, une clé copiée d’un champ de formulaire jamais rempli ; c’est peut-être aussi la façon dont un projet vide une colonne.
 
 pgcast ne peut pas savoir lequel, et votre compilateur non plus : si la 6.7 avait simplement omis la colonne, ce code compilerait toujours, s’exécuterait toujours, et cesserait sans bruit de vider les slogans.
 
-En 6.x, la nouvelle lecture arrive comme une option, désactivée par défaut, et l’ancienne avertit quand elle s’exécute. Vous basculez quand vous êtes prêt, une option à la fois, avec vos tests pour montrer ce qui a bougé.
+En 6.x, la nouvelle interprétation d’`undefined` est proposée en option, désactivée par défaut. L’ancien comportement déclenche un avertissement. Quand vous êtes prêt, activez les options une par une et vérifiez ce qui change avec vos tests.
 
 Le modèle est emprunté : le cycle de dépréciation de Node lui-même (documenté, puis un avertissement à l’exécution, puis supprimé dans une majeure), les future flags de React Router, et la famille `--strict` de TypeScript, une option par comportement plus sûr.
 
@@ -74,7 +74,7 @@ Appelez cet `update()` en 6.7 et Node affiche, une fois :
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-Entre crochets figure le code, un par comportement déprécié du runtime, qu’on peut rechercher : [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) liste les avertissements actuels et leurs déclencheurs. Ensuite, le message dit ce qui se passe encore, quelle option le change, et que la 7.0 en fera le comportement par défaut.
+Chaque comportement déprécié du runtime a son propre code, affiché entre crochets pour faciliter la recherche. La section [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) liste les avertissements actuels et ce qui les déclenche. Le message décrit le comportement encore en vigueur, indique l’option qui le modifie et annonce que la 7.0 adoptera le nouveau comportement par défaut.
 
 Rien d’autre ne change : la requête s’exécute comme en 6.6.1, sauf si Node tourne avec `--throw-deprecation`, qui arrête le processus ([Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings)).
 

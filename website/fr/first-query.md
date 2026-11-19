@@ -287,7 +287,7 @@ const row: s.films.Insertable = {
 ```
 
 ::: tip Opt-in
-Omettez une clé ou donnez-lui la valeur `undefined` pour insérer la valeur par défaut de la colonne. Donnez `null` pour écrire `NULL` dans une colonne qui l’accepte ([Valeurs à l’écriture](/fr/insert#undefined-values)).
+Omettez une clé ou donnez-lui la valeur `undefined` pour insérer la valeur par défaut de la colonne. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

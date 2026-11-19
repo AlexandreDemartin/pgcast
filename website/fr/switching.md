@@ -230,7 +230,7 @@ Le texte et les valeurs de `.compile()` changent aussi au-delà des cas ci-dessu
 
 ## 5. Lire les avertissements {#read-the-warnings}
 
-Avant de passer de la 6.x à la 7.0, lancez vos tests et votre application avec les avertissements de dépréciation activés. En 6.x, le premier appel qui utilise chaque ancien comportement émet un avertissement de ce type :
+Avant de passer de la 6.x à la 7.0, lancez vos tests et votre application avec les avertissements de dépréciation activés. En 6.x, pour chaque ancien comportement, le premier appel qui l’utilise émet un avertissement de ce type :
 
 ```txt
 (node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
@@ -263,7 +263,7 @@ Pour trouver chaque appel :
 
 ## 6. Activer les opt-ins {#turn-on-the-opt-ins}
 
-En 6.x, une fois qu’une exécution ne montre plus d’avertissement, ou que chacun vient d’un appel que vous avez vérifié, activez les options, une fois, avant la première requête :
+En 6.x, quand une exécution se termine sans avertissement ou que vous avez vérifié chaque appel signalé, activez les options une seule fois, avant la première requête :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -278,7 +278,7 @@ db.setConfig({
 });
 ```
 
-En 7.0, les écritures utilisent déjà les nouvelles valeurs par défaut. Une mise à jour avec une accroche à `undefined` conserve l’accroche stockée :
+En 7.0, les écritures utilisent déjà les nouvelles valeurs par défaut. Une mise à jour qui donne la valeur `undefined` à l’accroche conserve l’accroche enregistrée :
 
 <CastPanel example="switching_undefined">
 
@@ -286,10 +286,10 @@ En 7.0, les écritures utilisent déjà les nouvelles valeurs par défaut. Une m
 
 </CastPanel>
 
-Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez son option à `false` dans `db.setConfig()`. Les deux choix sont indépendants : `undefinedMeansMissing: false` conserve les valeurs `undefined` à l’écriture, et `upsertRequiresSameKeys: false` autorise les clés absentes à écraser des colonnes stockées. Aucun des deux réglages n’émet l’avertissement de la 6.x.
+Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez son option à `false` dans `db.setConfig()`. Les deux choix sont indépendants : `undefinedMeansMissing: false` conserve les valeurs `undefined` à l’écriture, et `upsertRequiresSameKeys: false` permet d’écraser des valeurs stockées même si les clés correspondantes sont absentes. Aucun des deux réglages n’émet l’avertissement de la 6.x.
 
 - `insert()` envoie `DEFAULT`<!-- probe: db.insert('tags', { film_id: 1000, tag: undefined }) --> pour une valeur `undefined`, un `update()` sans autre clé lève l’erreur "nothing to update: an Updatable needs at least one column"<!-- message -->, et un `upsert()` sans autre clé "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
-- Un upsert dont une clé absente écraserait une valeur stockée lève une erreur à l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+- Un upsert par batch dans lequel une clé absente entraînerait l’écrasement d’une valeur stockée lève une erreur à l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans retry ([`transaction()`, Erreurs](/fr/transaction#errors)).
 - Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 - Une `transaction()` qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien est rejetée avant son callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
