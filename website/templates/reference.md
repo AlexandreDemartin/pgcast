@@ -26,7 +26,7 @@ What it does, in one sentence, then its parameters as a list: `table`, a table o
 | `limit: 10` | `LIMIT $2` | none |
 
 ::: tip Opt-in
-Only for a behaviour behind an opt-in: the option, what it changes, the warning code until 7.0 (`PGCAST_DEP003`), and a link to [Versions](/versions).
+Only for a behaviour behind an opt-in: the option, what it changes, the warning code and a release that emitted it (`PGCAST_DEP003` in pgcast 6.7.0), and a link to [Versions](/versions).
 :::
 
 ## `count()` {#count}

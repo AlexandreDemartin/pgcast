@@ -435,11 +435,13 @@ From 6.12.0. What [`transactionEventListener`](#Config.transactionEventListener)
 
 In 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) and [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) were opt-ins whose old behaviour triggered warnings. In 7.0, all six are on by default and none warns. An explicit `false` keeps the old behaviour without warnings through 7.x (see [Versions](/versions) and the [7.0 migration](/switching#from-7-0)).
 
-One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
+One opt-in stays off by default in 7.0 and emits no warning: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
 
 From 7.0, the generator enables [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) by default without migration notes. Its [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) has no note, and stays off in 7.0. From 7.0, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder) use the enum's own schema and declaration order by default, without a migration note. The generator also enables [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) by default without a migration note.
 
-Node emits each migration warning once per process and names the option in its message. For example, in 6.x a rolled-back commit produced this warning on `stderr`:
+In pgcast 6.7.0, a programmatic generator could send `PGCAST_DEP006` through [`warningListener`](/generator#generate.warningListener) before exiting on a database error. From 7.0, [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) defaults to `true`. Explicit `false` keeps the immediate exit without a migration note.
+
+Node emits each migration warning once per process and names the option in its message. For example, in pgcast 6.7.0 a rolled-back commit produced this warning on `stderr`:
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.

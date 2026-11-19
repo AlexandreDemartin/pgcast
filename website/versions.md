@@ -66,14 +66,14 @@ The cost is a few more keys in [`Config`](/runtime-config#Config), and two paths
 
 ## Reading a warning
 
-With the 6.7 defaults, if a `transaction()` callback catches a query error and Postgres answers `COMMIT` with `ROLLBACK`, Node prints this warning once:
+With the pgcast 6.7.0 defaults, if a `transaction()` callback catches a query error and Postgres answers `COMMIT` with `ROLLBACK`, Node prints this warning once:
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists current warnings and their triggers. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
+In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists the 6.x warnings and their triggers. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
 
 The promise resolves as in 6.6.1, even with `--throw-deprecation`, after which Node ends the process on the warning ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
 
@@ -89,11 +89,11 @@ Throughout 7.x, `aggregatesTypedByColumn: false` in both `db.setConfig()` and `C
 
 7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` and the generator's (below), except `selectExactlyOneChecksForSecondRow`, which stays off.
 
-If you enabled `aggregatesTypedByColumn` only at run time in 6.x, run `tsc` to find uses incompatible with the new types. A project that has turned every option on, including the aggregate types in `ConfigTypes`, and sees no `PGCAST_DEP` warning or generator note has no code to change, except where it relies on the [read-only client types widened in 7.0](/switching#from-7-0) or the [7.0 array condition types](/switching#array-condition-types), which change without a warning. If you check types, declare the two [optional peer dependencies](/install#requirements), `typescript` and `@types/pg`, in your `devDependencies`.
+Enabling every fix on 6.x, including aggregate types in `ConfigTypes`, prepares you for the new defaults. Even with a clean warning trace, compile the [read-only callbacks and array conditions](/switching#from-7-0) and check the [optional type peers](/install#requirements) on a fresh install. The [migration guide](/switching#regenerate-for-7-0) lists all ten quiet fallbacks that go in 8.0 and the three permanent choices.
 
 Throughout 7.x, `undefinedMeansMissing: false` and `upsertRequiresSameKeys: false` independently restore the 6.x write behaviours without warnings. 8.0 removes both legacy write behaviours. Across the other options, three legacy values remain: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
 
-In 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` and `transactionRequiresSatisfyingLevel` also default to `true`. Set any one to `false` to restore its [6.x transaction behaviour](/switching#turn-on-the-opt-ins) without a warning. 8.0 removes these three overrides.
+In 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` and `transactionRequiresSatisfyingLevel` also default to `true`. Set any one to `false` to restore its [6.x transaction behaviour](/switching#runtime-migration) without a warning. 8.0 removes these three overrides.
 
 The generator gets opt-ins of its own in 6.7: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), which types an enum of another schema by its labels, [`enumOrder`](/generator#generate.enumOrder), which keeps an enum's labels in their declared order, [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), which rejects `generate()` on a failed query rather than end the process, [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), which lists in `UniqueIndex` only the names `ON CONFLICT ON CONSTRAINT` takes, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), which types a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, by context, as its base type is, and a domain over a domain or an array of a domain, `any` without it, by the base type of its innermost domain, [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), which types an array of an enum as the text `pg` returns in `Selectable`, and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), which types an `interval` in `Selectable` as `pg` parses it.
 

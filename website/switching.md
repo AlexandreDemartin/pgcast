@@ -1,17 +1,17 @@
 ---
-description: "Move from Zapatos 6.6.1 to pgcast: swap the package, add any missing type peers if you check types on 7.0, regenerate, and check the calls that change."
+description: "Move from Zapatos 6.6.1 to pgcast 6.x, then migrate to 7.0 and check the new defaults, types and install requirements."
 ---
 
-# Switch from Zapatos
+# Switch from Zapatos or upgrade pgcast
 
-To move from Zapatos 6.6.1 to pgcast, swap the package and, from 7.0, [add any missing dev dependencies](/install#requirements) if you check types. Regenerate, then let `tsc`, a look through your code and pgcast's warnings show you the few calls whose result changes. It assumes a project that already runs on Zapatos; for a new one, start at [Install](/install).
+Already on pgcast 6.x? Start with the [7.0 migration](#from-7-0). From Zapatos 6.6.1, follow steps 1–6 on pgcast 6.x first. That release line emits the warnings that help you prepare for 7.0. For a new project, start at [Install](/install).
 {.lede}
 
 <AtAGlance>
 
 - One line of `package.json` swaps the package; imports, config and generated files stay as they are.
 - A few calls give other rows, or throw: [step 4](#find-the-calls-whose-result-changes) lists them, with what to do.
-- What code may rely on at runtime is kept, with a warning, until you turn on its opt-in. The [7.0 array condition types](#array-condition-types) change without a warning.
+- A clean warning trace in 6.x still leaves the [7.0 type and install checks](#from-7-0).
 
 </AtAGlance>
 
@@ -25,16 +25,16 @@ To move from Zapatos 6.6.1 to pgcast, swap the package and, from 7.0, [add any m
 
 ## 1. Swap the package {#swap-the-package}
 
-Install pgcast under the name Zapatos had. The Yarn and bun commands target 6.x. For 7.x, replace `@^6` with `@^7`.
+For the Zapatos 6.6.1 → pgcast 6.x route, install the 6.x alias so existing imports still resolve.
 
 ::: code-group
 
 ```sh [npm]
-npm install zapatos@npm:@pgcast/pgcast
+npm install zapatos@npm:@pgcast/pgcast@^6
 ```
 
 ```sh [pnpm]
-pnpm add zapatos@npm:@pgcast/pgcast
+pnpm add zapatos@npm:@pgcast/pgcast@^6
 ```
 
 ```sh [yarn]
@@ -102,84 +102,6 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 - From 6.11.0, once the schema is regenerated, a table with a column named like a member of `String`, of a type that member fits (`search` typed `any`, as a `tsvector` is, or a `length` number), no longer takes any string as a name in its `SQL` type (2345): `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 took the string as a name, `"titel"`, which Postgres refuses when no column has it (42703). For a name known only at run time, check it, then type it as the table's `Column`.
 - From 6.11.0, on such a table, a shortcut's `where`, `select()`'s `having`, `exists()` and `isInSelect()`, and the rows of `insert()`, `upsert()` and `update()`, no longer take a string, a `String` or an array, whatever the schema (2345, 2769): `db.select('films', 'titel')`. Zapatos 6.6.1 ran the string as a column, `WHERE "titel"` (42703 when no column has that name; when it named a boolean column, the query filtered by that column), and sent a string row as its characters, `("0", "1", …)` (42703). Write a Whereable, `{ subtitled: true }`, or a fragment, `` db.sql<s.screenings.SQL>`${'subtitled'}` `` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). On a table whose columns are all optional, one named `length`, `[]`, an array of rows held in a variable, a `readonly` one and an array `as const`, held in a variable or written in the call, given to `insert()` or `upsert()`, are now typed as an array, as they run, not as one row ([#683](https://github.com/AlexandreDemartin/pgcast/issues/683)).
 
-### From 7.0 {#from-7-0}
-
-Aggregates are now [typed by column](/select#typed-by-column). Handle `null` before arithmetic, or use `?? 0` if an empty sum should be zero. To keep numeric results through 7.x, set the option and declare it in the module you import (`pgcast/db` if you use that name).
-
-```ts twoslash
-import * as db from 'zapatos/db';
-
-declare module 'zapatos/db' {
-  interface ConfigTypes { aggregatesTypedByColumn: false }
-}
-db.setConfig({ aggregatesTypedByColumn: false });
-```
-
-<div class="stack">
-
-| Your code | Zapatos 6.6.1 and pgcast 6.x | pgcast 7.0 | What to do |
-|---|---|---|---|
-| A `SelectOneSignatures` or `SelectExactlyOneSignatures` implementation forwarding to `select()` with a mode | Compiles with 6.x numeric signatures | TS2322 (TS2375 with `exactOptionalPropertyTypes`) | Forward to `selectOne()` or `selectExactlyOne()`, respectively. |
-| An exported spread of a date minimum with `declaration: true` | Compiles with 6.x numeric signatures | TS4023 | Export the fragment itself. |
-| `db.serializableRO(pool, countSeats)`, where the parameter of `countSeats` is typed `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compiles | TS2345 under `strictFunctionTypes` (on with `strict`) because TypeScript checks the callback against the wider client type | For `pg`, use [`db.TxnClientForSerializableRO`](/transaction#TxnClientForSerializableRO). For an adapter with client type `C`, use `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. If the helper inspects `_zapatos.isolationLevel`, handle `SerializableRODeferrable` too. Types built on the levels see it too: add the `SerializableRODeferrable` key to a `Record` keyed by `IsolationSatisfying<…>`, widen the client of a handwritten signature, and pass an explicit discriminator where overloads on the ordinary and deferrable client types chose the result, since the two types now coincide. The callbacks of `transaction()`, `savepoint()` and nested calls that keep the client get the wider type too. |
-
-</div>
-
-### Array condition types in 7.0 {#array-condition-types}
-
-For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.conditions`):
-
-- A 6.6.1 mock must implement both the parent and array overloads.
-- Replace `.map(c.arrayContains)` with `.map(xs => c.arrayContains(xs))` to keep the element type. A saved `c.arrayContains([1])` constrains `number[]`.
-- Drop the type argument on `c.arrayContains(db.parent('genres'))`. Narrow an array-or-parent union before calling.
-- To include parents in a derived operand type, use `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
-- For `xs: T[]` with `T extends number[]`, let the wrapper infer its return type. Its old `db.SQLFragment<boolean | null, T>` annotation fails.
-- For an enum array on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
-
-### Enum types in 7.0 {#enum-types}
-
-With the 7.0 defaults, a foreign enum supplies its own labels, even when the relation's schema has an enum of the same name. The `every.<name>` tuple follows Postgres declaration order. Regenerate and run `tsc` to find writes with invalid labels and code that depends on a label's position.
-
-- Fresh output omits foreign enum placeholders such as `PgStatus` and `Pg_mood` from `zapatos/custom`. Existing files remain, but their columns no longer use them. Replace each import with the column type, such as `products.Selectable['status']`, or set `typeEnumsAcrossSchemas: false` in 7.x.
-- A foreign composite column previously typed as the local enum of the same name now gets its own placeholder. Type it for your parser, or set `typeEnumsAcrossSchemas: false` in 7.x.
-- If you pass `columnsTypedByEnumName` to `definitionForRelationInSchema()`, only `typeEnumsAcrossSchemas: false` fills it.
-
-To update an existing domain placeholder over a foreign enum, generate into a fresh directory with `outDir`. Diff the two files, merge the new labels with your local edits, then run `tsc` again.
-
-Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0.
-
-### Named conflict targets in 7.0 {#named-conflict-targets}
-
-Regenerate the schema and run `tsc`. For [the `festival_entries` table](/generator#generate.uniqueIndexConstraintsOnly), `constraint()` still accepts `festival_entries_pkey` and `festival_entries_film_festival_key`. Keep these two keys in a `Record<s.festival_entries.UniqueIndex, string>` object literal. Remove `festival_entries_live_idx` and `festival_entries_slot_key`. If an upsert targets either name, choose a constraint usable with `DO UPDATE`.
-
-If a relation's `UniqueIndex` becomes `never`, a `Record` literal typed with that union still compiles with the old key. Check those records by hand.
-
-On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColumns: db.doNothing` compiled and worked in 6.x. The 7.0 default rejects the name at compile time. To keep `DO NOTHING`, write an explicit `sql` statement naming the key, or set `uniqueIndexConstraintsOnly: false` through 7.x.
-
-This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
-
-### Domains, enum arrays and intervals in 7.0 {#domain-and-parser-types}
-
-Regenerate with `npx pgcast` and run `tsc`. In 7.0 all three generator settings default to `true` and emit no migration note.
-
-For callers of `definitionForRelationInSchema()`, the four optional arrays still collect columns independently of listener messages.
-
-| Out-parameter | When it collects a column |
-|---|---|
-| `domainsNotByContext` | `domainsTypedByContext: false`, for a known domain base whose type differs by context |
-| `domainsUnderDomains` | The same setting, for a nested domain or array of domains with a known root |
-| `enumArraysNotAsText` | `enumArraysTypedAsText` omitted or `null`, for a recognised enum array, including a direct domain over one |
-| `intervalsAsText` | `intervalsTypedAsObjects` omitted or `null`, for an interval, its array or a direct domain over either. A resolved interval or interval-array root also counts when `domainsTypedByContext` is on (the 7.0 default). |
-
-- With [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), a `bigint` domain gives a number in shortcut JSON with the default parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` before calling `.padStart()`.
-- A nested domain with an `any` placeholder takes its innermost base type. An array of `bigint` domains narrows from `any` to `number[]` in default shortcut JSON. If rows contain null elements or multiple dimensions, check the shape before using an element. Include those shapes and the raw `string` in the array placeholder, or use `domainsTypedByContext: false` through 7.x. This override goes in 8.0.
-- With [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), a `sql` row holds the array's text. To call `.map()` or write the labels back, use the array returned by a shortcut. Keep `false` if your `pg` parser returns the label array.
-- With the 7.0 default, an `isInSelect()` subquery `sub` selecting `c_enum_array` compares as the raw `string` type. TypeScript now rejects `{ c_enum_array: sub }` and accepts a text column that Postgres rejects (42883). Set `enumArraysTypedAsText: false` or write an explicit `sql` condition.
-- With [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), a `sql` row holds a `PostgresInterval`. Read its fields or write the object back directly. Shortcut JSON keeps the text. Keep `false` if your parser returns interval text. Both parser settings remain available beyond 8.0.
-
-Regeneration preserves existing placeholders. Context typing compares the placeholder's type with the type a fresh run would generate under the current settings. An old interval-domain `string` stays text. An edit to `db.PostgresInterval` matches the new default, so shortcut JSON becomes text. Switching back to `intervalsTypedAsObjects: false` preserves an existing object placeholder. Generate into an empty `outDir`, diff the placeholders and merge the changes you need. For a missing `db` import, [add the import](/custom-types#when-a-placeholder-does-not-compile).
-
-To restore the 6.x raw type of a domain over an enum array, set both `domainsTypedByContext` and `enumArraysTypedAsText` to `false`.
 
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
@@ -308,7 +230,7 @@ The text and values of `.compile()` change beyond these rows, where the rows ret
 
 ## 5. Read the warnings {#read-the-warnings}
 
-Before upgrading from 6.x, run your tests and your app with deprecation warnings enabled. In 6.x, the first call that uses each legacy behaviour emits a warning like this:
+On pgcast 6.x, run your tests and your app with deprecation warnings enabled. For example, pgcast 6.7.0 emits this warning the first time Postgres rolls back a commit after the callback caught a query error.
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
@@ -330,6 +252,8 @@ To find each call:
 
 | Warning | The call | Fix it, or turn on |
 |---|---|---|
+| `PGCAST_DEP001` | A batch upsert would update a column missing from a row. | Give every row that key or specify `updateColumns`. |
+| `PGCAST_DEP002` | A write uses `undefined` for a column value. | Use `null` to clear the column or omit the key to leave it untouched on update. |
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
 | `PGCAST_DEP004` in 6.x | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) with a null or missing result, or a minimum or maximum whose pg value is not a number | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows uses incompatible with the new type, and `?? 0` keeps a `0` |
 | `PGCAST_DEP005` | a [`transaction()`](/transaction#transaction) given a client you sent `BEGIN` on: its `COMMIT` or `ROLLBACK` ends your transaction ([Your own `BEGIN`](/transaction#your-own-begin)) | open the outer transaction with `transaction()`, or give that call the pool, for a transaction of its own, committed apart from the outer one, which doesn't see the outer one's uncommitted rows, and hangs (unless `lock_timeout` is set) if it writes or locks a row the outer one has written or locked, or inserts a key the outer one has inserted (two `FOR SHARE` locks don't conflict); or [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), and such a call rejects before sending its `START TRANSACTION` |
@@ -354,7 +278,38 @@ db.setConfig({
 });
 ```
 
-In 7.0, `tagline: undefined` alone throws `nothing to update`. This update runs because it also assigns `title`, so the stored tagline survives.
+Run `npx zapatos` on 6.x to see which generator settings would change your schema. Generator migration notes go through `warningListener`.
+
+## Migrate from pgcast 6.x to 7.0 {#from-7-0}
+
+On 6.x, [trace the warnings](#read-the-warnings) and [enable the fixes](#turn-on-the-opt-ins) first. Keep your existing package alias when installing 7.x. Choose the command that matches your imports.
+
+::: code-group
+
+```sh [zapatos/db]
+npm install zapatos@npm:@pgcast/pgcast@^7
+```
+
+```sh [pgcast/db]
+npm install pgcast@npm:@pgcast/pgcast@^7
+```
+
+:::
+
+A clean 6.x warning trace misses three changes. A fresh install can lose `tsc` or the declarations for `pg` because their peers are now optional. If you check types and relied on automatic installation, run `npm install --save-dev typescript @types/pg`. JavaScript needs only the `pg` peer. Also check [read-only transaction callbacks](#runtime-migration) and [array conditions](#array-condition-types). [Install](/install#requirements) · [#592](https://github.com/AlexandreDemartin/pgcast/issues/592).
+
+### Check runtime calls {#runtime-migration}
+
+All six settings below now default to `true`. To keep one 6.x behaviour, set the corresponding option to `false` in `db.setConfig()`. Each fallback runs quietly through 7.x and goes in 8.0.
+
+| Temporary setting | What to check in 7.0 | With the 6.x setting |
+|---|---|---|
+| `undefinedMeansMissing: false` | An undefined insert cell takes its column default. An update with `tagline: undefined` leaves the tagline untouched if it also assigns `title`. Use `null` to clear it. | Treat undefined writes as values. An undefined value reaches Postgres as `NULL`. |
+| `upsertRequiresSameKeys: false` | A batch with `tagline` in only one row throws at construction if the implicit update would overwrite that column. Check the [conflict target, `updateValues` and `updateColumns` exceptions](/insert#upsert-options). | A missing cell can overwrite a stored value with the column default. |
+| `transactionRequiresCommit: false` | If a callback catches a failed query and Postgres answers its `COMMIT` with `ROLLBACK`, the promise rejects. [Transaction errors](/transaction#errors). | The promise resolves with the callback result. |
+| `transactionRequiresIdleClient: false` | After your own `BEGIN`, the helper rejects if your client still reports a block after the status recheck. End your block first. [Your own `BEGIN`](/transaction#your-own-begin). | The helper can end the caller's transaction. |
+| `transactionRequiresSatisfyingLevel: false` | A nested `serializable()` inside `readCommitted()` rejects before the inner callback runs. Open the outer transaction at the level you need. [Passing a transaction through](/transaction#passing-a-transaction-through). | The inner callback runs at the outer isolation level. |
+| `aggregatesTypedByColumn: false` | An empty `sum()` returns `null`. A `min()` over a date returns the date value. Handle `null` before arithmetic. [Typed by column](/select#typed-by-column). | Results go through `Number()`. An empty sum is zero. |
 
 <CastPanel example="switching_undefined">
 
@@ -362,23 +317,108 @@ In 7.0, `tagline: undefined` alone throws `nothing to update`. This update runs 
 
 </CastPanel>
 
-To keep a 6.x write behaviour through 7.x, set its option to `false` in `db.setConfig()`. Choose them independently: `undefinedMeansMissing: false` keeps undefined write values, and `upsertRequiresSameKeys: false` allows missing keys to overwrite stored columns. Neither setting emits the 6.x warning.
+For numeric aggregate results through 7.x, set the literal `false` in both places. Augment the module you import (`pgcast/db` if you use that name).
 
-In 7.x, each transaction check defaults to `true`. Set only the check you need to disable in `db.setConfig()`. [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit) returns the callback result after a rolled-back commit, [`transactionRequiresIdleClient: false`](/runtime-config#Config.transactionRequiresIdleClient) lets the helper end a caller's block, and [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel) runs the nested callback at the outer level. These overrides run without a warning through 7.x and go in 8.0.
+```ts twoslash
+import * as db from 'zapatos/db';
 
-- `insert()` sends `DEFAULT`<!-- probe: db.insert('tags', { film_id: 1000, tag: undefined }) --> for an `undefined` value, an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->, and an `upsert()` with no other key "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
-- By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
-- A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
-- If your unmarked client reports `T` or `E` both before and after the empty query, `transaction()` rejects and leaves your block open. Without a status, the call proceeds. An overlapping call can commit writes before the first transaction starts, so await each call before the next on the same client ([Your own `BEGIN`](/transaction#your-own-begin)).
-- A nested `transaction()` rejects before its callback if the level recorded when the outer helper opened cannot satisfy its request. A later `SET TRANSACTION` leaves the marker unchanged. Open the outer helper at the level you need ([Passing a transaction through](/transaction#passing-a-transaction-through)).
-- `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, and `min()` and `max()` their column's value, typed so by the `ConfigTypes` declaration ([Typed by column](/select#typed-by-column)).
-- No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: false }
+}
+db.setConfig({ aggregatesTypedByColumn: false });
+```
 
-One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
+<div class="stack">
 
-In 6.x, run `npx zapatos` to see which generator options would change the types for your schema.
+| Your code | Zapatos 6.6.1 and pgcast 6.x | pgcast 7.0 | What to do |
+|---|---|---|---|
+| A `SelectOneSignatures` or `SelectExactlyOneSignatures` implementation forwarding to `select()` with a mode | Compiles with 6.x numeric signatures | TS2322 (TS2375 with `exactOptionalPropertyTypes`) | Forward to `selectOne()` or `selectExactlyOne()`, respectively. |
+| An exported spread of a date minimum with `declaration: true` | Compiles with 6.x numeric signatures | TS4023 | Export the fragment itself. |
+| [#694](https://github.com/AlexandreDemartin/pgcast/issues/694) · `db.serializableRO(pool, countSeats)`, where the parameter of `countSeats` is typed `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compiles | TS2345 under `strictFunctionTypes` (on with `strict`) because TypeScript checks the callback against the wider client type | For `pg`, use [`db.TxnClientForSerializableRO`](/transaction#TxnClientForSerializableRO). For an adapter with client type `C`, use `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. If the helper inspects `_zapatos.isolationLevel`, handle `SerializableRODeferrable` too. Types built on the levels see it too: add the `SerializableRODeferrable` key to a `Record` keyed by `IsolationSatisfying<…>`, widen the client of a handwritten signature, and pass an explicit discriminator where overloads on the ordinary and deferrable client types chose the result, since the two types now coincide. The callbacks of `transaction()`, `savepoint()` and nested calls that keep the client get the wider type too. |
 
-From 6.7 until 7.0, `generate()` and `tsForConfig()` could report `PGCAST_DEP006` before exiting on a connection or query failure. In 7.0, omitting `rejectOnQueryError` or setting it to `null` in JSON lets your `catch` handle the original error. Listener errors also reject the promise, and earlier listener output stays visible. If the script must fail, rethrow the error or set `process.exitCode = 1`. To keep the immediate exit, set [`rejectOnQueryError: false`](/generator#generate.rejectOnQueryError). This choice remains available beyond 8.0. On a connection or query failure, the CLI prints the error and exits with code 1.
+</div>
+
+### Array condition types in 7.0 {#array-condition-types}
+
+Replace `arrayContains<number[]>([[1]])` with `arrayContains([1])`. Change a saved fragment's scalar constraint from `number` to `number[]`. [#705](https://github.com/AlexandreDemartin/pgcast/issues/705).
+
+For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.conditions`):
+
+- A 6.6.1 mock must implement both the parent and array overloads.
+- Replace `.map(c.arrayContains)` with `.map(xs => c.arrayContains(xs))` to keep the element type. A saved `c.arrayContains([1])` constrains `number[]`.
+- Drop the type argument on `c.arrayContains(db.parent('genres'))`. Narrow an array-or-parent union before calling.
+- To include parents in a derived operand type, use `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
+- For `xs: T[]` with `T extends number[]`, let the wrapper infer its return type. Its old `db.SQLFragment<boolean | null, T>` annotation fails.
+- For an enum array on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
+
+### Regenerate and compile {#regenerate-for-7-0}
+
+Regenerate whenever the generator version or an output option changes. Run `npx pgcast`, then diff the generated schema. The first four old settings below run quietly through 7.x and go in 8.0. The last three are permanent choices.
+
+| 7.0 default | What changes for the caller | Old setting |
+|---|---|---|
+| `typeEnumsAcrossSchemas: true` | A write to [`prints.keeper`](/generator#generate.typeEnumsAcrossSchemas) takes the foreign label `'archivist'`. The local label `'director'` no longer compiles. Check [placeholder imports](#enum-types). | `false` |
+| `enumOrder: 'declared'` | `every.crew_job[0]` is `'director'`, the first declared label. Check code that indexes the tuple. | `'alphabetical'` |
+| `uniqueIndexConstraintsOnly: true` | A bare unique index such as `festival_entries_live_idx` drops out of `UniqueIndex`. Choose an eligible constraint for a [named upsert](#named-conflict-targets). | `false` |
+| `domainsTypedByContext: true` | With the generated placeholder and default parsers, a `bigint` domain is a string in a raw row, a number in shortcut JSON, and accepts a `bigint` on write. [Domain types](#domain-and-parser-types). | `false` |
+| `enumArraysTypedAsText: true` | A raw enum array is text such as `'{writer,editor}'`. Use the shortcut's array for `.map()`, or select `false` if your parser returns an array. | `false` (permanent) |
+| `intervalsTypedAsObjects: true` | A raw interval has `toPostgres()`. Shortcut JSON keeps the text. Select `false` if your parser returns text. | `false` (permanent) |
+| `rejectOnQueryError: true` | `await generate()` and `await tsForConfig()` reject with the original connection or query error. Rethrow it or set `process.exitCode = 1` if the job must fail. | `false` (permanent immediate exit) |
+
+By default, `await check()` already rejects on database errors and returns `false` for missing or stale files. Explicit `rejectOnQueryError: false` ends the process on database errors for all three functions. Both CLI names, `pgcast` and `zapatos`, exit 1 on database errors. Their `--check` also exits 1 for stale files. [Generator errors](/generator#generate.rejectOnQueryError).
+
+Regeneration preserves existing `custom/` placeholders. Generate a second copy into an empty `outDir` outside your TypeScript project, compare its placeholders with yours and merge the changes that fit your parsers. Then run `npx tsc` against the regenerated schema and run your tests.
+
+Three settings keep their own defaults. `selectExactlyOneChecksForSecondRow` stays off. Enabling it checks for a second row only in a standalone query. A nested query keeps `LIMIT 1`. The generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) stays opt-in and [`moduleNames`](/generator#generate.moduleNames) still defaults to `'zapatos'`.
+
+### Enum types in 7.0 {#enum-types}
+
+With the 7.0 defaults, a foreign enum supplies its own labels, even when the relation's schema has an enum of the same name. The `every.<name>` tuple follows Postgres declaration order. Regenerate and run `tsc` to find writes with invalid labels and code that depends on a label's position.
+
+- Fresh output omits foreign enum placeholders such as `PgStatus` and `Pg_mood` from `zapatos/custom`. Existing files remain, but their columns no longer use them. Replace each import with the column type, such as `products.Selectable['status']`, or set `typeEnumsAcrossSchemas: false` in 7.x.
+- A foreign composite column previously typed as the local enum of the same name now gets its own placeholder. Type it for your parser, or set `typeEnumsAcrossSchemas: false` in 7.x.
+- If you pass `columnsTypedByEnumName` to `definitionForRelationInSchema()`, only `typeEnumsAcrossSchemas: false` fills it.
+
+To update an existing domain placeholder over a foreign enum, generate into a fresh directory with `outDir`. Diff the two files, merge the new labels with your local edits, then run `tsc` again.
+
+Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0.
+
+### Named conflict targets in 7.0 {#named-conflict-targets}
+
+Regenerate the schema and run `tsc`. For [the `festival_entries` table](/generator#generate.uniqueIndexConstraintsOnly), `constraint()` still accepts `festival_entries_pkey` and `festival_entries_film_festival_key`. Keep these two keys in a `Record<s.festival_entries.UniqueIndex, string>` object literal. Remove `festival_entries_live_idx` and `festival_entries_slot_key`. If an upsert targets either name, choose a constraint usable with `DO UPDATE`.
+
+If a relation's `UniqueIndex` becomes `never`, a `Record` literal typed with that union still compiles with the old key. Check those records by hand.
+
+On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColumns: db.doNothing` compiled and worked in 6.x. The 7.0 default rejects the name at compile time. To keep `DO NOTHING`, write an explicit `sql` statement naming the key, or set `uniqueIndexConstraintsOnly: false` through 7.x.
+
+This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
+
+### Domains, enum arrays and intervals in 7.0 {#domain-and-parser-types}
+
+Regenerate with `npx pgcast` and run `tsc`. In 7.0 all three generator settings default to `true` and emit no migration note.
+
+For callers of `definitionForRelationInSchema()`, the four optional arrays still collect columns independently of listener messages.
+
+| Out-parameter | When it collects a column |
+|---|---|
+| `domainsNotByContext` | `domainsTypedByContext: false`, for a known domain base whose type differs by context |
+| `domainsUnderDomains` | The same setting, for a nested domain or array of domains with a known root |
+| `enumArraysNotAsText` | `enumArraysTypedAsText` omitted or `null`, for a recognised enum array, including a direct domain over one |
+| `intervalsAsText` | `intervalsTypedAsObjects` omitted or `null`, for an interval, its array or a direct domain over either. A resolved interval or interval-array root also counts when `domainsTypedByContext` is on (the 7.0 default). |
+
+- With [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), a `bigint` domain gives a number in shortcut JSON with the default parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` before calling `.padStart()`.
+- A nested domain with an `any` placeholder takes its innermost base type. An array of `bigint` domains narrows from `any` to `number[]` in default shortcut JSON. If rows contain null elements or multiple dimensions, check the shape before using an element. Include those shapes and the raw `string` in the array placeholder, or use `domainsTypedByContext: false` through 7.x. This override goes in 8.0.
+- With [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), a `sql` row holds the array's text. To call `.map()` or write the labels back, use the array returned by a shortcut. Keep `false` if your `pg` parser returns the label array.
+- With the 7.0 default, an `isInSelect()` subquery `sub` selecting `c_enum_array` compares as the raw `string` type. TypeScript now rejects `{ c_enum_array: sub }` and accepts a text column that Postgres rejects (42883). Set `enumArraysTypedAsText: false` or write an explicit `sql` condition.
+- With [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), a `sql` row holds a `PostgresInterval`. Read its fields or write the object back directly. Shortcut JSON keeps the text. Keep `false` if your parser returns interval text. Both parser settings remain available beyond 8.0.
+
+Regeneration preserves existing placeholders. Context typing compares the placeholder's type with the type a fresh run would generate under the current settings. An old interval-domain `string` stays text. An edit to `db.PostgresInterval` matches the new default, so shortcut JSON becomes text. Switching back to `intervalsTypedAsObjects: false` preserves an existing object placeholder. Generate into an empty `outDir`, diff the placeholders and merge the changes you need. For a missing `db` import, [add the import](/custom-types#when-a-placeholder-does-not-compile).
+
+To restore the 6.x raw type of a domain over an enum array, set both `domainsTypedByContext` and `enumArraysTypedAsText` to `false`.
+
+### Roll back to pgcast 6.x {#roll-back-to-6-x}
+
+Restore the 6.x package and lockfile, reinstall, and restore the runtime and generator settings you used on that release. Revert calls and type annotations that depend on 7.0. Repeat the [regeneration, placeholder comparison and compilation](#regenerate-for-7-0) with the 6.x generator, then run your tests. For Zapatos 6.6.1, follow [Go back](#go-back).
 
 ## Go back
 
