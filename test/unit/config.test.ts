@@ -69,9 +69,9 @@ describe('setConfig()', () => {
     castObjectParamsToJson: false,
     upsertRequiresSameKeys: true,
     undefinedMeansMissing: true,
-    transactionRequiresCommit: false,
-    transactionRequiresIdleClient: false,
-    transactionRequiresSatisfyingLevel: false,
+    transactionRequiresCommit: true,
+    transactionRequiresIdleClient: true,
+    transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: false,
   };
   const changed = {
@@ -81,9 +81,9 @@ describe('setConfig()', () => {
     castObjectParamsToJson: true,
     upsertRequiresSameKeys: false,
     undefinedMeansMissing: false,
-    transactionRequiresCommit: true,
-    transactionRequiresIdleClient: true,
-    transactionRequiresSatisfyingLevel: true,
+    transactionRequiresCommit: false,
+    transactionRequiresIdleClient: false,
+    transactionRequiresSatisfyingLevel: false,
     selectExactlyOneChecksForSecondRow: true,
   };
 

@@ -181,7 +181,7 @@ describe('transaction', () => {
     expect(await db.serializableRODeferrable(t.pool, level)).toBe('serializable');
   });
 
-  it('passes a transaction client through: no nested transaction, whatever the level asked', async () => {
+  it('passes a transaction client through: no nested transaction for a satisfying level', async () => {
     const queries: string[] = [];
     db.setConfig({ queryListener: q => queries.push(q.text) });
     let outer: db.TxnClientForSerializable | undefined;
@@ -304,7 +304,8 @@ describe('transaction', () => {
     expect(await notes()).toEqual(['plain client']);
   });
 
-  it('characterization: on a client already in a raw BEGIN, at the same level, it commits the outer transaction', async () => {
+  it('with transactionRequiresIdleClient false, on a client already in a raw BEGIN, at the same level, it commits the outer transaction', async () => {
+    db.setConfig({ transactionRequiresIdleClient: false });
     // characterization: only a client from transaction() is passed through; START TRANSACTION inside BEGIN
     // at the level already in force only warns, and its COMMIT ends the outer transaction,
     // so the later ROLLBACK undoes nothing
@@ -320,7 +321,8 @@ describe('transaction', () => {
     expect(await notes()).toEqual(['inner', 'outer']);
   });
 
-  it('characterization: on a client already in a raw BEGIN, at another level, it rolls back the outer transaction', async () => {
+  it('with transactionRequiresIdleClient false, on a client already in a raw BEGIN, at another level, it rolls back the outer transaction', async () => {
+    db.setConfig({ transactionRequiresIdleClient: false });
     // characterization: once the outer transaction has run a query, its level can no longer change:
     // START TRANSACTION fails with 25001, then transaction()'s ROLLBACK undoes the outer write
     let called = false;
@@ -687,6 +689,25 @@ describe('the config transaction() reads', () => {
   });
 });
 
+/** Start with untouched config, transaction IDs and warning state for each replay. */
+const fresh = async () => {
+  vi.restoreAllMocks();
+  vi.resetModules();
+  const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+  const fdb = await import('../../src/db');
+  fdb.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+  return { fdb, emitWarning };
+};
+
+const legacyChecks = {
+  transactionRequiresCommit: false, transactionRequiresIdleClient: false, transactionRequiresSatisfyingLevel: false,
+};
+
+const resetCheck = (fdb: typeof db, key: keyof typeof legacyChecks, value: null | undefined) => {
+  fdb.setConfig(legacyChecks);
+  expect(fdb.setConfig({ [key]: value })).toMatchObject({ ...legacyChecks, [key]: true });
+};
+
 // #190: after a database error the callback catches, Postgres has aborted the transaction,
 // and answers the COMMIT that follows with the command tag ROLLBACK, without an error
 describe('a COMMIT that Postgres answers with ROLLBACK', () => {
@@ -694,26 +715,16 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
 
   const rolledBack = 'the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on';
 
-  /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
-  const fresh = async () => {
-    vi.restoreAllMocks();
-    vi.resetModules();
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
-    const fdb = await import('../../src/db');
-    fdb.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
-    return { fdb, emitWarning };
-  };
-
   /** Writes a note, then swallows a database error and returns: the pattern of #190. */
-  const swallow = (sqlstate: '40001' | '23505') => async (c: db.Queryable) => {
+  const swallow = (sqlstate: '40001' | '40P01' | '23505') => async (c: db.Queryable) => {
     await write(c, 'lost');
     try { await raise(c, sqlstate); } catch { return 'swallowed'; }
   };
 
-  it('with transactionRequiresCommit, rejects, saves nothing and sends no ROLLBACK of its own', async () => {
+  it('by default rejects, saves nothing and sends no ROLLBACK of its own', async () => {
     const { messages } = listen();
     const queries: string[] = [];
-    db.setConfig({ transactionRequiresCommit: true, queryListener: q => { queries.push(q.text); } });
+    db.setConfig({ queryListener: q => { queries.push(q.text); } });
     let attempts = 0;
     const err = await db.serializable(t.pool, async c => { attempts++; return swallow('23505')(c); }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Error);
@@ -727,18 +738,16 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
     expect(await notes()).toEqual([]);
   });
 
-  it('with transactionRequiresCommit, a swallowed 40001 is not retried', async () => {
+  it.each(['40001', '40P01'] as const)('a swallowed %s is not retried', async code => {
     const { messages } = listen();
-    db.setConfig({ transactionRequiresCommit: true });
     let attempts = 0;
-    const err = await db.serializable(t.pool, async c => { attempts++; return swallow('40001')(c); }).catch((e: unknown) => e);
+    const err = await db.serializable(t.pool, async c => { attempts++; return swallow(code)(c); }).catch((e: unknown) => e);
     expect((err as Error).message).toBe(rolledBack);
     expect(attempts).toBe(1);
     expect(messages).toEqual([]);
   });
 
-  it('with transactionRequiresCommit, an error caught after ROLLBACK TO SAVEPOINT commits', async () => {
-    db.setConfig({ transactionRequiresCommit: true });
+  it('by default an error caught after ROLLBACK TO SAVEPOINT commits', async () => {
     const result = await db.serializable(t.pool, async c => {
       await write(c, 'kept');
       await sql`SAVEPOINT ${db.raw('before_duplicate')}`.run(c);
@@ -749,8 +758,7 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
     expect(await notes()).toEqual(['kept']);
   });
 
-  it('with transactionRequiresCommit, releases a pool client, and leaves a plain client checked out', async () => {
-    db.setConfig({ transactionRequiresCommit: true });
+  it('by default releases a pool client, and leaves a plain client checked out', async () => {
     const counts = () => ({ total: t.pool.totalCount, idle: t.pool.idleCount });
     const checkedOut = () => t.pool.totalCount - t.pool.idleCount;
     const outBefore = checkedOut();
@@ -770,31 +778,25 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
     expect(await notes()).toEqual(['still usable']);
   });
 
-  it('without transactionRequiresCommit (deprecated, PGCAST_DEP003), resolves as in 6.6.1 and warns once, naming the option', async () => {
+  it('with transactionRequiresCommit false, returns the callback result quietly and saves nothing', async () => {
     const { fdb, emitWarning } = await fresh();
-    expect(await fdb.serializable(t.pool, swallow('23505'))).toBe('swallowed');
+    fdb.setConfig({ transactionRequiresCommit: false });
     expect(await fdb.serializable(t.pool, swallow('23505'))).toBe('swallowed');
     expect(await notes()).toEqual([]);
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    const [message, options] = emitWarning.mock.calls[0];
-    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP003' });
-    expect(message).toMatch(/transactionRequiresCommit: true/);
-    expect(message).toMatch(/default in pgcast 7\.0/);
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it('reads an undefined transactionRequiresCommit as its default (false): resolves and warns', async () => {
+  it.each([null, undefined])('resetting transactionRequiresCommit with %s restores only the commit check', async value => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig(undefinedKey('transactionRequiresCommit'));
-    expect(await fdb.serializable(t.pool, swallow('23505'))).toBe('swallowed');
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP003' });
+    resetCheck(fdb, 'transactionRequiresCommit', value);
+    await expect(fdb.serializable(t.pool, swallow('23505'))).rejects.toThrow(rolledBack);
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it('does not warn on a committed transaction, a callback that throws, nor with the option', async () => {
+  it('does not warn on a commit, a callback error or a rolled-back commit', async () => {
     const { fdb, emitWarning } = await fresh();
     expect(await fdb.serializable(t.pool, c => write(c, 'committed'))).toBeDefined();
     await expect(fdb.serializable(t.pool, async c => { await raise(c, '23505'); })).rejects.toMatchObject({ code: '23505' });
-    fdb.setConfig({ transactionRequiresCommit: true });
     await expect(fdb.serializable(t.pool, swallow('23505'))).rejects.toThrow(rolledBack);
     expect(emitWarning).not.toHaveBeenCalled();
     expect(await notes()).toEqual(['committed']);
@@ -807,16 +809,6 @@ describe('a client already inside a transaction block', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   const inBlock = 'transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()';
-
-  /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
-  const fresh = async () => {
-    vi.restoreAllMocks();
-    vi.resetModules();
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
-    const fdb = await import('../../src/db');
-    fdb.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
-    return { fdb, emitWarning };
-  };
 
   /** The text of each query the client is sent from now on, by anyone: a spy on its query(). */
   const spyQueries = (client: pg.PoolClient) => {
@@ -861,9 +853,8 @@ describe('a client already inside a transaction block', () => {
   ];
 
   describe.each(cases)('$name', ({ begin, prior, level, old }) => {
-    it('with transactionRequiresIdleClient, rejects before sending its SQL, and leaves the caller\'s transaction to its ROLLBACK', async () => {
+    it('by default, rejects before sending its SQL, and leaves the caller\'s transaction to its ROLLBACK', async () => {
       const { fdb, emitWarning } = await fresh();
-      fdb.setConfig({ transactionRequiresIdleClient: true });
       const client = await t.pool.connect();
       let called = false;
       try {
@@ -888,8 +879,9 @@ describe('a client already inside a transaction block', () => {
       expect(emitWarning).not.toHaveBeenCalled();
     });
 
-    it('without transactionRequiresIdleClient (deprecated, PGCAST_DEP005), does what Zapatos 6.6.1 does, and warns', async () => {
+    it('with transactionRequiresIdleClient false, runs quietly as in Zapatos 6.6.1', async () => {
       const { fdb, emitWarning } = await fresh();
+      fdb.setConfig({ transactionRequiresIdleClient: false });
       const client = await t.pool.connect();
       try {
         await client.query(begin);
@@ -903,44 +895,16 @@ describe('a client already inside a transaction block', () => {
         client.release();
       }
       expect(await notes()).toEqual(old.left);
-      expect(emitWarning).toHaveBeenCalledTimes(1);
-      const [message, options] = emitWarning.mock.calls[0];
-      expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP005' });
-      expect(message).toMatch(/transactionRequiresIdleClient: true/);
-      expect(message).toMatch(/default in pgcast 7\.0/);
+      expect(emitWarning).not.toHaveBeenCalled();
     });
   });
 
-  it('warns once per process, however many such calls', async () => {
+  it.each([null, undefined])('resetting transactionRequiresIdleClient with %s restores only the entry check', async value => {
     const { fdb, emitWarning } = await fresh();
-    const client = await t.pool.connect();
-    try {
-      for (let i = 0; i < 3; i++) {
-        await client.query('BEGIN');
-        await fdb.readCommitted(client, c => write(c, `inner ${i}`));
-        await client.query('ROLLBACK');
-      }
-    } finally {
-      client.release();
-    }
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    expect(await notes()).toEqual(['inner 0', 'inner 1', 'inner 2']);
-  });
-
-  it('reads an undefined transactionRequiresIdleClient as its default (false): runs and warns', async () => {
-    const { fdb, emitWarning } = await fresh();
-    fdb.setConfig(undefinedKey('transactionRequiresIdleClient'));
-    const client = await t.pool.connect();
-    try {
-      await client.query('BEGIN');
-      await fdb.readCommitted(client, c => write(c, 'inner'));
-      await client.query('ROLLBACK');
-    } finally {
-      client.release();
-    }
-    expect(await notes()).toEqual(['inner']);
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP005' });
+    resetCheck(fdb, 'transactionRequiresIdleClient', value);
+    await expect(fdb.readCommitted(t.client, c => write(c, 'inner'))).rejects.toThrow(inBlock);
+    expect(t.client.getTransactionStatus()).toBe('T');
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
   it.each([false, true])('outside a block, sends what Zapatos 6.6.1 sends, and nothing more, nor a warning (option %s)', async option => {
@@ -961,7 +925,6 @@ describe('a client already inside a transaction block', () => {
 
   it('a pool given is unaffected: its client is checked out outside a block', async () => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     const queries: string[] = [];
     fdb.setConfig({ queryListener: q => { queries.push(q.text); } });
     await fdb.serializable(t.pool, c => fdb.sql`INSERT INTO ${'txn_probe'} (${'note'}) VALUES (${fdb.param('inner')})`.run(c));
@@ -972,7 +935,6 @@ describe('a client already inside a transaction block', () => {
 
   it('limitation: a pool client released inside a block is not checked, as in 6.6.1', async () => {
     const { fdb } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     const pool = new pg.Pool({ connectionString: (t.pool as unknown as { options: { connectionString: string } }).options.connectionString, max: 1 });
     try {
       const leaked = await pool.connect();
@@ -986,11 +948,10 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual(['inner', 'leaked']);
   });
 
-  it('with transactionRequiresIdleClient, a call at the same moment as a refused one is passed through, into the caller\'s block, as in 6.6.1', async () => {
+  it('by default, a call at the same moment as a refused one is passed through, into the caller\'s block, as in 6.6.1', async () => {
     const { fdb } = await fresh();
     const queries: [string, number | undefined][] = [], results: [string, number | undefined][] = [];
     fdb.setConfig({
-      transactionRequiresIdleClient: true,
       queryListener: (q, txnId) => { queries.push([q.text, txnId]); },
       resultListener: (_r, txnId, _ms, q) => { results.push([q!.text, txnId]); },
     });
@@ -1013,9 +974,8 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual([]);  // the caller's ROLLBACK undid g's write
   });
 
-  it('with transactionRequiresIdleClient, queues no query behind its empty query: pg deprecates a query sent while another runs', async () => {
+  it('by default, queues no query behind its empty query: pg deprecates a query sent while another runs', async () => {
     const { fdb } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     const client = await t.pool.connect();
     try {
       vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
@@ -1039,7 +999,6 @@ describe('a client already inside a transaction block', () => {
   // statement that fails can leave it at the I read before that string (the empty query only reads again a T or E)
   it('limitation: a BEGIN sent in one query string with a statement that fails can be read as outside a block', async () => {
     const { fdb } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     const client = await t.pool.connect();
     try {
       await client.query("BEGIN; INSERT INTO txn_probe VALUES ('outer'); SELECT 1/0").catch(() => { });
@@ -1058,8 +1017,9 @@ describe('a client already inside a transaction block', () => {
 
   // serializable too: the caller's block has run no query yet, so a query of the second call sent before the
   // first's START TRANSACTION would make Postgres refuse that START (25001)
-  it.each(['readCommitted', 'serializable'] as const)('without transactionRequiresIdleClient, two %s() at the same moment on one client in a block: the second is passed through, as in 6.6.1', async level => {
+  it.each(['readCommitted', 'serializable'] as const)('with transactionRequiresIdleClient false, two %s() at the same moment on one client in a block: the second is passed through, as in 6.6.1', async level => {
     const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: false });
     const queries: [string, number | undefined][] = [], results: [string, number | undefined][] = [];
     fdb.setConfig({
       queryListener: (q, txnId) => { queries.push([q.text, txnId]); },
@@ -1081,16 +1041,14 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual(['f', 'g']);  // its COMMIT ended the caller's block
   });
 
-  it('with transactionRequiresIdleClient, a transaction passed through is not refused', async () => {
+  it('by default, a transaction passed through is not refused', async () => {
     const { fdb } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     await fdb.serializable(t.pool, c => fdb.serializable(c, inner => write(inner, 'inner')));
     expect(await notes()).toEqual(['inner']);
   });
 
   it('reads the status again after a stale one: a T sends one empty query, then runs as in 6.6.1', async () => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     const client = await t.pool.connect();
     try {
       vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
@@ -1104,8 +1062,9 @@ describe('a client already inside a transaction block', () => {
     expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it('limitation: without transactionRequiresIdleClient, a stale T (after a failed COMMIT) warns once outside a block, and runs as in 6.6.1', async () => {
+  it('with transactionRequiresIdleClient false, a stale T runs quietly as in 6.6.1', async () => {
     const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: false });
     const client = await t.pool.connect();
     try {
       vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
@@ -1116,15 +1075,13 @@ describe('a client already inside a transaction block', () => {
       client.release();
     }
     expect(await notes()).toEqual(['inner']);
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP005' });
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
   // the first call goes on after its empty query, but the mark was set before it: the second call, passed
   // through, has its first query queued behind that empty query, so before the first call's START TRANSACTION
-  it('limitation: with transactionRequiresIdleClient, after a stale T, a call at the same moment sends its first query outside any transaction, committed on its own', async () => {
+  it('limitation: by default, after a stale T, a call at the same moment sends its first query outside any transaction, committed on its own', async () => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     const client = await t.pool.connect();
     try {
       vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
@@ -1144,9 +1101,8 @@ describe('a client already inside a transaction block', () => {
     expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it('with transactionRequiresIdleClient, after a failed COMMIT, neither refuses nor warns: the block is over', async () => {
+  it('by default, after a failed COMMIT, neither refuses nor warns: the block is over', async () => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ transactionRequiresIdleClient: true });
     await t.pool.query('CREATE TABLE txn_parent (id int PRIMARY KEY); CREATE TABLE txn_child (parent_id int REFERENCES txn_parent DEFERRABLE INITIALLY DEFERRED)');
     const client = await t.pool.connect();
     try {
@@ -1165,19 +1121,9 @@ describe('a client already inside a transaction block', () => {
   });
 });
 
-// #177: given the client of a transaction already open, transaction() passes it through, whatever the level asked:
-// its callback runs at the outer transaction's level, as Postgres can't change the isolation level once the transaction's first query has run
+// #177: a nested callback runs on the marked client at the outer isolation level, so check that level before calling it.
 describe('the client of a transaction at another level', () => {
   afterEach(() => { vi.restoreAllMocks(); });
-
-  /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
-  const fresh = async () => {
-    vi.restoreAllMocks();
-    vi.resetModules();
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
-    const fdb = await import('../../src/db');
-    return { fdb, emitWarning };
-  };
 
   const
     { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,
@@ -1213,22 +1159,18 @@ describe('the client of a transaction at another level', () => {
     return { result, queries, called };
   };
 
-  it.each(pairs)('without transactionRequiresSatisfyingLevel (deprecated, PGCAST_DEP007), %s then %s: runs at the outer level, as in Zapatos 6.6.1, and warns only when that level does not satisfy the inner one', async (outer, inner) => {
+  it.each(pairs)('with transactionRequiresSatisfyingLevel false, %s then %s: runs quietly at the outer level', async (outer, inner) => {
     const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresSatisfyingLevel: false });
     const { result, queries, called } = await nest(fdb, outer, inner);
     expect(called).toBe(true);
     expect(result).toBe(settingsAt[outer]);
     expect(queries).toEqual([`START TRANSACTION ISOLATION LEVEL ${outer}`, settingsSQL, 'COMMIT']);
-    if (satisfies(outer, inner)) expect(emitWarning).not.toHaveBeenCalled();
-    else {
-      expect(emitWarning).toHaveBeenCalledTimes(1);
-      expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP007' });
-    }
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it.each(pairs)('with transactionRequiresSatisfyingLevel, %s then %s: rejects before the callback when the outer level does not satisfy the inner one, and the outer transaction rolls back', async (outer, inner) => {
+  it.each(pairs)('by default, %s then %s: rejects before the callback when the outer level does not satisfy the inner one, and the outer transaction rolls back', async (outer, inner) => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
     const { result, queries, called } = await nest(fdb, outer, inner);
     if (satisfies(outer, inner)) {
       expect(called).toBe(true);
@@ -1242,28 +1184,15 @@ describe('the client of a transaction at another level', () => {
     expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it('without the option, warns once per process, naming the option', async () => {
+  it.each([null, undefined])('resetting transactionRequiresSatisfyingLevel with %s restores only the level check', async value => {
     const { fdb, emitWarning } = await fresh();
-    await fdb.readCommitted(t.pool, rc => fdb.serializable(rc, c => write(c, 'first')));
-    await fdb.readCommittedRO(t.pool, ro => fdb.repeatableReadRO(ro, async () => 'second'));
-    expect(await notes()).toEqual(['first']);
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    expect(emitWarning.mock.calls[0]).toEqual([
-      'transaction() at SERIALIZABLE was given the client of a transaction at READ COMMITTED, so its callback runs at READ COMMITTED. Set transactionRequiresSatisfyingLevel: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.',
-      { type: 'DeprecationWarning', code: 'PGCAST_DEP007' },
-    ]);
+    resetCheck(fdb, 'transactionRequiresSatisfyingLevel', value);
+    await expect(fdb.readCommitted(t.pool, rc => fdb.serializable(rc, async () => 'ran'))).rejects.toThrow(refused(RC, S));
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it('reads an undefined transactionRequiresSatisfyingLevel as its default (false): runs and warns', async () => {
-    const { fdb, emitWarning } = await fresh();
-    fdb.setConfig(undefinedKey('transactionRequiresSatisfyingLevel'));
-    expect(await fdb.readCommitted(t.pool, rc => fdb.serializable(rc, async () => 'ran'))).toBe('ran');
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-  });
-
-  it('with the option, the issue\'s readCommitted(pool, rc => serializable(rc, …)) rejects, and nothing is saved', async () => {
+  it('by default, the issue\'s readCommitted(pool, rc => serializable(rc, …)) rejects, and nothing is saved', async () => {
     const { fdb } = await fresh();
-    fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
     await expect(fdb.readCommitted(t.pool, async rc => {
       await write(rc, 'outer');
       await fdb.serializable(rc, c => write(c, 'inner'));
@@ -1281,9 +1210,8 @@ describe('the client of a transaction at another level', () => {
     expect(emitWarning).not.toHaveBeenCalled();
   });
 
-  it('with the option, a pool, a plain client and a client kept after its transaction ended are not passed through, nor refused', async () => {
+  it('by default, a pool, a plain client and a client kept after its transaction ended are not passed through, nor refused', async () => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
     const level = (c: db.Queryable) => sql<db.SQL, [{ s: string }]>`${db.raw(settingsSQL)}`.run(c).then(r => r[0].s);
     expect(await fdb.serializable(t.pool, level)).toBe(settingsAt[S]);
     const client = await t.pool.connect();
@@ -1388,7 +1316,7 @@ describe('savepoint() (#723)', () => {
 
   it('a callback that swallows a query error: rejects with 25P02 after ROLLBACK TO, and the outer transaction commits its own rows', async () => {
     const queries: string[] = [];
-    db.setConfig({ transactionRequiresCommit: true, queryListener: q => queries.push(q.text) });
+    db.setConfig({ queryListener: q => queries.push(q.text) });
     const result = await db.serializable(t.pool, async c => {
       await write(c, 'outer');
       const err = await db.savepoint(c, async sp => {
@@ -1485,8 +1413,7 @@ describe('savepoint() (#723)', () => {
     expect(await notes()).toEqual(['inner']);
   });
 
-  it('with transactionRequiresCommit, an error caught around savepoint() commits the rest', async () => {
-    db.setConfig({ transactionRequiresCommit: true });
+  it('by default an error caught around savepoint() commits the rest', async () => {
     const result = await db.serializable(t.pool, async c => {
       await write(c, 'kept');
       await db.savepoint(c, async sp => { await write(sp, 'duplicate'); await raise(sp, '23505'); }).catch((err: unknown) => {
@@ -1522,7 +1449,7 @@ describe('savepoint() (#723)', () => {
 
   it.each(['returns', 'rethrows'] as const)('a Postgres 40001 caught by the outer savepoint\'s callback, which %s: the outer work is undone, and no savepoint is left established', async how => {
     const names: string[] = [];
-    db.setConfig({ transactionRequiresCommit: true, queryListener: q => { const [, name] = /^SAVEPOINT (\S+)$/.exec(q.text) ?? []; if (name) names.push(name); } });
+    db.setConfig({ queryListener: q => { const [, name] = /^SAVEPOINT (\S+)$/.exec(q.text) ?? []; if (name) names.push(name); } });
     const wrapped = new Error('wrapped');
     let attempts = 0, left: number | undefined;
     await db.serializable(t.pool, async c => {
