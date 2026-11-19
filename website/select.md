@@ -116,7 +116,7 @@ A read shortcut is a subquery there: `select()`, `selectOne()`, `selectExactlyOn
 - **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`, or `null` when its query returns no row ([`count()`](#count)). A `count()` whose `groupBy` gives several groups brings the parent row back once per group under an outer `select()`; under `selectOne()` or `selectExactlyOne()`, once, with one group's count, though with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) `selectExactlyOne()` rejects with `NotExactlyOneError`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
 - **One subquery**: its result is passed through in place of each row. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
   - When you call `.run()` on the outer `selectOne()`, `selectExactlyOne()` or [`selectRows()`](#selectRows), `pg` reads the passed-through `result` column with its configured type parser. An outer `select()` returns the values in a JSON array. A `sql` template keeps its result annotation in both cases.
-  - By default, `pg` reads a [`count()`](#count) of two rows as `"2"`. It also reads `bigint` or `numeric` results from `sum()` and `avg()` as strings. With `Number` as its `int8` parser, the same count gives `2`. The aggregate is typed as `number`, or `number | null` for `sum()` and `avg()` with [`aggregatesTypedByColumn`](#typed-by-column) declared.
+  - By default, `pg` reads a [`count()`](#count) of two rows as `"2"`. It also reads `bigint` or `numeric` results from `sum()` and `avg()` as strings. With `Number` as its `int8` parser, the same count gives `2`. The aggregate is typed as `number`, or `number | null` for `sum()` and `avg()` by default.
   - Apply `Number()` only to a string. A missing aggregate row gives `null`, as do `sum()` and `avg()` when no rows match. With no parent row, `selectOne()` gives `undefined`.
 - **`null`**: `lateral: null`, or a key whose subquery is `null` or `undefined`, throws while compiling, so `.run()` rejects before any query: "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", or "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 threw a `TypeError` at the call.
 
@@ -282,7 +282,7 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-- With [`aggregatesTypedByColumn`](#typed-by-column) enabled and declared, a passed-through `min()` of a `date` is typed as `Date | null` per row. For a matching finite date, the default parser gives a `Date`.
+- By default, a passed-through `min()` of a `date` is typed as `Date | null` per row. For a matching finite date, the default parser gives a `Date`.
 - A `lateral` passed through and typed `number` does not compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by column, alone or in a union, `cond ? count() : select()`. The error is TS2322 on `lateral`, `… is not assignable to type 'undefined'.` A `sql` template typed `number` is refused with them, as its type cannot be told from theirs. Use a key for an [ungrouped count](#lateral), as in `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. A count subquery that returns no row gives JSON `null` under that key. A `lateral` whose type is a type parameter, an object of subqueries included, or a fragment typed by an unconstrained one, `db.SQLFragment<R>`, does not compile either: `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` gives TS2345. The forwarder can call `select()` or cast the map with `l as db.SQLFragmentMap`. For a `db.SQLFragment<R>`, use `l as db.SQLFragment<any>` (the map cast gives TS2352).
 - A `lock` locks each row as its batch is fetched, not before.
 - Nested, it is a set of rows, not one value. A `sql` template takes it, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, and so do [`withCTEs()`](/sql-template#withCTEs) and `cursor()`. As a `lateral`, an `extras` value, a `where` or the Whereable value of a typed column, it does not compile: its type, a [`RowsQuery`](#RowsQuery), says so. Its type takes it as `order.by`, and as the Whereable value of a column typed `any`, where Postgres refuses it. Past the type, from JavaScript, a `lateral` key repeats the parent row once per row, and an `extras` value gets 21000 from Postgres.
@@ -350,7 +350,7 @@ With `columns`, it counts two of the four screenings: the other two have `subtit
 
 `where`, `alias`, `withTies` and `lock` add what they add to `select()`. So does `order`, by a `groupBy` column or a `sql` fragment (`` db.sql`count(*)` ``): by another column, Postgres refuses the query (42803).
 
-`.run()` reads the first row of the result. When the query returns none, it reads a `NULL`: `count()` gives `0`, and `sum()`, `avg()`, `min()` and `max()` give what they give for an empty set, `0`, or `null` with [`aggregatesTypedByColumn`](#typed-by-column). Zapatos 6.6.1 rejected with `TypeError: Cannot read properties of undefined (reading 'result')`. Nested in a `lateral`, a query that returns no row gives `null`, `count()`'s too, though its type says `number`.
+`.run()` reads the first row of the result. When the query returns none, it reads a `NULL`: `count()` gives `0`, and `sum()`, `avg()`, `min()` and `max()` give what they give for an empty set, `null` by default or `0` with [`aggregatesTypedByColumn: false`](#typed-by-column). Zapatos 6.6.1 rejected with `TypeError: Cannot read properties of undefined (reading 'result')`. Nested in a `lateral`, a query that returns no row gives `null`, `count()`'s too, though its type says `number`.
 
 ## `sum()` {#sum}
 
@@ -358,7 +358,7 @@ With `columns`, it counts two of the four screenings: the other two have `subtit
 db.sum(table, where, options?)
 ```
 
-`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, `.run()` rejects before any query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`; `.run()` then warns once, `PGCAST_DEP004`. From 6.7.0, [`aggregatesTypedByColumn`](#typed-by-column) gives `null`.
+`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number | null`; otherwise as [`count()`](#count). Give one column in `columns`: without it, `.run()` rejects before any query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. When no row matches, the sum is `null`.
 
 <CastPanel example="sum">
 
@@ -372,7 +372,7 @@ db.sum(table, where, options?)
 db.avg(table, where, options?)
 ```
 
-`SELECT avg("column") AS result`<!-- probe: db.avg('ratings', db.all, { columns: ['column'] }) -->: the mean, through `Number()`, so `0` when no row matches. Otherwise as [`sum()`](#sum).
+`SELECT avg("column") AS result`<!-- probe: db.avg('ratings', db.all, { columns: ['column'] }) -->: the mean as a number, or `null` when no row matches. Otherwise as [`sum()`](#sum).
 
 <CastPanel example="avg">
 
@@ -386,12 +386,7 @@ db.avg(table, where, options?)
 db.min(table, where, options?)
 ```
 
-`SELECT min("column") AS result`<!-- probe: db.min('ratings', db.all, { columns: ['column'] }) -->, through `Number()`, so `0` when no row matches. The type says `number` whatever the column:
-
-- a date or time column (`date`, `timestamp`, `timestamptz`) gives its milliseconds since 1970, as node-postgres reads it as a `Date`;
-- text or an enum gives `NaN`, unless the text reads as a number: `'9'` gives `9`.
-
-`.run()` warns once, `PGCAST_DEP004`, when `Number()` changes the value. From 6.7.0, [`aggregatesTypedByColumn`](#typed-by-column) keeps it. Otherwise as [`sum()`](#sum).
+`SELECT min("column") AS result`<!-- probe: db.min('ratings', db.all, { columns: ['column'] }) -->, the column value as `pg` reads it, or `null`. The minimum of a `date` column is a `Date` and the minimum of a `text` column is a string.
 
 <CastPanel example="min">
 
@@ -405,7 +400,7 @@ db.min(table, where, options?)
 db.max(table, where, options?)
 ```
 
-`SELECT max("column") AS result`<!-- probe: db.max('ratings', db.all, { columns: ['column'] }) -->; as [`min()`](#min): `0` when no row matches, a date's milliseconds, and `NaN` on text or an enum unless the text reads as a number.
+`SELECT max("column") AS result`<!-- probe: db.max('ratings', db.all, { columns: ['column'] }) -->, the maximum of the column, with the same result type as [`min()`](#min).
 
 <CastPanel example="max">
 
@@ -415,18 +410,13 @@ db.max(table, where, options?)
 
 ## Typed by column {#typed-by-column}
 
-From 6.7.0, [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn) drops the `Number()`. Declared in [`ConfigTypes`](/runtime-config#ConfigTypes) as well, it types each result as Postgres sends it:
+From 7.0, aggregates are typed by column by default. To restore the numeric 6.x results, set [`aggregatesTypedByColumn`](/runtime-config#ConfigTypes) to `false` at run time and in the type declaration.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 // ---cut---
-declare module 'zapatos/db' {
-  interface ConfigTypes { aggregatesTypedByColumn: true }
-}
-db.setConfig({ aggregatesTypedByColumn: true });
-
 const firstShow = await db.min('screenings', db.all, {
   columns: ['starts_at'],
 }).run(pool);
@@ -434,7 +424,7 @@ const firstShow = await db.min('screenings', db.all, {
 
 <div class="stack">
 
-| Call | Off | On |
+| Call | Explicit `false` | Default in 7.0 |
 |---|---|---|
 | `min()` of `starts_at`, a `timestamptz` | its milliseconds, `number` | a `Date`, `Date \| null` |
 | `max()` of `title`, a `text` | `NaN`, `number` | `'The Salt Orchard'`, `string \| null` |
@@ -445,7 +435,7 @@ const firstShow = await db.min('screenings', db.all, {
 
 </div>
 
-- The SQL is the same either way: `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: (db.setConfig({ aggregatesTypedByColumn: true }), db.min('screenings', db.all, { columns: ['starts_at'] })) -->.
+- The SQL is the same either way: `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: db.min('screenings', db.all, { columns: ['starts_at'] }) -->.
 - `min()` and `max()` give a `bigint` or a `numeric` as `pg` sends it, a string; nested, as a JSON number.
 - `count()` is unchanged by the option: `0` at top level, and `null` nested in a `lateral` or as an `extras` value when its query returns no row.
 - Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`. That `selectOne()` or `selectExactlyOne()`, nested in turn, is typed as nested.
@@ -570,11 +560,11 @@ The call signature of `select()`: `table`, `where`, `options?`, `mode?` (by defa
 
 ### `SelectOneSignatures` {#SelectOneSignatures}
 
-The call signature of `selectOne()`: `table`, `where`, `options?`, with the mode `One`. With `aggregatesTypedByColumn` declared in [`ConfigTypes`](/runtime-config#ConfigTypes), it returns a [`ColumnAggregateFragment`](#ColumnAggregateFragment) when its single `lateral` is a `min()` or `max()`, and a `SQLFragment` otherwise ([Typed by column](#typed-by-column)): a function typed `SelectOneSignatures` then returns what `selectOne()` does, not a `SQLFragment` of its own.
+The call signature of `selectOne()`: `table`, `where`, `options?`, with the mode `One`. By default, it returns a [`ColumnAggregateFragment`](#ColumnAggregateFragment) when its single `lateral` is a `min()` or `max()`, and a `SQLFragment` otherwise ([Typed by column](#typed-by-column)): a function typed `SelectOneSignatures` then returns what `selectOne()` does, not a `SQLFragment` of its own.
 
 ### `SelectExactlyOneSignatures` {#SelectExactlyOneSignatures}
 
-The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with the mode `ExactlyOne`. With `aggregatesTypedByColumn` declared, it returns a `ColumnAggregateFragment` in the same case as [`SelectOneSignatures`](#SelectOneSignatures): a function typed `SelectExactlyOneSignatures` then returns what `selectExactlyOne()` does.
+The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with the mode `ExactlyOne`. By default, it returns a `ColumnAggregateFragment` in the same case as [`SelectOneSignatures`](#SelectOneSignatures): a function typed `SelectExactlyOneSignatures` then returns what `selectExactlyOne()` does.
 
 ### `SelectRowsSignatures` {#SelectRowsSignatures}
 
@@ -590,15 +580,15 @@ From 6.12.0. The second type argument of the fragment `selectRows()` returns, wh
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 
-The call signature of `count()`, `sum()`, `avg()`, `min()` and `max()`: `table`, `where`, `options?`, returning `SQLFragment<number>`. With `aggregatesTypedByColumn` declared in [`ConfigTypes`](/runtime-config#ConfigTypes), `sum()` and `avg()` take [`NullableNumericAggregateSignatures`](#NullableNumericAggregateSignatures), and `min()` and `max()` [`ColumnAggregateSignatures`](#ColumnAggregateSignatures) ([Typed by column](#typed-by-column)).
+The signature of `count()`, also used for the other aggregates with `aggregatesTypedByColumn: false` in `ConfigTypes`: `table`, `where`, `options?`, returning `SQLFragment<number>`. By default, `sum()` and `avg()` take [`NullableNumericAggregateSignatures`](#NullableNumericAggregateSignatures), and `min()` and `max()` [`ColumnAggregateSignatures`](#ColumnAggregateSignatures) ([Typed by column](#typed-by-column)).
 
 ### `NullableNumericAggregateSignatures` {#NullableNumericAggregateSignatures}
 
-From 6.7.0. The call signature of `sum()` and `avg()` with `aggregatesTypedByColumn` declared: as [`NumericAggregateSignatures`](#NumericAggregateSignatures), returning `SQLFragment<number | null>`.
+The default signature of `sum()` and `avg()` from 7.0: as [`NumericAggregateSignatures`](#NumericAggregateSignatures), returning `SQLFragment<number | null>`.
 
 ### `ColumnAggregateSignatures` {#ColumnAggregateSignatures}
 
-From 6.7.0. The call signature of `min()` and `max()` with `aggregatesTypedByColumn` declared: as [`NumericAggregateSignatures`](#NumericAggregateSignatures), returning a [`ColumnAggregateFragment`](#ColumnAggregateFragment) of the column in `columns`.
+The default signature of `min()` and `max()` from 7.0: as [`NumericAggregateSignatures`](#NumericAggregateSignatures), returning a [`ColumnAggregateFragment`](#ColumnAggregateFragment) of the column in `columns`.
 
 ### `ColumnAggregateFragment` {#ColumnAggregateFragment}
 
@@ -606,4 +596,4 @@ From 6.7.0. The call signature of `min()` and `max()` with `aggregatesTypedByCol
 interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult>
 ```
 
-From 6.7.0. What `min()` and `max()` return with `aggregatesTypedByColumn` declared: `.run()` gives `RunResult`, the column's `Selectable` type or `null`; nested in a `lateral` or as an `extras` value, it is typed `NestedResult`, its `JSONSelectable` type or `null`, as [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment) reads it. A function of yours that returns one, in a project built with `declaration: true`, has it written in its `.d.ts` by this name, but not a spread of one (`{ ...db.min(…) }`), whose members name a symbol `zapatos/db` does not export: TS4023.
+What `min()` and `max()` return by default from 7.0: `.run()` gives `RunResult`, the column's `Selectable` type or `null`; nested in a `lateral` or as an `extras` value, it is typed `NestedResult`, its `JSONSelectable` type or `null`, as [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment) reads it. A function of yours that returns one, in a project built with `declaration: true`, has it written in its `.d.ts` by this name, but not a spread of one (`{ ...db.min(…) }`), whose members name a symbol `zapatos/db` does not export: TS4023.

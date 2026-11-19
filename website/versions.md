@@ -79,11 +79,13 @@ The promise resolves as in 6.6.1, even with `--throw-deprecation`, after which N
 
 Each code warns once per process. `node --trace-deprecation` prints the stack. To find the other calls, turn the option on and run your tests.
 
-`PGCAST_DEP004` warns once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`, if `Number()` changes it.
+In 6.x, `PGCAST_DEP004` warned when `Number()` changed an aggregate result. From 7.0, aggregates are typed by column by default.
 
 Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 
 ## 7.0 and 8.0
+
+Throughout 7.x, `aggregatesTypedByColumn: false` in both `db.setConfig()` and `ConfigTypes` restores numeric 6.x results without a warning. 8.0 removes this behaviour. [Migrating aggregates](/switching#from-7-0).
 
 7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` and the generator's (below), except `selectExactlyOneChecksForSecondRow`, which stays off.
 

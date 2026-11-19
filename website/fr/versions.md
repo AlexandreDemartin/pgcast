@@ -80,11 +80,13 @@ La promesse se résout comme en 6.6.1, même avec `--throw-deprecation`, puis No
 
 Chaque code avertit une fois par processus. `node --trace-deprecation` affiche la pile. Pour retrouver les autres appels, activez l’option et lancez vos tests.
 
-`PGCAST_DEP004` est émis après que `.run()` a reçu le résultat de `sum()`, `avg()`, `min()` ou `max()`, si `Number()` le modifie.
+En 6.x, `PGCAST_DEP004` était émis quand `Number()` modifiait le résultat d’un agrégat. Depuis la 7.0, les agrégats sont typés par colonne par défaut.
 
 Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l’autre réglage, et n’avertit jamais.
 
 ## 7.0 et 8.0 {#_7-0-and-8-0}
+
+En 7.x, `aggregatesTypedByColumn: false` dans `db.setConfig()` et dans `ConfigTypes` rétablit les résultats numériques de la 6.x sans avertissement. La 8.0 supprime ce comportement. [Migration des agrégats](/fr/switching#from-7-0).
 
 La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux du générateur (plus bas), sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
