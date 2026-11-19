@@ -1,6 +1,6 @@
 ---
-english: 34107932f207
-description: "Pour passer de Zapatos 6.6.1 à pgcast, remplacez le paquet. Si vous vérifiez les types avec la 7.0, ajoutez les peer dependencies manquantes. Régénérez le schéma et repérez les appels dont le résultat change."
+english: 57007bfa437f
+description: "Passez de Zapatos 6.6.1 à pgcast : changez le paquet, ajoutez les peer dependencies de types manquantes en 7.0, régénérez et vérifiez les appels qui changent."
 ---
 
 # Venir de Zapatos

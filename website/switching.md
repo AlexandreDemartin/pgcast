@@ -1,5 +1,5 @@
 ---
-description: "Move a project from Zapatos 6.6.1 to pgcast: swap the package, add any missing type peers if you check types on 7.0, then regenerate and check the calls that change."
+description: "Move from Zapatos 6.6.1 to pgcast: swap the package, add any missing type peers if you check types on 7.0, regenerate, and check the calls that change."
 ---
 
 # Switch from Zapatos
