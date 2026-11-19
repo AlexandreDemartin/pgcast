@@ -1,5 +1,5 @@
 ---
-english: a729e0b05410
+english: 76a6102bad55
 description: "Un type que le générateur ne sait pas traduire, comme point, et chaque domaine vous arrivent en placeholder dans zapatos/custom, que vous remplissez vous-même."
 ---
 

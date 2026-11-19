@@ -1,5 +1,5 @@
 ---
-english: b0a46bbf7f45
+english: d58a8c07ca6c
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
