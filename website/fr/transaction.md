@@ -405,7 +405,7 @@ db.setLocal(txnClient, settings)
 - `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
 - `settings` : un objet de chaînes, chacune le nom d’un réglage et sa valeur : un littéral, un `Record<string, string>`, un alias de type, `as const`. Une interface n’a pas de signature d’index, elle ne compile donc pas : passez-en le spread, `{ ...context }`. Une valeur typée `number`, `null` ou `string | undefined`, une `Map` et un `Date` ne compilent pas non plus. À partir de TypeScript 4.2, une propriété optionnelle compile, `{ 'app.customer'?: string }`, et un `undefined` qu’elle contient est refusé à l’exécution. Seules ses clés propres, énumérables et de type chaîne sont envoyées : une clé `Symbol`, qui compile, et une propriété non énumérable sont ignorées, sans erreur.
 
-Avec une politique à vous sur `seat_bookings`, `USING (customer = current_setting('app.customer', true))`, un client ne lit que ses propres réservations :
+Avec une politique à vous sur `seat_bookings`, `USING (customer = NULLIF(current_setting('app.customer', true), ''))`, un client ne lit que ses propres réservations :
 
 <<< ../examples/plain/set_local_customer.ts{ts twoslash}
 
@@ -493,13 +493,15 @@ Comment elle se termine :
 |---|---|---|
 | le dernier batch est lu, ou la boucle fait `break` ou `return` | `CLOSE` | |
 | la boucle lève une erreur | `CLOSE` | l’erreur de la boucle sort, quoi que donne `CLOSE` |
-| le `runResultTransform` du fragment lève une erreur, ou `resultListener` en lève une après `DECLARE` ou `FETCH` | `CLOSE` | son erreur remonte |
+| le `runResultTransform` du fragment lève une erreur, ou `resultListener` en lève une après `DECLARE` ou `FETCH` | `CLOSE` | son erreur remonte, sauf si une erreur de `CLOSE` autre que 25P02 la remplace |
 | une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort, et `transaction()` réessaie un 40001 ou un 40P01. Ce statut est le dernier reçu par `pg`, et il peut arriver juste après l’erreur : un `CLOSE` peut alors encore partir. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE`. Dans les deux cas, son 25P02 est ignoré, dans un `for await` comme dans un `finally` qui appelle `return()`, et un `break` après une erreur que la boucle a interceptée termine la boucle |
 | `pg` indique que le client est hors d’un bloc de transaction : un `COMMIT` de votre part est passé avant la fin de la boucle | pas de `CLOSE`, que Postgres refuserait (34000) | le curseur est parti avec la transaction |
 | Postgres refuse un `FETCH`, par exemple avec 22012 ou 40001 | pas de `CLOSE` | son erreur remonte telle quelle. Si `transaction()` réessaie, le parcours recommence sur un nouvel instantané. Les batchs peuvent différer. |
 | le générateur est abandonné, ni terminé ni arrêté par `return()` | rien | Postgres ferme le curseur au `COMMIT` ou au `ROLLBACK` ; son numéro reste pris sur ce client |
 
 </div>
+
+Si un écouteur de requête lève une erreur avant que le driver reçoive un `FETCH` ou un `CLOSE`, le curseur peut rester ouvert jusqu’à la fin de la transaction et le prochain appel à `cursor()` sur ce client reçoit alors 42P03.
 
 Deux cas tournent mal, à dessein :
 

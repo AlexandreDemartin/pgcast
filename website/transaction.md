@@ -401,7 +401,7 @@ From 6.12.0. Sets each of `settings` for the rest of the transaction, as `SET LO
 - `txnClient`: the client of a transaction: a [`TxnClient`](#TxnClient), the [`TxnClientLike`](#TxnClientLike) of another driver's pool, or a `pg.PoolClient` you sent `BEGIN` on. A pool, a `pg.Client` or a [`QueryableLike`](/sql-template#QueryableLike) does not compile.
 - `settings`: an object of strings, each a setting's name and its value: a literal, a `Record<string, string>`, a type alias, `as const`. An interface has no index signature, so it does not compile: spread it, `{ ...context }`. A value typed `number`, `null` or `string | undefined`, a `Map` and a `Date` do not compile either. From TypeScript 4.2 an optional property compiles, `{ 'app.customer'?: string }`, and an `undefined` in it is refused at run time. Only its own enumerable string keys are sent: a `Symbol` key, which compiles, and a non-enumerable property are dropped, with no error.
 
-Given a policy of yours on `seat_bookings`, `USING (customer = current_setting('app.customer', true))`, a customer reads only their own bookings:
+Given a policy of yours on `seat_bookings`, `USING (customer = NULLIF(current_setting('app.customer', true), ''))`, a customer reads only their own bookings:
 
 <<< ./examples/plain/set_local_customer.ts{ts twoslash}
 
@@ -489,13 +489,15 @@ How it ends:
 |---|---|---|
 | the last batch is read, or the loop `break`s or `return`s | `CLOSE` | |
 | the loop throws | `CLOSE` | the loop's error goes out, whatever `CLOSE` gives |
-| the fragment's `runResultTransform` throws, or `resultListener` throws after `DECLARE` or `FETCH` | `CLOSE` | its error goes out |
+| the fragment's `runResultTransform` throws, or `resultListener` throws after `DECLARE` or `FETCH` | `CLOSE` | its error goes out unless a failure in `CLOSE` other than 25P02 replaces it |
 | a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out, and `transaction()` retries a 40001 or 40P01. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out. A client that reports no status, another driver's, sends `CLOSE`. Either way its 25P02 is dropped, in a `for await` as in a `finally` that calls `return()`, and a `break` after an error the loop caught ends the loop |
 | `pg` reports the client outside a transaction block: a `COMMIT` of yours came before the loop ended | no `CLOSE`, which Postgres would refuse (34000) | the cursor went with the transaction |
 | Postgres rejects a `FETCH`, for example with 22012 or 40001 | no `CLOSE` | its error goes out unchanged. If `transaction()` retries, the scan restarts on a fresh snapshot. The batches can differ. |
 | the generator is left, neither finished nor `return()`ed | nothing | Postgres closes the cursor at `COMMIT` or `ROLLBACK`; its number stays taken on that client |
 
 </div>
+
+A query listener that throws before a `FETCH` or `CLOSE` reaches the driver can leave the cursor open until the transaction ends, so the next `cursor()` on that client gets 42P03.
 
 Two cases go wrong, by design:
 
