@@ -1,11 +1,11 @@
 ---
 english: 34107932f207
-description: "Passez de Zapatos 6.6.1 à pgcast : remplacez le paquet, ajoutez les dépendances de types manquantes si vous vérifiez les types en 7.0, puis régénérez le schéma et vérifiez les appels qui changent."
+description: "Pour passer de Zapatos 6.6.1 à pgcast, remplacez le paquet. Si vous vérifiez les types avec la 7.0, ajoutez les peer dependencies manquantes. Régénérez le schéma et repérez les appels dont le résultat change."
 ---
 
 # Venir de Zapatos
 
-Pour passer de Zapatos 6.6.1 à pgcast, remplacez le paquet et, à partir de la 7.0, [ajoutez les dépendances de développement manquantes](/fr/install#requirements) si vous vérifiez les types. Régénérez le schéma, puis laissez `tsc`, un coup d’œil à votre code et les avertissements de pgcast vous montrer les quelques appels dont le résultat change. La page suppose un projet qui tourne déjà sur Zapatos ; pour un nouveau, commencez par [Installation](/fr/install).
+Pour passer de Zapatos 6.6.1 à pgcast, remplacez le paquet. À partir de la 7.0, [ajoutez les dépendances de développement manquantes](/fr/install#requirements) si vous vérifiez les types. Régénérez le schéma, puis appuyez-vous sur `tsc`, les avertissements de pgcast et une relecture de votre code pour repérer les quelques appels dont le résultat change. Pour un nouveau projet, commencez par [Installation](/fr/install).
 {.lede}
 
 <AtAGlance>
@@ -26,7 +26,7 @@ Pour passer de Zapatos 6.6.1 à pgcast, remplacez le paquet et, à partir de la 
 
 ## 1. Changer de paquet {#swap-the-package}
 
-Installez pgcast sous le nom qu’avait Zapatos. Les commandes Yarn et bun ciblent la 6.x. Pour la 7.x, remplacez `@^6` par `@^7`.
+Installez pgcast sous le nom qu’avait Zapatos. Les commandes Yarn et bun ci-dessous installent la 6.x. Pour installer la 7.x, remplacez `@^6` par `@^7`.
 
 ::: code-group
 
