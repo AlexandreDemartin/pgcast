@@ -67,11 +67,11 @@ A materialised view keeps no `NOT NULL` at all, not even a domain's, so its colu
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
 - `UniqueIndex` lists constraints usable with `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restores all of the relation's unique indexes.
-- A domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, is typed by its placeholder in all five interfaces, which, as generated, holds what `pg` returns, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
-- A domain over a domain, or an array of a domain, is `any`, its placeholder's type as generated, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
-- An array of an enum is an array in `Selectable`, though `pg` returns its text, `'{writer,editor}'`, unless [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) is on.
+- A domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, follows its base type in each context while its placeholder holds the generated type.
+- A nested domain or an array of domains follows the innermost domain's base type if the generator recognises it. [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) restores the placeholder type in all five interfaces.
+- An enum array is text in `Selectable` and a label array in shortcut JSON. [`enumArraysTypedAsText: false`](/generator#generate.enumArraysTypedAsText) suits a parser that returns an array.
 - A domain over `text` whose `CHECK` lists its values, `CHECK (VALUE IN ('U', 'PG', '12'))`, is a `string`, its placeholder's type as generated, unless [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) is on.
-- An `interval` is its text in all five interfaces, though `pg` parses it into an object, a [`PostgresInterval`](/runtime-config#PostgresInterval), for a query of your own, unless [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) is on. Set it to `false` if a type parser of yours returns the text.
+- An `interval` is a [`PostgresInterval`](/runtime-config#PostgresInterval) in a raw row and text in JSON. [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects) suits a parser that returns text.
 
 ::: info Coming
 Reading more of the catalog, as a separate tool: the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
@@ -105,7 +105,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-A domain or custom type is the exception: its placeholder is one type, used in all five contexts. That suits `seat_label`, a string everywhere, but not a domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, whose writes differ from what `pg` returns, and, but for `money`, its JSON too. [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) types such a domain by context, as its base type is, while its placeholder holds what the generator wrote.
+The `seat_label` domain is a string in all five interfaces. For a domain over `bigint`, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) keeps the string from `pg` in `Selectable` and gives a number in `JSONSelectable`. Editing the placeholder to another type gives the column that type in all five interfaces.
 
 The same row, asked for twice, shows the first two side by side:
 

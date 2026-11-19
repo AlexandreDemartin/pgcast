@@ -162,9 +162,9 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | les noms figurant dans l’`UniqueIndex` de chaque relation |
-| [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | le type d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, hors de `Selectable`, et d’un domaine sur un domaine ou d’un tableau d’un domaine |
-| [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | aucune : un tableau, avec une note | le type `Selectable` d’un tableau d’un enum |
-| [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | aucune : le texte, avec une note | le type d’un `interval` dans `Selectable` et dans une écriture |
+| [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | le type d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, hors de `Selectable`, et d’un domaine sur un domaine ou d’un tableau d’un domaine |
+| [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | le type `Selectable` d’un tableau d’un enum |
+| [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | `true` | le type d’un `interval` dans `Selectable` et dans une écriture |
 | [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions) | `false` | le type d’un domaine sur `text` dont le `CHECK` liste les valeurs |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
@@ -446,7 +446,7 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
-`boolean`, par défaut `false` ; un opt-in, `true` par défaut à partir de la 7.0 ([Versions](/fr/versions)). Le type d’une colonne dont le domaine porte sur `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` ou `timestamptz`, ou sur un tableau de l’un d’eux : des types que `pg`, le JSON des raccourcis et une écriture donnent chacun à leur façon ([Types de valeurs](/fr/runtime-config#value-types)). `false`, comme dans Zapatos 6.6.1, la type par son placeholder dans les cinq interfaces, qui, tel que généré, contient ce que renvoie `pg` ; `true` la type selon le contexte, comme l’est son type de base, tant que son placeholder contient ce que le générateur y a écrit pour elle. Supposons qu’une réservation ait un numéro de billet :
+`boolean`, `true` par défaut depuis la 7.0. En JSON, `null` prend aussi la valeur par défaut. Le type d’une colonne dont le domaine porte sur `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` ou `timestamptz`, ou sur un tableau de l’un d’eux : des types que `pg`, le JSON des raccourcis et une écriture donnent chacun à leur façon ([Types de valeurs](/fr/runtime-config#value-types)). `false`, comme dans Zapatos 6.6.1, la type par son placeholder dans les cinq interfaces, qui, tel que généré, contient ce que renvoie `pg` ; `true` la type selon le contexte, comme l’est son type de base, tant que son placeholder contient ce que le générateur y a écrit pour elle. Supposons qu’une réservation ait un numéro de billet :
 
 ```sql
 CREATE DOMAIN ticket_no AS bigint;
@@ -464,10 +464,9 @@ Son placeholder, `PgTicket_no.d.ts`, contient `db.Int8String`. Les raccourcis re
 - `true` écrit [`DomainInContext`](/fr/runtime-config#DomainInContext) dans les quatre autres interfaces, `db.DomainInContext<c.PgTicket_no, db.Int8String, number>` dans `JSONSelectable` ; un éditeur affiche `number`.
 - Un placeholder que vous modifiez, vers tout autre type, type la colonne dans les cinq interfaces, comme avec `false` : `number | db.Int8String`, un type « branded », `any` ou `any[]`. Seul un placeholder qui vaut exactement le type écrit par le générateur est typé selon le contexte. L’option ne change jamais un placeholder, donc l’activer ou la désactiver n’oblige à en modifier aucun.
 - Un placeholder écrit par Zapatos 6.6.1 sur `int8` ou `numeric` contient le même type sans son import, et le générateur ne le réécrit jamais : la colonne vaut `any`, avec `false` comme avec `true`, donc `insert()` accepte `ticket: 'abc'`. Sur un tableau de l’un d’eux, il contient `db.Int8String[]` ou `db.NumericString[]`, qui vaut `any[]`, avec `false` comme avec `true` là aussi : `insert()` accepte `nos: ['abc']` et refuse `nos: 'abc'` (TS2769). Dans le placeholder, `tsc` signale TS2503, et rien sous `skipLibCheck`. Ajoutez d’abord son import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Sur `date`, `timestamp`, `timestamptz`, `bytea` ou `money`, le placeholder de la 6.6.1 est celui qu’écrit le générateur.
-- Deux domaines qui partagent un placeholder, comme `public.ticket_no AS bigint` et `archive.ticket_no AS date`, tous deux `PgTicket_no` ([`customTypesTransform`](#generate.customTypesTransform)), partagent son type unique, comme le dit la note du générateur `custom types … are both named PgTicket_no` ([`warningListener`](#generate.warningListener)) : `true` type selon le contexte les colonnes du domaine dont le placeholder contient le type, et laisse celles de l’autre typées par le placeholder dans les cinq interfaces, bien que la note de `false` les nomme aussi. Renommez l’un des deux dans la base.
+- Deux domaines qui partagent un placeholder, comme `public.ticket_no AS bigint` et `archive.ticket_no AS date`, tous deux `PgTicket_no` ([`customTypesTransform`](#generate.customTypesTransform)), partagent son type unique, comme le dit la note du générateur `custom types … are both named PgTicket_no` ([`warningListener`](#generate.warningListener)) : `true` type selon le contexte les colonnes du domaine dont le placeholder contient le type, et laisse celles de l’autre typées par le placeholder dans les cinq interfaces. Renommez l’un des deux dans la base.
 - Chaque type de base prend ses propres types : `numeric` `number`, puis `number | NumericString` ; `date`, `timestamp` et `timestamptz` leur type chaîne, puis celui-ci ou un `Date` ; `bytea` `ByteArrayString`, puis celui-ci ou un `Buffer` ; `money` `string`, puis `number | string` ; un tableau, ceux de son élément, en tableau. Avec [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers), `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans `JSONSelectable`.
 - Inchangé : un domaine typé de la même façon dans chaque contexte, comme `seat_label`.
-- `false` signale, via [`warningListener`](#generate.warningListener), chaque colonne d’un domaine sur l’un de ces types, que `true` type selon le contexte tant que son placeholder contient ce que le générateur y a écrit pour elle.
 
 Un domaine sur un domaine, ou un tableau d’un domaine, reçoit un placeholder qui contient `any` : le générateur lit le domaine intérieur, ou le type du tableau, comme un type personnalisé. `true` le type dans les cinq interfaces par le type de base de son domaine le plus intérieur, tant que son placeholder contient `any` :
 
@@ -482,49 +481,46 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 | `JSONSelectable`, une ligne des raccourcis | `number` | `number[]` |
 | `Whereable`, `Insertable`, `Updatable` | `number \| Int8String \| bigint` | `(number \| Int8String \| bigint)[]` |
 
-- `false` les type tous deux par leur placeholder, `any`, dans les cinq interfaces, comme Zapatos 6.6.1.
+- En 7.x, `false` rétablit sans note le type du placeholder, `any`, dans les cinq interfaces pour les deux colonnes. Ce réglage disparaît en 8.0.
 - `pg` parse un domaine sur un domaine selon le type de base de son domaine le plus intérieur, mais renvoie un tableau d’un domaine sous forme de texte, faute de connaître le type de ce tableau : de même pour un domaine sur un tel tableau, directement ou à travers d’autres domaines. Un tableau d’un domaine sur un tableau reste `any`, de même qu’un domaine sur celui-ci, ou qu’un type de base que le générateur ne sait pas traduire, tel que `point`.
 - Pour un domaine imbriqué ou un tableau de domaines dont le type de base est un enum, le générateur écrit le nom de cet enum s’il est défini dans le schéma de la relation, et ses labels s’il est défini ailleurs. Ce comportement vaut quel que soit le réglage de [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) et écarte tout homonyme. Un domaine défini directement sur un enum d’un autre schéma garde son placeholder dans les cinq interfaces. Si le placeholder est généré pour la première fois et que son nom est propre au domaine, son contenu dépend de `typeEnumsAcrossSchemas`. Par défaut, il contient les labels de cet enum. Avec `false`, il contient l’enum du même nom dans le schéma de la relation, ou `any` si ce schéma n’en contient aucun.
-- Un placeholder que vous modifiez garde son type dans les cinq, `unknown` compris. Un placeholder modifié vers `any` compte comme laissé tel que généré : écrivez `unknown`, ou laissez l’option désactivée, pour garder une telle colonne non typée.
-- `false` signale, via [`warningListener`](#generate.warningListener), chacune de ces colonnes, dans une note à part.
+- Un placeholder que vous modifiez garde son type dans les cinq, `unknown` compris. Un placeholder modifié vers `any` compte comme laissé tel que généré : écrivez `unknown`, ou réglez l’option sur `false`, pour garder une telle colonne non typée.
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
 
-`boolean`, ou omis ; un opt-in. Le type `Selectable` d’une colonne dont le type est un tableau d’un enum, ou un domaine sur un tel tableau. Postgres donne au type d’un tel tableau un numéro propre à chaque base, donc `pg` n’a pas de parser pour lui : une ligne de `pg`, comme celle d’une requête [`sql`](/fr/sql-template), contient le texte du tableau, tandis que le JSON des raccourcis contient le tableau. Supposons qu’un membre de l’équipe puisse occuper d’autres postes, et garde ceux qu’il a déjà occupés dans un domaine sur le tableau :
+`boolean`, `true` par défaut depuis la 7.0. En JSON, `null` prend aussi la valeur par défaut. Le type `Selectable` d’une colonne dont le type est un tableau d’un enum, ou un domaine sur un tel tableau. Postgres donne au type d’un tel tableau un numéro propre à chaque base, donc `pg` n’a pas de parser pour lui : une ligne de `pg`, comme celle d’une requête [`sql`](/fr/sql-template), contient le texte du tableau, tandis que le JSON des raccourcis contient le tableau. Supposons qu’un membre de l’équipe puisse occuper d’autres postes, et garde ceux qu’il a déjà occupés dans un domaine sur le tableau :
 
 ```sql
 CREATE DOMAIN job_list AS crew_job[];
 ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COLUMN past_jobs job_list;
 ```
 
-| `crew.other_jobs` | omis, ou `false` | `true` |
+| `crew.other_jobs` | `false` | `true` (par défaut) |
 |---|---|---|
 | `Selectable`, une ligne de `pg` | `crew_job[]`, bien que `pg` donne `'{writer,editor}'` | `string` |
 | `JSONSelectable`, une ligne des raccourcis | `crew_job[]` : `['writer', 'editor']` | le même |
 | `Whereable`, `Insertable`, `Updatable` | `crew_job[]` | le même |
 
-- Omis, ou `null` : le tableau, comme dans Zapatos 6.6.1, et le générateur signale via [`warningListener`](#generate.warningListener) chaque colonne que `true` changerait. À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
-- `false` : le tableau, sans note, en 7.0 et après : le bon type pour un projet qui le parse avec `pg.types.setTypeParser`, en lui donnant l’OID du type du tableau (`SELECT 'crew_job[]'::regtype::oid`) et le parser de `text[]`, `pg.types.getTypeParser(1009)`.
+- `false` : le tableau, sans note, même au-delà de la 8.0 : le bon type pour un projet qui le parse avec `pg.types.setTypeParser`, en lui donnant l’OID du type du tableau (`SELECT 'crew_job[]'::regtype::oid`) et le parser de `text[]`, `pg.types.getTypeParser(1009)`.
 - `true` : `string`, le texte que renvoie `pg`. Les écritures prennent toujours un tableau, donc le texte d’une ligne de `sql` ne se réécrit pas tel quel : `insert()` et `update()` le refusent (TS2769, TS2322), alors que Postgres l’accepterait.
 - Un domaine sur un tel tableau, comme `crew.past_jobs`, prend `db.DomainInContext<c.PgJob_list, crew_job[], string>` dans `Selectable` ([`DomainInContext`](/fr/runtime-config#DomainInContext)) : `string` tant que son placeholder contient ce que le générateur y a écrit, et un placeholder que vous modifiez garde son type. Ses autres interfaces et son placeholder ne changent pas.
 - Un tableau d’un enum d’un autre schéma, typé par ses labels avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), ou sinon comme l’enum du même nom dans le schéma de la relation, est lui aussi un `string` dans `Selectable`. Sans l’un ni l’autre, c’est un placeholder `any`, et il le reste. Un tableau d’un domaine sur un enum relève de [`domainsTypedByContext`](#generate.domainsTypedByContext).
 
 ### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
 
-`boolean`, ou omis ; un opt-in. Le type d’une colonne `interval`, d’un `interval[]`, et d’un domaine sur l’un ou l’autre. Le parser de types par défaut de `pg` renvoie un `interval` sous forme d’objet de ses parties, un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) ; le JSON des raccourcis en donne le texte. Disons qu’une séance a un entracte :
+`boolean`, `true` par défaut depuis la 7.0. En JSON, `null` prend aussi la valeur par défaut. Le type d’une colonne `interval`, d’un `interval[]`, et d’un domaine sur l’un ou l’autre. Le parser de types par défaut de `pg` renvoie un `interval` sous forme d’objet de ses parties, un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) ; le JSON des raccourcis en donne le texte. Disons qu’une séance a un entracte :
 
 ```sql
 ALTER TABLE screenings ADD COLUMN intermission interval;
 ```
 
-| `screenings.intermission`, `'15 minutes'` | omis, ou `false` | `true` |
+| `screenings.intermission`, `'15 minutes'` | `false` | `true` (par défaut) |
 |---|---|---|
 | `Selectable`, une ligne venant de `pg` | `string`, bien que `pg` renvoie `{ minutes: 15 }` | `PostgresInterval` |
 | `JSONSelectable`, une ligne venant des raccourcis | `string` : `'00:15:00'` | la même chose |
 | `Whereable`, `Insertable`, `Updatable` | `string` | `string \| PostgresInterval` |
 
-- Omis, ou `null` : comme dans Zapatos 6.6.1, le texte dans les cinq interfaces, et une note via [`warningListener`](#generate.warningListener) nomme chaque colonne que `true` changerait. À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
-- `false` : le texte, sans note. Cette valeur reste en 7.0 et en 8.0, pour un parser de types à vous qui renvoie le texte : `pg.types.setTypeParser(1186, v => v)` pour `interval`, et `1187` aussi pour `interval[]`, dont `pg` garde sinon son propre parser.
+- `false` : le texte, sans note. Cette valeur reste au-delà de la 8.0, pour un parser de types à vous qui renvoie le texte : `pg.types.setTypeParser(1186, v => v)` pour `interval`, et `1187` aussi pour `interval[]`, dont `pg` garde sinon son propre parser.
 - `true` : un `PostgresInterval` dans `Selectable`, un tableau de `PostgresInterval` pour un `interval[]`. Une écriture en reprend un, puisque `pg` l’envoie via son `toPostgres()` ; `insert()` refuse toujours un simple objet comme `{ minutes: 15 }` (TS2769) : Postgres le refuse aussi à partir de sa version 17 (22007), et le stocke comme `00:00:15` jusqu’à la 16.
 - `pg` ne lit que l’`IntervalStyle` par défaut, `postgres` : sous `iso_8601`, `sql_standard` ou `postgres_verbose`, son objet revient avec des parties manquantes, souvent `{}`, quoi que dise le type. Les raccourcis donnent le texte, dans ce style.
 - Un domaine sur l’un d’eux suit la même règle : un nouveau placeholder contient `db.PostgresInterval`, et avec [`domainsTypedByContext`](#generate.domainsTypedByContext) sa colonne est typée selon le contexte, comme l’est un domaine sur `date`. Un domaine sur un tel domaine prend `PostgresInterval` dans `Selectable` avec `domainsTypedByContext` ; un tableau d’un domaine y reste `string`, le texte que renvoie `pg`. Un placeholder écrit auparavant contient `string`, et le générateur ne le réécrit jamais.
@@ -587,14 +583,6 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: the schemas rule of "public" gives include as a string, "films", so it is read as the list ["films"]. Zapatos 6.6.1 also matched each relation whose name is part of the string. Write the list to silence this note.`
   - après l’écriture, pour chaque `include` ou `exclude` d’une règle de [`schemas`](#generate.schemas) donné sous forme de chaîne autre que `"*"` ;
 - la note sur les colonnes `bigint` et `numeric`, une fois par processus ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers)) ;
-- `Note: public.seat_bookings.ticket (public.ticket_no) has a domain over a type typed by context, such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a write takes more and, except for money, the shortcuts' JSON gives another type. Set domainsTypedByContext: true to type it by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.`
-  - une fois par exécution, sans [`domainsTypedByContext`](#generate.domainsTypedByContext), quand une colonne générée a un tel domaine ; s’il y en a plusieurs, sous la forme `public.screenings.premiere (public.premiere_day) and public.seat_bookings.ticket (public.ticket_no) have domains over a type typed by context` ;
-- `` Note: public.seat_bookings.tickets (public.ticket_no[]) and public.seat_bookings.vip_ticket (public.vip_ticket_no) have domains over a domain, or arrays of a domain: as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0. ``
-  - une fois par exécution, sans [`domainsTypedByContext`](#generate.domainsTypedByContext), quand une colonne générée a un tel type, sur un type de base que le générateur sait traduire ; s’il n’y en a qu’une, sous la forme `public.seat_bookings.vip_ticket (public.vip_ticket_no) has a domain over a domain, or an array of a domain` ;
-- `Note: public.crew.other_jobs (public.crew_job[]) is an array of an enum, which pg returns as its text, such as '{a,b}', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.`
-  - une fois par exécution, avec [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) omis, quand une colonne générée a un tel type ; s’il y en a plusieurs, sous la forme `public.crew.other_jobs (public.crew_job[]) and public.crew.past_jobs (public.job_list) are arrays of an enum` ;
-- `Note: public.screenings.intermission (interval) is of interval or of a type that wraps it in arrays or domains: as generated, it is typed as its text, though pg's default type parser returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to type it as pg parses it; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.`
-  - une fois par exécution, avec [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) omis, quand une colonne générée est de type `interval` ou `interval[]` ou d’un domaine sur l’un ou l’autre, et, avec `domainsTypedByContext`, aussi de tout type qui enveloppe `interval` dans des domaines et au plus un tableau, comme un domaine sur un tel domaine ou un tableau d’un domaine sur `interval` ; s’il y en a plusieurs, sous la forme `… and public.screenings.intermission (interval) are of interval` ;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
   - après l’écriture, avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, quand `outDir` contient un `zapatos/schema.d.ts` ; un dossier sans son `schema.d.ts` n’est pas signalé ;
 - `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`
