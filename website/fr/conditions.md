@@ -340,7 +340,7 @@ Le type en accepte davantage, et chacune de ces valeurs lève une erreur à la c
 
 ## Les tableaux {#arrays}
 
-À partir de la 7.0, chaque condition accepte un tableau d’éléments du type de ceux de la colonne, même en lecture seule, ou une [colonne parente](/fr/sql-template#parent). Pour `films.genres`, de type `text[]`, passez un tableau de chaînes.
+À partir de la 7.0, chaque condition accepte un tableau, y compris en lecture seule, dont les éléments ont le même type que ceux de la colonne. Elle accepte aussi une [colonne parente](/fr/sql-template#parent). Pour `films.genres`, de type `text[]`, passez un tableau de chaînes.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -352,11 +352,11 @@ db.select('films', { genres: db.conditions.arrayOverlaps([1]) });
 db.select('films', { genres: db.conditions.arrayContains([db.parent('id')]) });
 ```
 
-Le fragment renvoyé par `arrayContains(['drama'])` a pour contrainte `string[]`. Dans un rappel, écrivez `.map(genres => db.conditions.arrayContains(genres))` pour conserver le type des éléments. Un mock écrit avec la signature de la 6.6.1 doit prendre en charge les deux surcharges.
+Si vous stockez le résultat de `arrayContains(['drama'])` dans une variable, sa contrainte est `string[]`. Dans un callback, écrivez `.map(genres => db.conditions.arrayContains(genres))` pour conserver le type des éléments. Un mock qui suit la signature de la 6.6.1 doit prendre en charge les deux surcharges.
 
-TypeScript accepte encore un tableau littéral vide, une variable de type `never[]` ou `parent()` sur une colonne scalaire. Postgres refuse la comparaison de tableaux sur une colonne d’entiers.
+Sur une colonne scalaire, TypeScript accepte encore un littéral de tableau vide, une variable de type `never[]` ou `parent()`. Postgres refuse de comparer une colonne de type entier à un tableau.
 
-La forme de la 6.6.1 ci-dessous compile aussi. Elle envoie un tableau à deux dimensions en un seul paramètre. Ces opérateurs comparent les éléments quelles que soient les dimensions, donc `{drama,romance}` chevauche `{{romance,thriller}}`.
+La syntaxe de la 6.6.1 ci-dessous compile aussi. Elle envoie un tableau à deux dimensions dans un seul paramètre. Ces opérateurs comparent les éléments quelles que soient les dimensions. Ainsi, `{drama,romance}` chevauche `{{romance,thriller}}`.
 
 <CastPanel example="conditions_arrays">
 
@@ -372,7 +372,7 @@ Ou écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et caste
 
 </CastPanel>
 
-Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) activé, une condition envoie son tableau en `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, un tableau de tableaux aussi, que Postgres refuse (42883 : `text[] @> json`). Le type de la condition refuse un `Parameter` d’un tableau (TS2769), mais dans le fragment, le cast donné à `param()` l’emporte sur l’option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)) : il s’exécute dans les deux cas.
+Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) activé, une condition envoie son tableau en `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, y compris s’il s’agit d’un tableau de tableaux. Postgres refuse cette comparaison (`text[] @> json`, 42883). Le type de la condition refuse un `Parameter` qui contient un tableau (TS2769). Dans le fragment, le cast passé à `param()` l’emporte sur l’option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)). La requête s’exécute avec ou sans l’option.
 
 Comme dans Zapatos 6.6.1, le type accepte aussi `{}`, `{ value: … }` et `db.param()` d’un nom de colonne, qui passent pour un `ParentColumn`, dont tous les membres sont optionnels ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` est envoyé en `'{}'`, le tableau vide : `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> trouve chaque ligne dont le tableau n’est pas `NULL`, `arrayContainedIn({})` les tableaux vides, et `arrayOverlaps({})` aucune ligne. Postgres refuse `{ value: 'title' }` et `db.param('title')` (22P02, `malformed array literal`), et, avec [`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson) activé, `{}` et `{ value: … }` aussi (42883).
 
