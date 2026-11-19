@@ -117,7 +117,7 @@ COMMIT
 
 The SQL of the callback's query: [`count()`](/select#count).
 
-- The callback gets the pool's client, marked for that isolation level. TypeScript infers a [`TxnClientLike`](#TxnClientLike) unless the client extends `pg.PoolClient`, in which case it infers `pg`'s transaction client type. `taken` is a `number`, as on a `pg.Pool`.
+- The callback gets the pool's client, marked for that isolation level. When the pool's client type is known, TypeScript infers a [`TxnClientLike`](#TxnClientLike) unless the client extends `pg.PoolClient`, in which case it infers `pg`'s transaction client type. `taken` is a `number`, as on a `pg.Pool`.
   With a pool, supplying a result type argument on the call and omitting the pool-client type argument gives the callback `pg`'s transaction client type. For the `ShowClient` below, leave the type arguments off (you can annotate the callback's return type) or supply the client type too. For `transaction()`, the client type comes third, after the result and isolation level.
 - `command` is read off the `COMMIT`, which Postgres answers with `ROLLBACK` after a query error that the callback caught ([The SQL it sends](#the-sql-it-sends)): a pool whose client gives no `command` does not compile. PGlite and postgres.js give it at run time, but PGlite's type makes it optional, `command?: string`, so a pool that forwards PGlite's result maps `command` to a `string`, as its adapter does ([Drivers](/drivers#pglite)).
 - A retry reads the error's `code` alone, so another driver's 40001 and 40P01 are retried too ([Retries](#retries)).
