@@ -286,8 +286,8 @@ const row: s.films.Insertable = {
 };
 ```
 
-::: tip Opt-in
-Omettez une clé ou donnez-lui la valeur `undefined` pour insérer la valeur par défaut de la colonne. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
+::: tip Par défaut en 7.0
+Une clé absente ou une cellule `undefined` utilise la valeur par défaut de la colonne. Avec `undefinedMeansMissing: false`, seule la clé absente garde ce comportement : une cellule `undefined` passe `undefined` en paramètre, ce que `pg` envoie comme `NULL`. Omettre la seule clé lève l’erreur `nothing to insert`. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

@@ -285,8 +285,8 @@ const row: s.films.Insertable = {
 };
 ```
 
-::: tip Opt-in
-Leave a key out or set it to `undefined` to insert the column's default. Give `null` to store SQL `NULL` in a nullable column ([Write values](/insert#undefined-values)).
+::: tip Default in 7.0
+An omitted key or an undefined cell uses the column default. With `undefinedMeansMissing: false`, an omitted key still uses the default, but an undefined cell binds `undefined`, which `pg` sends as SQL `NULL`. Omitting the only key throws `nothing to insert`. Give `null` to store SQL `NULL` in a nullable column ([Write values](/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

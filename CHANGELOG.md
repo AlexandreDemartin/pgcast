@@ -11,7 +11,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Changed
 
-- Breaking: Undefined write values count as missing keys and a batch upsert throws if a missing key would overwrite a stored column. Set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently in `db.setConfig()` to restore either 6.x behaviour without warnings through 7.x. Both legacy behaviours go in 8.0 (#767, Epic #766).
+- Breaking: Undefined write values count as missing keys. By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently in `db.setConfig()` to restore either 6.x behaviour without warnings through 7.x. Both legacy behaviours go in 8.0 (#767, Epic #766).
 
 ## [6.12.0] - 2026-11-19
 

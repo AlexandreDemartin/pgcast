@@ -86,8 +86,8 @@ npx zapatos        # or: npx pgcast
 
 | Option | Warning in 6.x | Introduced |
 |---|---|---|
-| `upsertRequiresSameKeys`: a multi-row `upsert()` throws, rather than overwrite a column with `DEFAULT` | `PGCAST_DEP001` | 6.7.0 |
-| `undefinedMeansMissing`: an `undefined` value acts as a missing key, so `update()` leaves the column and `insert()` sends `DEFAULT` | `PGCAST_DEP002` | 6.7.0 |
+| `upsertRequiresSameKeys`: a multi-row `upsert()` throws, rather than overwrite a column with `DEFAULT` | retired in 7.0 | 6.7.0 |
+| `undefinedMeansMissing`: an `undefined` value acts as a missing key, so `update()` leaves the column and `insert()` sends `DEFAULT` | retired in 7.0 | 6.7.0 |
 | `transactionRequiresCommit`: a `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, after a query error the callback caught, rejects, rather than resolve with nothing saved | `PGCAST_DEP003` | 6.7.0 |
 | `aggregatesTypedByColumn`: `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, rather than `0`, and `min()` and `max()` their column's value, rather than `Number()` of it; declared in `ConfigTypes`, the types follow | `PGCAST_DEP004` | 6.7.0 |
 | `transactionRequiresIdleClient`: a `transaction()` given a client already inside a transaction block (a `BEGIN` of yours) rejects before sending its `START TRANSACTION`, rather than commit or roll back that transaction; needs pg 8.21 | `PGCAST_DEP005` | 6.7.0 |

@@ -56,7 +56,7 @@ Take an `update()` with an `undefined` value:
 
 Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column.
 
-pgcast can't tell which, and neither can your compiler: had 6.7 simply left the column out, that code would still compile, still run, and quietly stop clearing taglines.
+In 7.0, `tagline: undefined` alone throws `nothing to update`. The update runs only if it assigns another column, in which case the stored tagline survives.
 
 In 6.x the new reading arrives as an option, off by default, and the old one warns when it runs. You switch when you're ready, one option at a time, with your tests to show what moved.
 
@@ -66,22 +66,20 @@ The cost is a few more keys in [`Config`](/runtime-config#Config), and two paths
 
 ## Reading a warning
 
-Call that `update()` on 6.7 and Node prints, once:
+With the 6.7 defaults, if a `transaction()` callback catches a query error and Postgres answers `COMMIT` with `ROLLBACK`, Node prints this warning once:
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
 In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists current warnings and their triggers. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
 
-Nothing else changes: the query runs as it did in 6.6.1, unless Node runs with `--throw-deprecation`, which ends the process ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
+The promise resolves as in 6.6.1, unless Node runs with `--throw-deprecation`, which ends the process ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
 
-The warning comes when you call the shortcut, before `.run()`, and only if the old behaviour is actually used: an `update()` with no `undefined` in it never warns.
+Each code warns once per process. `node --trace-deprecation` prints the stack. To find the other calls, turn the option on and run your tests.
 
-It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes.
-
-`PGCAST_DEP003` comes later: once `transaction()` has sent `COMMIT` and Postgres has answered `ROLLBACK`, just before the promise resolves. So does `PGCAST_DEP004`, once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`: only then can it see whether `Number()` changes it.
+`PGCAST_DEP004` warns once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`, if `Number()` changes it.
 
 Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 

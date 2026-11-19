@@ -142,10 +142,10 @@ Une table partitionnée a besoin de `'suppress'` quand une ligne arrive dans une
 
 ### Lignes aux clés différentes {#upsert-different-keys}
 
-Si une clé absente devait entraîner la mise à jour d’une valeur stockée à partir d’`EXCLUDED`, l’appel lève une erreur avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
-- Donnez la clé à chaque ligne, nommez les colonnes à mettre à jour dans `updateColumns` ou fournissez une valeur définie pour la clé absente dans `updateValues`.
-- Les colonnes nommées dans la cible du conflit sont exemptées. Une nouvelle ligne peut omettre son `id` serial lors d’un upsert sur `'id'`. Le nom d’une contrainte ne suffit pas à pgcast pour en connaître les colonnes.
+- Donnez la clé à chaque ligne pour garder la mise à jour implicite.
+- Une nouvelle ligne peut omettre son `id` serial lors d’un upsert sur `'id'`. Le nom d’une contrainte ne suffit pas à pgcast pour en connaître les colonnes.
 - Une ligne `null` parmi d’autres compte comme une ligne à laquelle il manque toutes les clés.
 
 Avec [`upsertRequiresSameKeys: false`](/fr/runtime-config#Config.upsertRequiresSameKeys), la cellule manquante prend la valeur `DEFAULT`, qui peut écraser la valeur stockée. Par exemple, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` envoie `($4, $5, DEFAULT)`<!-- probe: (db.setConfig({ upsertRequiresSameKeys: false }), db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])) -->, et ramène à 1 le nombre de votes à 4 étoiles déjà enregistré.
@@ -316,7 +316,7 @@ Avec `'CASCADE'`, Postgres vide chaque table qui référence l’une d’elles, 
 
 ## Une valeur `undefined` {#undefined-values}
 
-En 7.0, une valeur `undefined` à l’écriture compte comme une clé absente. Utilisez `null` pour écrire `NULL` dans une colonne qui l’accepte.
+En 7.0, une valeur `undefined` à l’écriture compte comme une clé absente. Utilisez `null` pour écrire `NULL` dans une colonne qui l’accepte. Ces règles s’appliquent aux valeurs lues à l’appel, à condition qu’elles restent inchangées jusqu’à l’exécution de la requête et que les accesseurs renvoient la même valeur aux lectures suivantes.
 
 <div class="stack">
 
@@ -324,12 +324,12 @@ En 7.0, une valeur `undefined` à l’écriture compte comme une clé absente. U
 |---|---|---|
 | `insert()` | `DEFAULT` : `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 }) --> | `NULL` |
 | `update()` | omise : `SET ("title") = ROW($1)`<!-- probe: db.update('films', { title: 'x', tagline: undefined }, { id: 1000 }) --> ; sans clé restante, lève "nothing to update…"<!-- message --> | met la colonne à `NULL` et la clé compte comme présente |
-| `upsert()` | omise : ni insérée, ni mise à jour sauf si `updateColumns` la nomme (alors depuis `EXCLUDED`, donc une ligne existante prend le `DEFAULT` de la colonne) ; sur plusieurs lignes, sa cellule est `DEFAULT` et compte comme absente ([Lignes aux clés différentes](#upsert-different-keys)) ; sans colonne restante, lève "nothing to insert…"<!-- message --> | insère `NULL`, puis prend la valeur dans `EXCLUDED` lors de la mise à jour |
+| `upsert()` | colonne omise si aucune ligne ne la fournit, sinon `DEFAULT` dans la cellule absente ([Lignes aux clés différentes](#upsert-different-keys)). Si la colonne est omise, seuls `updateColumns` ou une valeur définie dans `updateValues` peuvent la mettre à jour (voir le `CASE` de `noNullUpdateColumns` ci-dessous). Sans colonne à insérer, l’appel lève "nothing to insert…"<!-- message --> | insère `NULL` |
 | `upsert()` `updateValues` | omise, comme une clé que `updateValues` n’a pas : `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, donc la valeur existante reste ; avec `doNothing`, ou un `updateColumns` vide à l’exécution, et aucune autre clé, `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } }) --> | la colonne prend sa valeur dans `EXCLUDED`, soit la valeur insérée ou le `DEFAULT` de la colonne |
 
 </div>
 
-Dans un filtre, `undefined` est toujours passé en paramètre. Si une colonne est nommée dans `updateColumns`, ou insérée et retenue pour la mise à jour implicite, elle prend toujours sa valeur dans `EXCLUDED` quand sa valeur dans `updateValues` est `undefined`.
+Dans un filtre, `undefined` est toujours passé en paramètre. En cas de conflit, une valeur définie dans `updateValues` est prioritaire. Sinon, la colonne retenue pour la mise à jour prend sa valeur dans `EXCLUDED`. Pour les colonnes protégées par `noNullUpdateColumns`, un `CASE` garde la valeur stockée si la valeur entrante est `NULL`.
 
 Utilisez [`undefinedMeansMissing: false`](/fr/runtime-config#Config.undefinedMeansMissing) pour garder le comportement d’écriture de la 6.x pendant toute la 7.x. Ce choix est indépendant de la vérification des clés d’un upsert.
 

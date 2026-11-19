@@ -96,7 +96,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | l’attente avant chaque retry | à chaque `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | un paramètre tableau : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
-| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | lève une erreur avant l’envoi du SQL si un `upsert()` de plusieurs lignes devait mettre à jour depuis `EXCLUDED` une colonne dont la clé manque dans certaines lignes | à chaque `upsert()` |
+| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. | à chaque `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : la traiter comme une clé absente | à chaque appel de l’une d’elles |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | un `COMMIT` auquel Postgres répond `ROLLBACK` : être rejetée, pas se résoudre | à chaque `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | un client à vous déjà dans un bloc de transaction : être rejetée avant son `START TRANSACTION`, pas terminer votre transaction | à chaque `transaction()` qui reçoit un tel client |
@@ -182,7 +182,7 @@ Un cast donné en chaîne l’emporte, la valeur restant du texte JSON : `param
 upsertRequiresSameKeys?: boolean  // default: true
 ```
 
-Avec `true`, un [`upsert()`](/fr/insert#upsert) de plusieurs lignes sans `updateColumns`, où une clé absente de certaines lignes prend quand même sa valeur dans `EXCLUDED`, lève une erreur dès l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
 Avec `false`, une clé absente peut entraîner l’écrasement de la valeur stockée sans avertissement. Voir [Lignes aux clés différentes](/fr/insert#upsert-different-keys).
 

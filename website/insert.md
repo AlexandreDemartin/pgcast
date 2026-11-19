@@ -138,10 +138,10 @@ A partitioned table needs `'suppress'` when a row lands in a partition whose col
 
 ### Rows with different keys {#upsert-different-keys}
 
-If a missing key would set a stored column from `EXCLUDED`, the call throws before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
-- Give every row the key, name the columns to update with `updateColumns`, or supply a defined value for the missing key in `updateValues`.
-- Columns named in the conflict target are exempt. New rows can omit their serial `id` when upserting on `'id'`. A constraint name alone does not identify its columns to pgcast.
+- Give every row the key to keep the implicit update.
+- New rows can omit their serial `id` when upserting on `'id'`. A constraint name alone does not identify its columns to pgcast.
 - A `null` row among others counts as a row missing every key.
 
 With [`upsertRequiresSameKeys: false`](/runtime-config#Config.upsertRequiresSameKeys), the missing cell takes `DEFAULT` and can overwrite a stored value. For example, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` sends `($4, $5, DEFAULT)`<!-- probe: (db.setConfig({ upsertRequiresSameKeys: false }), db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])) -->, so an existing count of 4-star votes goes back to 1.
@@ -312,7 +312,7 @@ With `'CASCADE'`, Postgres empties every table that references one of them, at a
 
 ## An `undefined` value {#undefined-values}
 
-In 7.0 an undefined write value counts as a missing key. Use `null` to store SQL `NULL` in a nullable column.
+In 7.0 an undefined write value counts as a missing key. Use `null` to store SQL `NULL` in a nullable column. These rules apply to the values read at the call, provided they stay unchanged until the query runs and getters return the same value on later reads.
 
 <div class="stack">
 
@@ -320,12 +320,12 @@ In 7.0 an undefined write value counts as a missing key. Use `null` to store SQL
 |---|---|---|
 | `insert()` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 }) --> | `NULL` |
 | `update()` | left out: `SET ("title") = ROW($1)`<!-- probe: db.update('films', { title: 'x', tagline: undefined }, { id: 1000 }) -->; with no key left, it throws "nothing to update…"<!-- message --> | sets the column to `NULL`, and counts as a key |
-| `upsert()` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)); with no column left, it throws "nothing to insert…"<!-- message --> | inserts `NULL`, then sets it from `EXCLUDED` |
+| `upsert()` | column omitted if no row supplies it, otherwise `DEFAULT` in the missing cell ([Rows with different keys](#upsert-different-keys)). An omitted column is updated only if named in `updateColumns` or given a defined `updateValues` override (see the `noNullUpdateColumns` `CASE` below). With no column to insert, the call throws "nothing to insert…"<!-- message --> | inserts `NULL` |
 | `upsert()` `updateValues` | left out, as a key `updateValues` doesn't have: `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, so the existing value stays; with `doNothing`, or an `updateColumns` empty at run time, and no other key, `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } }) --> | sets it from `EXCLUDED`: the value inserted, or the column's `DEFAULT` |
 
 </div>
 
-An `undefined` in a filter still binds a parameter. A column named in `updateColumns`, or inserted and selected for the implicit update, still takes its value from `EXCLUDED` when its override is undefined.
+An `undefined` in a filter still binds a parameter. On conflict, a defined `updateValues` override wins. Otherwise a selected column takes its value from `EXCLUDED`. For columns protected by `noNullUpdateColumns`, a `CASE` keeps the stored value if the incoming value is `NULL`.
 
 Set [`undefinedMeansMissing: false`](/runtime-config#Config.undefinedMeansMissing) to keep the 6.x write behaviour through 7.x. This choice is independent of the upsert key check.
 

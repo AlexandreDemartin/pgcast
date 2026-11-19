@@ -52,7 +52,7 @@ const warned = new Set<string>();
 
 /**
  * Emit a `DeprecationWarning` once per process for each code.
- * @param code The warning code, e.g. `PGCAST_DEP001`
+ * @param code The warning code, e.g. `PGCAST_DEP003`
  * @param message What is deprecated, and the option that opts in to what replaces it
  */
 export const warnOnce = (code: string, message: string) => {

@@ -91,7 +91,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | the wait before each retry | at each `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | an array parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> in place of `$1` | at each `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | a plain object parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> in place of `$1` | at each `compile()` |
-| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | a multi-row `upsert()` with a key missing from some row, still set from `EXCLUDED`: throw before sending SQL | at each `upsert()` |
+| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. | at each `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | an `undefined` value in `insert()`, `update()` and `upsert()`: treat it as a missing key | at each call of those |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | a client of yours already inside a transaction block: reject before its `START TRANSACTION`, not end your transaction | at each `transaction()` given such a client |
@@ -177,7 +177,7 @@ A string cast wins, the value still JSON text: `param({ a: 1 }, 'jsonb')` gives 
 upsertRequiresSameKeys?: boolean  // default: true
 ```
 
-With `true`, a multi-row [`upsert()`](/insert#upsert) without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
 With `false`, the missing key can overwrite the stored value without a warning. See [Rows with different keys](/insert#upsert-different-keys).
 

@@ -253,8 +253,10 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
  * `upsert()` refuses too; a `null` row in an array gives `DEFAULT` for each
  * column of the others. An `undefined` value sends `DEFAULT`, as a missing
  * cell does: `{ title: undefined }` gives `VALUES (DEFAULT)`. With
- * `undefinedMeansMissing: false`, it sends a parameter for SQL `NULL`. A shortcut's
- * query (`count()`, `selectOne()`…) or its `copy()` is written in parentheses,
+ * `undefinedMeansMissing: false`, it sends a parameter for SQL `NULL`.
+ * These rules apply to the values read at the call, provided they stay unchanged
+ * until the query runs and getters return the same value on later reads.
+ * A shortcut's query (`count()`, `selectOne()`…) or its `copy()` is written in parentheses,
  * a scalar subquery, and stores what it gives in `extras`:
  * `VALUES ((SELECT count(*) AS result FROM "films"))`.
  * @param options Optionally, `returning` (an array of columns) and `extras`;
@@ -457,8 +459,8 @@ const updateValueSQL = (value: any, column: string) =>
  * returns `undefined`, which the type of a `Column[]` does not say; check for
  * it, or pass `doNothing`, which the type follows.
  *
- * Without `updateColumns`, the call throws if a key missing from a row would
- * be set from `EXCLUDED` on conflict. Give every row the key, name the columns
+ * Without `updateColumns`, the call throws if an implicitly updated column is
+ * missing from any row, even with `noNullUpdateColumns`. Give every row the key, name the columns
  * to update, or supply a defined override in `updateValues`. Columns named
  * in `conflictTarget` are exempt: a new row may omit its serial `id` when
  * upserting on `'id'`. A constraint target does not identify its columns here.
@@ -469,9 +471,13 @@ const updateValueSQL = (value: any, column: string) =>
  * The row omits the column unless another row supplies it, in which case its
  * cell takes `DEFAULT`. A row or batch left with no columns throws.
  * In `updateValues`, `{ votes: undefined }` adds no column to `DO UPDATE SET`.
- * A column already selected for update still takes its value from `EXCLUDED`.
+ * A defined `updateValues` override wins. Otherwise a selected column takes
+ * its value from `EXCLUDED`, with a `CASE` for `noNullUpdateColumns` that
+ * keeps the stored value if the incoming value is SQL `NULL`.
  * With `undefinedMeansMissing: false`, an undefined cell binds SQL `NULL` and
- * an undefined override adds its column to the update, set from `EXCLUDED`.
+ * an undefined override adds its column to the update.
+ * These rules apply to the values read at the call, provided they stay unchanged
+ * until the query runs and getters return the same value on later reads.
  */
 export const upsert: {
   <T extends Table,
@@ -549,7 +555,7 @@ export const upsert: {
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
       callerValue(updateValues, c) === undefined &&  // as below: otherwise, c is set from EXCLUDED
       !conflictColumns.includes(c) &&  // on conflict, EXCLUDED.c equals the existing value
-      values.some(v => !Object.prototype.hasOwnProperty.call(v ?? {}, c))),  // a null row misses every key
+      values.some(v => !Object.prototype.propertyIsEnumerable.call(v ?? {}, c))),  // a null row misses every key
     updateColumns = [...new Set(  // deduplicate the keys here
       [...specifiedUpdateColumns as string[] ?? colNames, ...updateValuesKeys(updateValues, specifiedUpdateColumns as string[] ?? colNames)]
     )],
@@ -604,8 +610,10 @@ export const upsert: {
  * It needs at least one key: with none, there is nothing to set, and `update()`
  * throws before any query. An `undefined` value leaves its key out:
  * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
- * With `undefinedMeansMissing: false`, the key sets its column to `NULL`. A
- * shortcut's query is written in parentheses, as for `insert`.
+ * With `undefinedMeansMissing: false`, the key sets its column to `NULL`.
+ * These rules apply to the values read at the call, provided they stay unchanged
+ * until the query runs and getters return the same value on later reads.
+ * A shortcut's query is written in parentheses, as for `insert`.
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
  * (`db.all` throws: to touch every row, give `` sql`TRUE` ``)
  * @param options Optionally, `returning` and `extras`, as for `insert`
