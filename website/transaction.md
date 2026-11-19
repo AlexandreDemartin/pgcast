@@ -556,7 +556,7 @@ The second argument of [`transaction()`](#transaction). Each value is written af
 type IsolationSatisfying<T extends IsolationLevel>
 ```
 
-The outer levels pgcast accepts for a nested call at level `T`.
+The outer levels a nested call at level `T` accepts with [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel); without it, any outer level passes, with `PGCAST_DEP007`.
 
 | `T` | `IsolationSatisfying<T>` |
 |---|---|

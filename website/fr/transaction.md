@@ -99,7 +99,7 @@ Avec le client d’une transaction que `transaction()` a ouverte, elle n’envoi
 Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, les deux `INSERT`, `COMMIT`.
 
 - Le callback s’exécute au niveau de la transaction extérieure, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de celle-ci exécutée. Le type ne vérifie pas ce niveau : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`, comme dans Zapatos 6.6.1, avec un avertissement, une fois, `PGCAST_DEP007`.
-- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), `transaction()` vérifie que le niveau de la transaction extérieure offre les garanties du niveau demandé ([`IsolationSatisfying`](#IsolationSatisfying)). Si cette vérification échoue, la promesse est rejetée avant l’appel au callback et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Si le niveau extérieur offre les garanties demandées, l’appel transmet le client avec ou sans l’option.
+- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), si le niveau de la transaction extérieure ne satisfait pas le niveau demandé ([`IsolationSatisfying`](#IsolationSatisfying)), la promesse est rejetée avant l’appel au callback et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Si le niveau extérieur satisfait le niveau demandé, l’appel transmet le client avec ou sans l’option.
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.
@@ -560,7 +560,7 @@ Le deuxième argument de [`transaction()`](#transaction). Chaque valeur est écr
 type IsolationSatisfying<T extends IsolationLevel>
 ```
 
-Les niveaux de la transaction externe que pgcast accepte pour un appel imbriqué au niveau `T`.
+Les niveaux de la transaction extérieure qu’un appel imbriqué au niveau `T` accepte avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel) ; sans cette option, tout niveau extérieur est accepté, avec `PGCAST_DEP007`.
 
 | `T` | `IsolationSatisfying<T>` |
 |---|---|
