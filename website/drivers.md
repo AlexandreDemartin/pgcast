@@ -24,7 +24,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 The types pgcast generates describe values as `pg` parses them ([Parse like pg](#parse-like-pg)): the adapters below parse each column with `pg`'s own parsers. Whichever driver runs the queries, keep `pg` installed: `zapatos/db` loads it.
 
 ::: info Coming
-The two adapters are packages of their own, `@pgcast/adapter-postgres-js` and `@pgcast/adapter-pglite`, version 0.1.0, not yet on npm ([#718](https://github.com/AlexandreDemartin/pgcast/issues/718)). Until then, each builds from its folder of the repository, [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters).
+The two adapters are packages of their own, `@pgcast/adapter-postgres-js` and `@pgcast/adapter-pglite`, not yet on npm ([#718](https://github.com/AlexandreDemartin/pgcast/issues/718)). Until then, each builds from its folder of the repository, [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters). Each adapter has its own changelog: [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) and [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
 :::
 
 ## postgres.js
@@ -95,7 +95,9 @@ The panel's code is typed on a `pg.Pool`; on `asPool(pglite)`, the SQL and the t
 - An error is PGlite's `DatabaseError`, not `pg`'s: it has `pg`'s fields (`code`, `constraint`…), so `isDatabaseError()` and the retries work.
 - PGlite has one connection, which the pool lends to one transaction at a time: [Transactions](#transactions).
 
-What it reads and writes, type by type, how it differs from `pg`, and what a page needs: [its README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).
+In a page, load a `Buffer` implementation before the adapter. Bundling the core with the real `pg` can also fail on Node's `global`. The [playground worker](https://github.com/AlexandreDemartin/pgcast/tree/master/website/.vitepress/playground) replaces `pg` with stub `Pool` and `Client` classes. It supplies `process.emitWarning` and a limited `Buffer` before loading `zapatos/db`. Its `Buffer.from()` throws.
+
+What the adapter reads and writes, type by type, and how it differs from `pg`: [its README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).
 
 ## Transactions
 
@@ -154,7 +156,7 @@ The SQL is the same on any driver, and the types describe what `pg` gives ([Valu
 
 It writes each value as `pg` writes it too, or Postgres stores another value: `pg` sends a `Date` in local time, with its offset, where the wrapper above, given PGlite's own `query()`, sends it in UTC, so a `Date` at 05:00 on 1 March in Tokyo goes into a `date` as 28 February.
 
-Both adapters read each column with `pg`'s parsers ([pg-types](https://github.com/brianc/node-pg-types) 2), from the text their driver gives, and write each value as `pg` writes it. Where each driver alone reads and writes otherwise: postgres.js's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-reads) and [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-writes), PGlite's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-reads) and [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-writes). Their source and their tests, which read each type through `pg` and through the adapter, are in [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters).
+Both adapters read each column with `pg`'s parsers ([pg-types](https://github.com/brianc/node-pg-types) 2), from the text their driver gives. The [postgres.js adapter](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#how-it-differs-from-pg) sends a `Buffer` as hex text. A `text` column receives `\x6869` for `Buffer.from('hi')` where `pg` sends the bytes of `hi`. Where each driver alone reads and writes otherwise: postgres.js's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-reads) and [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-writes), PGlite's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-reads) and [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-writes). Their source and their tests, which read each type through `pg` and through the adapter, are in [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters).
 
 ## A fake for tests
 
