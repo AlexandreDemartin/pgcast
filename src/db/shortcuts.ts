@@ -78,7 +78,7 @@ declare const nestedResult: unique symbol;
  * `ConfigTypes` selects the types: `RunResult` there, `NestedResult` for JSON under a lateral key,
  * in `extras` or under `select()`. Nest the original fragment for JSON. A `.copy()` returns a plain
  * `SQLFragment` with the direct type (e.g. `Date | null` for a date returned as a JSON string).
- * The original fragment’s own members name a symbol `zapatos/db` does not export,
+ * The original fragment's own members name a symbol `zapatos/db` does not export,
  * so a package built with `declaration: true` cannot write them out (TS4023 on a
  * spread of `min()`); it can name the type itself, as a function returning `min()` does.
  */
