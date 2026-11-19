@@ -1,5 +1,5 @@
 ---
-english: e67ffacc9c6f
+english: a64e40acff27
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -24,14 +24,14 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 Les types que pgcast génère décrivent les valeurs telles que `pg` les parse ([Parser comme pg](#parse-like-pg)) : les adaptateurs ci-dessous parsent chaque colonne avec les parsers de `pg` lui-même. Quel que soit le driver qui lance les requêtes, gardez `pg` installé : `zapatos/db` le charge.
 
-::: info À venir
-Les deux adaptateurs sont des paquets à part, `@pgcast/adapter-postgres-js` et `@pgcast/adapter-pglite`, pas encore sur npm ([#718](https://github.com/AlexandreDemartin/pgcast/issues/718)). D’ici là, chacun se construit depuis son dossier du dépôt, [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters). Chaque adaptateur a son propre changelog : [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) et [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
+::: info Adaptateurs sur npm
+Les paquets [`@pgcast/adapter-postgres-js`](https://www.npmjs.com/package/@pgcast/adapter-postgres-js) et [`@pgcast/adapter-pglite`](https://www.npmjs.com/package/@pgcast/adapter-pglite) sont disponibles sur npm. Il leur faut pgcast 6.12.0 ou une version plus récente. Chaque adaptateur a son propre changelog : [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) et [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
 :::
 
 ## postgres.js {#postgres-js}
 
 ```sh
-npm install @pgcast/adapter-postgres-js postgres
+npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-postgres-js postgres
 ```
 
 Passez à `asPool()` le `sql` que renvoie `postgres()`, importé comme d’habitude (`import postgres from 'postgres'`) :
@@ -66,7 +66,7 @@ Ce qu’il lit et écrit, type par type, et en quoi il diffère de `pg` : [son 
 ## PGlite {#pglite}
 
 ```sh
-npm install @pgcast/adapter-pglite @electric-sql/pglite
+npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-pglite @electric-sql/pglite
 ```
 
 Passez à `asPool()` un PGlite où votre schéma est chargé, celui d’après lequel pgcast a généré ses types :
