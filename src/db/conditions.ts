@@ -418,6 +418,8 @@ export const exists = <T extends Table>(table: T, where: WhereableArg<T> | SQLFr
  * `"col" IN (SELECT <column> FROM <table> WHERE <where>)`, as a Whereable value, typed on `column`'s type, `null`
  * aside. Under `not()`, a `NULL` from the subquery makes it match no row, as Postgres reads `NOT IN`: for the
  * anti-join, write `not(exists(…))`.
+ * With the 7.0 default, an enum-array subquery compares as `string`, so TypeScript rejects the same enum-array column
+ * and accepts a text column that Postgres rejects (42883).
  * @param table The subquery's table
  * @param where A Whereable or `sql` fragment on `table`, or `all` for no `WHERE`
  * @param column The column of `table` the subquery selects

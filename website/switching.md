@@ -158,6 +158,29 @@ On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColum
 
 This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
 
+### Domains, enum arrays and intervals in 7.0 {#domain-and-parser-types}
+
+Regenerate with `npx pgcast` and run `tsc`. In 7.0 all three generator settings default to `true` and emit no migration note.
+
+For callers of `definitionForRelationInSchema()`, the four optional arrays still collect columns independently of listener messages.
+
+| Out-parameter | When it collects a column |
+|---|---|
+| `domainsNotByContext` | `domainsTypedByContext: false`, for a known domain base whose type differs by context |
+| `domainsUnderDomains` | The same setting, for a nested domain or array of domains with a known root |
+| `enumArraysNotAsText` | `enumArraysTypedAsText` omitted or `null`, for a recognised enum array, including a direct domain over one |
+| `intervalsAsText` | `intervalsTypedAsObjects` omitted or `null`, for an interval, its array or a direct domain over either. A resolved interval or interval-array root also counts when `domainsTypedByContext` is on (the 7.0 default). |
+
+- With [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), a `bigint` domain gives a number in shortcut JSON with the default parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` before calling `.padStart()`.
+- A nested domain with an `any` placeholder takes its innermost base type. An array of `bigint` domains narrows from `any` to `number[]` in default shortcut JSON. If rows contain null elements or multiple dimensions, check the shape before using an element. Include those shapes and the raw `string` in the array placeholder, or use `domainsTypedByContext: false` through 7.x. This override goes in 8.0.
+- With [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), a `sql` row holds the array's text. To call `.map()` or write the labels back, use the array returned by a shortcut. Keep `false` if your `pg` parser returns the label array.
+- With the 7.0 default, an `isInSelect()` subquery `sub` selecting `c_enum_array` compares as the raw `string` type. TypeScript now rejects `{ c_enum_array: sub }` and accepts a text column that Postgres rejects (42883). Set `enumArraysTypedAsText: false` or write an explicit `sql` condition.
+- With [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), a `sql` row holds a `PostgresInterval`. Read its fields or write the object back directly. Shortcut JSON keeps the text. Keep `false` if your parser returns interval text. Both parser settings remain available beyond 8.0.
+
+Regeneration preserves existing placeholders. Context typing compares the placeholder's type with the type a fresh run would generate under the current settings. An old interval-domain `string` stays text. An edit to `db.PostgresInterval` matches the new default, so shortcut JSON becomes text. Switching back to `intervalsTypedAsObjects: false` preserves an existing object placeholder. Generate into an empty `outDir`, diff the placeholders and merge the changes you need. For a missing `db` import, [add the import](/custom-types#when-a-placeholder-does-not-compile).
+
+To restore the 6.x raw type of a domain over an enum array, set both `domainsTypedByContext` and `enumArraysTypedAsText` to `false`.
+
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
 pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6.6.1: a call that Postgres or the type refused, that did the opposite of its name, or that let a string splice SQL. A few such calls did run, and now give other rows, or throw.
@@ -354,12 +377,6 @@ In 7.x, each transaction check defaults to `true`. Set only the check you need t
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
 In 6.x, run `npx zapatos` to see which generator options would change the types for your schema.
-
-The note of [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) names each column of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, which its placeholder, as generated, types as `pg` returns it in all five interfaces. A placeholder Zapatos 6.6.1 wrote over `bigint` or `numeric` has no import, so its column is `any`, with the option too: add the import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Turn it on and regenerate: a placeholder left as generated now types its column by context, and `tsc` shows the code that took the shortcuts' JSON for the placeholder's type, a `Date` for a date or a string for a `bigint`. A placeholder you edited keeps its type, as before. Its second note names each column of a domain over a domain, or of an array of a domain, which its placeholder types as `any`: turned on, it types them by the base type of the innermost domain, and `tsc` shows the code that wrote a value of another type there.
-
-The note of [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) names each column whose type is an array of an enum, which `Selectable` types as an array though `pg` returns its text. Turn it on and regenerate: `tsc` shows the code that read a `sql` row's array as an array, and the code that wrote that text back, which the writes refuse, as they take an array. If you parse the array with `pg.types.setTypeParser`, set it to `false` instead: the array stays, with no note.
-
-The note of [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) names each column of `interval`, `interval[]` or a domain over either, which the generator types as its text, though `pg` returns an object from a query of your own. Turn it on and regenerate: `tsc` shows the code that read such a column from a `sql` query as a string, which ran only with a type parser of your own. If you set one, `pg.types.setTypeParser(1186, …)`, write `false` instead, which keeps the text with no note, in 7.0 too.
 
 From 6.7 until 7.0, `generate()` and `tsForConfig()` could report `PGCAST_DEP006` before exiting on a connection or query failure. In 7.0, omitting `rejectOnQueryError` or setting it to `null` in JSON lets your `catch` handle the original error. Listener errors also reject the promise, and earlier listener output stays visible. If the script must fail, rethrow the error or set `process.exitCode = 1`. To keep the immediate exit, set [`rejectOnQueryError: false`](/generator#generate.rejectOnQueryError). This choice remains available beyond 8.0. On a connection or query failure, the CLI prints the error and exits with code 1.
 

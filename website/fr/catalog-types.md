@@ -1,5 +1,5 @@
 ---
-english: 683fe68e5878
+english: e30e79149e19
 ---
 
 # Le catalogue
@@ -71,11 +71,11 @@ Une vue matérialisée ne garde aucun `NOT NULL`, pas même celui d’un domaine
 Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos : une nullabilité que la base ne déclare pas serait une supposition, et une supposition est la seule chose qu’un type généré ne doit pas être. Certaines lacunes de ce que lit le générateur sont connues, et décrites ici telles qu’elles sont aujourd’hui :
 
 - `UniqueIndex` liste les contraintes utilisables avec `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la liste de tous les index uniques de la relation.
-- Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, est typé dans les cinq interfaces par son placeholder, qui, tel que généré, contient ce que renvoie `pg`, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
-- Un domaine sur un domaine, ou un tableau d’un domaine, vaut `any`, le type de son placeholder tel que généré, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
-- Un tableau d’un enum est un tableau dans `Selectable`, bien que `pg` renvoie son texte, `'{writer,editor}'`, sauf si [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) est activé.
+- Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, suit son type de base dans chaque contexte tant que son placeholder contient le type généré.
+- Un domaine imbriqué ou un tableau de domaines suit le type de base du domaine au dernier niveau d’imbrication si le générateur reconnaît ce type. [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext) rétablit le type du placeholder dans les cinq interfaces.
+- Un tableau d’enums est représenté par du texte dans `Selectable` et par un tableau de labels dans le JSON des raccourcis. [`enumArraysTypedAsText: false`](/fr/generator#generate.enumArraysTypedAsText) convient à un parser qui renvoie un tableau.
 - Un domaine sur `text` dont le `CHECK` liste les valeurs, `CHECK (VALUE IN ('U', 'PG', '12'))`, est une `string`, le type de son placeholder tel que généré, sauf si [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) est activé.
-- Un `interval` est typé par son texte dans les cinq interfaces, bien que `pg` le parse en objet, un [`PostgresInterval`](/fr/runtime-config#PostgresInterval), pour une requête à vous, sauf si [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) est activé. Mettez-le à `false` si un parser de types à vous renvoie le texte.
+- Un `interval` est représenté par un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) dans une ligne renvoyée par `pg` et par du texte en JSON. [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects) convient à un parser qui renvoie du texte.
 
 ::: info À venir
 Lire davantage du catalogue, comme outil à part : les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
@@ -109,7 +109,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-Un domaine ou un type personnalisé fait exception : son placeholder déclare un seul type, utilisé dans les cinq contextes. Cela convient à `seat_label`, une chaîne partout, mais pas à un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, dont les écritures diffèrent de ce que renvoie `pg`, et, sauf pour `money`, son JSON aussi. [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) type un tel domaine selon le contexte, comme l’est son type de base, tant que son placeholder contient ce qu’a écrit le générateur.
+Le domaine `seat_label` est une chaîne dans les cinq interfaces. Pour un domaine sur `bigint`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) conserve la chaîne de `pg` dans `Selectable` et donne un nombre dans `JSONSelectable` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. Si vous modifiez le type du placeholder, la colonne prend ce type dans les cinq interfaces.
 
 La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 

@@ -428,7 +428,7 @@ declare module 'zapatos/schema' {
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format: c.PgDigital_format | null;
+        digital_format: db.DomainInContext<c.PgDigital_format, any, string> | null;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
@@ -452,7 +452,7 @@ declare module 'zapatos/schema' {
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats: c.Pg_book_format | null;
+        formats: db.DomainInContext<c.Pg_book_format, any, string> | null;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
@@ -526,7 +526,7 @@ declare module 'zapatos/schema' {
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format: c.PgDigital_format | null;
+        digital_format: db.DomainInContext<c.PgDigital_format, any, string> | null;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
@@ -550,7 +550,7 @@ declare module 'zapatos/schema' {
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats: c.Pg_book_format | null;
+        formats: db.DomainInContext<c.Pg_book_format, any, string[]> | null;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
@@ -624,7 +624,7 @@ declare module 'zapatos/schema' {
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format?: c.PgDigital_format | db.Parameter<c.PgDigital_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgDigital_format | db.Parameter<c.PgDigital_format> | db.SQLFragment | db.ParentColumn>;
+        digital_format?: db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | db.SQLFragment | db.ParentColumn>;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
@@ -648,7 +648,7 @@ declare module 'zapatos/schema' {
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats?: c.Pg_book_format | db.Parameter<c.Pg_book_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.Pg_book_format | db.Parameter<c.Pg_book_format> | db.SQLFragment | db.ParentColumn>;
+        formats?: db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | db.SQLFragment | db.ParentColumn>;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
@@ -722,7 +722,7 @@ declare module 'zapatos/schema' {
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format?: c.PgDigital_format | db.Parameter<c.PgDigital_format> | null | db.DefaultType | db.SQLFragment<any>;
+        digital_format?: db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
@@ -746,7 +746,7 @@ declare module 'zapatos/schema' {
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats?: c.Pg_book_format | db.Parameter<c.Pg_book_format> | null | db.DefaultType | db.SQLFragment<any>;
+        formats?: db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
@@ -820,7 +820,7 @@ declare module 'zapatos/schema' {
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format?: c.PgDigital_format | db.Parameter<c.PgDigital_format> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgDigital_format | db.Parameter<c.PgDigital_format> | null | db.DefaultType | db.SQLFragment>;
+        digital_format?: db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | null | db.DefaultType | db.SQLFragment>;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
@@ -844,7 +844,7 @@ declare module 'zapatos/schema' {
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats?: c.Pg_book_format | db.Parameter<c.Pg_book_format> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.Pg_book_format | db.Parameter<c.Pg_book_format> | null | db.DefaultType | db.SQLFragment>;
+        formats?: db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | null | db.DefaultType | db.SQLFragment>;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database

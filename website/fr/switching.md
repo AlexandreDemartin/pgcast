@@ -159,6 +159,29 @@ Sur Postgres 18, un upsert qui cible par son nom une clé `WITHOUT OVERLAPS` non
 
 Ce réglage rétablit le type union de la 6.x sans note de migration. C’est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
 
+### Domaines, tableaux d’enums et intervalles en 7.0 {#domain-and-parser-types}
+
+Régénérez le schéma avec `npx pgcast`, puis lancez `tsc`. En 7.0, les trois options du générateur valent `true` par défaut. Aucune ne produit de note de migration.
+
+Si vous appelez `definitionForRelationInSchema()`, les quatre tableaux facultatifs recensent toujours les colonnes, que les écouteurs reçoivent des messages ou non.
+
+| Paramètre de sortie | Quand il recense une colonne |
+|---|---|
+| `domainsNotByContext` | Avec `domainsTypedByContext: false`, pour un domaine dont le type de base est connu et varie selon le contexte |
+| `domainsUnderDomains` | Avec le même réglage, pour un domaine imbriqué ou un tableau de domaines dont le type de base est connu |
+| `enumArraysNotAsText` | Si `enumArraysTypedAsText` est omis ou vaut `null`, pour un tableau d’enums reconnu ou un domaine portant directement sur ce tableau |
+| `intervalsAsText` | Si `intervalsTypedAsObjects` est omis ou vaut `null`, pour un intervalle, un tableau d’intervalles ou un domaine portant directement sur l’un des deux. Si la résolution du type de base donne un intervalle ou un tableau d’intervalles, la colonne est aussi recensée quand `domainsTypedByContext` est activé (par défaut en 7.0). |
+
+- Avec [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), les raccourcis renvoient un nombre pour un domaine sur `bigint` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez le type `number | db.Int8String` avant d’appeler `.padStart()`.
+- Un domaine imbriqué dont le placeholder vaut `any` prend le type de base du domaine le plus intérieur. Un tableau de domaines sur `bigint` passe de `any` à `number[]` dans le JSON des raccourcis avec le parser par défaut. Si vos lignes contiennent des tableaux à plusieurs dimensions ou contenant des éléments `null`, vérifiez leur structure avant d’utiliser un élément. Déclarez ces formes de tableau et le type brut `string` dans le placeholder, ou utilisez `domainsTypedByContext: false` en 7.x. Ce réglage disparaît en 8.0.
+- Avec [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), une ligne renvoyée par une requête `sql` contient le texte du tableau. Pour appeler `.map()` ou réécrire les labels, utilisez le tableau renvoyé par un raccourci. Gardez `false` si votre parser `pg` renvoie déjà les labels sous forme de tableau.
+- Avec le réglage par défaut de la 7.0, si `sub` est une sous-requête `isInSelect()` qui sélectionne `c_enum_array`, la comparaison utilise le type brut `string`. TypeScript refuse désormais `{ c_enum_array: sub }` et accepte la comparaison avec une colonne de type texte, que Postgres refuse (42883). Réglez `enumArraysTypedAsText` sur `false` ou écrivez une condition `sql` explicite.
+- Avec [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), une ligne renvoyée par une requête `sql` contient un `PostgresInterval`. Lisez ses champs ou réécrivez l’objet directement. Le JSON des raccourcis conserve le texte. Gardez `false` si votre parser renvoie le texte de l’intervalle. Les deux réglages liés aux parsers restent disponibles au-delà de la 8.0.
+
+La régénération conserve les placeholders existants. Le typage par contexte compare le type du placeholder à celui qu’une nouvelle génération produirait avec les réglages actuels. Un ancien placeholder pour un domaine sur `interval` garde le type `string`. Si vous lui donnez le type `db.PostgresInterval`, il correspond au nouveau type par défaut et les raccourcis renvoient du texte en JSON. Si vous repassez à `intervalsTypedAsObjects: false`, un placeholder existant de type objet garde son type. Générez dans un `outDir` vide, comparez les placeholders et intégrez les changements voulus. S’il manque l’import de `db`, [ajoutez-le](/fr/custom-types#when-a-placeholder-does-not-compile).
+
+Pour retrouver le type brut de la 6.x pour un domaine sur un tableau d’enums, réglez `domainsTypedByContext` et `enumArraysTypedAsText` sur `false`.
+
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
 pgcast corrige, sans option à activer, ce sur quoi aucun code ne pouvait compter dans Zapatos 6.6.1 : un appel que Postgres ou le type refusait, qui faisait le contraire de son nom, ou qui laissait une chaîne injecter du SQL. Quelques-uns de ces appels s’exécutaient bel et bien, et donnent maintenant d’autres lignes, ou lèvent une erreur.
@@ -355,12 +378,6 @@ En 7.x, les trois vérifications de transaction sont activées par défaut. Dans
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
 En 6.x, lancez `npx zapatos` pour voir quelles options du générateur changeraient les types de votre schéma.
-
-La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, que son placeholder, tel que généré, type dans les cinq interfaces telle que `pg` la renvoie. Un placeholder écrit par Zapatos 6.6.1 sur `bigint` ou `numeric` n’a pas d’import, donc sa colonne vaut `any`, même avec l’option : ajoutez d’abord l’import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Activez l’option et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant. La seconde note de l’option nomme chaque colonne d’un domaine sur un domaine, ou d’un tableau d’un domaine, que son placeholder type comme `any` : une fois activée, l’option les type par le type de base du domaine le plus intérieur, et `tsc` montre le code qui y écrivait une valeur d’un autre type.
-
-La note d’[`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) nomme chaque colonne dont le type est un tableau d’un enum, que `Selectable` type comme un tableau bien que `pg` renvoie son texte. Activez l’option et régénérez : `tsc` montre le code qui lisait le tableau d’une ligne de `sql` comme un tableau, et celui qui réécrivait ce texte, que les écritures refusent, puisqu’elles prennent un tableau. Si vous parsez le tableau avec `pg.types.setTypeParser`, mettez plutôt l’option à `false` : le tableau reste, sans note.
-
-La note d’[`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) nomme chaque colonne de type `interval` ou `interval[]`, ou d’un domaine sur l’un ou l’autre, que le générateur type par son texte, bien que `pg` renvoie un objet pour une requête à vous. Activez-le et régénérez : `tsc` montre le code qui lisait une telle colonne depuis une requête `sql` comme une chaîne, ce qui ne marchait qu’avec un parser de types à vous. Si vous en avez réglé un, `pg.types.setTypeParser(1186, …)`, écrivez plutôt `false`, qui garde le texte sans note, en 7.0 aussi.
 
 De la 6.7 à la fin de la 6.x, `generate()` et `tsForConfig()` pouvaient signaler `PGCAST_DEP006` avant d’arrêter le processus en cas d’échec de connexion ou de requête. En 7.0, si vous omettez `rejectOnQueryError` ou fixez sa valeur à `null` en JSON, votre bloc `catch` peut intercepter l’erreur d’origine. La promesse est aussi rejetée si un écouteur lève une erreur. Les messages que les écouteurs ont déjà affichés restent visibles. Si le script doit échouer, relancez l’erreur ou utilisez `process.exitCode = 1`. Pour conserver l’arrêt immédiat, réglez [`rejectOnQueryError: false`](/fr/generator#generate.rejectOnQueryError). Ce choix reste possible au-delà de la 8.0. En cas d’échec de connexion ou de requête, la CLI affiche l’erreur et quitte avec le code 1.
 

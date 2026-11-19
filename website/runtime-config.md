@@ -437,7 +437,7 @@ In 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequir
 
 One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
 
-The generator has its own: [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too. Its [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) has no note, and stays off in 7.0. From 7.0, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder) use the enum's own schema and declaration order by default, without a migration note. The generator also enables [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) by default without a migration note.
+From 7.0, the generator enables [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) by default without migration notes. Its [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) has no note, and stays off in 7.0. From 7.0, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder) use the enum's own schema and declaration order by default, without a migration note. The generator also enables [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) by default without a migration note.
 
 Node emits each migration warning once per process and names the option in its message. For example, in 6.x a rolled-back commit produced this warning on `stderr`:
 
@@ -478,8 +478,8 @@ process.on('warning', (warning: Error & { code?: string }) => {
 - An array column takes the array of its item's type: `int8[]` gives `Int8String[]` in a `Selectable`.
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
-- A domain over one of these types takes its placeholder's type, the `Selectable` one, in every interface, unless the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([`DomainInContext`](#DomainInContext)).
-- An `interval` is a `string` in every interface, unless the generator's [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) is on: then [`PostgresInterval`](#PostgresInterval) in a `Selectable`, and `string | PostgresInterval` in a write.
+- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder. A direct domain over an enum array also needs `enumArraysTypedAsText: false` to use that type in raw rows. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
+- An `interval` gives a [`PostgresInterval`](#PostgresInterval) in `Selectable`, a `string` in JSON and `string | PostgresInterval` in a write. With [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects), all five interfaces use `string`.
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.
 
@@ -498,7 +498,7 @@ type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-The type that the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) writes for a column of a domain, in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`, and in `Selectable` too for a domain over a domain or an array of a domain: `InContext`, its base type's type there, while the placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, as without the option.
+The type that the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) writes for a column of a domain, in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`, and in `Selectable` too for a domain over a domain or an array of a domain: `InContext`, its base type's type there, while the placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, as with `domainsTypedByContext: false`.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` is `number`: a placeholder left as generated.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` is `number | db.Int8String`: an edited placeholder keeps its type, in every context.

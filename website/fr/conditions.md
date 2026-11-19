@@ -1,5 +1,5 @@
 ---
-english: 9d58bc1b5678
+english: f4232a9d26f6
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -588,6 +588,7 @@ import * as db from 'zapatos/db';
 db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id') });
 ```
 
+- Avec le réglage par défaut de la 7.0, une sous-requête qui sélectionne un tableau d’enums utilise le type `string` pour la comparaison. TypeScript refuse donc la comparaison avec la même colonne de type tableau d’enums et accepte celle avec une colonne de type texte, que Postgres refuse (42883).
 - **Sous `not()`**, elle ne trouve aucune ligne dès que la sous-requête renvoie un `NULL`, vu la façon dont Postgres lit `NOT IN` : `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` ne trouve personne, car un `mentor_id` est `NULL`. Pour l’anti-jointure, écrivez `not(exists(…))` (voir plus haut).
 - **Comme `where` entier**, hors d’une clé, elle n’a pas de colonne : le type l’y refuse, seule, sous `not()` ou dans `and()` (TS2345), et en code non typé, elle lève "The 'self' column alias has no meaning here".
 
@@ -622,7 +623,7 @@ db.conditions.websearchToTsquery<T = TsvectorColumn>(config: string, query: stri
 
 - **La configuration** : nommez celle qui a construit le vecteur de la colonne, car la requête doit avoir les mêmes racines : `websearchToTsquery('simple', 'lanterns')` cherche `'lanterns'`, que `title_search` ne contient pas. Sans elle, Postgres prendrait `default_text_search_config`, un réglage du serveur ou de la session : la condition la nomme donc toujours. Postgres la cherche dans le `search_path` (`'pg_catalog.english'` marche aussi), et une configuration qu’il ne connaît pas donne l’erreur 42704, « <span lang="en">text search configuration "klingon" does not exist</span> » ; jusqu’à Postgres 15, un nom dont le schéma n’existe pas, `'nowhere.english'`, donne l’erreur 3F000, « <span lang="en">schema "nowhere" does not exist</span> ». Une configuration à vous, construite sur `unaccent` par exemple, est un nom comme un autre.
 - **`NULL`** : un vecteur `NULL` donne `NULL`, donc la ligne ne correspond ni à la condition ni à son [`not()`](#conditions.not).
-- **Type** : son `T` est [`TsvectorColumn`](#conditions.TsvectorColumn), que seule une colonne typée `any` accepte : une colonne `tsvector`, par son placeholder `PgTsvector` laissé tel que généré ([Types personnalisés](/fr/custom-types)). Une colonne `text` ne compile pas, ni une `varchar`, une `citext` ou un domaine sur l’un de ces types, tous typés `string` : Postgres lirait `text @@ tsquery`, et construirait le vecteur avec `default_text_search_config`, pas avec la configuration donnée. Toute autre colonne typée `any` passe : un domaine sur un domaine sur `text`, tel que généré sans [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), exécute ce `text @@ tsquery` sans erreur ; une colonne `xml`, Postgres la refuse (42883). Une fois le placeholder modifié, donnez son type, `websearchToTsquery<PgTsvector>(…)`, ou pour une `string`, `db.conditions.websearchToTsquery<string>('english', 'lanterns')`<!-- tsc: db.select('films', { title_search: … }) -->.
+- **Type** : son `T` est [`TsvectorColumn`](#conditions.TsvectorColumn), que seule une colonne typée `any` accepte : une colonne `tsvector`, par son placeholder `PgTsvector` laissé tel que généré ([Types personnalisés](/fr/custom-types)). Une colonne `text` ne compile pas, ni une `varchar`, une `citext` ou un domaine sur l’un de ces types, tous typés `string` : Postgres lirait `text @@ tsquery`, et construirait le vecteur avec `default_text_search_config`, pas avec la configuration donnée. Toute autre colonne typée `any` passe : avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), Postgres exécute `text @@ tsquery` sans erreur sur une colonne de type domaine imbriqué sur `text`. Postgres refuse une colonne `xml` (42883). Une fois le placeholder modifié, donnez son type, `websearchToTsquery<PgTsvector>(…)`, ou pour une `string`, `db.conditions.websearchToTsquery<string>('english', 'lanterns')`<!-- tsc: db.select('films', { title_search: … }) -->.
 
 ```ts twoslash
 // @errors: 2322
