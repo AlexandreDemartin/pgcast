@@ -3091,7 +3091,7 @@ declare module 'zapatos/schema' {
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array: ('sad' | 'ok' | 'happy')[] | null;
+        c_enum_array: string | null;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
@@ -3145,7 +3145,7 @@ declare module 'zapatos/schema' {
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval: string | null;
+        c_interval: db.PostgresInterval | null;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
@@ -3393,7 +3393,7 @@ declare module 'zapatos/schema' {
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain: c.PgTicket_no | null;
+        c_int8_domain: db.DomainInContext<c.PgTicket_no, db.Int8String, number> | null;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
@@ -3647,13 +3647,13 @@ declare module 'zapatos/schema' {
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | db.ParentColumn>;
+        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | db.SQLFragment | db.ParentColumn>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | db.SQLFragment | db.ParentColumn>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
@@ -3901,13 +3901,13 @@ declare module 'zapatos/schema' {
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: c.PgTicket_no | db.Parameter<c.PgTicket_no> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
@@ -4149,13 +4149,13 @@ declare module 'zapatos/schema' {
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: c.PgTicket_no | db.Parameter<c.PgTicket_no> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTicket_no | db.Parameter<c.PgTicket_no> | null | db.DefaultType | db.SQLFragment>;
+        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database

@@ -157,12 +157,12 @@ export const definitionForRelationInSchema = async (
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters?: string[],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
-  domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
+  domainsNotByContext?: string[],  // an 'out' parameter too: what domainsTypedByContext would change
   domainRoots: () => Promise<DomainRoots> = () => domainRootsInDatabase(queryFn),
-  domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
-  // an 'out' parameter too: what enumArraysTypedAsText would change, with a domain's placeholder, which may end `any`
-  enumArraysNotAsText: [column: string, customType: string | null][] = [],
-  intervalsAsText: string[] = [],  // an 'out' parameter too: what intervalsTypedAsObjects would change
+  domainsUnderDomains?: string[],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
+  // Direct callers can still collect the columns the 6.x parser notes named when the setting was omitted.
+  enumArraysNotAsText?: [column: string, customType: string | null][],
+  intervalsAsText?: string[],
   // an 'out' parameter too: for each placeholder, the column that holds it, and the text and import that each of its
   // types gives it, as that type alone would (#42)
   customTypeHolders: Record<string, {
@@ -175,7 +175,8 @@ export const definitionForRelationInSchema = async (
     otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
     typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? true,
-    enumArraysAsText = config.enumArraysTypedAsText ?? false,
+    enumArraysAsText = config.enumArraysTypedAsText ?? true,
+    domainsByContext = config.domainsTypedByContext ?? true,
     inlineIn = (schema: string) => typeEnumsAcrossSchemas && schema !== schemaName,
     // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
     // types it, read once per run if a column is `any`; an enum of another schema by its labels, never by its name in
@@ -184,7 +185,7 @@ export const definitionForRelationInSchema = async (
       'Selectable', config, inlineIn(row.udtSchema)) === 'any',
     roots: DomainRoots = rows.some(isAny) ? await domainRoots() : {},
     // intervalsTypedAsObjects types pg_catalog's interval only
-    textIntervals = config.intervalsTypedAsObjects ? { ...config, intervalsTypedAsObjects: false } : config,
+    textIntervals = (config.intervalsTypedAsObjects ?? true) ? { ...config, intervalsTypedAsObjects: false } : config,
     configIn = (schema: string) => schema === 'pg_catalog' ? config : textIntervals,
     rootIn = (schema: string, name: string): DomainRoots[string] | undefined => roots[JSON.stringify([schema, name])],
     // a domain over a domain over an array of a domain has that array as its root, which has a root of its own
@@ -219,9 +220,9 @@ export const definitionForRelationInSchema = async (
     // an interval, an array of one or a domain over either, whose placeholder holds what pg returns, as generated; under
     // another domain, or in an array of a domain, only where domainsTypedByContext types it by its base type, read as
     // below: an array of a domain over interval[] is then no type it knows
-    const base = rootOf(row);
-    if (config.intervalsTypedAsObjects == null &&  // left out, or null from JSON: false is a choice, a parser of your own
-      (isInterval({ schema: udtSchema, name: udtName }) || (config.domainsTypedByContext ?? false) &&
+    const base = intervalsAsText && rootOf(row);
+    if (intervalsAsText && config.intervalsTypedAsObjects == null &&  // left out, or null from JSON: false is a choice, a parser of your own
+      (isInterval({ schema: udtSchema, name: udtName }) || domainsByContext &&
         isInterval(base && { schema: base.schema, name: (base.isArray ? '_' : '') + base.name }))) {
       const type = domainName !== null ? `${domainSchema}.${domainName}` : udtName === 'interval' ? udtName :
         udtName === '_interval' ? 'interval[]' : `${udtSchema}.${udtName.slice(1)}[]`;
@@ -240,7 +241,7 @@ export const definitionForRelationInSchema = async (
       ownEnums = acrossSchemas ? otherEnums[udtSchema] : enums,
       enumArray = selectableType !== 'any' && udtName.charAt(0) === '_' && !hasOwn(ownEnums, udtName) &&
         hasOwn(ownEnums, udtName.slice(1));
-    if (enumArray && config.enumArraysTypedAsText == null) {  // left out, or null from JSON
+    if (enumArraysNotAsText && enumArray && config.enumArraysTypedAsText == null) {  // left out, or null from JSON
       enumArraysNotAsText.push([`${schemaName}.${rel.name}.${column} (${domainName === null ?
         `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`})`,
       domainName === null ? null : transformCustomType(domainName, config)]);
@@ -330,11 +331,11 @@ export const definitionForRelationInSchema = async (
         underDomains = rootTypes && rootTypes[1] !== 'any' ? rootTypes : undefined,
         byContext = domainName !== null && selectableType !== 'any' &&
           [JSONSelectableType, whereableType, insertableType, updatableType].some(type => type !== selectableType),
-        typedByContext = (byContext || underDomains !== undefined) && (config.domainsTypedByContext ?? false),
+        typedByContext = (byContext || underDomains !== undefined) && domainsByContext,
         inContext = (type: string) => typedByContext ? `db.DomainInContext<${placeholder}, ${selectableType}, ${type}>` : placeholder;
 
-      if (byContext && !typedByContext) domainsNotByContext.push(`${schemaName}.${rel.name}.${column} (${domainSchema}.${domainName})`);
-      if (underDomains && !typedByContext) {
+      if (byContext && !typedByContext) domainsNotByContext?.push(`${schemaName}.${rel.name}.${column} (${domainSchema}.${domainName})`);
+      if (domainsUnderDomains && underDomains && !typedByContext) {
         const type = domainName === null ? `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`;
         domainsUnderDomains.push(`${schemaName}.${rel.name}.${column} (${type})`);
       }

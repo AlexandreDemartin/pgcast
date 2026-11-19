@@ -746,7 +746,7 @@ declare module 'zapatos/schema' {
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array: ('sad' | 'ok' | 'happy')[] | null;
+        c_enum_array: string | null;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
