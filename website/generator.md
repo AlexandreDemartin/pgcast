@@ -412,7 +412,7 @@ try {
 
 From 7.0, this boolean defaults to `true`, including for JSON `null`. Each relation's `UniqueIndex` lists its non-deferrable `UNIQUE` and `PRIMARY KEY` constraints backed by valid, non-exclusion indexes. With `false`, the generator lists all of the relation's unique indexes.
 
-[`constraint()`](/insert#constraint) compiles a name containing a dot as a qualified identifier. For `screenings.id` it emits `"screenings"."id"` (42601). Use an explicit `sql` statement with `ON CONSTRAINT "screenings.id"`.
+[`constraint()`](/insert#constraint) compiles a name such as `screenings.id` as a qualified identifier: `"screenings"."id"` (42601). Use an explicit `sql` statement with `ON CONSTRAINT "screenings.id"`.
 
 ```sql
 CREATE TABLE festival_entries (
@@ -434,7 +434,7 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 | `festival_entries_slot_key`, `DEFERRABLE` | yes | no | 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters` |
 | `festival_entries_live_idx`, an index and no constraint | yes | no | 42704, `constraint "festival_entries_live_idx" for table "festival_entries" does not exist` |
 
-- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint. `DO NOTHING` accepts a non-deferrable key and returns 55000 for a deferrable one. `DO UPDATE` returns 42809 for either declaration. An `EXCLUDE` constraint is in neither list, since its index isn't unique.
+- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint. `DO NOTHING` accepts a non-deferrable key and, when there is a row to insert, returns 55000 for a deferrable one. `DO UPDATE` returns 42809 for either declaration. An `EXCLUDE` constraint is in neither list, since its index isn't unique.
 - `true` leaves out, too, a constraint whose index isn't valid yet: a partitioned table's, added with `ALTER TABLE ONLY`, until each partition's index is attached ([Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html#DDL-PARTITIONING-DECLARATIVE-MAINTENANCE)). Postgres answers 42P10 meanwhile, `there is no unique or exclusion constraint matching the ON CONFLICT specification`; regenerate once they are.
 - For a partitioned table, the union follows the parent constraint. Postgres checks the receiving partition's index, so a deferrable key there can still raise 55000. A deferrable parent key is omitted even when the partitions' keys are immediate.
 - A relation left with none gets `never`. `UniqueIndexForTable` and the aggregate `UniqueIndex` types follow.
