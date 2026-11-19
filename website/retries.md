@@ -53,7 +53,7 @@ Moved into the callback, a retried booking sends two confirmation emails, and pu
 
 pgcast retries only what reaches it. Don't swallow a database error inside the callback: after it, Postgres refuses every query of the transaction with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error.
 
-The promise then resolves with what the callback returned, nothing is saved, and a 40001 caught this way is never retried; pgcast warns once, `PGCAST_DEP003`. With [`transactionRequiresCommit: true`](/runtime-config#Config.transactionRequiresCommit), the default from 7.0, the promise rejects instead, still without a retry: pgcast never saw the error.
+The promise rejects without a retry, and nothing is saved. With [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit), it resolves with the callback result. A swallowed 40001 or 40P01 cannot trigger a retry under either setting.
 
 If you catch one inside, rethrow it.
 
@@ -94,7 +94,9 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-Typed [`db.Queryable`](/sql-template#Queryable), it would take that client, and `bookSeats()` would run at `READ COMMITTED`, with a warning, once, `PGCAST_DEP007`. With [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), it rejects instead, before its callback.
+A [`db.Queryable`](/sql-template#Queryable) parameter accepts this client. The call below compiles, then rejects before the booking callback. With [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel), the booking would run at `READ COMMITTED`.
+
+<<< ./examples/plain/retries_lower_level.ts{ts twoslash}
 
 ## Queue the requests with a lock
 

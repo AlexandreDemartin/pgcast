@@ -11,7 +11,7 @@ import ts from 'typescript';
 import * as db from 'zapatos/db';
 import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 
-process.noDeprecation = true;  // a probe may show what pgcast warns about (PGCAST_DEP003): the warning is not news here
+process.noDeprecation = true;  // a probe may show what pgcast warns about: the warning is not news here
 
 const
   // the English pages and their French translations (fr/), which quote the same SQL and messages

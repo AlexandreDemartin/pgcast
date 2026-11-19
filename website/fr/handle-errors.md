@@ -84,7 +84,7 @@ Le SQL de chaque `INSERT` : [`insert()`](/fr/insert#insert). Un échec de séri
 ::: warning Écritures perdues
 N’interceptez pas une erreur de base de données dans le callback pour continuer comme si de rien n’était. Postgres a interrompu la transaction : chaque requête suivante est refusée avec 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), et si le callback rend la main, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, que Postgres transforme en rollback sans erreur.
 
-La promesse se résout, rien de ce que le callback a écrit n’est enregistré, et pgcast avertit une fois, `PGCAST_DEP003`. Avec [`transactionRequiresCommit: true`](/fr/runtime-config#Config.transactionRequiresCommit), la valeur par défaut à partir de la 7.0, elle est rejetée à la place ([`transaction()`, Erreurs](/fr/transaction#errors)).
+La promesse est rejetée sans retry. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Dans les deux cas, les écritures sont perdues ([Erreurs de `transaction()`](/fr/transaction#errors)).
 
 Pour une place qui peut être prise, demandez à Postgres de ne pas refuser : [`upsert()` avec `doNothing`](/fr/insert#doNothing) écrit `ON CONFLICT ON CONSTRAINT "seat_bookings_pkey" DO NOTHING`<!-- probe: db.upsert('seat_bookings', { screening_id: 1001, seat: 'H2', customer: 'Wren Abernathy' }, db.constraint('seat_bookings_pkey'), { updateColumns: db.doNothing }) --> et donne `undefined` pour une place prise, sans erreur, et la transaction continue.
 :::

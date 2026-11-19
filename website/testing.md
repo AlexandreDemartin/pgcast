@@ -68,20 +68,12 @@ So an id is read, never hard-coded; and a prepared name stands for one text acro
 
 ### Give code that commits the pool
 
-Code that opens its own [`transaction()`](/transaction#transaction) can't join the test's. Given the test's client, inside its `BEGIN`, it sends `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres answers with a warning (25001, "there is already a transaction in progress"), then ends the test's transaction one of two ways ([#233](https://github.com/AlexandreDemartin/pgcast/issues/233)):
+With pg 8.21 or later, [`transaction()`](/transaction#your-own-begin) rejects when the test's client still reports its own `BEGIN` after the empty query. Its seeds remain in the test's transaction for its `ROLLBACK`. With [`transactionRequiresIdleClient: false`](/runtime-config#Config.transactionRequiresIdleClient), pgcast sends `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) --> and can end the test's transaction:
 
 - If the test has run no query yet, or at the session's own level (`readCommitted()`, on a default server), its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits the test's transaction, rows and all.
 - At another level, after any query, the test's seeds included, Postgres refuses with 25001 ("SET TRANSACTION ISOLATION LEVEL must be called before any query"): its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes the seeds, and the call rejects.
 
-Either way, the test's `ROLLBACK` has nothing left to undo (25P01), and pgcast warns once, `PGCAST_DEP005`. Turn on [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) where your tests set up, and such a call rejects instead, before its `START TRANSACTION`: the test fails, and its `ROLLBACK` still undoes its seeds.
-
-```ts twoslash
-import * as db from 'zapatos/db';
-// ---cut---
-db.setConfig({ transactionRequiresIdleClient: true });
-```
-
-It needs pg 8.21 or later, which reports the test's `BEGIN` ([Your own `BEGIN`](/transaction#your-own-begin)). Then run such a test on the pool, not on a client inside its `BEGIN`: give the code the pool, and delete what it commits:
+Give code that commits the pool and delete what it commits:
 
 <<< ./examples/plain/testing_commits.ts{ts twoslash}
 

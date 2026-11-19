@@ -69,20 +69,12 @@ Un id se lit donc, il ne s’écrit jamais en dur ; et un nom préparé désign
 
 ### Donner le pool au code qui commite {#give-code-that-commits-the-pool}
 
-Le code qui ouvre sa propre [`transaction()`](/fr/transaction#transaction) ne peut pas rejoindre celle du test. Si on lui donne le client du test, dans son `BEGIN`, il envoie `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, à quoi Postgres répond par un avertissement (25001, « <span lang="en">there is already a transaction in progress</span> »), puis il termine la transaction du test de l’une de deux façons ([#233](https://github.com/AlexandreDemartin/pgcast/issues/233)) :
+Avec pg 8.21 ou plus récent, [`transaction()`](/fr/transaction#your-own-begin) est rejetée si le client du test signale encore son propre `BEGIN` après la requête vide. Les seeds restent dans la transaction du test jusqu’à son `ROLLBACK`. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), pgcast envoie `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) --> et peut mettre fin à la transaction du test :
 
 - Si le test n’a encore lancé aucune requête, ou au niveau propre à la session (`readCommitted()`, sur un serveur par défaut), son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commite la transaction du test, lignes comprises.
 - À un autre niveau, après n’importe quelle requête, seeds du test compris, Postgres refuse avec 25001 (« <span lang="en">SET TRANSACTION ISOLATION LEVEL must be called before any query</span> ») : son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> annule les seeds, et l’appel est rejeté.
 
-Dans les deux cas, le `ROLLBACK` du test n’a plus rien à annuler (25P01), et pgcast avertit une fois, `PGCAST_DEP005`. Activez [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) dans la mise en place de vos tests, et un tel appel est alors rejeté, avant son `START TRANSACTION` : le test échoue, et son `ROLLBACK` annule toujours ses seeds.
-
-```ts twoslash
-import * as db from 'zapatos/db';
-// ---cut---
-db.setConfig({ transactionRequiresIdleClient: true });
-```
-
-Il faut pg 8.21 ou plus récent, qui signale le `BEGIN` du test ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). Faites ensuite tourner un tel test sur le pool, et non sur un client dans son `BEGIN` : donnez le pool au code, et supprimez ce qu’il commite :
+Passez le pool au code qui commite et supprimez ce qu’il a écrit :
 
 <<< ../examples/plain/testing_commits.ts{ts twoslash}
 
