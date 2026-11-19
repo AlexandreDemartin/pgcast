@@ -6,7 +6,7 @@ Released under the MIT licence: see LICENCE file
 
 import * as pg from 'pg';
 import { isDatabaseError } from './pgErrors';
-import { mapWithSeparator, wait, warnOnce } from './utils';
+import { mapWithSeparator, wait } from './utils';
 import { sql, raw, param, SQLFragment } from './core';
 import { getConfig } from './config';
 import type { SQLQuery, TransactionEvent } from './config';
@@ -176,20 +176,17 @@ type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
  * a database transaction. The transaction is committed, retried, or rolled back
  * as appropriate.
  *
- * When the callback catches a query's error and returns, Postgres answers
- * `COMMIT` with `ROLLBACK` and nothing is saved: with the
- * `transactionRequiresCommit` config option, this rejects; without it, it
- * resolves and emits a `DeprecationWarning` (`PGCAST_DEP003`), once.
+ * When the callback catches a query error and Postgres answers `COMMIT` with
+ * `ROLLBACK`, reject without retrying. With `transactionRequiresCommit: false`,
+ * resolve with the callback's result even though its writes were rolled back.
  *
- * Given a client already inside a transaction block (a `BEGIN` of yours), its
- * `COMMIT` or `ROLLBACK` would end yours: with the
- * `transactionRequiresIdleClient` config option, this rejects before its
- * `START TRANSACTION`; without it, it runs and emits `PGCAST_DEP005`, once.
+ * When a caller's client still reports a transaction block after an empty
+ * query, reject before `START TRANSACTION`. Set
+ * `transactionRequiresIdleClient: false` to skip the recheck and run, ending the caller's block.
  *
- * Given the client of a transaction at a level that doesn't satisfy this one
- * (`IsolationSatisfying`), the callback would run at the outer level. With the
- * `transactionRequiresSatisfyingLevel` config option, this rejects before
- * calling it; without it, it runs and emits `PGCAST_DEP007`, once.
+ * When the outer transaction's isolation level does not satisfy the nested
+ * request (`IsolationSatisfying`), reject before its callback. With
+ * `transactionRequiresSatisfyingLevel: false`, run it at the outer level.
  *
  * Given a `PoolLike` of another driver, the callback gets its client, a
  * `TxnClientLike`, released once the transaction ends. Passed to a nested
@@ -220,9 +217,9 @@ export async function transaction<T, M extends IsolationLevel, C = unknown, N ex
     // if txnClientOrQueryable is a TxnClient, just pass it through: its callback runs at the outer transaction's level, as
     // Postgres can't change the isolation level once the transaction's first query has run (see https://github.com/AlexandreDemartin/pgcast/issues/177)
     const outer = (txnClientOrQueryable as TxnClient<IsolationLevel>)._zapatos?.isolationLevel;
-    if (outer !== undefined && satisfying.has(outer) && satisfying.get(isolationLevel)?.includes(outer) === false) {
-      if (getConfig().transactionRequiresSatisfyingLevel ?? false) throw new Error(`transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${isolationLevel} (IsolationSatisfying)`);
-      warnOnce('PGCAST_DEP007', `transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback runs at ${outer}. Set transactionRequiresSatisfyingLevel: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.`);
+    if (outer !== undefined && satisfying.has(outer) && satisfying.get(isolationLevel)?.includes(outer) === false &&
+        (getConfig().transactionRequiresSatisfyingLevel ?? true)) {
+      throw new Error(`transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${isolationLevel} (IsolationSatisfying)`);
     }
     return (callback as Callback<T, M>)(txnClientOrQueryable as TxnClient<IsolationSatisfying<M>>);
   }
@@ -242,15 +239,11 @@ export async function transaction<T, M extends IsolationLevel, C = unknown, N ex
 
     // a client of the caller's, inside a block of its own (BEGIN): our COMMIT or ROLLBACK would end that
     // transaction (see https://github.com/AlexandreDemartin/pgcast/issues/233)
-    if (!clientIsOurs && inBlock(txnClient)) {
-      if (getConfig().transactionRequiresIdleClient ?? false) {
-        // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
-        // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
-        await sql``.run(txnClient);  // meanwhile, a call at the same moment sees the mark, and is passed through
-        if (inBlock(txnClient)) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()');
-      } else {
-        warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.');
-      }
+    if (!clientIsOurs && inBlock(txnClient) && (getConfig().transactionRequiresIdleClient ?? true)) {
+      // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
+      // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
+      await sql``.run(txnClient);  // meanwhile, a call at the same moment sees the mark, and is passed through
+      if (inBlock(txnClient)) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()');
     }
 
     const
@@ -314,9 +307,8 @@ export async function transaction<T, M extends IsolationLevel, C = unknown, N ex
 
       // after a query error that the callback caught, the transaction is aborted: Postgres answers COMMIT
       // with the command tag ROLLBACK, not an error, and nothing was saved (see https://github.com/AlexandreDemartin/pgcast/issues/190)
-      if (commandTag === 'ROLLBACK') {
-        if (config.transactionRequiresCommit ?? false) throw new Error('the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on');
-        warnOnce('PGCAST_DEP003', 'transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.');
+      if (commandTag === 'ROLLBACK' && (config.transactionRequiresCommit ?? true)) {
+        throw new Error('the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on');
       }
 
       return result;
