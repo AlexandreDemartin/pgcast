@@ -4257,9 +4257,9 @@ describe('generate()', () => {
       await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));
     });
 
-    it('defaults rejectOnQueryError to true and keeps an explicit false', () => {
-      expect(finaliseConfig({}).rejectOnQueryError).toBe(true);
-      expect(finaliseConfig(JSON.parse('{"rejectOnQueryError": null}')).rejectOnQueryError).toBe(true);
+    it('keeps rejectOnQueryError as supplied when finalising the config', () => {
+      expect(Object.prototype.hasOwnProperty.call(finaliseConfig({}), 'rejectOnQueryError')).toBe(false);
+      expect(finaliseConfig(JSON.parse('{"rejectOnQueryError": null}')).rejectOnQueryError).toBeNull();
       expect(finaliseConfig({ rejectOnQueryError: false }).rejectOnQueryError).toBe(false);
       // @ts-expect-error a boolean
       const wrong: Config = { rejectOnQueryError: 'yes' };
@@ -4694,6 +4694,16 @@ describe('the CLI with --check (#556)', () => {
           expect(tree()).toEqual(before);
         }
       });
+    });
+
+    it('exits on a refused connection when a check() config getter returns false', () => {
+      const script = `
+        class Config { get rejectOnQueryError() { return false; } }
+        const config = new Config();
+        config.db = JSON.parse(process.argv[2]);
+        require(process.argv[1]).check(config).catch(() => console.log('reject handler ran'));
+      `;
+      expectExit(child(['-e', script, join(build, 'dist/generate'), JSON.stringify(unreachable)]), 'ECONNREFUSED');
     });
 
     it.each(['pgcast', 'zapatos'])('%s exits on either database error, including with --check', name => {
