@@ -218,6 +218,8 @@ Candidates for a check, a rule or a skill line.
 - #755 — Compile an internal option reader against the generated fixture as well as the stub schema: only the fixture exposed the disjoint upsert column keys — codex
 - #755 — A reference check that matches an export by any heading of the same name passes on a colliding ordinary heading ("The CLI"); require an anchor dedicated to the export — codex
 - #755 — Probe both initial list lengths when a condition chooses its SQL at construction and reads its values at compilation: an `isIn([])` that later gets `db.all` compiles to `((false))` — codex
+- #756 — A documented pass-through type depends on two things a reader configures: the int8 type parser (a count is `"2"` by default, `2` with `Number`) and the outer selector (`selectOne`/`selectExactlyOne`/`selectRows` give pg's parse, `select()` gives JSON); probe each selector under each parser — codex
+- #756 — A keyed count holds only when its subquery returns a row: a grouped count with no matching group gives JSON `null` under the key — codex
 
 ## Minors kept
 
