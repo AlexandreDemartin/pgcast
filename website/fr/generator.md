@@ -1,5 +1,5 @@
 ---
-english: b1a29a1ccc44
+english: 50334c8e537c
 ---
 
 # Générateur
@@ -450,13 +450,13 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 À partir de la 7.1.0, réglez `constraintNames` sur `true` pour générer un type `Constraint` dans l’espace de noms de chaque relation. Ce type réunit les noms des clés primaires, des contraintes d’unicité, des clés étrangères, des contraintes de vérification, des contraintes d’exclusion et de tous les index uniques de la relation. Pour la table ci-dessus, `festival_entries.Constraint` contient `festival_entries_slot_key` et `festival_entries_live_idx`, quelle que soit la valeur de `uniqueIndexConstraintsOnly`.
 
-Le type reprend les noms du catalogue, que Postgres applique ou non les contraintes. Un déclencheur ou une fonction peut signaler un nom absent du type. Vérifiez `err.table` et `err.constraint`. Si aucun nom ne correspond à la relation, son type vaut `never`.
+Le type reprend les noms du catalogue, que Postgres applique ou non les contraintes. Un trigger ou une fonction peut signaler un nom absent du type. Si aucun nom du catalogue ne correspond à la relation, son type `Constraint` vaut `never`.
 
-Pour chaque partition ou table qui hérite d’une autre table, le type reprend les noms enregistrés pour cette relation, y compris ceux des contraintes de vérification héritées. Si une écriture via une table partitionnée échoue dans une partition, Postgres indique cette partition. Comparez le nom de la contrainte signalée au type `Constraint` de la partition.
+Comparez `err.constraint` aux noms du type `Constraint` de la relation désignée par `err.schema` et `err.table`. Chaque partition ou table qui hérite d’une autre table a ses propres noms, y compris ceux des contraintes de vérification héritées. Si une écriture enfreint une contrainte de la partition qui reçoit la ligne, Postgres indique cette partition. Si une clé étrangère empêche une suppression, Postgres indique la table qui contient la clé étrangère.
 
 Le type exclut les contraintes `NOT NULL` des tables. En cas de violation, Postgres indique la colonne concernée. Les contraintes de vérification d’un domaine appartiennent au domaine. Si la contrainte `NOT NULL` d’un domaine est violée, Postgres indique le domaine dans `err.dataType`.
 
-Si le générateur inclut une relation nommée `every` et que le même schéma contient un enum nommé `Constraint`, la relation et l’enum déclarent tous deux `every.Constraint`. Excluez cette relation, désactivez l’option pour ce schéma ou renommez l’un des deux.
+Si le générateur inclut une relation nommée `every` et que son schéma contient un enum nommé `Constraint` ou un domaine du même nom généré sous forme d’union, les deux objets déclarent `every.Constraint`. L’option s’applique à toute l’exécution. Pour la garder active, excluez cette relation ou renommez l’un des deux objets.
 
 Le générateur exécute la requête supplémentaire au catalogue et déclare le type uniquement si `constraintNames` vaut `true` après fusion de la configuration (fichier, puis argument JSON). La valeur JSON `null` dans l’argument désactive l’option même si le fichier indique `true`.
 
