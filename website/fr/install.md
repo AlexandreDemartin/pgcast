@@ -86,7 +86,7 @@ bun add pgcast@npm:@pgcast/pgcast@^7 pg
 
 Indiquez ensuite `"moduleNames": "pgcast"` dans `pgcastconfig.json`, le fichier de configuration du générateur ([La CLI](/fr/generator#cli)), et importez `pgcast/db` et `pgcast/schema` ([`moduleNames`](/fr/generator#generate.moduleNames)).
 
-La plage `^7` sélectionne les versions 7.x de pgcast. Yarn 2 et les versions suivantes exigent une plage de versions dans un alias. Yarn 1 et Bun avant la version 1.4 n’enregistrent une plage que si vous en indiquez une.
+La plage `^7` sélectionne les versions 7.x de pgcast. Depuis la version 2, Yarn exige une plage de versions dans un alias. Yarn 1 et les versions de Bun antérieures à la 1.4 n’enregistrent cette plage que si vous la précisez.
 
 ### Sous l’alias `zapatos` {#under-the-zapatos-alias}
 
