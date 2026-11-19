@@ -407,6 +407,21 @@ describe('selectOne, selectExactlyOne, count', () => {
     db.sum('accounts', db.all, { columns: ['balance'] }).run(pool).then((n): number => n);
   });
 
+  test('a copied date minimum gives a Date directly and a DateString in extras', async () => {
+    const first = db.min('events', db.all, { columns: ['occurred_on'] }).copy();
+    const day = await first.run(pool);
+    expectTypeOf(day).toEqualTypeOf<Date | null>();
+    expectTypeOf(day).not.toBeAny();
+    // @ts-expect-error pg parses the date as a Date
+    day?.toUpperCase();
+
+    const row = await db.selectExactlyOne('users', { id: 1 }, { extras: { day: first } }).run(pool);
+    expectTypeOf(row.day).toEqualTypeOf<db.DateString | null>();
+    expectTypeOf(row.day).not.toBeAny();
+    // @ts-expect-error JSON carries the date as a string
+    row.day?.getTime();
+  });
+
   test('a single SQL lateral keeps its result annotation under each selector', () => {
     const native = db.sql<db.SQL, Date>`SELECT now() AS result`,
       json = db.sql<db.SQL, string>`SELECT to_jsonb(now()) AS result`;

@@ -1216,6 +1216,12 @@ describe('count, sum, avg, min, max', () => {
     }
   });
 
+  it('returns a copied date minimum as a date string in extras', async () => {
+    const day = db.min('events', all, { columns: ['occurred_on'] }).copy();
+    expect(await run(db.selectExactlyOne('users', { display_name: 'Ada' }, { columns: [], extras: { day } })))
+      .toEqual({ day: '2025-06-01' });
+  });
+
   it('nested in a lateral, min / max come back as JSON, NULL as null, option or not', async () => {
     const query = () => db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
