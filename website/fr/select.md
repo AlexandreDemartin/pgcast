@@ -122,7 +122,7 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
   - Quand vous appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou [`selectRows()`](#selectRows), `pg` lit la colonne `result` transmise avec le parseur configuré pour son type. Un `select()` extérieur renvoie les valeurs dans un tableau JSON. Un template `sql` garde son annotation de type de résultat dans les deux cas.
   - Par défaut, quand [`count()`](#count) compte deux lignes, `pg` renvoie la chaîne `"2"`. Il lit aussi les résultats de type `bigint` ou `numeric` de `sum()` et `avg()` comme des chaînes. Avec `Number` comme parseur d’`int8`, le même compte donne `2`. `count()` est typé `number`. Par défaut, `sum()` et `avg()` sont typés `number | null`.
   - N’appliquez `Number()` qu’à une chaîne. Un agrégat dont la requête ne renvoie aucune ligne donne `null`, tout comme `sum()` et `avg()` quand aucune ligne ne correspond. Sans ligne parente, `selectOne()` donne `undefined`.
-  - Si l’unique `lateral` de `selectOne()` ou de `selectExactlyOne()` peut être le minimum d’une date ou un compte, imbriquer cette requête sous une clé type la chaîne de date JSON comme un `Date`, et la passer à `selectRows()` laisse passer le compte alors que le parseur par défaut de pg renvoie une chaîne.
+  - Supposons que l’unique `lateral` de `selectOne()` ou de `selectExactlyOne()` puisse être soit le minimum d’une date, soit un compte. Si vous imbriquez la requête sous une clé, la date est une chaîne JSON typée `Date`. Si vous passez la requête à `selectRows()`, TypeScript accepte aussi le cas du compte, que le parseur par défaut de `pg` renvoie sous forme de chaîne.
 - **`null`** : `lateral: null`, ou une clé dont la sous-requête vaut `null` ou `undefined`, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête : "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", ou "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 levait une `TypeError` à l’appel.
 
 Placez le compte sous une clé pour le lire en JSON. Dans cet exemple, le compte sans `groupBy` renvoie une ligne, ce qui donne `{ n: 2 }`. Si un compte avec `groupBy` ne renvoie aucune ligne, le résultat est `{ n: null }`.
@@ -393,7 +393,7 @@ db.avg(table, where, options?)
 db.min(table, where, options?)
 ```
 
-`SELECT min("column") AS result`<!-- probe: db.min('ratings', db.all, { columns: ['column'] }) -->, par défaut, la valeur de la colonne telle que `pg` la lit, ou `null`. Le parseur par défaut donne un `Date` pour une `date` finie et une chaîne pour `text`. Avec `aggregatesTypedByColumn: false` dans `setConfig()`, `.run()` applique `Number()`. Le littéral `false` dans `ConfigTypes` donne le type `number`.
+`SELECT min("column") AS result`<!-- probe: db.min('ratings', db.all, { columns: ['column'] }) -->, par défaut, la valeur de la colonne telle que `pg` la lit, ou `null`. Le parseur par défaut donne un `Date` pour une valeur finie de type `date` et une chaîne pour une valeur de type `text`. Avec `aggregatesTypedByColumn: false` dans `setConfig()`, `.run()` applique `Number()`. Le littéral `false` dans `ConfigTypes` donne le type `number`.
 
 <CastPanel example="min">
 
@@ -433,7 +433,7 @@ const firstShow = await db.min('screenings', db.all, {
 
 | Appel | Avec `false` explicite | Par défaut en 7.0 |
 |---|---|---|
-| `min()` d’une valeur finie de `starts_at` (`timestamptz`), parseur par défaut de pg | ses millisecondes, `number` | un `Date`, `Date \| null` |
+| `min()` d’une valeur finie de `starts_at` (`timestamptz`), avec le parseur par défaut de `pg` | ses millisecondes, `number` | un `Date`, `Date \| null` |
 | `max()` de `title`, un `text` | `NaN`, `number` | `'The Salt Orchard'`, `string \| null` |
 | `sum()` ou `avg()`, sans ligne correspondante, ou sans ligne renvoyée | `0`, `number` | `null`, `number \| null` |
 | `max()` de `runtime_minutes`, un `integer` | `131`, `number` | `131`, `number \| null` |
@@ -443,7 +443,7 @@ const firstShow = await db.min('screenings', db.all, {
 </div>
 
 - Le SQL est le même dans les deux cas : `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: db.min('screenings', db.all, { columns: ['starts_at'] }) -->.
-- `min()` et `max()` donnent un `bigint` ou un `numeric` sous forme de chaîne avec le parseur de pg et le réglage d’exécution par défaut. Sous une clé de `lateral`, le parseur JSON de la requête extérieure lit le nombre et peut conserver les grandes valeurs sous forme de chaînes.
+- `min()` et `max()` donnent un `bigint` ou un `numeric` sous forme de chaîne avec le parseur par défaut de `pg` et le réglage d’exécution par défaut. Sous une clé de `lateral`, le parseur JSON de la requête extérieure lit le nombre et peut conserver les grandes valeurs sous forme de chaînes.
 - `count()` ne change pas avec l’option : `0` au premier niveau, et `null` imbriqué dans un `lateral` ou comme valeur d’`extras` quand sa requête ne renvoie aucune ligne.
 - Passé comme unique `lateral`, l’agrégat est typé comme au premier niveau par `selectOne()` et `selectExactlyOne()`, qui rendent sa colonne telle quelle, et comme imbriqué par `select()`, qui enveloppe ses lignes dans `jsonb_agg()`. Ce `selectOne()` ou ce `selectExactlyOne()`, imbriqué à son tour, est typé comme imbriqué.
 - `.copy()` renvoie un simple `SQLFragment`, typé comme au premier niveau : imbriquée à son tour, une copie revient en JSON avec ce type.
@@ -603,4 +603,4 @@ La signature de `count()` prend `table`, `where` et `options?`, et renvoie `SQLF
 interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult>
 ```
 
-Avec le `ConfigTypes` par défaut, `min()` et `max()` utilisent `RunResult` (le type `Selectable` de la colonne ou `null`) pour les appels directs et le `lateral` unique de `selectOne()`, `selectExactlyOne()` et `selectRows()`. Ces requêtes latérales donnent la valeur lue par pg, tout comme un appel direct avec le réglage d’exécution par défaut. Sous une clé de `lateral`, dans `extras` ou sous `select()`, la valeur est du JSON, de type `NestedResult` (le type `JSONSelectable` de la colonne ou `null`), comme le lit [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment). Si une de vos fonctions en renvoie un, dans un projet compilé avec `declaration: true`, son `.d.ts` l’écrit sous ce nom, mais pas un spread de ce fragment (`{ ...db.min(…) }`), dont les membres nomment un symbole que `zapatos/db` n’exporte pas : TS4023.
+Avec les types par défaut de `ConfigTypes`, `min()` et `max()` utilisent `RunResult` (le type `Selectable` de la colonne ou `null`) pour les appels directs et le `lateral` unique de `selectOne()`, `selectExactlyOne()` et `selectRows()`. Ces requêtes transmettent la valeur lue par `pg`, tout comme un appel direct avec le réglage d’exécution par défaut. Sous une clé de `lateral`, dans `extras` ou dans un `select()`, la valeur est renvoyée en JSON et typée `NestedResult` (le type `JSONSelectable` de la colonne ou `null`), comme l’indique [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment). Avec `declaration: true`, le fichier `.d.ts` d’une fonction qui renvoie ce fragment le désigne par son nom. Un spread du fragment (`{ ...db.min(…) }`) déclenche l’erreur TS4023, car ses membres font référence à un symbole que `zapatos/db` n’exporte pas.
