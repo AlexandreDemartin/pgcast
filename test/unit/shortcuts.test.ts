@@ -800,6 +800,12 @@ describe('upsertRequiresSameKeys', () => {
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
   });
 
+  it('treats a non-enumerable own column as missing at construction', () => {
+    const tee = Object.defineProperty({ ...rows[0] }, 'title', { value: 'Tee' });
+    expect(() => db.upsert('products', [tee, rows[1]], ['sku', 'variant']))
+      .toThrow(new Error('rows have different keys: pass updateColumns, or give every row the same keys'));
+  });
+
   it('with it, the same keys, one row, updateColumns or doNothing compile as without it', () => {
     const queries = () => [
       db.upsert('products', sameKeys, ['sku', 'variant']),
