@@ -53,15 +53,18 @@ const commandRefusals = [
     reason: 'Publishing is a mandatory stop point: the user publishes (AGENTS.md § Stop points).',
   },
   {
-    // a pushed `v*` tag starts release.yml, which publishes once the owner approves its deployment; read on the words
+    // a pushed release tag starts release.yml, which publishes once the owner approves its deployment; read on the words
     // as the shell passes them, quotes taken off, since a quoted refspec is still a refspec
     refuses: (command, unquoted) => {
       const {options, words: [subcommand, ...words]} = gitOptionsAndWordsOf(unquoted);
       return subcommand === 'push' && (options.some(option => /^push\.followtags\b/i.test(option)) ||
-        words.some(word => /^--(tags|follow-tags|mirror)$/.test(word) || word === 'tag' ||
-          /refs\/tags\//.test(word) || /(^|:)\+?v\d/.test(word)));
+        words.some(word => {
+          if (/^--(tags|follow-tags|mirror)$/.test(word) || word === 'tag') return true;
+          const destination = word.slice(word.lastIndexOf(':') + 1);
+          return /^\+?(refs\/tags\/|(tags\/)?(v\d|@pgcast\/[^/:@]+@[^/:@]+))/.test(destination);
+        }));
     },
-    reason: 'A pushed `v*` tag starts release.yml: the owner pushes it, after the version PR (AGENTS.md § Stop points, docs/WORKFLOW.md § Releases).',
+    reason: 'A pushed release tag starts release.yml: the owner pushes it, after the version PR (AGENTS.md § Stop points, docs/WORKFLOW.md § Releases).',
   },
   {
     // the same tag, created through GitHub's API

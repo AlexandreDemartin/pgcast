@@ -27,6 +27,7 @@ npm run lint && npm run typecheck && npm test && npm run test:types && npm run b
 ```
 
 - `npm run bench:types` when a type changes; `npm run check:agents` when `.agents/`, `.claude/`, `AGENTS.md`, `CHANGELOG.md` or `docs/CHARACTERISATION-REPORT.md` changes. All commands: [AGENTS.md § Commands](AGENTS.md#commands).
+- Run `npm run check:agents` for changes to `scripts/release-folder.mjs` or its tests.
 
 ## Docs
 

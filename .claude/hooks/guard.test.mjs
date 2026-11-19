@@ -32,6 +32,25 @@ test('refuses publishing', () => {
   }
 });
 
+for (const command of [
+  'git push origin @pgcast/adapter-postgres-js@0.1.0',
+  'git push origin refs/tags/@pgcast/adapter-pglite@0.1.0',
+  'git push origin tags/v6.11.0',
+  'git push origin tags/@pgcast/adapter-pglite@0.1.0',
+  'git push origin HEAD:@pgcast/adapter-postgres-js@0.1.0',
+  'git push origin "HEAD:refs/tags/@pgcast/adapter-pglite@0.1.0"',
+  "git push origin '@pgcast/adapter-pglite@0.1.0'",
+  'git push origin --tags',
+]) {
+  test(`refuses ${command}`, () => assert.ok(bash(command), command));
+}
+
+for (const source of ['v6.11.0', 'refs/tags/@pgcast/adapter-pglite@0.1.0']) {
+  test(`allows pushing ${source} to an explicit branch`, () => {
+    assert.equal(bash(`git push origin ${source}:refs/heads/release-review`), undefined);
+  });
+}
+
 test('refuses pushing a tag, which starts release.yml', () => {
   for (const command of [
     'git push origin v6.11.0',
@@ -57,6 +76,8 @@ test('refuses pushing a tag, which starts release.yml', () => {
   }
   for (const command of [
     'git push origin docs/19-method',
+    'git push origin feature@x',
+    'git push origin pgcast',
     'git push -u origin fix/12-v2-names',
     'git push origin chore/1-tags-ci',
     'git push origin "docs/19-method"',
