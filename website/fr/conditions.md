@@ -1,5 +1,5 @@
 ---
-english: d31d569f9fe2
+english: 9d58bc1b5678
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
