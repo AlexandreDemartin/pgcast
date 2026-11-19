@@ -96,7 +96,6 @@ export const moduleRoot = () => {
 
 export const finaliseConfig = (config: Config) => {
   const finalConfig = { ...defaultConfig, ...config } as CompleteConfig;
-  finalConfig.rejectOnQueryError ??= true;
   finalConfig.schemas = schemaRulesAsTyped(finalConfig.schemas);  // a rule missing include or exclude (#301), or giving one as a string (#442)
   return finalConfig;
 };

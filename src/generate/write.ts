@@ -68,7 +68,8 @@ export const check = async (suppliedConfig: Config) => {
     warn = config.warningListener === true ? console.log :
       config.warningListener || (() => void 0),
 
-    { folderTargetPath, lines } = await staleFiles(suppliedConfig);
+    rejectOnQueryError = suppliedConfig.rejectOnQueryError ?? true,
+    { folderTargetPath, lines } = await staleFiles({ ...suppliedConfig, rejectOnQueryError });
 
   if (lines.length === 0) log(upToDate(folderTargetPath));
   for (const line of lines) warn(line);

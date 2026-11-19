@@ -323,7 +323,7 @@ The note of [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText)
 
 The note of [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) names each column of `interval`, `interval[]` or a domain over either, which the generator types as its text, though `pg` returns an object from a query of your own. Turn it on and regenerate: `tsc` shows the code that read such a column from a `sql` query as a string, which ran only with a type parser of your own. If you set one, `pg.types.setTypeParser(1186, …)`, write `false` instead, which keeps the text with no note, in 7.0 too.
 
-In 6.x, a script calling `generate()` could print `PGCAST_DEP006` just before exiting on a database error. In 7.0, the promise rejects and your `catch` runs. If the script must fail, rethrow the error or set `process.exitCode = 1`. To keep the immediate exit, set [`rejectOnQueryError: false`](/generator#generate.rejectOnQueryError). This choice remains available beyond 8.0. The CLI always prints the error and exits with code 1.
+From 6.7 until 7.0, `generate()` and `tsForConfig()` could report `PGCAST_DEP006` before exiting on a connection or query failure. In 7.0, omitting `rejectOnQueryError` or setting it to `null` in JSON lets your `catch` handle the original error. Listener errors also reject the promise, and earlier listener output stays visible. If the script must fail, rethrow the error or set `process.exitCode = 1`. To keep the immediate exit, set [`rejectOnQueryError: false`](/generator#generate.rejectOnQueryError). This choice remains available beyond 8.0. On a connection or query failure, the CLI prints the error and exits with code 1.
 
 ## Go back
 

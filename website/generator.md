@@ -107,7 +107,7 @@ if (!upToDate) process.exitCode = 1;
 ```
 
 - It takes the config of [`generate()`](#generate), and resolves to `true` when every file matches. The exit code is yours to set.
-- It prints only through the listeners: a line per file that differs or is missing through [`warningListener`](#generate.warningListener), so with `console.log` by default; `The generated files in src/zapatos are up to date.` through [`progressListener`](#generate.progressListener). Not the CLI's last line, `Run the generator without --check to write them.`
+- It reports file comparisons only through the listeners: a line per file that differs or is missing through [`warningListener`](#generate.warningListener), so with `console.log` by default; `The generated files in src/zapatos are up to date.` through [`progressListener`](#generate.progressListener). Not the CLI's last line, `Run the generator without --check to write them.`
 - A failed query rejects the promise with the original error. Set [`rejectOnQueryError: false`](#generate.rejectOnQueryError) to print it and exit with code 1.
 
 ## `generate()` {#generate}
@@ -392,7 +392,7 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, default `true` from 7.0. With the option omitted, set to `null` in JSON, or set to `true`, a failed connection or query rejects `generate()`, `tsForConfig()` and [`check()`](#export-check) with the original error. The generator prints no error or migration note, and writes no files.
+`boolean`, default `true` from 7.0. With the option omitted, set to `null` in JSON, or set to `true`, a failed connection or query rejects `generate()`, `tsForConfig()` and [`check()`](#export-check) with the original error before any files are written. Listener errors also reject the promise, and earlier listener output stays visible.
 
 Set `rejectOnQueryError: false` to print `*** error <n> ***` and the error to stdout, then end the process with code 1 before the promise settles. This is a permanent option and the one [the CLI](#cli) uses.
 
