@@ -1,5 +1,5 @@
 ---
-english: 5fa678f29684
+english: 6d1a8292be5c
 description: "Comprendre ce qui a échoué dans une requête et y répondre : une place déjà réservée, une séance qui n’existe pas, une option mal donnée par votre code."
 ---
 
@@ -35,6 +35,12 @@ try {
   console.log(err.detail);  // Key (screening_id, seat)=(1002, C4) already exists.
 }
 ```
+
+À partir de la 7.1.0, activez [`constraintNames` (contraintes couvertes et limites)](/fr/generator#generate.constraintNames) pour vérifier le nom de la contrainte à la compilation. Dans le `catch` ci-dessus, relancez l’erreur sauf si `err instanceof pg.DatabaseError && seatTaken(err)`.
+
+<<< ../examples/plain/errors_named_constraint.ts{ts twoslash}
+
+TypeScript refuse tout nom absent de `s.seat_bookings.Constraint`, par exemple si vous faites une faute de frappe dans la valeur de `bookingKey`. Si vous supprimez la contrainte, la même erreur se produit après la régénération des types, à condition qu’aucune autre contrainte ni aucun autre index unique de la table ne porte son nom.
 
 ## Distinguer les refus {#tell-the-refusals-apart}
 

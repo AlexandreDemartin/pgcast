@@ -152,7 +152,7 @@ Three things in that type are worth a closer look:
 - **`hours` is a `number` because you said so.** A `sql` fragment's type is its second type argument, here `number`, and pgcast doesn't parse your SQL to check it ([Type arguments](/sql-template#type-arguments)). `year`, a column, takes its type from the schema.
 - **`roles` is a `number`**, the type of `count()`, though Postgres counts in `int8`: like Zapatos, pgcast assumes no count comes near `Number.MAX_SAFE_INTEGER`.
 
-Here `studio` is never missing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't read foreign keys, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null`. Zapatos's docs list this among their limitations; [Add the row it points to](/lateral#add-the-row-it-points-to) says when a key rules the missing row out.
+Here `studio` is never missing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't infer a join or its nullability from a foreign key, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null`. Zapatos's docs list this among their limitations; [Add the row it points to](/lateral#add-the-row-it-points-to) says when a key rules the missing row out.
 
 All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extras`, `lateral` and `returning` leave the type at the table's full `JSONSelectable`, and `films[0].studio` doesn't compile ([`select()` options](/select#options)).
 

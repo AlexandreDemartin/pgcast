@@ -29,7 +29,11 @@ try {
   } finally {
     await client.end();
   }
-  await generate({ db: { connectionString: url }, outDir: fileURLToPath(new URL('.', import.meta.url)) });
+  await generate({
+    db: { connectionString: url },
+    outDir: fileURLToPath(new URL('.', import.meta.url)),
+    constraintNames: true,
+  });
 } finally {
   // No FORCE: it would terminate a connection of generate()'s pool still closing (pool.end() does not wait for the
   // sockets), and the pool has no 'error' handler. A plain DROP waits up to 5 s for those sessions to go.

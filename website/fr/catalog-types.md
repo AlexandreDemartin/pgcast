@@ -1,5 +1,5 @@
 ---
-english: e30e79149e19
+english: 64fb2e7b4b6d
 ---
 
 # Le catalogue
@@ -156,7 +156,7 @@ Trois choses dans ce type méritent qu’on s’y arrête :
 - **`hours` est un `number` parce que vous l’avez dit.** Le type d’un fragment `sql` est son second argument de type, ici `number`, et pgcast ne parse pas votre SQL pour le vérifier ([Arguments de type](/fr/sql-template#type-arguments)). `year`, une colonne, prend son type du schéma.
 - **`roles` est un `number`**, le type de `count()`, bien que Postgres compte en `int8` : comme Zapatos, pgcast suppose qu’aucun compte n’approche `Number.MAX_SAFE_INTEGER`.
 
-Ici `studio` ne manque jamais, puisque `films.studio_id` est `NOT NULL REFERENCES studios` ; mais le générateur ne lit pas les clés étrangères, alors dites-le vous-même avec `selectExactlyOne()`, et `studio` perd son `| null`. La doc de Zapatos range ce point parmi ses limites ; [Ajouter la ligne vers laquelle elle pointe](/fr/lateral#add-the-row-it-points-to) dit quand une clé exclut la ligne manquante.
+Ici `studio` ne manque jamais, puisque `films.studio_id` est `NOT NULL REFERENCES studios` ; mais le générateur ne déduit d’une clé étrangère ni jointure ni nullabilité, alors dites-le vous-même avec `selectExactlyOne()`, et `studio` perd son `| null`. La doc de Zapatos range ce point parmi ses limites ; [Ajouter la ligne vers laquelle elle pointe](/fr/lateral#add-the-row-it-points-to) dit quand une clé exclut la ligne manquante.
 
 Tout cela demande `strictNullChecks`, ou `strict`. Sans cette option, `columns`, `extras`, `lateral` et `returning` laissent le type au `JSONSelectable` complet de la table, et `films[0].studio` ne compile pas ([Options de `select()`](/fr/select#options)).
 
