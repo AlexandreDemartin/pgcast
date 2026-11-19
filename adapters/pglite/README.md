@@ -2,15 +2,15 @@
 
 Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [PGlite](https://pglite.dev/) 0.5.x, the Postgres that runs in Node or in a page. Values are read and written as `pg` reads and writes them, so the types pgcast generates from your schema hold: a `timestamptz` is a `Date`, a `bigint` a string, an `interval` an object.
 
-Version 0.1.0 (its changes: [CHANGELOG.md](CHANGELOG.md)). MIT licence.
+[Changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md). MIT licence.
 
 ## Install
 
 ```sh
-npm install @pgcast/adapter-pglite @electric-sql/pglite
+npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-pglite @electric-sql/pglite
 ```
 
-pgcast is installed as usual (`@pgcast/pgcast`, or `zapatos@npm:@pgcast/pgcast`), and generates its types from a Postgres that has your schema. The adapter imports neither pgcast nor PGlite: its types are structural, so it works with `zapatos/*` and `pgcast/*` module names alike.
+For `pgcast/db`, install `pgcast@npm:@pgcast/pgcast@^6.12.0` in place of the `zapatos` alias. Set [`moduleNames`](https://pgcast.dev/generator#generate.moduleNames) to `"pgcast"`. Generate the types from a Postgres database with your schema. The adapter imports neither pgcast nor PGlite. Its types fit either alias.
 
 ## Use
 
@@ -50,14 +50,14 @@ Each column is parsed by its type with `pg`'s own parsers ([pg-types](https://gi
 
 | Type | `pg`, and the adapter | PGlite's `query()` and `exec()` |
 |---|---|---|
-| `int8`, a domain over it, `int8[]` | a string | a number up to 2^53, a `bigint` beyond |
+| `int8`, a domain over it, `int8[]` elements | a string | a number from −(2^53−1) to 2^53−1 inclusive, a `bigint` outside that range |
 | `numeric[]` | numbers, as `pg` parses them | strings |
-| `bytea`, `bytea[]` | a Buffer | a Uint8Array |
-| `date`, `date[]` | local midnight; BC; the year 99 | UTC midnight; an invalid `Date` for BC |
-| `timestamp`, `timestamp[]` | a `Date` in local time; `±Infinity`; BC; the year 99 | the same `Date`, but an invalid `Date` for `infinity` (up to 0.5.13) and BC, 1999 for the year 99 |
-| `timestamptz`, `timestamptz[]` | a `Date`; `±Infinity`; BC; an offset in seconds (1900 in Paris) | an invalid `Date` for `infinity` (up to 0.5.13), BC and an offset in seconds |
-| `interval`, `interval[]` | an object (`db.PostgresInterval`) | its text |
-| `point`, `circle`, `point[]` | `{ x, y }`, `{ x, y, radius }` | their text |
+| `bytea`, `bytea[]` elements | a Buffer | a Uint8Array |
+| `date`, `date[]` elements | local midnight; BC; the year 99 | UTC midnight; an invalid `Date` for BC |
+| `timestamp`, `timestamp[]` elements | a `Date` in local time; `±Infinity`; BC; the year 99 | the same `Date`, but an invalid `Date` for `infinity` (up to 0.5.13) and BC, 1999 for the year 99 |
+| `timestamptz`, `timestamptz[]` elements | a `Date`; `±Infinity`; BC; an offset in seconds (1900 in Paris) | an invalid `Date` for `infinity` (up to 0.5.13), BC and an offset in seconds |
+| `interval`, `interval[]` elements | an object (`db.PostgresInterval`) | its text |
+| `point`, `circle`, `point[]` elements | `{ x, y }`, `{ x, y, radius }` | their text |
 | `box[]`, `circle[]`, `tstzrange[]` | the array's text | an array of texts |
 | an array of an enum, after `refreshArrayTypes()` | its text, `'{writer,editor}'` (see `enumArraysTypedAsText`) | an array |
 
@@ -65,7 +65,11 @@ The others (`int2`, `int4`, `float8`, `numeric` as a string, `bool`, `json`, `js
 
 ## What it writes
 
-Each value is prepared as `pg` prepares it (its `prepareValue()`: a `Date` in local time with its offset, an array as an array literal, an object as JSON, `toPostgres()`, `undefined` as `NULL`), then sent in text, a Buffer or a Uint8Array in binary, as `pg` sends them; Postgres infers each type from the query. PGlite's `query()` serializes each value for the type Postgres asks for instead, so:
+The adapter always serialises a `Date` in local time with its offset. This matches `pg`'s default, `pg.defaults.parseInputDatesAsUTC = false`.
+
+Like `pg`'s `prepareValue()`, the adapter writes arrays as array literals, objects as JSON, `toPostgres()` as its return value and `undefined` as `NULL`.
+
+It sends a Buffer or a Uint8Array in binary and other non-null values in text. Postgres infers each type from the query. PGlite's `query()` serialises each value for the type Postgres asks for instead:
 
 | Value | `pg`, and the adapter | PGlite's `query()` |
 |---|---|---|
@@ -106,10 +110,10 @@ CI runs them on PGlite 0.5.0, 0.5.13 and the lockfile's version, on Postgres 14 
 
 ## Publishing
 
-Follow the [owner setup and first publication](../../docs/WORKFLOW.md#owner-setup) once for `@pgcast/adapter-pglite`.
+Follow the [owner setup and first publication](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/WORKFLOW.md#owner-setup) once for `@pgcast/adapter-pglite`.
 
 For each later release, the owner pushes `@pgcast/adapter-pglite@<version>` on the merged version commit and approves the `npm` deployment. The workflow builds and publishes this adapter with provenance.
 
 ## Licence
 
-MIT. `prepareValue()` is node-postgres's, under its MIT licence: see [LICENCE](LICENCE).
+MIT. `prepareValue()` is node-postgres's, under its MIT licence: see [LICENCE](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/LICENCE).
