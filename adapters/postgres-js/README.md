@@ -99,18 +99,9 @@ CI runs them on postgres.js 3.4.0, the lockfile's version, 4.0.0 and 4.1.1, on P
 
 ## Publishing
 
-The owner publishes it, apart from pgcast, under its own version:
+Follow the [owner setup and first publication](../../docs/WORKFLOW.md#owner-setup) once for `@pgcast/adapter-postgres-js`.
 
-```sh
-npm ci && npm run build   # at the repository root
-cd adapters/postgres-js
-npm ci && npm test && npm run test:types
-npm pack --dry-run        # dist/, README.md, CHANGELOG.md, LICENCE, package.json
-npm publish --access public
-git tag @pgcast/adapter-postgres-js@0.1.0 && git push origin @pgcast/adapter-postgres-js@0.1.0
-```
-
-`prepack` builds `dist/`. The first publish of a scoped package needs `--access public`. The tag names the published commit, as `v<version>` names pgcast's.
+For each later release, the owner pushes `@pgcast/adapter-postgres-js@<version>` on the merged version commit and approves the `npm` deployment. The workflow builds and publishes this adapter with provenance.
 
 ## Licence
 

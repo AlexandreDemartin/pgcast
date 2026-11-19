@@ -84,12 +84,13 @@ The core's release, `@pgcast/pgcast`, goes in this order; an extension's, below.
 3. **The owner** pushes the tag `v<version>` on the version commit, approves the `npm` deployment, then creates the GitHub release from its changelog section.
 4. **The session** checks the registry (version, `latest`, provenance), closes the milestone, and lists the existing advisories before publishing one, so none is published twice.
 
-- The tag starts [release.yml](../.github/workflows/release.yml): it checks that the tag names `package.json`'s version on a commit of master, then publishes with npm trusted publishing (OIDC, no token) and a provenance attestation.
-- Publishing stays the owner's act: the tag only queues a deployment to the GitHub environment `npm`, which waits for the owner's approval before the job runs. An agent never pushes a tag, `v*` or an extension's (`AGENTS.md` § Stop points).
-- Once, in this order, the owner's settings:
-  1. On GitHub, Settings › Environments › `npm`: Required reviewers, the owner; Deployment branches and tags, the tags `v*` only.
-  2. On npmjs.com, package settings › Trusted publishing: repository `AlexandreDemartin/pgcast`, workflow `release.yml`, environment `npm`. Then Publishing access › "Require two-factor authentication and disallow tokens", and revoke the token of `~/.npmrc`.
-- Until both are set, the job fails at `npm publish` without publishing anything; with the npm side alone, a tag would publish with no approval.
+A release tag queues a deployment to the GitHub environment `npm`. After the owner approves it, the [release workflow](../.github/workflows/release.yml) checks that the tagged commit is on master and that the tag matches the package manifest. It publishes that package with npm trusted publishing (OIDC) and provenance.
+
+### Owner setup
+
+1. On GitHub, open Settings › Environments › `npm`. Keep the owner as a required reviewer. Under Deployment branches and tags, select tag rules and allow both `v*` and `@pgcast/*@*`.
+2. Each package must exist on npm before its owner can configure trusted publishing. For a new extension, complete its pre-release pass and merge its version PR. At that commit, install the root dependencies, then run `npm ci` and `npm publish --access public` by hand in the extension folder, authenticating with 2FA. Skip the release tag for this first version. [npm package creation](https://github.blog/changelog/2026-10-02-npm-staged-publishing-now-supports-creating-new-packages/)
+3. For each package on npmjs.com, open Settings › Trusted publishing and choose GitHub Actions. Enter owner `AlexandreDemartin`, repository `pgcast`, workflow filename `release.yml` and environment `npm`. Allow direct `npm publish`. Configure this within two days of its first workflow publication, when npm validates the connection. Under Publishing access, require two-factor authentication and disallow tokens. Revoke obsolete publish tokens. [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 
 ### An extension
 
@@ -99,7 +100,7 @@ Each extension under `@pgcast/*` (`adapters/<driver>/`, later `tools/<name>/`) i
 - **Before it**: the pre-release pass of step 1, on its range and its `npm pack`.
 - **Its version PR**: `version` in its `package.json` and both root entries of its `package-lock.json`; its own `CHANGELOG.md`, as the core's above.
 - **The core's `CHANGELOG.md`**: one line, at its first publication, linking to its changelog.
-- **Until #718** teaches `release.yml` its tag, the owner publishes it by hand, with the commands of its README § Publishing, then pushes its tag.
+- **After the first publication**, the owner pushes the extension tag and approves its `npm` deployment. The workflow publishes from the extension folder. Check the version, `latest` and provenance on npm.
 
 ## Later
 
