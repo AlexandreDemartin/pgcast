@@ -11,7 +11,7 @@ english: b2816ae478b4
 
 - Seules les requêtes que vous lancez avec `.run(txnClient)` sont dans la transaction ; une requête lancée sur le pool n’y est pas.
 - Sur 40001 ou 40P01, tout le callback s’exécute de nouveau, cinq tentatives en tout par défaut : écrivez-le pour qu’il puisse être rejoué.
-- Si Postgres répond au `COMMIT` du raccourci par `ROLLBACK`, la promesse est rejetée sans retry et rien n’est enregistré. Laissez les erreurs de requête se propager hors du callback.
+- Si Postgres répond au `COMMIT` du raccourci par `ROLLBACK`, par défaut la promesse est rejetée sans retry et rien n’est enregistré. Laissez les erreurs de requête se propager hors du callback.
 
 </AtAGlance>
 

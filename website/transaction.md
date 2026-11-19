@@ -7,7 +7,7 @@
 
 - Only the queries you `.run(txnClient)` are in the transaction; one run on the pool is not.
 - On 40001 or 40P01, the whole callback runs again, five attempts in all by default: write it so it can.
-- If Postgres answers the helper's `COMMIT` with `ROLLBACK`, the promise rejects without a retry and nothing is saved. Let query errors out of the callback.
+- If Postgres answers the helper's `COMMIT` with `ROLLBACK`, by default the promise rejects without a retry and nothing is saved. Let query errors out of the callback.
 
 </AtAGlance>
 
