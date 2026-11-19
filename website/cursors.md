@@ -25,7 +25,7 @@ COMMIT
 
 Each fetch costs one round trip. Choose a whole number of rows from 1 to 2147483647 to limit how many each fetch brings into memory. Allow room for one batch to overlap the next.
 
-[`cursor()`](/transaction#cursor) ignores the prepared statement name on the fragment you pass to it. Leave nested fragments unnamed if you reuse the query. The cursor number can change the declaration’s SQL, and `pg` requires one query text per name.
+[`cursor()`](/transaction#cursor) runs the declaration unnamed. You can reuse prepared fragments at any depth. The cursor number can change the declaration's SQL, and `pg` requires one query text per name.
 
 ## Keep one snapshot
 

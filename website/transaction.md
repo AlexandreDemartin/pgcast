@@ -294,7 +294,7 @@ The SQL of each query: [`count()`](/select#count). The other read-only shortcuts
 db.savepoint(txnClient, callback)
 ```
 
-Runs `callback` inside a savepoint of the transaction `txnClient` is in. It returns a promise of what `callback` resolves to.
+From 6.12.0. Runs `callback` inside a savepoint of the transaction `txnClient` is in. It returns a promise of what `callback` resolves to.
 
 - `txnClient`: the client of a transaction: a [`TxnClient`](#TxnClient), the [`TxnClientLike`](#TxnClientLike) of another driver's pool, or a `pg.PoolClient` you sent `BEGIN` on. A pool, a `pg.Client` or a [`QueryableLike`](/sql-template#QueryableLike) does not compile.
 - `callback`: `async spClient => …`, given that same client, typed as it is: in `db.serializable()`, a [`TxnClientForSerializable`](#TxnClientForSerializable). A callback typed for a level the client does not satisfy does not compile ([`IsolationSatisfying`](#IsolationSatisfying)).
@@ -329,11 +329,11 @@ The SQL of the callback's query: [`insert()`](/insert#insert).
 | it rejects with 40001 or 40P01 | nothing more: it rejects with that error |
 
 - The name ends in the savepoint's depth: `pgcast_savepoint_1` directly in the transaction, `pgcast_savepoint_2` inside that, and so on, the same text on every call at a depth. `ROLLBACK TO` and `RELEASE` also end every savepoint established after their own, so savepoints nest: each failure undoes the work of its own level, inner levels included, whatever they left. Don't give a savepoint of yours such a name.
-- On 40001 or 40P01, the transaction stays aborted: its `COMMIT` cannot save half of it. `transaction()` rolls back and runs its whole callback again, the savepoint included ([Retries](#retries)). A savepoint never retries on its own: only a new transaction gets a new snapshot.
+- A server-side 40001 or 40P01 leaves the transaction aborted. If the error reaches the outer `transaction()` with an attempt left, it retries the whole callback, including the savepoint ([Retries](#retries)). A savepoint never retries on its own.
 - A callback that catches a query's error and returns: Postgres refuses the `RELEASE` (25P02), so `savepoint()` rolls back to the savepoint and rejects with that 25P02. Its work is undone, inner levels included, and the transaction can go on. So a 40001 or 40P01 the callback catches is not retried there. After a 40P01, or a 40001 of `REPEATABLE READ`, the transaction's `COMMIT` saves what it wrote outside that savepoint; after a 40001 of `SERIALIZABLE`, Postgres can refuse a later query or the `COMMIT` with 40001 again, and `transaction()` retries that one. Let them out, and rethrow them around `savepoint()`, as the example does.
 - The 40001 and 40P01 are read by their `code`, as [Retries](#retries) reads them. One thrown from JavaScript, then caught, gets no `ROLLBACK TO`: the work of its savepoint stays in, unless an outer level rolls back.
 - Outside a transaction block, Postgres refuses the `SAVEPOINT` (25P01): `savepoint()` rejects with it, and never calls the callback.
-- One at a time on a client: `await` each. Two at once nest in the order they are called: the first, if it ends first, ends the second's savepoint, whose own `RELEASE` then fails (3B001), and the transaction is aborted; a `ROLLBACK TO` of the second also undoes what the first wrote after the second's `SAVEPOINT`. Not checked.
+- On one client, `await` each savepoint. pgcast does not check for overlap. Overlapping calls nest in call order. If the first releases its savepoint first, it removes the second savepoint too. The second call's `RELEASE` then fails with 3B001 and aborts the transaction. A `ROLLBACK TO` the second savepoint also undoes anything the first call wrote after that savepoint.
 - The depth is counted per client object, by each copy of pgcast installed: a wrapper or a `Proxy` of the client counts from 1 again, as does, with two copies such as two versions in `node_modules`, a savepoint of one inside the other's. The inner savepoint then takes the outer one's name, and its 40001 caught by the outer callback leaves the outer work in.
 - Its queries reach [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id; [`transactionListener`](/runtime-config#Config.transactionListener) gets nothing from it.
 - A `transaction()` given the client of a `transaction()` callback is [passed through](#passing-a-transaction-through): it sends no `SAVEPOINT`. Given a `pg.PoolClient` you sent `BEGIN` on, it is not ([Your own `BEGIN`](#your-own-begin)).
@@ -401,7 +401,7 @@ From 6.12.0. Sets each of `settings` for the rest of the transaction, as `SET LO
 - `txnClient`: the client of a transaction: a [`TxnClient`](#TxnClient), the [`TxnClientLike`](#TxnClientLike) of another driver's pool, or a `pg.PoolClient` you sent `BEGIN` on. A pool, a `pg.Client` or a [`QueryableLike`](/sql-template#QueryableLike) does not compile.
 - `settings`: an object of strings, each a setting's name and its value: a literal, a `Record<string, string>`, a type alias, `as const`. An interface has no index signature, so it does not compile: spread it, `{ ...context }`. A value typed `number`, `null` or `string | undefined`, a `Map` and a `Date` do not compile either. From TypeScript 4.2 an optional property compiles, `{ 'app.customer'?: string }`, and an `undefined` in it is refused at run time. Only its own enumerable string keys are sent: a `Symbol` key, which compiles, and a non-enumerable property are dropped, with no error.
 
-Given a policy of yours on `seat_bookings`, `USING (customer = current_setting('app.customer', true))`, a customer reads only their own bookings:
+Given a policy of yours on `seat_bookings`, `USING (customer = NULLIF(current_setting('app.customer', true), ''))`, a customer reads only their own bookings:
 
 <<< ./examples/plain/set_local_customer.ts{ts twoslash}
 
@@ -449,10 +449,10 @@ It rejects before any query in five cases, in this order:
 db.cursor(txnClient, query, { batchSize })
 ```
 
-From 6.12.0. Reads the rows of `query` through a server-side cursor, `batchSize` at a time, and yields each batch as `query.run()` would give those rows. It returns an async generator, for `for await`, and sends nothing before the first batch is asked for ([`DECLARE`](https://www.postgresql.org/docs/current/sql-declare.html)).
+From 6.12.0. Reads the rows of `query` through a server-side cursor, `batchSize` at a time. It returns an async generator, for `for await`, and sends nothing before the first batch is asked for ([`DECLARE`](https://www.postgresql.org/docs/current/sql-declare.html)).
 
 - `txnClient`: the client of a transaction: a [`TxnClient`](#TxnClient), the [`TxnClientLike`](#TxnClientLike) of another driver's pool, or a `pg.PoolClient` you sent `BEGIN` on. A pool, a `pg.Client` or a [`QueryableLike`](/sql-template#QueryableLike) does not compile.
-- `query`: a fragment whose result is an array of rows: a `sql` template, typed `s.films.Selectable[]` or `any[]` by default, a [`select()`](/select#select) or a [`selectRows()`](/select#selectRows). A batch has that type, `readonly` kept. `selectOne()`, `selectExactlyOne()`, `count()` and the other aggregates, whose result is no array, do not compile.
+- `query`: a fragment whose result type extends `readonly unknown[]`. Each batch has that type. A `sql` template can specify `s.films.Selectable[]` and defaults to `any[]`. [`select()`](/select#select) and [`selectRows()`](/select#selectRows) qualify, as does `selectExactlyOne()` with an array-valued pass-through lateral. A scalar such as the result of `count()` is refused.
 - `batchSize`: the rows each `FETCH` reads, an integer from 1 to 2147483647. There is no default: no size fits every row's width.
 
 A studio's films, read 100 at a time:
@@ -475,9 +475,9 @@ COMMIT
 - `pgcast_cursor_<n>` takes the lowest number that no other `cursor()` still running on that client holds: nested loops get 1, then 2; a loop after another gets 1 again; two at once get two names. Don't name a cursor of yours `pgcast_cursor_<n>`.
 - `NO SCROLL`: it only fetches forward. Without it, whether Postgres could fetch backward would depend on the plan. It is also the form a `FOR UPDATE` query needs, whose rows are locked as each batch is fetched, not before.
 - Postgres takes no parameter in `FETCH FORWARD`, so the size is written into the SQL once it has been checked.
-- Each batch with rows goes through the fragment's `runResultTransform`; the `FETCH` that returns no row ends the loop.
-- A prepared fragment runs unprepared, and stays prepared. The `DECLARE`'s text changes with the cursor's number, and `pg` refuses a second text under one name ("Prepared statements must be unique").
-- The cursor reads the rows as they were at its `DECLARE`: rows the transaction writes after it are not read. A `ROLLBACK TO` a savepoint taken after the `DECLARE` does not move it back.
+- The fragment's `runResultTransform` receives each non-empty `FETCH` result, including its command tag. An empty fetch ends the loop.
+- The `DECLARE` runs unnamed, even for a nested prepared fragment. Each fragment keeps its prepared name for use outside the cursor. The cursor number can change the declaration's text, and `pg` requires one text per name.
+- A plain select reads the snapshot visible at `DECLARE`. It skips rows inserted later by the loop. Under `READ COMMITTED`, [a locking select with `FOR UPDATE`](/cursors#work-inside-the-loop) can fetch a newer version of a row. A `ROLLBACK TO` a savepoint taken after the declaration keeps the cursor's position.
 - [`queryListener`](/runtime-config#Config.queryListener) gets the `DECLARE`, each `FETCH` and the `CLOSE`, with the transaction's id; [`resultListener`](/runtime-config#Config.resultListener) gets each `FETCH`'s rows, the batch of a `sql` fragment, then `[]`. [`transactionListener`](/runtime-config#Config.transactionListener) and [`transactionEventListener`](/runtime-config#Config.transactionEventListener) get nothing from it.
 - It runs, rather than returning a fragment, so that its type can ask for a transaction's client, which a fragment's `run()` can't. In a query of yours, `DECLARE`, `FETCH` and `CLOSE` are plain `sql`.
 
@@ -489,13 +489,15 @@ How it ends:
 |---|---|---|
 | the last batch is read, or the loop `break`s or `return`s | `CLOSE` | |
 | the loop throws | `CLOSE` | the loop's error goes out, whatever `CLOSE` gives |
-| the fragment's `runResultTransform` throws | `CLOSE` | its error goes out |
-| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out, and `transaction()` retries a 40001 or 40P01. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out. A client that reports no status, another driver's, sends `CLOSE`. Either way its 25P02 is dropped, in a `for await` as in a `finally` that calls `return()`, and a `break` after an error the loop caught ends the loop |
+| the fragment's `runResultTransform` throws, or `resultListener` throws after `DECLARE` or `FETCH` | `CLOSE` | its error goes out unless a failure in `CLOSE` other than 25P02 replaces it |
+| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out. If a 40001 or 40P01 reaches the outer `transaction()` with an attempt left, it retries. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out. A client that reports no status, another driver's, sends `CLOSE`. Either way its 25P02 is dropped, in a `for await` as in a `finally` that calls `return()`, and a `break` after an error the loop caught ends the loop |
 | `pg` reports the client outside a transaction block: a `COMMIT` of yours came before the loop ended | no `CLOSE`, which Postgres would refuse (34000) | the cursor went with the transaction |
-| a `FETCH` fails: a row whose computation fails (22012), a 40001 found mid-way | no `CLOSE` | its error goes out unchanged; `transaction()` retries a 40001 or 40P01, and the next attempt reads every batch again |
+| Postgres rejects a `FETCH`, for example with 22012 or 40001 | no `CLOSE` | its error goes out unchanged. If `transaction()` retries, the scan restarts on a fresh snapshot. The batches can differ. |
 | the generator is left, neither finished nor `return()`ed | nothing | Postgres closes the cursor at `COMMIT` or `ROLLBACK`; its number stays taken on that client |
 
 </div>
+
+A query listener that throws before a `FETCH` or `CLOSE` reaches the driver can leave the cursor open until the transaction ends. Reusing the leaked cursor's name in the same transaction fails with 42P03.
 
 Two cases go wrong, by design:
 
@@ -663,7 +665,7 @@ type TxnClientLike<C, T extends IsolationLevel> = C & {
 }
 ```
 
-The client of a [`PoolLike`](#PoolLike), `C`, as a [`transaction()`](#transaction) callback gets it: marked while the transaction runs, as a [`TxnClient`](#TxnClient) is, `_zapatos` optional in the type too. The nested callback gets the same client. See [how TypeScript infers its isolation level](#another-drivers-pool). A `TxnClient` is typed at the nested call's own level, and a nested call in a function generic over `C` does not compile.
+From 6.12.0. The client of a [`PoolLike`](#PoolLike), `C`, as a [`transaction()`](#transaction) callback gets it: marked while the transaction runs, as a [`TxnClient`](#TxnClient) is, `_zapatos` optional in the type too. The nested callback gets the same client. See [how TypeScript infers its isolation level](#another-drivers-pool). A `TxnClient` is typed at the nested call's own level, and a nested call in a function generic over `C` does not compile.
 
 ## `isDatabaseError()` {#isDatabaseError}
 
