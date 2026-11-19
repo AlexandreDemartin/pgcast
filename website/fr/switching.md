@@ -1,5 +1,5 @@
 ---
-english: 2698f52995f4
+english: af53158e19f1
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -230,10 +230,10 @@ Le texte et les valeurs de `.compile()` changent aussi au-delà des cas ci-dessu
 
 ## 5. Lire les avertissements {#read-the-warnings}
 
-Lancez vos tests, puis votre application. Là où Zapatos 6.6.1 faisait quelque chose sur quoi du code peut compter, pgcast le garde, et avertit une fois par processus, au premier appel qui le fait :
+Avant de passer de la 6.x à la 7.0, lancez vos tests et votre application avec les avertissements de dépréciation activés. En 6.x, pour chaque ancien comportement, le premier appel qui l’utilise émet un avertissement de ce type :
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
@@ -252,8 +252,6 @@ Pour trouver chaque appel :
 
 | Avertissement | L’appel | Corrigez-le, ou activez |
 |---|---|---|
-| `PGCAST_DEP001` | un `upsert()` de plusieurs lignes sans [`updateColumns`](/fr/insert#upsert-options), avec une clé absente de certaines lignes : insérée comme `DEFAULT`, elle écrase la valeur existante ([Lignes aux clés différentes](/fr/insert#upsert-different-keys)) | donnez la clé à chaque ligne (`db.Default` garde le SQL), ou passez `updateColumns` ; ou [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), et un tel appel lève une erreur |
-| `PGCAST_DEP002` | une valeur `undefined` dans `insert()`, `update()` ou `upsert()`, envoyée comme `NULL`, ou, dans `updateValues` d’`upsert()`, qui prend sa valeur dans `EXCLUDED` ([Une valeur `undefined`](/fr/insert#undefined-values)) | omettez la clé, ou donnez `null` pour effacer la colonne ; ou [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), et `undefined` est une clé absente |
 | `PGCAST_DEP003` | une [`transaction()`](/fr/transaction#transaction) dont le callback intercepte l’erreur d’une requête et se termine : Postgres répond au `COMMIT` par `ROLLBACK`, et rien n’est enregistré ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | laissez l’erreur sortir du callback, ou faites `ROLLBACK TO` un `SAVEPOINT` avant de continuer ; ou [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), et une telle transaction est rejetée |
 | `PGCAST_DEP004` | un [`sum()`, `avg()`, `min()` ou `max()`](/fr/select#typed-by-column) dont `Number()` change le résultat : `0` pour aucune ligne, les millisecondes d’une date, `NaN` pour un texte | activez [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), déclaré dans [`ConfigTypes`](/fr/runtime-config#ConfigTypes) : `tsc` montre alors chaque appel dont le résultat est désormais `null` ou du type de la colonne, et `?? 0` garde un `0` |
 | `PGCAST_DEP005` | une [`transaction()`](/fr/transaction#transaction) qui reçoit un client sur lequel vous avez envoyé `BEGIN` : son `COMMIT` ou son `ROLLBACK` termine votre transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | ouvrez la transaction extérieure avec `transaction()`, ou donnez le pool à cet appel, pour une transaction à lui, qui est commitée séparément de la transaction extérieure, ne voit pas les lignes non commitées de celle-ci, et reste bloquée (sauf si `lock_timeout` est défini) si elle écrit ou verrouille une ligne que la transaction extérieure a écrite ou verrouillée, ou insère une clé que celle-ci a insérée (deux verrous `FOR SHARE` n’entrent pas en conflit) ; ou [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), et un tel appel est rejeté avant d’envoyer son `START TRANSACTION` |
@@ -263,7 +261,7 @@ Pour trouver chaque appel :
 
 ## 6. Activer les opt-ins {#turn-on-the-opt-ins}
 
-Une fois qu’une exécution ne montre plus d’avertissement, ou que chacun vient d’un appel que vous avez vérifié, activez les options, une fois, avant la première requête :
+En 6.x, quand une exécution se termine sans avertissement ou que vous avez vérifié chaque appel signalé, activez les options une seule fois, avant la première requête :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -278,7 +276,7 @@ db.setConfig({
 });
 ```
 
-Toutes ces options deviendront le comportement par défaut dans la 7.0 ([Versions](/fr/versions)). Avec elles, une valeur `undefined` est omise d’un `update()` :
+En 7.0, `tagline: undefined` seul lève l’erreur `nothing to update`. Ici, la mise à jour s’exécute car elle affecte aussi `title`. L’accroche est conservée.
 
 <CastPanel example="switching_undefined">
 
@@ -286,8 +284,10 @@ Toutes ces options deviendront le comportement par défaut dans la 7.0 ([Version
 
 </CastPanel>
 
-- `insert()` envoie `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> pour une valeur `undefined`, un `update()` sans autre clé lève l’erreur "nothing to update: an Updatable needs at least one column"<!-- message -->, et un `upsert()` sans autre clé "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
-- L’`upsert()` de `PGCAST_DEP001` lève une erreur à l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez son option à `false` dans `db.setConfig()`. Les deux choix sont indépendants : `undefinedMeansMissing: false` conserve les valeurs `undefined` à l’écriture, et `upsertRequiresSameKeys: false` permet d’écraser des valeurs stockées même si les clés correspondantes sont absentes. Aucun des deux réglages n’émet l’avertissement de la 6.x.
+
+- `insert()` envoie `DEFAULT`<!-- probe: db.insert('tags', { film_id: 1000, tag: undefined }) --> pour une valeur `undefined`, un `update()` sans autre clé lève l’erreur "nothing to update: an Updatable needs at least one column"<!-- message -->, et un `upsert()` sans autre clé "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
+- Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans retry ([`transaction()`, Erreurs](/fr/transaction#errors)).
 - Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 - Une `transaction()` qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien est rejetée avant son callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).

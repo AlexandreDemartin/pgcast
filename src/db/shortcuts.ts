@@ -181,10 +181,7 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
 }
 
 
-const undefinedWarning = 'An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.';
-
-// an undefined value is sent as NULL, as in 6.6.1, but warns once; with undefinedMeansMissing (the default in 7.0)
-// it is a missing key instead, as JSON.stringify leaves it out: `toDefault` sends DEFAULT (insert), otherwise the
+// an undefined value is a missing key: `toDefault` sends DEFAULT (insert), otherwise the
 // key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
 // a null row, which an untyped caller may pass among others, is read as `{}`, as completeKeysWithDefaultValue reads it,
 // and a primitive one, a Buffer (its values, one per byte, unlisted) and a built-in with no own enumerable key are
@@ -196,10 +193,7 @@ function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V 
     lone = Array.isArray(values) || isRefusedBuffer(rows[0]) ? undefined : Object.entries(rows[0]),
     asGiven = lone?.some(([, v]) => isQuery(v)) ? withScalarQueries(lone) as V : values;
   if (!(lone ? lone.some(([, v]) => v === undefined) : rows.some(row => !isRefusedBuffer(row) && Object.values(row).includes(undefined)))) return asGiven;
-  if (!(getConfig().undefinedMeansMissing ?? false)) {
-    warnOnce('PGCAST_DEP002', undefinedWarning);
-    return asGiven;
-  }
+  if (!(getConfig().undefinedMeansMissing ?? true)) return asGiven;
   const kept = rows.map(row => {
     if (isPrimitive(row) || isRefusedBuffer(row)) return row;
     const entries = Object.entries(row);
@@ -221,10 +215,7 @@ const completedRows = <R extends object>(rows: R[]) => completeKeysWithDefaultVa
 function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[]): string[] {
   const keys = Object.keys(updateValues);
   if (!keys.some(k => updateValues[k] === undefined && !updated.includes(k))) return keys;
-  if (!(getConfig().undefinedMeansMissing ?? false)) {
-    warnOnce('PGCAST_DEP002', undefinedWarning);
-    return keys;
-  }
+  if (!(getConfig().undefinedMeansMissing ?? true)) return keys;
   return keys.filter(k => updateValues[k] !== undefined);
 }
 
@@ -242,7 +233,7 @@ const nothingToInsert = 'nothing to insert: an Insertable needs at least one col
 const hasOwnKey = (row: object, undefinedIsMissing = false) => {
   if (!isRefusedBuffer(row)) return Object.keys(row).length > 0;
   if ((row as Buffer).length > 0) return true;
-  return undefinedIsMissing && (getConfig().undefinedMeansMissing ?? false) ?
+  return undefinedIsMissing && (getConfig().undefinedMeansMissing ?? true) ?
     Object.values(row).some(v => v !== undefined) : Object.keys(row).length > 0;
 };
 
@@ -260,11 +251,12 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
  * alone in an array too, or a built-in row with no own enumerable key (a
  * `Date`, a `Map`…) beside a row with keys, which
  * `upsert()` refuses too; a `null` row in an array gives `DEFAULT` for each
- * column of the others. An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
- * (`PGCAST_DEP002`), once; with the `undefinedMeansMissing` config option (the
- * default in 7.0), it sends `DEFAULT`, as a key missing from one of several
- * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`. A shortcut's
- * query (`count()`, `selectOne()`…) or its `copy()` is written in parentheses,
+ * column of the others. An `undefined` value sends `DEFAULT`, as a missing
+ * cell does: `{ title: undefined }` gives `VALUES (DEFAULT)`. With
+ * `undefinedMeansMissing: false`, it sends a parameter for SQL `NULL`.
+ * These rules apply to the values read at the call, provided they stay unchanged
+ * until the query runs and getters return the same value on later reads.
+ * A shortcut's query (`count()`, `selectOne()`…) or its `copy()` is written in parentheses,
  * a scalar subquery, and stores what it gives in `extras`:
  * `VALUES ((SELECT count(*) AS result FROM "films"))`.
  * @param options Optionally, `returning` (an array of columns) and `extras`;
@@ -467,31 +459,25 @@ const updateValueSQL = (value: any, column: string) =>
  * returns `undefined`, which the type of a `Column[]` does not say; check for
  * it, or pass `doNothing`, which the type follows.
  *
- * Without `updateColumns`, rows with different keys can lose data: a key
- * missing from one row is inserted as `DEFAULT`, then overwrites that row's
- * existing value on conflict. When such a key is still set from `EXCLUDED`
- * (it is not a key of `updateValues`, nor a column of an array or string
- * `conflictTarget`), this emits a `DeprecationWarning` (`PGCAST_DEP001`),
- * once. With the `upsertRequiresSameKeys` config option (the default in 7.0),
- * it throws instead, before any query: pass `updateColumns`, or give every row
- * the same keys. So new rows without their serial `id`, upserted on `'id'`
- * among existing ones, neither warn nor throw.
+ * Without `updateColumns`, the call throws if an implicitly updated column is
+ * missing from any row, even with `noNullUpdateColumns`. Give every row the key, name the columns
+ * to update, or supply a defined override in `updateValues`. Columns named
+ * in `conflictTarget` are exempt: a new row may omit its serial `id` when
+ * upserting on `'id'`. A constraint target does not identify its columns here.
+ * With `upsertRequiresSameKeys: false`, the missing cell takes `DEFAULT` and
+ * can overwrite the stored value on conflict.
  *
- * An `undefined` value in `values` is sent as `NULL`, then set from `EXCLUDED`,
- * and emits a `DeprecationWarning` (`PGCAST_DEP002`), once. With the
- * `undefinedMeansMissing` config option (the default in 7.0), its key is left
- * out, as if it were missing: one row does not insert that column, nor update
- * it unless `updateColumns` names it, in which case it is still set from
- * `EXCLUDED` and an existing row takes the column `DEFAULT`; with no other
- * column, it throws.
- *
- * An `undefined` key of `updateValues` is set from `EXCLUDED`: an existing
- * row takes the value inserted, or the column `DEFAULT`. When that key alone
- * adds its column to the update (`updateColumns` leaves it out or, without
- * `updateColumns`, no row inserts it), this emits the same warning, once.
- * With `undefinedMeansMissing`, it is a missing key: `{ votes: undefined }`
- * adds no `"votes"` to `DO UPDATE SET`, and with `updateColumns: doNothing`
- * and nothing else, the SQL is `DO NOTHING`.
+ * An `undefined` value is a missing key in both the row and `updateValues`.
+ * The row omits the column unless another row supplies it, in which case its
+ * cell takes `DEFAULT`. A row or batch left with no columns throws.
+ * In `updateValues`, `{ votes: undefined }` adds no column to `DO UPDATE SET`.
+ * A defined `updateValues` override wins. Otherwise a selected column takes
+ * its value from `EXCLUDED`, with a `CASE` for `noNullUpdateColumns` that
+ * keeps the stored value if the incoming value is SQL `NULL`.
+ * With `undefinedMeansMissing: false`, an undefined cell binds SQL `NULL` and
+ * an undefined override adds its column to the update.
+ * These rules apply to the values read at the call, provided they stay unchanged
+ * until the query runs and getters return the same value on later reads.
  */
 export const upsert: {
   <T extends Table,
@@ -569,7 +555,7 @@ export const upsert: {
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
       callerValue(updateValues, c) === undefined &&  // as below: otherwise, c is set from EXCLUDED
       !conflictColumns.includes(c) &&  // on conflict, EXCLUDED.c equals the existing value
-      values.some(v => !Object.prototype.hasOwnProperty.call(v ?? {}, c))),  // a null row misses every key
+      values.some(v => !Object.prototype.propertyIsEnumerable.call(v ?? {}, c))),  // a null row misses every key
     updateColumns = [...new Set(  // deduplicate the keys here
       [...specifiedUpdateColumns as string[] ?? colNames, ...updateValuesKeys(updateValues, specifiedUpdateColumns as string[] ?? colNames)]
     )],
@@ -589,9 +575,8 @@ export const upsert: {
 
   // a key missing from some row is inserted as DEFAULT, then `SET col = EXCLUDED.col` overwrites the existing
   // value: Postgres can't tell that DEFAULT from a given one, so only the caller knows which columns to update
-  if (overwritesMissingKey) {
-    if (getConfig().upsertRequiresSameKeys ?? false) throw new Error('rows have different keys: pass updateColumns, or give every row the same keys');
-    warnOnce('PGCAST_DEP001', 'upsert() of rows with different keys, without updateColumns: a key missing from one row is inserted as DEFAULT, then overwrites the existing value on conflict. Set upsertRequiresSameKeys: true (db.setConfig) to throw instead; it will be the default in pgcast 7.0.');
+  if (overwritesMissingKey && (getConfig().upsertRequiresSameKeys ?? true)) {
+    throw new Error('rows have different keys: pass updateColumns, or give every row the same keys');
   }
 
   // the added-on $action = 'INSERT' | 'UPDATE' key takes after SQL Server's approach to MERGE
@@ -623,12 +608,12 @@ export const upsert: {
  * @param table The table to update
  * @param values An `Updatable` of the new values with which to update the table.
  * It needs at least one key: with none, there is nothing to set, and `update()`
- * throws before any query. A key whose value is `undefined` counts, sets the
- * column to `NULL`, and emits a `DeprecationWarning` (`PGCAST_DEP002`), once;
- * with the `undefinedMeansMissing` config option (the default in 7.0), it is
- * left out, as `JSON.stringify` leaves it out, and does not count:
- * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`. A
- * shortcut's query is written in parentheses, as for `insert`.
+ * throws before any query. An `undefined` value leaves its key out:
+ * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
+ * With `undefinedMeansMissing: false`, the key sets its column to `NULL`.
+ * These rules apply to the values read at the call, provided they stay unchanged
+ * until the query runs and getters return the same value on later reads.
+ * A shortcut's query is written in parentheses, as for `insert`.
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
  * (`db.all` throws: to touch every row, give `` sql`TRUE` ``)
  * @param options Optionally, `returning` and `extras`, as for `insert`
