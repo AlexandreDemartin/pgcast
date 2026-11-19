@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // `npm run check:agents`: keeps the agent method (.agents/README.md) consistent, AGENTS.md § Architecture in step with
 // src/ and CHANGELOG.md § Deprecated with its messages, finds a CHANGELOG.md entry written twice in a release,
-// recounts the summary of the characterisation report, then runs the tests of the guard hook and of these checks.
+// recounts the summary of the characterisation report, then runs the tests of the guard hook, of the release-folder
+// resolver and of these checks.
 import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
