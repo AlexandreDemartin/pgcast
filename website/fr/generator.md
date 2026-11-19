@@ -162,6 +162,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | les noms figurant dans l’`UniqueIndex` de chaque relation |
+| [`constraintNames`](#generate.constraintNames) | `false` | les noms dans le type `Constraint` de chaque relation |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | le type des domaines imbriqués et des tableaux de domaines, ainsi que celui des domaines sur `bigint`, `numeric`, `bytea`, `money`, une date ou un tableau de ces types hors de `Selectable` |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | le type `Selectable` d’un tableau d’un enum |
 | [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | `true` | le type d’un `interval` dans `Selectable` et dans une écriture |
@@ -444,6 +445,14 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 - Pour une table partitionnée, le type union se fonde sur la contrainte de la table parente. Postgres vérifie l’index de la partition qui reçoit la ligne, où une clé différable peut encore entraîner l’erreur 55000. Une clé différable de la table parente est exclue même si les clés des partitions sont immédiates.
 - Une relation qui n’en garde aucun reçoit `never`. `UniqueIndexForTable` et les types agrégés `UniqueIndex` suivent le même changement.
 - En 7.x, `false` rétablit le type union de la 6.x sans note de migration. Ce réglage disparaît en 8.0.
+
+### `constraintNames` {#generate.constraintNames}
+
+À partir de la 7.1.0. Réglez `constraintNames` sur `true` pour générer un type `Constraint` dans l’espace de noms de chaque relation. Il liste les noms de ses clés primaires, contraintes d’unicité, clés étrangères, contraintes de vérification et d’exclusion, ainsi que de tous ses index uniques. Pour la table ci-dessus, `festival_entries.Constraint` inclut à la fois `festival_entries_slot_key` et `festival_entries_live_idx`, quelle que soit la valeur de `uniqueIndexConstraintsOnly`.
+
+Chaque partition ou table fille reçoit les noms que Postgres enregistre pour cette relation, y compris ceux des contraintes de vérification héritées. Les contraintes de vérification d’un domaine appartiennent au domaine. En cas de violation de `NOT NULL`, Postgres indique la colonne. Une relation sans nom correspondant reçoit `never`.
+
+La valeur par défaut est `false`. Omettre la clé ou passer `null` en JSON évite aussi la requête supplémentaire sur le catalogue et la déclaration du type.
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 

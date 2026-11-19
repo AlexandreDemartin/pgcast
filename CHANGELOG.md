@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+
+- Set the generator's `constraintNames` option to `true` to get each relation's constraint and unique index names in its `Constraint` type. [#713](https://github.com/AlexandreDemartin/pgcast/issues/713)
+
 ## [7.0.0] - 2026-11-19
 
 ### Added
