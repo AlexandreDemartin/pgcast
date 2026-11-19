@@ -322,7 +322,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-La valeur par défaut de la 7.0, `true`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Le générateur cherche l’enum dans son propre schéma et écrit ses labels. La valeur `false` rétablit la recherche par nom dans le schéma de la relation, comme en 6.x.
+À partir de la 7.0.0. La valeur par défaut, `true`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Le générateur cherche l’enum dans son propre schéma et écrit ses labels. La valeur `false` rétablit la recherche par nom dans le schéma de la relation, comme en 6.x.
 
 ```sql
 CREATE SCHEMA archive;
@@ -344,7 +344,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 
 ### `enumOrder` {#generate.enumOrder}
 
-La valeur par défaut de la 7.0, `"declared"`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Les labels suivent l’ordre de déclaration de l’enum, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()`. La valeur `"alphabetical"` rétablit le tri alphabétique de la 6.x.
+À partir de la 7.0.0. La valeur par défaut, `"declared"`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Les labels suivent l’ordre de déclaration de l’enum, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()`. La valeur `"alphabetical"` rétablit le tri alphabétique de la 6.x.
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
@@ -396,7 +396,7 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, par défaut `true` à partir de la 7.0. Si vous omettez l’option, indiquez `null` en JSON ou choisissez `true`, la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) est rejetée avec l’erreur d’origine en cas d’échec de connexion ou de requête, avant toute écriture de fichier. La promesse est aussi rejetée si un écouteur lève une erreur. Les messages que les écouteurs ont déjà affichés restent visibles.
+À partir de la 7.0.0. Option booléenne activée par défaut. Si vous omettez l’option, indiquez `null` en JSON ou choisissez `true`, la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) est rejetée avec l’erreur d’origine en cas d’échec de connexion ou de requête, avant toute écriture de fichier. Une erreur levée de façon synchrone par un écouteur rejette aussi la promesse de génération. Gérez vous-même les promesses que renvoient vos écouteurs. Les messages que les écouteurs ont déjà affichés restent visibles.
 
 Réglez `rejectOnQueryError: false` pour afficher `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêter le processus avec le code 1 avant que la promesse se résolve ou soit rejetée. Cette valeur reste disponible et c’est celle qu’utilise [la CLI](#cli).
 
@@ -415,7 +415,7 @@ try {
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
-À partir de la 7.0, cette option booléenne vaut `true` par défaut, y compris si la configuration JSON indique `null`. Pour chaque relation, `UniqueIndex` liste les contraintes `UNIQUE` et `PRIMARY KEY` non différables qui s’appuient sur un index valide autre qu’un index d’exclusion. Avec `false`, le générateur liste tous les index uniques de la relation.
+À partir de la 7.0.0. Cette option booléenne vaut `true` par défaut, y compris si la configuration JSON indique `null`. Pour chaque relation, `UniqueIndex` liste les contraintes `UNIQUE` et `PRIMARY KEY` non différables qui s’appuient sur un index valide autre qu’un index d’exclusion. Avec `false`, le générateur liste tous les index uniques de la relation.
 
 Pour un nom tel que `screenings.id`, [`constraint()`](/fr/insert#constraint) produit l’identifiant qualifié `"screenings"."id"`, que Postgres refuse avec le code 42601. Écrivez une requête `sql` explicite avec `ON CONSTRAINT "screenings.id"`.
 
@@ -447,7 +447,7 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
-`boolean`, `true` par défaut depuis la 7.0. En JSON, `null` prend aussi la valeur par défaut. Cette option règle le type d’une colonne dont le domaine porte sur `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` ou `timestamptz`, ou sur un tableau de l’un d’eux. Ces types ont une représentation propre aux lignes de `pg`, au JSON des raccourcis et aux écritures ([Types de valeurs](/fr/runtime-config#value-types)). Avec `false`, les cinq interfaces utilisent le type du placeholder, comme dans Zapatos 6.6.1. Le placeholder généré contient le type que renvoie `pg`. Avec `true`, la colonne suit son type de base dans chaque contexte tant que son placeholder conserve le type généré. Supposons qu’une réservation ait un numéro de billet :
+À partir de la 7.0.0. Option booléenne activée par défaut. En JSON, `null` prend aussi la valeur par défaut. Cette option règle le type d’une colonne dont le domaine porte sur `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` ou `timestamptz`, ou sur un tableau de l’un d’eux. Ces types ont une représentation propre aux lignes de `pg`, au JSON des raccourcis et aux écritures ([Types de valeurs](/fr/runtime-config#value-types)). Avec `false`, les cinq interfaces utilisent le type du placeholder, comme dans Zapatos 6.6.1. Le placeholder généré contient le type que renvoie `pg`. Avec `true`, la colonne suit son type de base dans chaque contexte tant que son placeholder conserve le type généré. Supposons qu’une réservation ait un numéro de billet :
 
 ```sql
 CREATE DOMAIN ticket_no AS bigint;
@@ -490,7 +490,7 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
 
-`boolean`, `true` par défaut depuis la 7.0. En JSON, `null` prend aussi la valeur par défaut. Cette option règle le type `Selectable` d’une colonne de type tableau d’enums ou domaine sur ce tableau. Postgres attribue au type de ce tableau un OID propre à chaque base, et `pg` n’a pas de parser pour ce type. Une ligne renvoyée par `pg`, par exemple lors d’une requête [`sql`](/fr/sql-template), contient le texte du tableau. Le JSON des raccourcis contient le tableau lui-même. Supposons qu’un membre de l’équipe puisse occuper plusieurs postes et que ses postes précédents soient stockés dans un domaine sur ce tableau :
+À partir de la 7.0.0. Option booléenne activée par défaut. En JSON, `null` prend aussi la valeur par défaut. Cette option règle le type `Selectable` d’une colonne de type tableau d’enums ou domaine sur ce tableau. Postgres attribue au type de ce tableau un OID propre à chaque base, et `pg` n’a pas de parser pour ce type. Une ligne renvoyée par `pg`, par exemple lors d’une requête [`sql`](/fr/sql-template), contient le texte du tableau. Le JSON des raccourcis contient le tableau lui-même. Supposons qu’un membre de l’équipe puisse occuper plusieurs postes et que ses postes précédents soient stockés dans un domaine sur ce tableau :
 
 ```sql
 CREATE DOMAIN job_list AS crew_job[];
@@ -503,14 +503,14 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COL
 | `JSONSelectable`, une ligne des raccourcis | `crew_job[]` : `['writer', 'editor']` | le même |
 | `Whereable`, `Insertable`, `Updatable` | `crew_job[]` | le même |
 
-- `false` : le tableau, sans note de migration, même au-delà de la 8.0. Choisissez cette valeur si vous parsez le tableau avec `pg.types.setTypeParser` en lui passant l’OID du type du tableau (`SELECT 'crew_job[]'::regtype::oid`) et le parser de `text[]` (`pg.types.getTypeParser(1009)`).
+- `false` : le tableau, sans note de migration, même au-delà de la 8.0. Choisissez cette valeur si vous parsez le tableau avec `pg.types.setTypeParser` en lui passant l’OID du type du tableau (`SELECT 'crew_job[]'::regtype::oid`) et le parser de `text[]`. Déclarez `const textArrayOid: number = 1009`, puis passez `pg.types.getTypeParser(textArrayOid)`.
 - `true` : `string`, le texte que renvoie `pg`. Les écritures prennent toujours un tableau, donc le texte d’une ligne de `sql` ne se réécrit pas tel quel : `insert()` et `update()` le refusent (TS2769, TS2322), alors que Postgres l’accepterait.
 - Un domaine sur un tel tableau, comme `crew.past_jobs`, prend `db.DomainInContext<c.PgJob_list, crew_job[], string>` dans `Selectable` ([`DomainInContext`](/fr/runtime-config#DomainInContext)) : `string` tant que le type du placeholder est identique à celui que le générateur produirait avec les réglages actuels, même si vous avez modifié le fichier. Si les types diffèrent, les cinq interfaces utilisent celui du placeholder.
 - Un tableau d’un enum d’un autre schéma, typé par ses labels avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), ou sinon comme l’enum du même nom dans le schéma de la relation, est lui aussi un `string` dans `Selectable`. Sans l’un ni l’autre, c’est un placeholder `any`, et il le reste. Un tableau d’un domaine sur un enum relève de [`domainsTypedByContext`](#generate.domainsTypedByContext).
 
 ### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
 
-`boolean`, `true` par défaut depuis la 7.0. En JSON, `null` prend aussi la valeur par défaut. Cette option règle le type d’une colonne de type `interval`, `interval[]` ou domaine sur l’un de ces types. Par défaut, le parser de `pg` renvoie un objet [`PostgresInterval`](/fr/runtime-config#PostgresInterval) dont les champs contiennent les composantes de l’intervalle. Le JSON des raccourcis en donne le texte. Supposons qu’une séance ait un entracte :
+À partir de la 7.0.0. Option booléenne activée par défaut. En JSON, `null` prend aussi la valeur par défaut. Cette option règle le type d’une colonne de type `interval`, `interval[]` ou domaine sur l’un de ces types. Par défaut, le parser de `pg` renvoie un objet [`PostgresInterval`](/fr/runtime-config#PostgresInterval) dont les champs contiennent les composantes de l’intervalle. Le JSON des raccourcis en donne le texte. Supposons qu’une séance ait un entracte :
 
 ```sql
 ALTER TABLE screenings ADD COLUMN intermission interval;

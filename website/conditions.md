@@ -335,7 +335,7 @@ The type takes more than that, and each of these throws as the query compiles, b
 
 ## Arrays {#arrays}
 
-From 7.0, each condition takes an array of the column's elements, including a readonly array, or a [parent column](/sql-template#parent). On `films.genres`, a `text[]`, pass an array of strings. For enum labels on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
+From 7.0.0. Each condition takes an array of the column's elements, including a readonly array, or a [parent column](/sql-template#parent). On `films.genres`, a `text[]`, pass an array of strings. For enum labels on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';

@@ -6,8 +6,8 @@ From 6.7.0, you install pgcast under its own name and import `pgcast/db`. A proj
 ## Requirements
 
 - Postgres. The test suite runs against 14, 16 and 18.
-- Node and `pg` (node-postgres). From 7.0, `pg` is the only peer dependency required to run queries and the generator in JavaScript.
-- To check types, add `typescript` and `@types/pg` to your `devDependencies`. Use TypeScript 5.7 or later to check the declarations of `@types/node` and `pg-protocol`, which `@types/pg` brings in, and the return type of [`toBuffer()`](/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
+- Node and `pg` (node-postgres) to run queries and the generator in JavaScript.
+- From 7.0.0. The type peers `typescript` and `@types/pg` are optional. Add them to your `devDependencies` to check types. Use TypeScript 5.7 or later to check the declarations of `@types/node` and `pg-protocol`, which `@types/pg` brings in, and the return type of [`toBuffer()`](/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
 
 ::: code-group
 

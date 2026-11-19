@@ -580,7 +580,7 @@ await db.serializable(pool, txnClient => countBookings(txnClient));
 await db.readCommitted(pool, txnClient => countBookings(txnClient));
 ```
 
-From 7.0, a helper taking a `pg` client at any of the three other read-only levels accepts the client of `serializableRODeferrable()`. For a helper shared with 6.x, use the union `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable` in the example below.
+From 7.0.0. A helper taking a `pg` client at any of the three other read-only levels accepts the client of `serializableRODeferrable()`. For a helper shared with 6.x, use the union `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable` in the example below.
 
 ```ts twoslash
 import * as db from 'zapatos/db';

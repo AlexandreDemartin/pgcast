@@ -4,7 +4,7 @@ english: 7f152c939b66
 
 # Lectures {#select-and-the-aggregates}
 
-Les raccourcis de lecture : `select()`, `selectOne()` et `selectExactlyOne()` pour des lignes, `count()`, `sum()`, `avg()`, `min()` et `max()` pour un nombre. Chaque option, le SQL qu’elle ajoute et son effet sur le type, puis les types qu’ils partagent.
+`select()`, `selectOne()` et `selectExactlyOne()` renvoient des lignes. Par défaut, `count()` renvoie un nombre, `sum()` et `avg()` un nombre ou `null`, et `min()` et `max()` une valeur de la colonne ou `null`.
 {.lede}
 
 ## `select()` {#select}
@@ -246,7 +246,7 @@ Comme [`selectOne()`](#selectOne), mais son type n’a pas d’`undefined` : qu
 
 </CastPanel>
 
-Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), la requête exécutée seule demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> avec `2`, et `.run()` est rejetée aussi sur une seconde ligne. Imbriquée dans une autre requête, dans un `lateral` ou un template `sql`, elle garde `LIMIT 1`, avec l’option ou non : une seconde ligne y joindrait deux fois la ligne parente.
+Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), la requête exécutée seule demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> avec `2`, et `.run()` est rejetée aussi sur une seconde ligne. Imbriquée dans une autre requête, dans un `lateral` ou un template `sql`, elle garde `LIMIT 1`, sauf si [`withTies`](#order-limit-offset-and-withties) inclut les ex æquo.
 
 ### `NotExactlyOneError` {#NotExactlyOneError}
 
@@ -458,7 +458,7 @@ Ce dont sont faites les signatures ci-dessus, tirées de `zapatos/db`. `T` est u
 enum SelectResultMode { Many, One, ExactlyOne, Numeric }
 ```
 
-Le quatrième argument de `select()` : un tableau de lignes (`select()`), une ligne ou `undefined` (`selectOne()`), une ligne ou une erreur (`selectExactlyOne()`), un nombre (`count()` et les autres).
+Le quatrième argument de `select()` : un tableau de lignes (`select()`), une ligne ou `undefined` (`selectOne()`), une ligne ou une erreur (`selectExactlyOne()`), un nombre si vous appelez `select()` avec `SelectResultMode.Numeric`.
 
 Avec `Numeric`, le cinquième argument nomme l’agrégat, `'count'` par défaut ; depuis pgcast 6.6.2, ce doit être un nom de fonction, simple, entre guillemets ou entre guillemets `U&`, en trois parties au plus séparées par des points (`stddev_pop`, `my_schema."MyAgg"`). Tout agrégat qui renvoie un nombre convient :
 

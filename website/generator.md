@@ -318,7 +318,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-The 7.0 default, `true`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. The generator looks up an enum in its own schema and writes its labels. Set `false` for the 6.x lookup by name in the relation's schema.
+From 7.0.0. The default, `true`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. The generator looks up an enum in its own schema and writes its labels. Set `false` for the 6.x lookup by name in the relation's schema.
 
 ```sql
 CREATE SCHEMA archive;
@@ -340,7 +340,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 
 ### `enumOrder` {#generate.enumOrder}
 
-The 7.0 default, `"declared"`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. Labels follow the declaration order that Postgres uses for `ORDER BY`, comparisons and `enum_range()`. Set `"alphabetical"` for the 6.x sort order.
+From 7.0.0. The default, `"declared"`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. Labels follow the declaration order that Postgres uses for `ORDER BY`, comparisons and `enum_range()`. Set `"alphabetical"` for the 6.x sort order.
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
@@ -392,7 +392,7 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, default `true` from 7.0. With the option omitted, set to `null` in JSON, or set to `true`, a failed connection or query rejects `generate()`, `tsForConfig()` and [`check()`](#export-check) with the original error before any files are written. Listener errors also reject the promise, and earlier listener output stays visible.
+From 7.0.0. This boolean defaults to `true`. With the option omitted, set to `null` in JSON, or set to `true`, a failed connection or query rejects `generate()`, `tsForConfig()` and [`check()`](#export-check) with the original error before any files are written. A synchronous throw from a listener also rejects generation. Handle any promise the listener returns yourself. Earlier listener output stays visible.
 
 Set `rejectOnQueryError: false` to print `*** error <n> ***` and the error to stdout, then end the process with code 1 before the promise settles. This is a permanent option and the one [the CLI](#cli) uses.
 
@@ -411,7 +411,7 @@ try {
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
-From 7.0, this boolean defaults to `true`, including for JSON `null`. Each relation's `UniqueIndex` lists its non-deferrable `UNIQUE` and `PRIMARY KEY` constraints backed by valid, non-exclusion indexes. With `false`, the generator lists all of the relation's unique indexes.
+From 7.0.0. This boolean defaults to `true`, including for JSON `null`. Each relation's `UniqueIndex` lists its non-deferrable `UNIQUE` and `PRIMARY KEY` constraints backed by valid, non-exclusion indexes. With `false`, the generator lists all of the relation's unique indexes.
 
 [`constraint()`](/insert#constraint) compiles a name such as `screenings.id` as a qualified identifier: `"screenings"."id"` (42601). Use an explicit `sql` statement with `ON CONSTRAINT "screenings.id"`.
 
@@ -443,7 +443,7 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
-`boolean`, default `true` from 7.0. JSON `null` also selects the default. The type of a column whose domain is over `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` or `timestamptz`, or over an array of one: types that `pg`, the shortcuts' JSON and a write each give in their own way ([Value types](/runtime-config#value-types)). `false`, as in Zapatos 6.6.1, types it by its placeholder in all five interfaces, which, as generated, holds what `pg` returns; `true` types it by context, as its base type is, while its placeholder holds what the generator wrote for it. Say a booking has a ticket number:
+From 7.0.0. This boolean defaults to `true`. JSON `null` also selects the default. The type of a column whose domain is over `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` or `timestamptz`, or over an array of one: types that `pg`, the shortcuts' JSON and a write each give in their own way ([Value types](/runtime-config#value-types)). `false`, as in Zapatos 6.6.1, types it by its placeholder in all five interfaces, which, as generated, holds what `pg` returns; `true` types it by context, as its base type is, while its placeholder holds what the generator wrote for it. Say a booking has a ticket number:
 
 ```sql
 CREATE DOMAIN ticket_no AS bigint;
@@ -486,7 +486,7 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
 
-`boolean`, default `true` from 7.0. JSON `null` also selects the default. The `Selectable` type of a column whose type is an array of an enum, or a domain over one. Postgres numbers such an array's type afresh in each database, so `pg` has no parser for it: a row from `pg`, such as a [`sql`](/sql-template) query's, holds the array's text, while the shortcuts' JSON holds the array. Say a crew member can do other jobs, and keeps those done before in a domain over the array:
+From 7.0.0. This boolean defaults to `true`. JSON `null` also selects the default. The `Selectable` type of a column whose type is an array of an enum, or a domain over one. Postgres numbers such an array's type afresh in each database, so `pg` has no parser for it: a row from `pg`, such as a [`sql`](/sql-template) query's, holds the array's text, while the shortcuts' JSON holds the array. Say a crew member can do other jobs, and keeps those done before in a domain over the array:
 
 ```sql
 CREATE DOMAIN job_list AS crew_job[];
@@ -499,14 +499,14 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COL
 | `JSONSelectable`, a row from the shortcuts | `crew_job[]`: `['writer', 'editor']` | the same |
 | `Whereable`, `Insertable`, `Updatable` | `crew_job[]` | the same |
 
-- `false`: the array, with no note, including beyond 8.0: the right type for a project that parses it with `pg.types.setTypeParser`, given the array type's OID (`SELECT 'crew_job[]'::regtype::oid`) and the parser of `text[]`, `pg.types.getTypeParser(1009)`.
+- `false`: the array, with no note, including beyond 8.0: the right type for a project that parses it with `pg.types.setTypeParser`, given the array type's OID (`SELECT 'crew_job[]'::regtype::oid`) and the parser of `text[]`. Declare `const textArrayOid: number = 1009`, then pass `pg.types.getTypeParser(textArrayOid)`.
 - `true`: `string`, the text `pg` returns. The writes still take an array, so a `sql` row's text isn't written back as it is: `insert()` and `update()` refuse it (TS2769, TS2322), though Postgres would take it.
 - A domain over such an array, as `crew.past_jobs`, takes `db.DomainInContext<c.PgJob_list, crew_job[], string>` in `Selectable` ([`DomainInContext`](/runtime-config#DomainInContext)): `string` while its placeholder matches the current generated type, even if edited. A different placeholder type is preserved in all five interfaces.
 - An array of an enum of another schema, typed by its labels with [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) or else as the enum of the same name in the relation's schema, is a `string` in `Selectable` too. Without either, it's an `any` placeholder, and stays one. An array of a domain over an enum is [`domainsTypedByContext`](#generate.domainsTypedByContext)'s.
 
 ### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
 
-`boolean`, default `true` from 7.0. JSON `null` also selects the default. The type of an `interval` column, of an `interval[]`, and of a domain over either. `pg`'s default type parser returns an interval as an object of its parts, a [`PostgresInterval`](/runtime-config#PostgresInterval); the shortcuts' JSON gives its text. Say a screening has an intermission:
+From 7.0.0. This boolean defaults to `true`. JSON `null` also selects the default. The type of an `interval` column, of an `interval[]`, and of a domain over either. `pg`'s default type parser returns an interval as an object of its parts, a [`PostgresInterval`](/runtime-config#PostgresInterval); the shortcuts' JSON gives its text. Say a screening has an intermission:
 
 ```sql
 ALTER TABLE screenings ADD COLUMN intermission interval;
