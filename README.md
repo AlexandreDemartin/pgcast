@@ -15,7 +15,7 @@ Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 - **Postgres is the source of the types.** The codegen reads the catalog and writes them; none is written by hand. No ORM, no models, no hidden state: you stay in full control.
 - **SQL you can read.** Each shortcut compiles to one predictable query, and the `sql` template is always there: the SQL you write is the SQL that runs.
 - **Values are parameters, and names cannot break out.** Every value is sent as `$1`, `$2`, …; a table, column or key that may come from outside is quoted with its `"` doubled.
-- **A drop-in for Zapatos.** Same module names, same API, the old behaviour by default wherever code may rely on it ([what differs](#what-differs-from-zapatos-661)): switch without touching an import.
+- **Keep your Zapatos imports.** The [6.x migration route](https://pgcast.dev/switching#swap-the-package) keeps the old defaults. The same alias works in 7.x. Check the [7.0 behaviour and type changes](https://pgcast.dev/switching#from-7-0) when upgrading.
 
 The goal is Zapatos going the last mile. The conditions Postgres offers and raw SQL each get a typed form, so that real code never has to fall back on `db.raw`, hand-written row types or casts. Foreign-key joins have theirs: a [lateral](https://pgcast.dev/lateral), its parent column checked by `db.parent<s.films.Column>('id')`. A function stays a `sql` fragment, its result's type written by hand ([Call a Postgres function](https://pgcast.dev/raw-sql#call-a-postgres-function)), and a CTE goes before a shortcut through `db.withCTEs()` ([Put a CTE before a shortcut](https://pgcast.dev/raw-sql#put-a-cte-before-a-shortcut)).
 
@@ -80,14 +80,14 @@ Switching from Zapatos 6.6.1? Keep your `zapatos/*` imports and [install pgcast 
 
 | Option | Warning in 6.x | Introduced |
 |---|---|---|
-| `upsertRequiresSameKeys`: a multi-row `upsert()` throws, rather than overwrite a column with `DEFAULT` | retired in 7.0 | 6.7.0 |
-| `undefinedMeansMissing`: an `undefined` value acts as a missing key, so `update()` leaves the column and `insert()` sends `DEFAULT` | retired in 7.0 | 6.7.0 |
+| `upsertRequiresSameKeys`: a batch throws if its implicit update would overwrite a column missing from a row ([exceptions](https://pgcast.dev/insert#upsert-options)) | `PGCAST_DEP001`, retired in 7.0 | 6.7.0 |
+| `undefinedMeansMissing`: an `undefined` value acts as a missing key, so `update()` leaves the column and `insert()` sends `DEFAULT` | `PGCAST_DEP002`, retired in 7.0 | 6.7.0 |
 | `transactionRequiresCommit`: a `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, after a query error the callback caught, rejects, rather than resolve with nothing saved | `PGCAST_DEP003` | 6.7.0 |
 | `aggregatesTypedByColumn`: `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, rather than `0`, and `min()` and `max()` their column's value, as parsed by `pg`. Both values and types default to this in 7.0 | `PGCAST_DEP004`, retired in 7.0 | 6.7.0 |
 | `transactionRequiresIdleClient`: a `transaction()` given a client already inside a transaction block (a `BEGIN` of yours) rejects before sending its `START TRANSACTION`, rather than commit or roll back that transaction; needs pg 8.21 | `PGCAST_DEP005` | 6.7.0 |
 | `transactionRequiresSatisfyingLevel`: a `transaction()` given the client of a transaction at a level that doesn't satisfy its own (`serializable()` given `readCommitted()`'s) rejects, rather than run its callback at that level | `PGCAST_DEP007` | 6.7.0 |
-| `selectExactlyOneChecksForSecondRow`: a `selectExactlyOne()` run on its own throws on a second row, rather than give the first; nested in a `lateral` or a `sql` template, or as a `.copy()`, it keeps `LIMIT 1` | none | 6.7.0 |
-| `typeEnumsAcrossSchemas` (generator): an enum of another schema is typed by its labels, rather than as an `any` custom type or a same-named enum of the relation's schema | a note through `warningListener` | 6.7.0 |
+| `selectExactlyOneChecksForSecondRow`: a `selectExactlyOne()` run on its own throws on a second row, rather than give the first; nested in a `lateral` or a `sql` template, or as a `.copy()`, it keeps `LIMIT 1` unless [`withTies`](https://pgcast.dev/select#order-limit-offset-and-withties) includes tied rows | none | 6.7.0 |
+| `typeEnumsAcrossSchemas` (generator): an enum of another schema uses its own labels, subject to [name collisions](https://pgcast.dev/generator#generate.typeEnumsAcrossSchemas) | a note through `warningListener` | 6.7.0 |
 | `enumOrder: 'declared'` (generator): an enum's labels, `every.<name>` included, keep their declared order, by which Postgres compares them, rather than the alphabetical one | a note through `warningListener` | 6.7.0 |
 | `rejectOnQueryError` (generator): a failed query, the connection included, rejects `generate()` with its error, rather than end the process with `process.exit(1)`; the CLI still exits | a note through `warningListener`, `PGCAST_DEP006` | 6.7.0 |
 | `uniqueIndexConstraintsOnly` (generator): a relation's `UniqueIndex`, the names `constraint()` takes, lists only the index of each of its `UNIQUE` and `PRIMARY KEY` constraints, valid, not `DEFERRABLE` nor `WITHOUT OVERLAPS` ([generator](https://pgcast.dev/generator#generate.uniqueIndexConstraintsOnly)), rather than every unique index, some of which `ON CONFLICT ON CONSTRAINT` refuses | a note through `warningListener` | 6.7.0 |
@@ -102,7 +102,7 @@ Everything else: the [changelog](https://pgcast.dev/changelog); what the charact
 
 - pgcast continues Zapatos's version numbers: 6.6.2 follows Zapatos 6.6.1.
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
-- **7.0** switches the opt-in defaults of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in for good; the warnings announce it.
+- **7.0** switches the opt-in defaults of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in for good; the [migration guide](https://pgcast.dev/switching#from-7-0) also covers changes without a 6.x warning.
   In 7.x, set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently to keep the corresponding 6.x write behaviour without a warning. The three transaction checks also default to `true`. Set any one to `false` for its 6.x behaviour without a warning through 7.x.
 - **8.0** removes the old paths, except those of `selectExactlyOneChecksForSecondRow` and `domainsTypedAsUnions`, and three old values asked for by choice, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` ([Versions](https://pgcast.dev/versions#_7-0-and-8-0)).
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
