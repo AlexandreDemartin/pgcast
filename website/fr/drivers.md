@@ -1,5 +1,5 @@
 ---
-english: 713b8b70edfb
+english: e67ffacc9c6f
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -25,7 +25,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 Les types que pgcast génère décrivent les valeurs telles que `pg` les parse ([Parser comme pg](#parse-like-pg)) : les adaptateurs ci-dessous parsent chaque colonne avec les parsers de `pg` lui-même. Quel que soit le driver qui lance les requêtes, gardez `pg` installé : `zapatos/db` le charge.
 
 ::: info À venir
-Les deux adaptateurs sont des paquets à part, `@pgcast/adapter-postgres-js` et `@pgcast/adapter-pglite`, en version 0.1.0, pas encore sur npm ([#718](https://github.com/AlexandreDemartin/pgcast/issues/718)). D’ici là, chacun se construit depuis son dossier du dépôt, [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters).
+Les deux adaptateurs sont des paquets à part, `@pgcast/adapter-postgres-js` et `@pgcast/adapter-pglite`, pas encore sur npm ([#718](https://github.com/AlexandreDemartin/pgcast/issues/718)). D’ici là, chacun se construit depuis son dossier du dépôt, [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters). Chaque adaptateur a son propre changelog : [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) et [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
 :::
 
 ## postgres.js {#postgres-js}
@@ -96,7 +96,9 @@ Le code du panneau est typé sur un `pg.Pool` ; sur `asPool(pglite)`, le SQL et
 - Une erreur est une `DatabaseError` de PGlite, pas celle de `pg` : elle a les champs de `pg` (`code`, `constraint`…), donc `isDatabaseError()` et les retries fonctionnent.
 - PGlite a une seule connexion, que le pool prête à une transaction à la fois : [Transactions](#transactions).
 
-Ce qu’il lit et écrit, type par type, en quoi il diffère de `pg`, et ce qu’il faut dans une page web : [son README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).
+Dans une page web, chargez une implémentation de `Buffer` avant l’adaptateur. Si vous incluez le cœur de pgcast et le vrai `pg` dans le même bundle, l’absence de l’objet `global` de Node peut aussi provoquer une erreur. Le [worker du playground](https://github.com/AlexandreDemartin/pgcast/tree/master/website/.vitepress/playground) remplace `pg` par deux classes vides, `Pool` et `Client`. Il fournit `process.emitWarning` et une implémentation limitée de `Buffer` avant de charger `zapatos/db`. Dans cette implémentation, `Buffer.from()` lève une erreur.
+
+Ce que l’adaptateur lit et écrit, type par type, et en quoi il diffère de `pg` : [son README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).
 
 ## Transactions {#transactions}
 
@@ -153,9 +155,9 @@ Le SQL est le même sur tout driver, et les types décrivent ce que donne `pg` (
 | `bytea` | un `Buffer` |
 | `json`, `jsonb` | la valeur parsée |
 
-Il écrit aussi chaque valeur comme `pg` l’écrit, sinon Postgres stocke une autre valeur : `pg` envoie un `Date` en heure locale, avec son décalage, là où le wrapper ci-dessus, sur le `query()` de PGlite lui-même, l’envoie en UTC. Un `Date` à 5 h le 1er mars à Tokyo entre donc dans une `date` comme le 28 février.
+Votre driver doit aussi écrire chaque valeur comme le fait `pg` avec son réglage par défaut (`parseInputDatesAsUTC: false`) pour que Postgres stocke la même valeur. Avec ce réglage, `pg` envoie un `Date` en heure locale avec son décalage horaire, tandis que le wrapper ci-dessus, qui appelle directement le `query()` de PGlite, l’envoie en UTC. Avec ce wrapper, Postgres stocke donc le 28 février dans une colonne `date` si le `Date` représente le 1er mars à 5 h à Tokyo.
 
-Les deux adaptateurs lisent chaque colonne avec les parsers de `pg` ([pg-types](https://github.com/brianc/node-pg-types) 2), à partir du texte que donne leur driver, et écrivent chaque valeur comme `pg` l’écrit. En quoi chaque driver, seul, lit et écrit autrement : les [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-reads) et [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-writes) de postgres.js, ceux de PGlite ([What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-reads), [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-writes)). Leur source et leurs tests, qui lisent chaque type via `pg` et via l’adaptateur, sont dans [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters).
+Les deux adaptateurs lisent chaque colonne avec les parsers de `pg` ([pg-types](https://github.com/brianc/node-pg-types) 2), à partir du texte que donne leur driver. L’[adaptateur postgres.js](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#how-it-differs-from-pg) envoie un `Buffer` sous forme de texte hexadécimal. Pour `Buffer.from('hi')`, une colonne `text` reçoit `\x6869` là où `pg` envoie les octets de `hi`. Pour les différences de lecture et d’écriture sans adaptateur, voyez les sections [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-reads) et [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-writes) de postgres.js, puis les sections [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-reads) et [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-writes) de PGlite. Le code source des adaptateurs et leurs tests sont dans [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters). Les tests lisent chaque type avec `pg` et avec l’adaptateur.
 
 ## Un fake pour les tests {#a-fake-for-tests}
 

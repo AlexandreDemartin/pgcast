@@ -114,7 +114,7 @@ END $$;
 
 GRANT SELECT ON seat_bookings TO cinema_customer;
 ALTER TABLE seat_bookings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY own_bookings ON seat_bookings USING (customer = current_setting('app.customer', true));
+CREATE POLICY own_bookings ON seat_bookings USING (customer = NULLIF(current_setting('app.customer', true), ''));
 
 INSERT INTO studios (id, name) VALUES
   (1000, 'Larkspur Pictures')

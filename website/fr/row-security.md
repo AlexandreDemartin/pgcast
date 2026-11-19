@@ -1,5 +1,5 @@
 ---
-english: 64f80e85a62f
+english: 8f23eff8b76e
 description: "Ne montrez à chaque client que ses propres réservations : une politique de sécurité niveau ligne lit un réglage, que setLocal() définit pour une transaction."
 ---
 
@@ -16,8 +16,10 @@ Le schéma de la doc active la sécurité niveau ligne sur `seat_bookings`, avec
 CREATE ROLE cinema_customer NOLOGIN;
 GRANT SELECT ON seat_bookings TO cinema_customer;
 ALTER TABLE seat_bookings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY own_bookings ON seat_bookings USING (customer = current_setting('app.customer', true));
+CREATE POLICY own_bookings ON seat_bookings USING (customer = NULLIF(current_setting('app.customer', true), ''));
 ```
+
+Utilisez des identifiants de client non vides. Avec `NULLIF`, un réglage vide ne correspond à aucune réservation.
 
 Avec `true`, `current_setting()` renvoie `NULL` pour un nom que cette connexion n’a jamais défini (`''` une fois qu’elle l’a défini, voir [les pièges](#avoid-the-pitfalls)), là où sans `true` il échouerait avec 42704. La politique est celle de Postgres : [Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
 

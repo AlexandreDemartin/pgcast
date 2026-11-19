@@ -21,7 +21,7 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
   - The file's variables are filled in before the merge: one it names must be set even when the argument replaces its key, or the CLI stops with `Environment variable 'NAME' is not set`.
 - Each string in both, at any depth, has its environment variables filled in ([Environment variables](#environment-variables)).
 - From 6.8.0, one flag, `--check`, before or after `config`. From 6.12.0, `--help` or `-h` in `config`'s place prints the usage, which names the config files, `config`, the flags and this page, and exits with code 0, before it reads the config.
-- The CLI skips a bare `--` before or after `config`, without a note. For example, `pgcast -- --help` prints the usage.
+- From 6.12.0, the CLI skips a bare `--` before or after `config`, without a note. For example, `pgcast -- --help` prints the usage.
 - An unrecognised flag starting with `--` in `config`'s place stops it with code 1 before it reads the config. From 6.12.0, it prints `Unknown flag --chek: the flags are --check, --help and -h` and the usage, on stderr; from 6.8.0, Node printed `Unknown flag --chek: the only flag is --check, beside the JSON argument` and its stack. Zapatos 6.6.1 read each of these, `-h` too, as the JSON argument, which failed.
 - After `config`, the CLI ignores unrecognised `--` flags and `--help`, as in Zapatos 6.6.1. It emits a [note](#generate.warningListener) for each. A misspelt `npx pgcast '{}' --chek` generates.
 - Of the other arguments, the first is `config`; any later one is ignored.
@@ -604,7 +604,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
   - from [the CLI](#cli), before generating, when the folder it runs in has both files;
 - `Note: flag --chek ignored after the JSON argument: only --check may follow it.`
-  - from [the CLI](#cli), before generating or checking, for each argument after `config` that starts with `--` and is not `--check`;
+  - from [the CLI](#cli), before generating or checking, for each argument after `config` that starts with `--` except `--` and `--check`;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
   - from `generate()` without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
 - the [old layout warning](#the-old-layout-warning);
