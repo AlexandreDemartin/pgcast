@@ -17,7 +17,6 @@ import * as db from 'zapatos/db';
 db.setConfig({
   transactionAttemptsMax: 3,
   transactionRetryDelay: { minMs: 50, maxMs: 500 },
-  undefinedMeansMissing: true,
 });
 ```
 
@@ -92,8 +91,8 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | the wait before each retry | at each `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | an array parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> in place of `$1` | at each `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | a plain object parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> in place of `$1` | at each `compile()` |
-| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | a multi-row `upsert()` with a key missing from some row, still set from `EXCLUDED`: throw, not warn | at each `upsert()` |
-| [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | an `undefined` value in `insert()`, `update()` and `upsert()`: a missing key, not `NULL` | at each call of those |
+| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. | at each `upsert()` |
+| [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | an `undefined` value in `insert()`, `update()` and `upsert()`: treat it as a missing key | at each call of those |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | a client of yours already inside a transaction block: reject before its `START TRANSACTION`, not end your transaction | at each `transaction()` given such a client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `false` | the client of a transaction at a level that doesn't satisfy the one asked for: reject, not run the callback at that level | at each `transaction()` given such a client |
@@ -175,20 +174,20 @@ A string cast wins, the value still JSON text: `param({ a: 1 }, 'jsonb')` gives 
 ### `upsertRequiresSameKeys` {#Config.upsertRequiresSameKeys}
 
 ```ts
-upsertRequiresSameKeys?: boolean  // default: false; the default in 7.0
+upsertRequiresSameKeys?: boolean  // default: true
 ```
 
-With `true`, a multi-row [`upsert()`](/insert#upsert) without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
-Off, it runs as in Zapatos 6.6.1 and warns once per process: `PGCAST_DEP001`. Which keys count, and the SQL: [Rows with different keys](/insert#upsert-different-keys).
+With `false`, the missing key can overwrite the stored value without a warning. See [Rows with different keys](/insert#upsert-different-keys).
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
 ```ts
-undefinedMeansMissing?: boolean  // default: false; the default in 7.0
+undefinedMeansMissing?: boolean  // default: true
 ```
 
-With `true`, an `undefined` value in [`insert()`](/insert#insert), [`update()`](/insert#update) and [`upsert()`](/insert#upsert) is a missing key: `DEFAULT` in `insert()`, left out of `update()` and `upsert()`, its `updateValues` included. Off, it is sent as `NULL` (in `updateValues`, set from `EXCLUDED`), as in Zapatos 6.6.1, and warns once per process: `PGCAST_DEP002`. The SQL of each: [An `undefined` value](/insert#undefined-values).
+With `true`, an `undefined` value in [`insert()`](/insert#insert), [`update()`](/insert#update) and [`upsert()`](/insert#upsert) is a missing key: `DEFAULT` in `insert()`, left out of `update()` and `upsert()`, its `updateValues` included. With `false`, it is sent as `NULL` (in `updateValues`, set from `EXCLUDED`), as in Zapatos 6.6.1, without a warning. The SQL of each: [An `undefined` value](/insert#undefined-values).
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
@@ -441,8 +440,6 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 
 | Option | Warning | It warns when | Default from |
 |---|---|---|---|
-| [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | a multi-row `upsert()` without `updateColumns` has a key missing from some row that is still set from `EXCLUDED` ([Rows with different keys](/insert#upsert-different-keys)) | 7.0 |
-| [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | a value of `insert()`, `update()` or `upsert()` is `undefined`, or a key of `upsert()` `updateValues` is and adds its column ([An `undefined` value](/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres answers the `COMMIT` of `transaction()` with `ROLLBACK`, after a query error the callback caught ([Let the error through](/retries#let-the-error-through)) | 7.0 |
 | [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` changes the result of `sum()`, `avg()`, `min()` or `max()`: a `NULL` made `0`, or a `min()` or `max()` that is not a number ([Typed by column](/select#typed-by-column)) | 7.0 |
 | [`transactionRequiresIdleClient: true`](#Config.transactionRequiresIdleClient) | `PGCAST_DEP005` | `transaction()` is given a client already inside a transaction block, which its `COMMIT` or `ROLLBACK` will end ([Your own `BEGIN`](/transaction#your-own-begin)) | 7.0 |
@@ -457,10 +454,10 @@ The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEn
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result; `PGCAST_DEP005`: when `transaction()` is called, before its `START TRANSACTION`; `PGCAST_DEP007`: when `transaction()` is called, before its callback), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 ```
 
-- `process.on('warning', …)` gets it, with `name` `'DeprecationWarning'` and `code` `'PGCAST_DEP002'`.
+- `process.on('warning', …)` gets it, with `name` `'DeprecationWarning'` and `code` `'PGCAST_DEP003'`.
 - `node --no-deprecation` hides it, from that hook too; `node --no-warnings` hides it from `stderr` only. `node --throw-deprecation` throws it, uncaught, so the process ends.
 - With the option on, the call never warns.
 

@@ -36,7 +36,7 @@ About half of them can't be fixed without changing a result that is valid today 
 | Class | When | What changes for you | Example |
 |---|---|---|---|
 | Fix | Postgres or the type already refused it, or it contradicts the function's name; every security hole | at once; the changelog lists each result that changes | [`not()`](/conditions#conditions.not) negates its whole condition: `` not(sql`a OR b`) `` gave `(NOT a OR b)`, which Postgres reads `(NOT a) OR b` |
-| Opt-in | the result is valid, and code may rely on it | nothing until you opt in; the old behaviour warns | an `undefined` value sent as `NULL`, until [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) makes it a missing key |
+| Opt-in | the result is valid, and code may rely on it | nothing until you opt in; the old behaviour warns | an `undefined` value sent as `NULL` in 6.x, until [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) makes it a missing key |
 | Document | Postgres does it, it is meant, or the type can't see a value known only at run time | nothing; the docs say so | [`isNotIn()`](/conditions#conditions.isNotIn) with a `NULL` in its list matches no row: that is how Postgres reads `NOT IN` |
 | Leave | [the report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) gives the reason: the type protects, the case is rare, or a fix would need a guess | nothing | an `int[][]` column is typed `number[]`: Postgres doesn't enforce the dimensions, and stores one, two or three in it alike |
 
@@ -54,11 +54,11 @@ Take an `update()` with an `undefined` value:
 
 <<< ./examples/plain/versions_undefined.ts{ts twoslash}
 
-Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)`<!-- probe: db.update('films', { tagline: undefined }, { id: 1002 }) --> with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column.
+Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column.
 
-pgcast can't tell which, and neither can your compiler: had 6.7 simply left the column out, that code would still compile, still run, and quietly stop clearing taglines.
+With the 7.0 defaults, `tagline: undefined` alone throws `nothing to update`. The update runs only if it assigns another column, in which case the stored tagline survives.
 
-So the new reading arrives as an option, off by default, and the old one warns when it runs. You switch when you're ready, one option at a time, with your tests to show what moved.
+In 6.x the new reading arrives as an option, off by default, and the old one warns when it runs. You switch when you're ready, one option at a time, with your tests to show what moved.
 
 The pattern is borrowed: Node's own deprecation cycle (documented, then a warning at run time, then removed in a major), React Router's future flags, and TypeScript's `--strict` family, one option per safer behaviour.
 
@@ -66,22 +66,20 @@ The cost is a few more keys in [`Config`](/runtime-config#Config), and two paths
 
 ## Reading a warning
 
-Call that `update()` on 6.7 and Node prints, once:
+With the 6.7 defaults, if a `transaction()` callback catches a query error and Postgres answers `COMMIT` with `ROLLBACK`, Node prints this warning once:
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists them, with what sets each off. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
+In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists current warnings and their triggers. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
 
-Nothing else changes: the query runs as it did in 6.6.1, unless Node runs with `--throw-deprecation`, which ends the process ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
+The promise resolves as in 6.6.1, even with `--throw-deprecation`, after which Node ends the process on the warning ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
 
-The warning comes when you call the shortcut, before `.run()`, and only if the old behaviour is actually used: an `update()` with no `undefined` in it never warns.
+Each code warns once per process. `node --trace-deprecation` prints the stack. To find the other calls, turn the option on and run your tests.
 
-It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes.
-
-`PGCAST_DEP003` comes later: once `transaction()` has sent `COMMIT` and Postgres has answered `ROLLBACK`, just before the promise resolves. So does `PGCAST_DEP004`, once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`: only then can it see whether `Number()` changes it.
+`PGCAST_DEP004` warns once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`, if `Number()` changes it.
 
 Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 
@@ -89,7 +87,7 @@ Where `undefined` meant "clear it", `null` says so under either setting, and nev
 
 7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` and the generator's (below), except `selectExactlyOneChecksForSecondRow`, which stays off.
 
-A project that has turned every option on and sees no `PGCAST_DEP` warning or generator note has nothing to change, except where it relies on the [read-only client types widened in 7.0](/switching#from-7-0). The old behaviours go in 8.0, except three, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
+A project that has turned every option on and sees no `PGCAST_DEP` warning or generator note has nothing to change, except where it relies on the [read-only client types widened in 7.0](/switching#from-7-0). Throughout 7.x, `undefinedMeansMissing: false` and `upsertRequiresSameKeys: false` independently restore the 6.x write behaviours without warnings. 8.0 removes both legacy write behaviours. Across the other options, three legacy values remain: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
 
 The generator gets opt-ins of its own in 6.7: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), which types an enum of another schema by its labels, [`enumOrder`](/generator#generate.enumOrder), which keeps an enum's labels in their declared order, [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), which rejects `generate()` on a failed query rather than end the process, [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), which lists in `UniqueIndex` only the names `ON CONFLICT ON CONSTRAINT` takes, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), which types a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, by context, as its base type is, and a domain over a domain or an array of a domain, `any` without it, by the base type of its innermost domain, [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), which types an array of an enum as the text `pg` returns in `Selectable`, and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), which types an `interval` in `Selectable` as `pg` parses it.
 

@@ -135,8 +135,14 @@ describe('insert', () => {
     `);
   });
 
+  it('uses the balance default for an undefined cell', async () => {
+    const account = await run(db.insert('accounts', { owner_id: 1, balance: undefined }));
+    expect(await run(db.selectExactlyOne('accounts', { id: account.id }, { columns: ['balance'] }))).toEqual({ balance: 0 });
+  });
+
   it('an undefined value inserts NULL without undefinedMeansMissing, the column DEFAULT with it', async () => {
-    // deprecated (PGCAST_DEP002): accounts.balance is NOT NULL DEFAULT 0, yet `balance: undefined` sends NULL
+    db.setConfig({ undefinedMeansMissing: false });
+    // accounts.balance is NOT NULL DEFAULT 0, yet `balance: undefined` sends NULL
     expect(await fails(db.insert('accounts', { owner_id: 1, balance: undefined }))).toMatchInlineSnapshot(`
       {
         "code": "23502",
@@ -224,7 +230,8 @@ describe('upsert', () => {
   });
 
   it('in several rows, a key missing from one row overwrites with DEFAULT on UPDATE, without upsertRequiresSameKeys', async () => {
-    // deprecated (PGCAST_DEP001): the missing key is filled with DEFAULT, then `SET title = EXCLUDED.title` erases the title
+    db.setConfig({ upsertRequiresSameKeys: false });
+    // The missing key is filled with DEFAULT, then `SET title = EXCLUDED.title` erases the title
     const [, tee] = sortBy(await run(db.upsert('products', [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
@@ -232,22 +239,22 @@ describe('upsert', () => {
     expect(tee).toEqual({ sku: 'TEE', title: null, $action: 'UPDATE' });
   });
 
-  it('in several rows, a key missing from one row throws with upsertRequiresSameKeys, unless updateColumns is given', async () => {
-    db.setConfig({ upsertRequiresSameKeys: true });
+  it.each([
+    [{ updateColumns: 'price_cents' }, 'T-shirt small'],
+    [{ updateValues: { title: 'Tee' } }, 'Tee'],
+  ] as const)('accepts a missing title with an explicit update %j', async (options, title) => {
     const rows = [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
     ];
     expect(() => db.upsert('products', rows, ['sku', 'variant']))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
-    const [, tee] = sortBy(await run(db.upsert('products', rows, ['sku', 'variant'], {
-      updateColumns: ['price_cents'], returning: ['sku', 'title', 'price_cents'],
-    })), 'sku');
-    expect(tee).toEqual({ sku: 'TEE', title: 'T-shirt small', price_cents: 1300, $action: 'UPDATE' });
+    await run(db.upsert('products', rows, ['sku', 'variant'], options));
+    expect((await t.client.query("SELECT title, price_cents::int FROM products WHERE sku = 'TEE' AND variant = 'S'")).rows)
+      .toEqual([{ title, price_cents: 1300 }]);
   });
 
   it('with upsertRequiresSameKeys, new rows without their serial id among existing rows run, and nothing is overwritten', async () => {
-    db.setConfig({ upsertRequiresSameKeys: true });
     const { id } = await run(db.selectExactlyOne('products', { sku: 'TEE', variant: 'S' }, { columns: ['id'] }));
     const [cap, tee] = sortBy(await run(db.upsert('products', [
       { id, sku: 'TEE', variant: 'S', price_cents: 1300 },
@@ -260,30 +267,57 @@ describe('upsert', () => {
 
   it('an undefined value: set from EXCLUDED as NULL without undefinedMeansMissing, left as it is with it', async () => {
     const tee = { sku: 'TEE', variant: 'S', price_cents: 1400, title: undefined };
-    db.setConfig({ undefinedMeansMissing: true });
     expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
       .toEqual({ title: 'T-shirt small', price_cents: 1400, $action: 'UPDATE' });
-    db.setConfig({ undefinedMeansMissing: false });  // deprecated (PGCAST_DEP002)
+    db.setConfig({ undefinedMeansMissing: false });
     expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
       .toEqual({ title: null, price_cents: 1400, $action: 'UPDATE' });
   });
 
   it('an undefined key of updateValues: the column DEFAULT without undefinedMeansMissing, left as it is with it', async () => {
     const ada = { email: 'Ada@Example.com', display_name: 'Ada' };
-    db.setConfig({ undefinedMeansMissing: true });
     expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
       .toEqual({ settings: { theme: 'dark' }, $action: 'UPDATE' });
-    db.setConfig({ undefinedMeansMissing: false });  // deprecated (PGCAST_DEP002)
+    db.setConfig({ undefinedMeansMissing: false });
     expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
       .toEqual({ settings: {}, $action: 'UPDATE' });
   });
 
   it('with undefinedMeansMissing, an undefined key of updateValues that leaves nothing to update: DO NOTHING', async () => {
     // so no row back on conflict, and the row is unchanged
-    db.setConfig({ undefinedMeansMissing: true });
     expect(await run(db.upsert('users', { email: 'Ada@Example.com', display_name: 'Ada' }, 'email',
       { updateColumns: db.doNothing, updateValues: { settings: undefined } }))).toBeUndefined();
     expect(await scalar(`SELECT settings AS v FROM users WHERE email = 'Ada@Example.com'`)).toEqual({ theme: 'dark' });
+  });
+
+  it.each([{}, { undefinedMeansMissing: false }])('stores SQL NULL for explicit null on each write path with %j', async config => {
+    db.setConfig(config);
+    const ada = { display_name: 'A', email: 'Ada@Example.com' };
+    expect((await run(db.insert('users', { ...ada, email: 'new@example.com', mood: null }))).mood).toBeNull();
+    for (const write of [
+      () => db.update('users', { mood: null }, { id: 1 }),
+      () => db.upsert('users', { ...ada, mood: null }, 'email'),
+      () => db.upsert('users', ada, 'email', { updateValues: { mood: null } }),
+    ]) {
+      await t.client.query("UPDATE users SET mood = 'happy' WHERE id = 1");
+      await run(write());
+      expect(await scalar('SELECT mood AS v FROM users WHERE id = 1')).toBeNull();
+    }
+  });
+
+  it.each([{}, { upsertRequiresSameKeys: false }, { undefinedMeansMissing: false },
+    { undefinedMeansMissing: false, upsertRequiresSameKeys: false }])('checks the stored title with %j', async config => {
+    db.setConfig(config);
+    const tee = { sku: 'TEE', variant: 'S', price_cents: 1300 };
+    for (const first of [tee, { ...tee, title: undefined }]) {
+      await t.client.query("UPDATE products SET title = 'T-shirt small' WHERE sku = 'TEE' AND variant = 'S'");
+      const rows = [first, { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' }];
+      const write = () => db.upsert('products', rows, ['sku', 'variant']);
+      const refuses = config.upsertRequiresSameKeys !== false && (!('title' in first) || config.undefinedMeansMissing !== false);
+      if (refuses) expect(write).toThrow('rows have different keys');
+      else await run(write());
+      expect(await scalar("SELECT title AS v FROM products WHERE sku = 'TEE' AND variant = 'S'")).toBe(refuses ? 'T-shirt small' : null);
+    }
   });
 
   it('constraint()', async () => {
@@ -441,7 +475,6 @@ describe('upsert', () => {
     expect((await pgError(t.client, () => run(sql`INSERT INTO ${'users'} () VALUES () ON CONFLICT (${'email'}) DO NOTHING`))).code).toBe('42601');
     expect(() => db.upsert('users', {}, 'email')).toThrow(nothingToInsert);
     // with undefinedMeansMissing, an undefined key is left out, so no column is left
-    db.setConfig({ undefinedMeansMissing: true });
     expect(() => db.upsert('users', { mood: undefined }, 'email')).toThrow(nothingToInsert);
     expect(await run(db.select('users', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
@@ -553,7 +586,8 @@ describe('update', () => {
   });
 
   it('an undefined value sets the column to NULL without undefinedMeansMissing, leaves it with it', async () => {
-    // deprecated (PGCAST_DEP002): Bob loses his manager; on a NOT NULL column the update fails
+    db.setConfig({ undefinedMeansMissing: false });
+    // Bob loses his manager; on a NOT NULL column the update fails
     expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 2 }, { returning: ['mood', 'manager_id'] })))
       .toEqual([{ mood: 'sad', manager_id: null }]);
     expect(await fails(db.update('users', { display_name: undefined }, { id: 2 }))).toMatchInlineSnapshot(`
@@ -565,7 +599,6 @@ describe('update', () => {
   });
 
   it('with undefinedMeansMissing, an undefined value leaves its column', async () => {
-    db.setConfig({ undefinedMeansMissing: true });
     expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 3 }, { returning: ['mood', 'manager_id'] })))
       .toEqual([{ mood: 'sad', manager_id: 1 }]);
     expect(await run(db.update('users', { mood: 'ok', display_name: undefined }, { id: 2 }, { returning: ['display_name'] })))
@@ -1540,13 +1573,13 @@ describe('copy()', () => {
 describe('a null row among others in upsert()', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('inserts a row of defaults, as in 6.6.1, and warns PGCAST_DEP001', async () => {
+  it('inserts a row of defaults when the key check is off', async () => {
+    db.setConfig({ upsertRequiresSameKeys: false });
     // since #27 it threw a TypeError at the call; the null row is read as `{}`, as insert() reads it (#341)
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
     const rows = await db.upsert('extra.type_zoo', [{ c_text: 'x' }, null as any], 'id', { returning: ['c_text'] }).run(t.client);
     expect(rows).toEqual([{ c_text: 'x', $action: 'INSERT' }, { c_text: null, $action: 'INSERT' }]);
-    // once per process: an earlier test of this file may have emitted it already
-    for (const [, options] of emitWarning.mock.calls) expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 });
 

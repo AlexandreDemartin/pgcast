@@ -62,8 +62,8 @@ const defaults: Config = {
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
-  upsertRequiresSameKeys: false,  // the default in 7.0
-  undefinedMeansMissing: false,  // the default in 7.0
+  upsertRequiresSameKeys: true,
+  undefinedMeansMissing: true,
   transactionRequiresCommit: false,  // the default in 7.0
   transactionRequiresIdleClient: false,  // the default in 7.0
   transactionRequiresSatisfyingLevel: false,  // the default in 7.0

@@ -1,5 +1,5 @@
 ---
-english: 415879ff07e7
+english: ce062edf3a5a
 ---
 
 # Écritures
@@ -23,7 +23,7 @@ db.insert(table, values, options?)
 Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stockées, valeurs par défaut et serials remplis.
 
 - `table` : une table du schéma.
-- `values` : un `Insertable`, ou un tableau de ceux-ci, `readonly` ou non (`readonly` à partir de la 6.11.0). Un fragment `sql` est écrit comme SQL (`` db.sql`now()` ``), `db.Default` comme `DEFAULT` ; une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
+- `values` : un `Insertable`, ou un tableau de ceux-ci, `readonly` ou non (`readonly` à partir de la 6.11.0). Un fragment `sql` est compilé en SQL (`` db.sql`now()` ``) et `db.Default` devient `DEFAULT`. Une cellule à `undefined` prend aussi la valeur `DEFAULT` ([Une valeur `undefined`](#undefined-values)).
   - Avec un tableau `readonly`, l’erreur d’une ligne erronée, ou d’un autre argument erroné, est, sous TypeScript 7, « <span lang="en">The type '…' is 'readonly' and cannot be assigned to the mutable type '…'</span> » : l’erreur de la dernière surcharge, celle du tableau modifiable, que TypeScript 7 affiche seule. TypeScript 4.1 et 5.9 listent l’erreur de chaque surcharge, dont celle de la ligne.
   - À partir de la 6.11.0, le type refuse une chaîne ou un `String` comme ligne, ici et dans `upsert()` (2769), et une chaîne, un `String` ou un tableau comme valeurs d’`update()` (2345), même sur une table dont une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`length` un nombre), quel que soit le schéma.
   - `raw()`, `cols()` et `vals()` ne sont pas des valeurs ici : ils lèvent une erreur à la compilation, avant toute requête ([`raw()`](/fr/sql-template#raw) donne le message), et le type de pgcast les refuse, là où celui de Zapatos 6.6.1 les acceptait. Pour du SQL, écrivez un fragment `sql` ; dans un tableau ou un objet `jsonb`, ils font partie de la valeur, envoyée en JSON.
@@ -88,7 +88,7 @@ db.upsert(table, values, conflictTarget, options?)
 - Chaque résultat a `$action`, `'INSERT'` ou `'UPDATE'` ([`UpsertAction`](#UpsertAction)).
 - Une ligne donne un résultat ; un tableau donne un tableau, sans les lignes qui ne font rien ([`doNothing`](#doNothing)).
 - Un tableau vide ne fait rien, comme pour `insert()`.
-- Une ligne sans clé, ou des lignes dont aucune n’a de clé, lèvent une erreur, comme pour `insert()` ; avec `undefinedMeansMissing`, une valeur `undefined` n’est pas une clé.
+- Comme pour `insert()`, l’appel lève une erreur si aucune des lignes fournies n’a de clé. Par défaut, une clé à `undefined` compte comme absente.
 
 ### Options {#upsert-options}
 
@@ -105,8 +105,8 @@ Chaque SQL remplace le `DO UPDATE SET …` de l’upsert simple, sur `ratings` (
 | `reportAction: 'suppress'` | pas de `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | pas d’`UpsertAction` |
 
 - `updateColumns` prend une colonne ou un tableau ; `noNullUpdateColumns` une colonne, un tableau, ou `db.all` pour toutes les colonnes. [Batches](/fr/batches#rows-with-different-keys) a un cast panel avec `updateColumns` : une réservation garde son horaire.
-- Un `updateColumns` calculé à l’exécution peut être vide. Sans clé dans `updateValues`, le SQL est alors `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: ['votes'].filter(() => false) }) --> ; avec `undefinedMeansMissing`, une clé à `undefined` ne compte pas ([Une valeur `undefined`](#undefined-values)). Une ligne en conflit donne alors `undefined`, alors que le type d’un `ratings.Column[]` annonce la ligne. Testez le cas `undefined`, ou passez [`doNothing`](#doNothing), et le type suit.
-- `updateValues` est un seul jeu de valeurs pour toutes les lignes mises à jour. Ses clés sont toujours mises à jour, même quand `updateColumns` les omet, ou vaut `doNothing` (le SQL est alors `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, pas `DO NOTHING`) ; avec `undefinedMeansMissing`, une clé à `undefined` n’est pas mise à jour ([Une valeur `undefined`](#undefined-values)).
+- Un `updateColumns` calculé à l’exécution peut être vide. Sans clé dans `updateValues`, le SQL est alors `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: ['votes'].filter(() => false) }) --> ; par défaut, une clé à `undefined` ne compte pas ([Une valeur `undefined`](#undefined-values)). Une ligne en conflit donne alors `undefined`, alors que le type d’un `ratings.Column[]` annonce la ligne. Testez si le résultat vaut `undefined` ou passez [`doNothing`](#doNothing) pour que le type prenne ce cas en compte.
+- `updateValues` fournit les mêmes valeurs à toutes les lignes mises à jour. Une clé dont la valeur est définie entraîne la mise à jour de sa colonne, même si `updateColumns` l’omet ou vaut `doNothing` (le SQL est alors `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, pas `DO NOTHING`) ; par défaut, une clé à `undefined` n’ajoute aucune colonne ([Une valeur `undefined`](#undefined-values)).
 - Dans `updateValues`, une valeur simple est un paramètre. Une valeur qui contient un fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` ou `self`, à n’importe quelle profondeur de ses tableaux et objets simples, est compilée comme dans un template `sql` ; un raccourci de lecture est écrit entre parenthèses, comme dans [`insert()`](/fr/insert#insert).
 - Pour y lire une colonne, nommez la table pour la ligne existante, `${'ratings'}.${'votes'}`, ou `EXCLUDED` pour la nouvelle, `` db.sql`EXCLUDED.${'votes'}` ``.
 - Là, un fragment ou une condition qui utilise `db.self` (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/fr/conditions#conditions.add)) lève "The 'self' column alias has no meaning here"<!-- message -->, comme dans Zapatos 6.6.1 ; `db.self` ou `db.all` seul, ou dans un `vals([…])`, lève une erreur à la compilation ([`self`](/fr/sql-template#self), [`all`](/fr/sql-template#all)) ; `db.parent()`, seul ou dans un fragment, lève "The 'parent' table alias has no meaning here"<!-- message -->.
@@ -142,17 +142,13 @@ Une table partitionnée a besoin de `'suppress'` quand une ligne arrive dans une
 
 ### Lignes aux clés différentes {#upsert-different-keys}
 
-Sur plusieurs lignes sans `updateColumns`, une clé absente d’une ligne est insérée comme `DEFAULT`, puis fixée depuis `EXCLUDED` en cas de conflit : la valeur existante de cette ligne est perdue.
+Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
-- `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` envoie `($4, $5, DEFAULT)`<!-- probe: db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars']) -->, donc un compte existant de votes à 4 étoiles revient à 1.
-- La requête s’exécute, comme dans Zapatos 6.6.1, et pgcast avertit une fois par processus : `PGCAST_DEP001`.
-- Une clé de `updateValues`, ou une colonne d’un `conflictTarget` tableau ou chaîne, ne compte pas : de nouvelles lignes sans leur `id` serial, upsertées sur `'id'`, n’avertissent ni ne lèvent d’erreur. Avec `constraint()`, chaque clé compte.
-- Aucun avertissement pour des lignes aux mêmes clés, pour une seule ligne, ni avec un `updateColumns`, quel qu’il soit.
-- Une ligne `null` parmi d’autres n’a aucune des clés, donc elle avertit aussi ; la requête s’exécute comme dans Zapatos 6.6.1, avec une ligne de valeurs par défaut.
+- Donnez la clé à chaque ligne pour garder la mise à jour implicite.
+- Une nouvelle ligne peut omettre son `id` serial lors d’un upsert sur `'id'`. Le nom d’une contrainte ne suffit pas à pgcast pour en connaître les colonnes.
+- Une ligne `null` parmi d’autres compte comme une ligne à laquelle il manque toutes les clés.
 
-::: tip Opt-in
-Avec `upsertRequiresSameKeys: true` ([`Config`](/fr/runtime-config#Config.upsertRequiresSameKeys)), un tel upsert lève une erreur avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->. Sans elle, pgcast avertit avec `PGCAST_DEP001` ; elle devient le comportement par défaut en 7.0 ([Versions](/fr/versions)).
-:::
+Avec [`upsertRequiresSameKeys: false`](/fr/runtime-config#Config.upsertRequiresSameKeys), la cellule manquante prend la valeur `DEFAULT`, qui peut écraser la valeur stockée. Par exemple, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` envoie `($4, $5, DEFAULT)`<!-- probe: (db.setConfig({ upsertRequiresSameKeys: false }), db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])) -->, et ramène à 1 le nombre de votes à 4 étoiles déjà enregistré.
 
 ## `constraint()` {#constraint}
 
@@ -227,7 +223,7 @@ db.update(table, values, where, options?)
 Met à jour les lignes qui correspondent, et les renvoie. Les arguments viennent dans l’ordre du SQL : `SET`, puis `WHERE`.
 
 - `table` : une table du schéma.
-- `values` : un `Updatable`, avec au moins une clé. Un fragment `sql` est écrit comme SQL, où `db.self` est la colonne, de même qu’une condition comme [`conditions.add()`](/fr/conditions#conditions.add) ; écrit en ligne, ce fragment peut demander un argument de type ([`Constraint`](/fr/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` et `parent()` lèvent une erreur, comme pour [`insert()`](#insert). Une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
+- `values` : un `Updatable`, avec au moins une clé. Un fragment `sql` est écrit comme SQL, où `db.self` est la colonne, de même qu’une condition comme [`conditions.add()`](/fr/conditions#conditions.add) ; écrit en ligne, ce fragment peut demander un argument de type ([`Constraint`](/fr/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` et `parent()` lèvent une erreur, comme pour [`insert()`](#insert). Une affectation à `undefined` est omise ([Une valeur `undefined`](#undefined-values)).
 - `where` : un `Whereable`, ou un fragment `sql` ([Conditions](/fr/conditions)).
 - `options` : `returning` et `extras`, comme pour [`insert()`](#insert-options).
 
@@ -320,27 +316,22 @@ Avec `'CASCADE'`, Postgres vide chaque table qui référence l’une d’elles, 
 
 ## Une valeur `undefined` {#undefined-values}
 
-Dans les valeurs d’`insert()`, `update()` et `upsert()`, Zapatos 6.6.1 envoie `undefined` comme `NULL` : une colonne `NOT NULL DEFAULT` échoue, et `update()` efface la colonne au lieu de la laisser telle quelle.
+En 7.0, une valeur `undefined` à l’écriture compte comme une clé absente. Utilisez `null` pour écrire `NULL` dans une colonne qui l’accepte. Ces règles s’appliquent aux valeurs lues à l’appel, à condition qu’elles restent inchangées jusqu’à l’exécution de la requête et que les accesseurs renvoient la même valeur aux lectures suivantes.
 
 <div class="stack">
 
-| Dans | Par défaut, comme en 6.6.1 | Avec `undefinedMeansMissing: true` |
+| Dans | Par défaut en 7.0 | Avec `undefinedMeansMissing: false` |
 |---|---|---|
-| `insert()` | `NULL` | `DEFAULT` : `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
-| `update()` | met la colonne à `NULL`, et compte comme une clé | omise : `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) --> ; sans clé restante, lève "nothing to update…"<!-- message --> |
-| `upsert()` | insère `NULL`, puis la fixe depuis `EXCLUDED` | omise : ni insérée, ni mise à jour sauf si `updateColumns` la nomme (alors depuis `EXCLUDED`, donc une ligne existante prend le `DEFAULT` de la colonne) ; sur plusieurs lignes, sa cellule est `DEFAULT` et compte comme absente ([Lignes aux clés différentes](#upsert-different-keys)) ; sans colonne restante, lève "nothing to insert…"<!-- message --> |
-| `upsert()` `updateValues` | la fixe depuis `EXCLUDED` : la valeur insérée, ou le `DEFAULT` de la colonne | omise, comme une clé que `updateValues` n’a pas : `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })) -->, donc la valeur existante reste ; avec `doNothing`, ou un `updateColumns` vide à l’exécution, et aucune autre clé, `DO NOTHING`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } })) --> |
+| `insert()` | `DEFAULT` : `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 }) --> | `NULL` |
+| `update()` | omise : `SET ("title") = ROW($1)`<!-- probe: db.update('films', { title: 'x', tagline: undefined }, { id: 1000 }) --> ; sans clé restante, lève "nothing to update…"<!-- message --> | met la colonne à `NULL` et la clé compte comme présente |
+| `upsert()` | colonne omise si aucune ligne ne la fournit, sinon `DEFAULT` dans la cellule absente ([Lignes aux clés différentes](#upsert-different-keys)). Si la colonne est omise, seuls `updateColumns` ou une valeur définie dans `updateValues` peuvent la mettre à jour (voir le `CASE` de `noNullUpdateColumns` ci-dessous). Sans colonne à insérer, l’appel lève "nothing to insert…"<!-- message --> | insère `NULL` |
+| `upsert()` `updateValues` | omise, comme une clé que `updateValues` n’a pas : `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, donc la valeur existante reste ; avec `doNothing`, ou un `updateColumns` vide à l’exécution, et aucune autre clé, `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } }) --> | la colonne prend sa valeur dans `EXCLUDED`, soit la valeur insérée ou le `DEFAULT` de la colonne |
 
 </div>
 
-- Par défaut, chacun envoie le SQL de 6.6.1 et avertit une fois par processus : `PGCAST_DEP002`.
-- Un `undefined` dans un `where` se comporte comme avant.
-- Dans `updateValues`, par défaut, `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` envoie `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, et un compte existant revient à 1. pgcast n’avertit que lorsque la clé est seule à ajouter sa colonne : `updateColumns` l’omet ou, sans `updateColumns`, aucune ligne ne l’insère.
-- Une colonne que la mise à jour fixe de toute façon, insérée sans `updateColumns` ou nommée par cette option, reste fixée depuis `EXCLUDED` dans les deux modes, comme sans clé dans `updateValues`.
+Dans un filtre, `undefined` est toujours passé en paramètre. En cas de conflit, une valeur définie dans `updateValues` est prioritaire. Sinon, la colonne retenue pour la mise à jour prend sa valeur dans `EXCLUDED`. Pour les colonnes protégées par `noNullUpdateColumns`, un `CASE` garde la valeur stockée si la valeur entrante est `NULL`.
 
-::: tip Opt-in
-`undefinedMeansMissing: true` ([`Config`](/fr/runtime-config#Config.undefinedMeansMissing)) lit une valeur `undefined` comme une clé absente, comme le fait `JSON.stringify()`. Sans elle, pgcast avertit avec `PGCAST_DEP002` ; elle devient le comportement par défaut en 7.0 ([Versions](/fr/versions)).
-:::
+Utilisez [`undefinedMeansMissing: false`](/fr/runtime-config#Config.undefinedMeansMissing) pour garder le comportement d’écriture de la 6.x pendant toute la 7.x. Ce choix est indépendant de la vérification des clés d’un upsert.
 
 ## `ReturningOptionsForTable` {#ReturningOptionsForTable}
 

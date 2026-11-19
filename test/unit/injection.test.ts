@@ -2365,6 +2365,8 @@ describe('a list that is not an array in isIn(), isNotIn(), eqAny(), likeAny() a
 });
 
 describe('cols and vals given a built-in', () => {
+  afterEach(resetConfig);
+
   // a Buffer now throws, with its own keys too, before any of them reaches the text; a built-in with own
   // enumerable keys still compiles to them, quoted as a plain object's are (#529)
   const
@@ -2393,6 +2395,7 @@ describe('cols and vals given a built-in', () => {
   });
 
   it('a Date given a hostile own key compiles to the text a plain object of that key gives', () => {
+    db.setConfig({ upsertRequiresSameKeys: false });  // compile the heterogeneous batch too
     const
       dated = builds(v => Object.assign(new Date(0), { [v]: 1 })),
       plain = builds(v => ({ [v]: 1 })),

@@ -1,5 +1,5 @@
 ---
-english: bd936a955436
+english: d01a991290f6
 ---
 
 # Transactions
@@ -734,7 +734,7 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 | Levée par | Comment | Messages |
 |---|---|---|
 | `select()`, `selectOne()`, `selectExactlyOne()` et les agrégats, avec un `order`, un `lock` ou un `aggregate` invalide | l’appel lève | [`select()`, Erreurs](/fr/select#errors) |
-| `upsert()` de lignes aux clés différentes, avec `upsertRequiresSameKeys` | l’appel lève | [Lignes aux clés différentes](/fr/insert#upsert-different-keys) |
+| `upsert()` | Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. | [Lignes aux clés différentes](/fr/insert#upsert-different-keys) |
 | `update()` sans colonne à fixer | l’appel lève | [`update()`](/fr/insert#update) |
 | `truncate()` avec une autre option | l’appel lève | [`truncate()`](/fr/insert#truncate) |
 | une interpolation qui n’a pas de sens en SQL : un nombre, `null`, `db.all`, l’objet global ; `db.all` comme filtre de `deletes()` ou d’`update()` | `.run()` est rejetée | [Interpolations](/fr/sql-template#interpolations), [`all`](/fr/sql-template#all) |
