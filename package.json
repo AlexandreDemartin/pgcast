@@ -21,7 +21,7 @@
     "typecheck": "tsc --emitDeclarationOnly --outDir node_modules/.cache/pgcast && tsc -p test && tsc -p test/generated",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:types": "tsc --emitDeclarationOnly --outDir node_modules/.cache/pgcast && vitest run --typecheck.only --mode typecheck && tsc -p test/types-opt-in && node scripts/check-declarations.mjs && tsc -p test/types-order",
+    "test:types": "tsc --emitDeclarationOnly --outDir node_modules/.cache/pgcast && vitest run --typecheck.only --mode typecheck && tsc -p test/types-opt-in && node scripts/check-declarations.mjs && tsc -p test/types-order && tsc -p test/types-opt-in/legacy",
     "bench:types": "node scripts/bench-types.mjs",
     "check:floor": "node scripts/check-declarations-floor.mjs",
     "version": "npm run lint && npm run typecheck && npm test && npm run test:types && npm run build",
