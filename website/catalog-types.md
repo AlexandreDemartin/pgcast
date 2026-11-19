@@ -105,7 +105,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-The `seat_label` domain is a string in all five interfaces. For a domain over `bigint`, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) keeps the string from `pg` in `Selectable` and gives a number in `JSONSelectable`. Editing the placeholder to another type gives the column that type in all five interfaces.
+The `seat_label` domain is a string in all five interfaces. For a domain over `bigint`, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) keeps the string from `pg` in `Selectable` and gives a number in `JSONSelectable` with the default JSON parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` first. Editing the placeholder to another type gives the column that type in all five interfaces.
 
 The same row, asked for twice, shows the first two side by side:
 

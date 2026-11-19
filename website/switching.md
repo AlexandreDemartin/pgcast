@@ -162,9 +162,24 @@ This setting restores the 6.x union without a migration note. It alone fills the
 
 Regenerate with `npx pgcast` and run `tsc`. In 7.0 all three generator settings default to `true` and emit no migration note.
 
-- With [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), a ticket number from a `bigint` domain is a number in shortcut JSON. Replace calls to `.padStart()` on that number. A nested domain whose placeholder still holds `any` takes its innermost domain's base type. Edited placeholders keep their types. If Zapatos 6.6.1 wrote a placeholder without its `db` import, [add the import](/custom-types#when-a-placeholder-does-not-compile). Set the option to `false` for the 6.x types through 7.x. This override goes in 8.0.
+For callers of `definitionForRelationInSchema()`, the four optional arrays still collect columns independently of listener messages.
+
+| Out-parameter | When it collects a column |
+|---|---|
+| `domainsNotByContext` | `domainsTypedByContext: false`, for a known domain base whose type differs by context |
+| `domainsUnderDomains` | The same setting, for a nested domain or array of domains with a known root |
+| `enumArraysNotAsText` | `enumArraysTypedAsText` omitted or `null`, for a recognised enum array, including a direct domain over one |
+| `intervalsAsText` | `intervalsTypedAsObjects` omitted or `null`, for an interval, its array or a direct domain over either. A resolved interval or interval-array root also counts when `domainsTypedByContext` is on (the 7.0 default). |
+
+- With [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), a `bigint` domain gives a number in shortcut JSON with the default parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` before calling `.padStart()`.
+- A nested domain with an `any` placeholder takes its innermost base type. An array of `bigint` domains narrows from `any` to `number[]` in default shortcut JSON. If rows contain null elements or multiple dimensions, check the shape before using an element. Include those shapes and the raw `string` in the array placeholder, or use `domainsTypedByContext: false` through 7.x. This override goes in 8.0.
 - With [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), a `sql` row holds the array's text. To call `.map()` or write the labels back, use the array returned by a shortcut. Keep `false` if your `pg` parser returns the label array.
+- With the 7.0 default, an `isInSelect()` subquery `sub` selecting `c_enum_array` compares as the raw `string` type. TypeScript now rejects `{ c_enum_array: sub }` and accepts a text column that Postgres rejects (42883). Set `enumArraysTypedAsText: false` or write an explicit `sql` condition.
 - With [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), a `sql` row holds a `PostgresInterval`. Read its fields or write the object back directly. Shortcut JSON keeps the text. Keep `false` if your parser returns interval text. Both parser settings remain available beyond 8.0.
+
+Regeneration preserves existing placeholders. Context typing compares the placeholder's type with the type a fresh run would generate under the current settings. An old interval-domain `string` stays text. An edit to `db.PostgresInterval` matches the new default, so shortcut JSON becomes text. Switching back to `intervalsTypedAsObjects: false` preserves an existing object placeholder. Generate into an empty `outDir`, diff the placeholders and merge the changes you need. For a missing `db` import, [add the import](/custom-types#when-a-placeholder-does-not-compile).
+
+To restore the 6.x raw type of a domain over an enum array, set both `domainsTypedByContext` and `enumArraysTypedAsText` to `false`.
 
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 

@@ -588,6 +588,7 @@ import * as db from 'zapatos/db';
 db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id') });
 ```
 
+- Avec le réglage par défaut de la 7.0, une sous-requête sur un tableau d’enums utilise le type `string` pour la comparaison, si bien que TypeScript refuse la colonne du tableau elle-même et accepte une colonne de texte que Postgres refuse (42883).
 - **Sous `not()`**, elle ne trouve aucune ligne dès que la sous-requête renvoie un `NULL`, vu la façon dont Postgres lit `NOT IN` : `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` ne trouve personne, car un `mentor_id` est `NULL`. Pour l’anti-jointure, écrivez `not(exists(…))` (voir plus haut).
 - **Comme `where` entier**, hors d’une clé, elle n’a pas de colonne : le type l’y refuse, seule, sous `not()` ou dans `and()` (TS2345), et en code non typé, elle lève "The 'self' column alias has no meaning here".
 

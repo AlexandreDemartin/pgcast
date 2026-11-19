@@ -478,7 +478,7 @@ process.on('warning', (warning: Error & { code?: string }) => {
 - An array column takes the array of its item's type: `int8[]` gives `Int8String[]` in a `Selectable`.
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
-- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) restores the placeholder type in all five interfaces.
+- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder. A direct domain over an enum array also needs `enumArraysTypedAsText: false` to use that type in raw rows. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
 - An `interval` gives a [`PostgresInterval`](#PostgresInterval) in `Selectable`, a `string` in JSON and `string | PostgresInterval` in a write. With [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects), all five interfaces use `string`.
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.

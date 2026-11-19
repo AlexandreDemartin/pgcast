@@ -109,7 +109,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-Le domaine `seat_label` est une chaîne dans les cinq interfaces. Pour un domaine sur `bigint`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) conserve la chaîne de `pg` dans `Selectable` et donne un nombre dans `JSONSelectable`. Si vous modifiez le type du placeholder, la colonne prend ce type dans les cinq interfaces.
+Le domaine `seat_label` est une chaîne dans les cinq interfaces. Pour un domaine sur `bigint`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) conserve la chaîne de `pg` dans `Selectable` et donne un nombre dans `JSONSelectable` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. Si vous modifiez le type du placeholder, la colonne prend ce type dans les cinq interfaces.
 
 La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 

@@ -583,6 +583,7 @@ import * as db from 'zapatos/db';
 db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id') });
 ```
 
+- With the 7.0 default, an enum-array subquery compares as `string`, so TypeScript rejects the same enum-array column and accepts a text column that Postgres rejects (42883).
 - **`not()` of it** matches no row once the subquery gives a `NULL`, as Postgres reads `NOT IN`: `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` finds no one, as one `mentor_id` is `NULL`. For the anti-join, write `not(exists(…))`, above.
 - **As the whole `where`**, outside a key, it has no column: the type refuses it there, alone, under `not()` or in `and()` (TS2345), and untyped code throws "The 'self' column alias has no meaning here".
 

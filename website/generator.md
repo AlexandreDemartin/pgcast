@@ -136,7 +136,7 @@ await generate({
 - A connection or query error rejects the promise before any files are written. You can catch the original `pg` error or set [`rejectOnQueryError: false`](#generate.rejectOnQueryError) to keep the 6.x exit.
 - Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2353, or TS2561 with a suggestion for a near-miss such as `outdir`).
-- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others). `definitionForRelationInSchema()` fills the `columnsTypedByEnumName` array only with `typeEnumsAcrossSchemas: false`.
+- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others). `definitionForRelationInSchema()` fills the `columnsTypedByEnumName` array only with `typeEnumsAcrossSchemas: false`. `tsTypeForPgType()` maps a type name in one context, so an enum array maps to an array. `definitionForRelationInSchema()` applies `enumArraysTypedAsText` to raw reads. See the [relation helper's out-parameters](/switching#domain-and-parser-types).
 
 ## Options {#options}
 
@@ -330,7 +330,8 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | Column of `prints` | `false` | `true` |
 |---|---|---|
 | `format` | `c.PgPrint_format`, an `any` placeholder | `('nitrate' \| 'safety' \| 'digital')` |
-| `formats` | `c.Pg_print_format \| null`, an `any` placeholder | `('nitrate' \| 'safety' \| 'digital')[] \| null` |
+| `formats` (`Selectable`) | `c.Pg_print_format \| null`, an `any` placeholder | `string \| null` by default, the label array below with `enumArraysTypedAsText: false` |
+| `formats` (`JSONSelectable`) | `c.Pg_print_format \| null`, an `any` placeholder | `('nitrate' \| 'safety' \| 'digital')[] \| null` |
 | `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
 - The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In the order of [`enumOrder`](#generate.enumOrder), as for every enum.
@@ -449,7 +450,7 @@ CREATE DOMAIN ticket_no AS bigint;
 ALTER TABLE seat_bookings ADD COLUMN ticket ticket_no;
 ```
 
-Its placeholder, `PgTicket_no.d.ts`, holds `db.Int8String`. The shortcuts return the ticket as a JSON number, and Postgres takes a number for it:
+Its placeholder, `PgTicket_no.d.ts`, holds `db.Int8String`. With the default JSON parser, the shortcuts return the ticket as a number, and Postgres takes a number for it:
 
 | `seat_bookings.ticket` | `false` | `true` |
 |---|---|---|
@@ -458,11 +459,12 @@ Its placeholder, `PgTicket_no.d.ts`, holds `db.Int8String`. The shortcuts return
 | `Whereable`, `Insertable`, `Updatable` | `PgTicket_no`, a string: `insert()` refuses `ticket: 1` (TS2769) | `number \| Int8String \| bigint` |
 
 - `true` writes [`DomainInContext`](/runtime-config#DomainInContext) in the four other interfaces, `db.DomainInContext<c.PgTicket_no, db.Int8String, number>` in `JSONSelectable`; an editor shows `number`.
-- A placeholder you edit, to any other type, types the column in all five interfaces, as with `false`: `number | db.Int8String`, a branded type, `any` or `any[]`. Only a placeholder that is exactly the type the generator wrote is typed by context. The option never changes a placeholder, so turning it on or off needs no edit to one.
+- A placeholder whose type differs from the current generated type supplies all five interfaces. Type identity alone decides this, even for an untouched 6.x file. To compare files, follow the [migration guide](/switching#domain-and-parser-types).
 - A placeholder Zapatos 6.6.1 wrote over `int8` or `numeric` holds the same type without its import, and the generator never rewrites it: the column is `any`, with `false` and `true`, so `insert()` takes `ticket: 'abc'`. Over an array of one, it holds `db.Int8String[]` or `db.NumericString[]`, which is `any[]`, with `false` and `true` too: `insert()` takes `nos: ['abc']` and refuses `nos: 'abc'` (TS2769). In the placeholder, `tsc` says TS2503, and nothing under `skipLibCheck`. Add its import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Over `date`, `timestamp`, `timestamptz`, `bytea` or `money`, 6.6.1's placeholder is the one the generator writes.
 - Two domains that share a placeholder, such as `public.ticket_no AS bigint` and `archive.ticket_no AS date`, both `PgTicket_no` ([`customTypesTransform`](#generate.customTypesTransform)), share its one type, as the generator's note `custom types … are both named PgTicket_no` says ([`warningListener`](#generate.warningListener)): `true` types by context the columns of the domain whose type the placeholder holds, and leaves the other's typed by the placeholder in all five interfaces. Rename one of the two in the database.
 - Each base type takes its own types: `numeric` `number`, then `number | NumericString`; `date`, `timestamp` and `timestamptz` their string type, then that or a `Date`; `bytea` `ByteArrayString`, then that or a `Buffer`; `money` `string`, then `number | string`; an array, its item's, as an array. With [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in `JSONSelectable`.
 - Unchanged: a domain typed alike in every context, such as `seat_label`.
+- For a plain `numeric[]` or a domain rooted in it, `Selectable` declares `db.NumericString[]`. The default `pg` array parser returns numbers.
 
 A domain over a domain, or an array of a domain, gets a placeholder that holds `any`: the generator reads the inner domain, or the array's type, as a custom type. `true` types it in all five interfaces by the base type of its innermost domain, while its placeholder holds `any`:
 
@@ -499,7 +501,7 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COL
 
 - `false`: the array, with no note, including beyond 8.0: the right type for a project that parses it with `pg.types.setTypeParser`, given the array type's OID (`SELECT 'crew_job[]'::regtype::oid`) and the parser of `text[]`, `pg.types.getTypeParser(1009)`.
 - `true`: `string`, the text `pg` returns. The writes still take an array, so a `sql` row's text isn't written back as it is: `insert()` and `update()` refuse it (TS2769, TS2322), though Postgres would take it.
-- A domain over such an array, as `crew.past_jobs`, takes `db.DomainInContext<c.PgJob_list, crew_job[], string>` in `Selectable` ([`DomainInContext`](/runtime-config#DomainInContext)): `string` while its placeholder holds what the generator wrote, and a placeholder you edit keeps its type. Its other interfaces and its placeholder don't change.
+- A domain over such an array, as `crew.past_jobs`, takes `db.DomainInContext<c.PgJob_list, crew_job[], string>` in `Selectable` ([`DomainInContext`](/runtime-config#DomainInContext)): `string` while its placeholder matches the current generated type, even if edited. A different placeholder type is preserved in all five interfaces.
 - An array of an enum of another schema, typed by its labels with [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) or else as the enum of the same name in the relation's schema, is a `string` in `Selectable` too. Without either, it's an `any` placeholder, and stays one. An array of a domain over an enum is [`domainsTypedByContext`](#generate.domainsTypedByContext)'s.
 
 ### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
@@ -516,7 +518,7 @@ ALTER TABLE screenings ADD COLUMN intermission interval;
 | `JSONSelectable`, a row from the shortcuts | `string`: `'00:15:00'` | the same |
 | `Whereable`, `Insertable`, `Updatable` | `string` | `string \| PostgresInterval` |
 
-- `false`: the text, with no note. It stays beyond 8.0, for a type parser of your own that returns the text: `pg.types.setTypeParser(1186, v => v)` for `interval`, and `1187` too for `interval[]`, whose own parser `pg` keeps otherwise.
+- `false` remains available beyond 8.0 for custom parsers. Use `pg.types.setTypeParser(1186, v => v)` for interval text and `pg.types.setTypeParser(1187, pg.types.getTypeParser(1009))` for an array of interval strings.
 - `true`: a `PostgresInterval` in `Selectable`, an array of them for an `interval[]`. A write takes one back, as `pg` sends it through its `toPostgres()`; `insert()` still refuses a plain object such as `{ minutes: 15 }` (TS2769): Postgres 17 and later refuse it too (22007), and Postgres 16 and earlier store `00:00:15` for it.
 - `pg` reads the default `IntervalStyle`, `postgres`, only: under `iso_8601`, `sql_standard` or `postgres_verbose`, its object comes back with parts missing, often `{}`, whatever the type says. The shortcuts give the text, in that style.
 - A domain over one follows: a new placeholder holds `db.PostgresInterval`, and with [`domainsTypedByContext`](#generate.domainsTypedByContext) its column is typed by context, as a domain over `date` is. A domain over such a domain takes `PostgresInterval` in `Selectable` with `domainsTypedByContext`; an array of a domain stays `string` there, the text `pg` returns. A placeholder written before holds `string`, and the generator never rewrites it.
