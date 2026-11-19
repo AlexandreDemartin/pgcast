@@ -1,5 +1,5 @@
 ---
-english: 64f80e85a62f
+english: 8f23eff8b76e
 description: "Ne montrez à chaque client que ses propres réservations : une politique de sécurité niveau ligne lit un réglage, que setLocal() définit pour une transaction."
 ---
 
