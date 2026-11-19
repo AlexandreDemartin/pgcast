@@ -1315,6 +1315,31 @@ describe('count, sum, avg, min, max', () => {
     }))).toEqual({ id: 3, n: null });
   });
 
+  it.each(['selectOne', 'selectExactlyOne'] as const)('now() passed through %s() gives a Date', async outer => {
+    const lateral = sql<db.SQL, Date>`SELECT now() AS result`;
+    const at = await run(db[outer]('users', { id: 1 }, { lateral }));
+    expect(at).toBeInstanceOf(Date);
+    expect(at.getTime()).toBe((await scalar('SELECT now() AS v')).getTime());
+  });
+
+  it('now() passed through select() gives a JSON string', async () => {
+    const lateral = sql<db.SQL, Date>`SELECT now() AS result`;
+    const stamp = await scalar('SELECT to_jsonb(now()) AS v');
+    expect(typeof stamp).toBe('string');
+    expect(await run(db.select('users', { id: 1 }, { lateral }))).toEqual([stamp]);
+  });
+
+  it.each(['selectOne', 'selectExactlyOne', 'select'] as const)('to_jsonb(now()) passed through %s() gives a JSON string', async outer => {
+    const lateral = sql<db.SQL, string>`SELECT to_jsonb(now()) AS result`;
+    const stamp = await scalar('SELECT to_jsonb(now()) AS v');
+    expect(typeof stamp).toBe('string');
+    if (outer === 'select') {
+      expect(await run(db.select('users', { id: 1 }, { lateral }))).toEqual([stamp]);
+    } else {
+      expect(await run(db[outer]('users', { id: 1 }, { lateral }))).toBe(stamp);
+    }
+  });
+
   it('characterization: passed through selectOne() / selectExactlyOne(), count(), sum() and avg() come as pg parses a bigint or numeric, a string, though typed number, as in 6.6.1 (#470)', async () => {
     // the passed-through column is handed over as it is, not through the aggregate's Number(); select() and a
     // lateral map read it from JSON, a number (rounded beyond 2^53). Ada (id 1) has two accounts, Cyd (id 3) none

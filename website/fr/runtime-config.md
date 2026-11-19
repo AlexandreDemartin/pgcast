@@ -1,5 +1,5 @@
 ---
-english: 1fc49c78eaaf
+english: 1ce48074a5cf
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -275,7 +275,7 @@ Sans l’option, le résultat passe par `Number()`, comme dans Zapatos 6.6.1 : 
 
 - Les types ne suivent qu’une fois l’option déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `setConfig()` règle le runtime, la déclaration les types.
 - Imbriquée dans un `lateral`, ou donnée comme valeur d’`extras`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; une fois l’option déclarée, elle est typée comme le `JSONSelectable` de sa colonne.
-  - Sauf quand la requête exécutée est un `selectOne()` ou un `selectExactlyOne()` qui la transmet : il rend la colonne telle que `pg` la lit ([`lateral`](/fr/select#lateral)).
+  - Pour un [`lateral` transmis](/fr/select#lateral), appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou `selectRows()` pour obtenir la colonne telle que `pg` la parse. Un `select()` extérieur renvoie du JSON. [`selectRows()`](/fr/select#selectRows) refuse à la compilation un fragment numérique transmis directement, comme `count()`.
 - L’option est lue à `.run()`, là où l’avertissement est aussi émis : une requête construite avant `setConfig()` prend l’option sous laquelle elle s’exécute, comme le dit son type, déclaré pour tout le programme. Une requête qui ne renvoie aucune ligne, un `groupBy` sans aucun groupe, se lit comme `NULL` : `null` avec l’option, `0` sans, avec l’avertissement.
 - Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
 
