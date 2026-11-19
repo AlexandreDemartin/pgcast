@@ -120,7 +120,7 @@ Ici, n’importe quelle 6.x convient : `@^6`.
 Vos imports et le schéma généré nomment le paquet par son dossier dans `node_modules` : `pgcast/db` ou `zapatos/db`. Installé sous son seul nom, `@pgcast/pgcast`, il atterrit dans `node_modules/@pgcast/pgcast`, où ni l’un ni l’autre ne se résout. L’alias nomme le dossier, et `moduleNames` doit lui correspondre ([décision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 :::
 
-Déjà sur Zapatos ? Le passage tient en une ligne de `package.json`, puis un coup d’œil aux quelques appels dont le résultat change : [Venir de Zapatos](/fr/switching).
+Déjà sur Zapatos ? Une ligne de `package.json` suffit pour remplacer le paquet. À partir de la 7.0, si vous vérifiez les types, [ajoutez les dépendances de développement manquantes](#requirements). Pour les quelques appels dont le résultat change, consultez [Venir de Zapatos](/fr/switching).
 
 Voilà pgcast dans votre projet. Ensuite, [Première requête](/fr/first-query) génère les types d’une base de données, puis exécute avec eux une lecture et une insertion.
 

@@ -58,7 +58,7 @@ describe('runtime imports', () => {
   });
 
   it('requires pg and makes both type peers optional at their Zapatos 6.6.1 ranges', () => {
-    expect(pkg.peerDependencies).toMatchObject({ pg: '>=7.18.2', '@types/pg': '>=7.14.3', typescript: '>=4.1' });
+    expect(pkg.peerDependencies).toEqual({ pg: '>=7.18.2', '@types/pg': '>=7.14.3', typescript: '>=4.1' });
     expect(optional('pg')).toBe(false);
     expect(Object.keys(pkg.peerDependencies).filter(optional).sort()).toEqual(['@types/pg', 'typescript']);
   });

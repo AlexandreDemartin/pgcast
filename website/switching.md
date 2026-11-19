@@ -1,10 +1,10 @@
 ---
-description: "Move a project from Zapatos 6.6.1 to pgcast: change one line of package.json, regenerate, and let tsc and pgcast's warnings show you the few calls that change."
+description: "Move a project from Zapatos 6.6.1 to pgcast: swap the package, add any missing type peers if you check types on 7.0, then regenerate and check the calls that change."
 ---
 
 # Switch from Zapatos
 
-Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, regenerate, then let `tsc`, a look through your code and pgcast's warnings show you the few calls whose result changes. It assumes a project that already runs on Zapatos; for a new one, start at [Install](/install).
+To move from Zapatos 6.6.1 to pgcast, swap the package and, from 7.0, [add any missing dev dependencies](/install#requirements) if you check types. Regenerate, then let `tsc`, a look through your code and pgcast's warnings show you the few calls whose result changes. It assumes a project that already runs on Zapatos; for a new one, start at [Install](/install).
 {.lede}
 
 <AtAGlance>
@@ -25,7 +25,7 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 
 ## 1. Swap the package {#swap-the-package}
 
-Install pgcast under the name Zapatos had:
+Install pgcast under the name Zapatos had. The Yarn and bun commands target 6.x. For 7.x, replace `@^6` with `@^7`.
 
 ::: code-group
 

@@ -116,7 +116,7 @@ Here any 6.x will do: `@^6`.
 Your imports and the generated schema name the package by its folder in `node_modules`: `pgcast/db` or `zapatos/db`. Installed as plain `@pgcast/pgcast`, it lands in `node_modules/@pgcast/pgcast`, where neither resolves. The alias names the folder, and `moduleNames` must match it ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 :::
 
-Already on Zapatos? Switching is one line of `package.json`, then a look for the few calls whose result changes: [Switch from Zapatos](/switching).
+Already on Zapatos? One line of `package.json` swaps the package. From 7.0, if you check types, [add any missing dev dependencies](#requirements). For the few calls whose result changes, see [Switch from Zapatos](/switching).
 
 That's pgcast in your project. Next, [First query](/first-query) generates the types of a database, then runs a select and an insert with them.
 

@@ -1,11 +1,11 @@
 ---
 english: 34107932f207
-description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
+description: "Passez de Zapatos 6.6.1 à pgcast : remplacez le paquet, ajoutez les dépendances de types manquantes si vous vérifiez les types en 7.0, puis régénérez le schéma et vérifiez les appels qui changent."
 ---
 
 # Venir de Zapatos
 
-Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.json`, régénérez, puis laissez `tsc`, un coup d’œil à votre code et les avertissements de pgcast vous montrer les quelques appels dont le résultat change. La page suppose un projet qui tourne déjà sur Zapatos ; pour un nouveau, commencez par [Installation](/fr/install).
+Pour passer de Zapatos 6.6.1 à pgcast, remplacez le paquet et, à partir de la 7.0, [ajoutez les dépendances de développement manquantes](/fr/install#requirements) si vous vérifiez les types. Régénérez le schéma, puis laissez `tsc`, un coup d’œil à votre code et les avertissements de pgcast vous montrer les quelques appels dont le résultat change. La page suppose un projet qui tourne déjà sur Zapatos ; pour un nouveau, commencez par [Installation](/fr/install).
 {.lede}
 
 <AtAGlance>
@@ -26,7 +26,7 @@ Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.jso
 
 ## 1. Changer de paquet {#swap-the-package}
 
-Installez pgcast sous le nom qu’avait Zapatos :
+Installez pgcast sous le nom qu’avait Zapatos. Les commandes Yarn et bun ciblent la 6.x. Pour la 7.x, remplacez `@^6` par `@^7`.
 
 ::: code-group
 
