@@ -205,7 +205,9 @@ type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
  * as is and not released), an existing transaction client to be passed
  * through, another driver's included, or the `PoolLike` of another driver,
- * whose client the callback gets
+ * whose client the callback gets. With that pool, a call specifying the result type
+ * argument but omitting the pool-client type argument gives the callback pg's
+ * transaction client type. You can annotate the callback's return type instead.
  * @param isolationLevel The desired isolation level (e.g.
  * `IsolationLevel.Serializable`)
  * @param callback A callback function that runs queries on the client provided
