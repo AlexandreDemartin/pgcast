@@ -166,14 +166,39 @@ describe('a pool that is not pg’s', () => {
     expectTypeOf(levels(db.IsolationLevel.ReadCommitted)).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
   });
 
-  // https://github.com/AlexandreDemartin/pgcast/issues/752: an explicit result type leaves the client at its pg default.
-  test('naming the result alone gives the callback a pg client type', () => {
+  // https://github.com/AlexandreDemartin/pgcast/issues/752: the explicit-result wrappers accepted by Zapatos 6.6.1
+  test('a wrapper can pass each function’s first parameter with a result type argument', () => {
+    const count = async () => 1;
+    const wrappers = [
+      (p: Parameters<typeof db.transaction>[0]) =>
+        db.transaction<number, db.IsolationLevel.Serializable>(p, db.IsolationLevel.Serializable, count),
+      (p: Parameters<typeof db.serializable>[0]) => db.serializable<number>(p, count),
+      (p: Parameters<typeof db.repeatableRead>[0]) => db.repeatableRead<number>(p, count),
+      (p: Parameters<typeof db.readCommitted>[0]) => db.readCommitted<number>(p, count),
+      (p: Parameters<typeof db.serializableRO>[0]) => db.serializableRO<number>(p, count),
+      (p: Parameters<typeof db.repeatableReadRO>[0]) => db.repeatableReadRO<number>(p, count),
+      (p: Parameters<typeof db.readCommittedRO>[0]) => db.readCommittedRO<number>(p, count),
+      (p: Parameters<typeof db.serializableRODeferrable>[0]) => db.serializableRODeferrable<number>(p, count),
+    ];
+    for (const run of wrappers) expectTypeOf(run(pool)).toEqualTypeOf<Promise<number>>();
+  });
+
+  test('annotating the callback’s return type lets TypeScript infer the pool’s client', () => {
+    const result = db.serializable(other, async (c): Promise<number> => {
+      expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>();
+      return 1;
+    });
+    expectTypeOf(result).toEqualTypeOf<Promise<number>>();
+  });
+
+  test('a result type argument without a pool-client type argument gives the callback a pg client type', () => {
     void db.transaction<number, db.IsolationLevel.ReadCommitted>(other, db.IsolationLevel.ReadCommitted, async c => {
       expectTypeOf(c).toEqualTypeOf<db.TxnClientForReadCommitted>();
       return 1;
     });
     void db.serializable<number>(other, async c => {
       expectTypeOf(c).toEqualTypeOf<db.TxnClientForSerializable>();
+      await c.query('SELECT 1');
       return 1;
     });
     void db.repeatableRead<number>(other, async c => {
@@ -189,6 +214,8 @@ describe('a pool that is not pg’s', () => {
     });
     void db.serializable<number, OtherClient>(other, async c => {
       expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>();
+      // @ts-expect-error this driver's query() requires a query object
+      await c.query('SELECT 1');
       return 1;
     });
     void db.repeatableRead<number, OtherClient>(other, async c => {
