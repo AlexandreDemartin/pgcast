@@ -4,6 +4,11 @@ All notable changes to `@pgcast/adapter-pglite` are documented here. Format: [Ke
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-19
+
+### Changed
+- The README explains when a nested transaction receives the outer client in pgcast 7 and updates both install commands to pgcast 7.
+
 ## [0.1.0] - 2026-11-19
 
 ### Added

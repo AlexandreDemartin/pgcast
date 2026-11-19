@@ -7,10 +7,10 @@ Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [postgres.js](
 ## Install
 
 ```sh
-npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-postgres-js postgres
+npm install zapatos@npm:@pgcast/pgcast@^7 @pgcast/adapter-postgres-js postgres
 ```
 
-For `pgcast/db`, install `pgcast@npm:@pgcast/pgcast@^6.12.0` in place of the `zapatos` alias. Set [`moduleNames`](https://pgcast.dev/generator#generate.moduleNames) to `"pgcast"`. The adapter imports neither pgcast nor postgres.js. Its types fit either alias.
+For `pgcast/db`, install `pgcast@npm:@pgcast/pgcast@^7` in place of the `zapatos` alias. Set [`moduleNames`](https://pgcast.dev/generator#generate.moduleNames) to `"pgcast"`. The adapter imports neither pgcast nor postgres.js. Its types fit either alias.
 
 ## Use
 
