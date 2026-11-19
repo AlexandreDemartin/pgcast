@@ -394,6 +394,24 @@ export const definitionForRelationInSchema = async (
     uniqueIndexesNotArbiters.push(...result.rows.filter(ui => !ui.isArbiter).map(ui => `${schemaName}.${rel.name}.${ui.indexname}`));
   }
 
+  let constraintDef = '';
+  if (config.constraintNames === true) {
+    const { rows } = await queryFn({
+      text: `
+        SELECT con.conname
+        FROM pg_catalog.pg_constraint con
+        JOIN pg_catalog.pg_class r ON r.oid = con.conrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = r.relnamespace
+        WHERE r.relname = $1 AND n.nspname = $2 AND con.contype IN ('p', 'u', 'f', 'c', 'x')`,
+      values: [rel.name, schemaName]
+    });
+    const extraNames = new Set<string>([...result.rows.map(ui => ui.indexname), ...rows.map(con => con.conname)]);
+    for (const ui of uniqueIndexes) extraNames.delete(ui.indexname);
+    const members = [...extraNames].sort().map(name => stringLiteral(name));
+    if (uniqueIndexes.length > 0) members.unshift('UniqueIndex');
+    constraintDef = `\n  export type Constraint = ${members.join(' | ') || 'never'};`;
+  }
+
   const
     schemaPrefix = schemaName === config.unprefixedSchema ? '' : `${schemaName}.`,
     friendlyRelTypes: Record<Relation['type'], string> = {
@@ -429,7 +447,7 @@ export namespace ${tsIdentifier(rel.name, 'namespace')} {
   }
   export type UniqueIndex = ${uniqueIndexes.length > 0 ?
         uniqueIndexes.map(ui => stringLiteral(ui.indexname)).join(' | ') :
-        'never'};
+        'never'};${constraintDef}
   export type Column = keyof Selectable;
   export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
   export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & ${notIterable}) | Column | db.ParentColumn | db.GenericSQLExpression;

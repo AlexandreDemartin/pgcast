@@ -35,6 +35,7 @@ export interface OptionalConfig {
   // optional for a CompleteConfig written for 6.6.1; the CLI sets false
   rejectOnQueryError?: boolean;  // reject with the query or connection error by default; false prints it and exits
   uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists usable ON CONFLICT ON CONSTRAINT arbiters by default; false lists all unique indexes
+  constraintNames?: boolean;  // true adds each relation's Constraint type, including all its unique indexes
   domainsTypedByContext?: boolean;  // use the base type by context when the placeholder matches the type generated with these settings
   enumArraysTypedAsText?: boolean;  // pg returns an enum array as text in Selectable by default; false keeps the label array for a custom parser
   intervalsTypedAsObjects?: boolean;  // pg returns a PostgresInterval in Selectable by default; false keeps string for a custom parser

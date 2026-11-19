@@ -93,7 +93,11 @@ const baseTsTypeForBasePgType = (pgType: string, enums: EnumData, context: TypeC
     case 'jsonb':
       return 'db.JSONValue';
     default:
-      if (hasOwnProp.call(enums, pgType)) return inlineEnums ? enumUnion(enums[pgType]) : tsIdentifier(pgType, 'type');
+      if (hasOwnProp.call(enums, pgType)) {
+        // A relation's Constraint alias shadows an enum of the same name.
+        if (inlineEnums || (config.constraintNames === true && pgType === 'Constraint')) return enumUnion(enums[pgType]);
+        return tsIdentifier(pgType, 'type');
+      }
       return null;
   }
 };
