@@ -25,7 +25,7 @@ Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 
   - Les variables du fichier sont substituées avant la fusion : une variable qu’il nomme doit être définie même quand l’argument remplace sa clé, sinon la CLI s’arrête avec `Environment variable 'NAME' is not set`.
 - Dans chaque chaîne des deux, à toute profondeur, les variables d’environnement sont substituées ([Variables d’environnement](#environment-variables)).
 - À partir de la 6.8.0, un seul flag, `--check`, avant ou après `config`. À partir de la 6.12.0, `--help` ou `-h` à la place de `config` affiche l’aide, qui nomme les fichiers de configuration, `config`, les flags et cette page, et se termine avec le code 0, avant qu’elle lise la config.
-- Avant comme après `config`, la CLI ignore un `--` isolé sans émettre de note. Par exemple, `pgcast -- --help` affiche l’aide.
+- À partir de la 6.12.0, la CLI ignore un `--` isolé avant ou après `config` sans émettre de note. Par exemple, `pgcast -- --help` affiche l’aide.
 - Si vous passez un flag inconnu commençant par `--` à la place de `config`, la CLI s’arrête avec le code 1 avant de lire la config. À partir de la 6.12.0, elle affiche sur stderr `Unknown flag --chek: the flags are --check, --help and -h` et l’aide. À partir de la 6.8.0, Node affichait `Unknown flag --chek: the only flag is --check, beside the JSON argument` et la trace de la pile d’appels. Zapatos 6.6.1 tentait de parser chacun de ces flags, y compris `-h`, comme l’argument JSON, ce qui échouait.
 - Après `config`, la CLI ignore les flags inconnus qui commencent par `--`, ainsi que `--help`, comme dans Zapatos 6.6.1. Elle émet une [note](#generate.warningListener) pour chacun. Ainsi, `npx pgcast '{}' --chek` génère les fichiers malgré la faute de frappe.
 - Parmi les autres arguments, le premier est `config` ; les suivants sont ignorés.
@@ -608,7 +608,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
   - depuis [la CLI](#cli), avant de générer, quand le dossier où elle tourne contient les deux fichiers ;
 - `Note: flag --chek ignored after the JSON argument: only --check may follow it.`
-  - depuis [la CLI](#cli), avant de générer ou de vérifier, pour chaque argument après `config` qui commence par `--` et n’est pas `--check` ;
+  - depuis [la CLI](#cli), avant de générer ou de vérifier, pour chaque argument après `config` qui commence par `--` sauf `--` et `--check` ;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
   - depuis `generate()` sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
 - l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning) ;
