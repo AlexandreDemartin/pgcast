@@ -4,7 +4,7 @@ english: 86c44b3f7136
 
 # Installation
 
-À partir de la 6.7.0, vous installez pgcast sous son propre nom et importez `pgcast/db`. Un projet qui vient de Zapatos [installe la 6.x sous l’alias `zapatos`](/fr/switching#swap-the-package), et garde ses imports.
+À partir de la 6.7.0, vous installez pgcast sous son propre nom et importez `pgcast/db`. Un projet qui vient de Zapatos [installe la 6.x sous l’alias `zapatos`](/fr/switching#swap-the-package) et garde ses imports.
 {.lede}
 
 ## Prérequis {#requirements}
@@ -92,7 +92,7 @@ Yarn 2 et les versions suivantes exigent une plage de versions dans un alias, et
 
 ### Sous l’alias `zapatos` {#under-the-zapatos-alias}
 
-Vous partez de Zapatos 6.6.1 ? Utilisez les [commandes qui installent la 6.x](/fr/switching#swap-the-package) pour voir ses avertissements de migration. Si vous utilisez déjà pgcast 6.x, suivez le [guide de migration vers la 7.0](/fr/switching#from-7-0).
+Vous partez de Zapatos 6.6.1 ? Utilisez les [commandes qui limitent l’installation à la 6.x](/fr/switching#swap-the-package) pour voir les avertissements de migration de pgcast. Vous utilisez déjà pgcast 6.x ? Suivez le [guide de migration vers la 7.0](/fr/switching#from-7-0).
 
 ::: tip Pourquoi l’alias
 Vos imports et le schéma généré nomment le paquet par son dossier dans `node_modules` : `pgcast/db` ou `zapatos/db`. Installé sous son seul nom, `@pgcast/pgcast`, il atterrit dans `node_modules/@pgcast/pgcast`, où ni l’un ni l’autre ne se résout. L’alias nomme le dossier, et `moduleNames` doit lui correspondre ([décision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
