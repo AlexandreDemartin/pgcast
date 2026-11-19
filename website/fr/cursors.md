@@ -29,7 +29,7 @@ COMMIT
 
 Chaque lecture coûte un aller-retour. Pour limiter le nombre de lignes chargées en mémoire à chaque lecture, fixez la taille du batch à un entier compris entre 1 et 2147483647. Prévoyez assez de mémoire pour que deux batchs successifs puissent s’y trouver en même temps.
 
-[`cursor()`](/fr/transaction#cursor) exécute la déclaration sans nom. Vous pouvez réutiliser les fragments préparés à tout niveau d’imbrication. Le numéro du curseur peut changer le SQL de la déclaration, et `pg` exige un seul texte de requête par nom.
+[`cursor()`](/fr/transaction#cursor) envoie la déclaration sans nom de requête préparée. Vous pouvez réutiliser les fragments préparés à n’importe quel niveau d’imbrication. Le numéro du curseur peut changer le texte SQL de la déclaration. `pg` exige qu’un nom de requête préparée corresponde à un seul texte SQL.
 
 ## Garder un seul instantané {#keep-one-snapshot}
 

@@ -298,7 +298,7 @@ Le SQL de chaque requête : [`count()`](/fr/select#count). Les autres raccourci
 db.savepoint(txnClient, callback)
 ```
 
-À partir de la 6.12.0. Exécute `callback` dans un savepoint de la transaction où se trouve `txnClient`. Elle renvoie une promesse de la valeur en laquelle `callback` se résout.
+À partir de la 6.12.0. Exécute `callback` dans un savepoint de la transaction en cours sur `txnClient`. La promesse renvoyée se résout avec la valeur produite par `callback`.
 
 - `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
 - `callback` : `async spClient => …`, qui reçoit ce même client, typé tel quel : dans `db.serializable()`, un [`TxnClientForSerializable`](#TxnClientForSerializable). Un callback typé pour un niveau que le client ne satisfait pas ne compile pas ([`IsolationSatisfying`](#IsolationSatisfying)).
@@ -333,11 +333,11 @@ Le SQL de la requête du callback : [`insert()`](/fr/insert#insert).
 | elle est rejetée avec 40001 ou 40P01 | rien de plus : elle est rejetée avec cette erreur |
 
 - Le nom se termine par la profondeur du savepoint : `pgcast_savepoint_1` directement dans la transaction, `pgcast_savepoint_2` à l’intérieur de celui-ci, et ainsi de suite, le même texte à chaque appel à une même profondeur. `ROLLBACK TO` et `RELEASE` suppriment aussi tous les savepoints établis après le leur, donc les savepoints s’imbriquent : chaque échec annule le travail de son propre niveau, niveaux intérieurs compris, quoi qu’ils aient laissé. Ne donnez pas un tel nom à l’un de vos savepoints.
-- Une erreur 40001 ou 40P01 renvoyée par le serveur laisse la transaction en échec. Si l’erreur remonte jusqu’à l’appel extérieur à `transaction()` et qu’il reste une tentative, celui-ci réexécute tout le callback, savepoint compris ([Retries](#retries)). Un savepoint ne réessaie jamais de lui-même.
+- Une erreur 40001 ou 40P01 renvoyée par le serveur laisse la transaction en échec. Si l’erreur remonte jusqu’à l’appel englobant à `transaction()` et qu’il reste une tentative, `transaction()` réexécute tout le callback, savepoint compris ([Retries](#retries)). Un savepoint ne réessaie jamais de lui-même.
 - Un callback qui intercepte l’erreur d’une requête et se termine : Postgres refuse le `RELEASE` (25P02), donc `savepoint()` annule jusqu’au savepoint et est rejetée avec ce 25P02. Son travail est annulé, niveaux intérieurs compris, et la transaction peut continuer. Ainsi, un 40001 ou un 40P01 que le callback intercepte n’est pas réessayé à cet endroit. Après un 40P01, ou un 40001 sous `REPEATABLE READ`, le `COMMIT` de la transaction enregistre ce qu’elle a écrit hors de ce savepoint ; après un 40001 sous `SERIALIZABLE`, Postgres peut refuser une requête suivante ou le `COMMIT` avec un nouveau 40001, et `transaction()` réessaie alors celui-ci. Laissez-les remonter, et relancez-les autour de `savepoint()`, comme le fait l’exemple.
 - Les 40001 et 40P01 sont reconnus à leur `code`, comme dans [Retries](#retries). Une telle erreur levée depuis JavaScript, puis interceptée, ne reçoit pas de `ROLLBACK TO` : le travail de son savepoint reste en place, sauf si un niveau extérieur l’annule.
 - Hors d’un bloc de transaction, Postgres refuse le `SAVEPOINT` (25P01) : `savepoint()` est rejetée avec cette erreur, et n’appelle jamais le callback.
-- Sur un même client, attendez chaque savepoint avec `await`. pgcast ne vérifie pas si les appels se chevauchent. Deux appels qui se chevauchent s’imbriquent dans l’ordre des appels. Si le premier libère son savepoint avant le second, il supprime aussi le second savepoint. Le `RELEASE` du second appel échoue alors avec 3B001 et la transaction passe en échec. Un `ROLLBACK TO` vers le second savepoint annule aussi ce que le premier appel a écrit après ce savepoint.
+- Sur un même client, attendez la fin de chaque appel à `savepoint()` avec `await`. pgcast ne vérifie pas si les appels se chevauchent. En cas de chevauchement, les savepoints s’imbriquent dans l’ordre des appels. Si le premier appel libère son savepoint avant que le second ait libéré le sien, Postgres supprime aussi le second savepoint. Le `RELEASE` du second appel échoue alors avec le code 3B001 et met la transaction en échec. Un `ROLLBACK TO` vers le second savepoint annule aussi les écritures du premier appel effectuées après la création de ce savepoint.
 - La profondeur est comptée par objet client, par chaque copie de pgcast installée : un objet wrapper ou un `Proxy` du client repart de 1, tout comme, avec deux copies, par exemple deux versions dans `node_modules`, un savepoint de l’une placé dans un savepoint de l’autre. Le savepoint intérieur prend alors le nom de l’extérieur, et son 40001 intercepté par le callback extérieur laisse en place le travail du niveau extérieur.
 - Ses requêtes passent par [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) avec l’id de la transaction ; [`transactionListener`](/fr/runtime-config#Config.transactionListener) n’en reçoit rien.
 - Une `transaction()` appelée avec le client du callback d’une `transaction()` est [transmise](#passing-a-transaction-through) : elle n’envoie pas de `SAVEPOINT`. Appelée avec un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`, elle ne l’est pas ([Votre propre `BEGIN`](#your-own-begin)).
@@ -405,7 +405,7 @@ db.setLocal(txnClient, settings)
 - `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
 - `settings` : un objet de chaînes, chacune le nom d’un réglage et sa valeur : un littéral, un `Record<string, string>`, un alias de type, `as const`. Une interface n’a pas de signature d’index, elle ne compile donc pas : passez-en le spread, `{ ...context }`. Une valeur typée `number`, `null` ou `string | undefined`, une `Map` et un `Date` ne compilent pas non plus. À partir de TypeScript 4.2, une propriété optionnelle compile, `{ 'app.customer'?: string }`, et un `undefined` qu’elle contient est refusé à l’exécution. Seules ses clés propres, énumérables et de type chaîne sont envoyées : une clé `Symbol`, qui compile, et une propriété non énumérable sont ignorées, sans erreur.
 
-Avec une politique à vous sur `seat_bookings`, `USING (customer = NULLIF(current_setting('app.customer', true), ''))`, un client ne lit que ses propres réservations :
+Si vous définissez la politique `USING (customer = NULLIF(current_setting('app.customer', true), ''))` sur `seat_bookings`, chaque client ne peut lire que ses propres réservations :
 
 <<< ../examples/plain/set_local_customer.ts{ts twoslash}
 
@@ -453,10 +453,10 @@ Elle est rejetée avant toute requête dans cinq cas, dans cet ordre :
 db.cursor(txnClient, query, { batchSize })
 ```
 
-À partir de la 6.12.0. Lit les lignes de `query` par un curseur côté serveur, `batchSize` à la fois. Elle renvoie un générateur asynchrone, pour `for await`, et n’envoie rien avant que le premier batch soit demandé ([`DECLARE`](https://www.postgresql.org/docs/current/sql-declare.html)).
+À partir de la 6.12.0. Lit les lignes de `query` par batchs de `batchSize` lignes, à l’aide d’un curseur côté serveur. Elle renvoie un générateur asynchrone à parcourir avec `for await` et n’envoie rien tant que le premier batch n’est pas demandé ([`DECLARE`](https://www.postgresql.org/docs/current/sql-declare.html)).
 
 - `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
-- `query` : un fragment dont le type de résultat est assignable à `readonly unknown[]`. Chaque batch a ce type. Un template `sql` peut préciser `s.films.Selectable[]` et donne `any[]` par défaut. [`select()`](/fr/select#select) et [`selectRows()`](/fr/select#selectRows) conviennent, tout comme `selectExactlyOne()` qui renvoie directement le tableau d’une sous-requête latérale. Un scalaire comme le résultat de `count()` est refusé.
+- `query` : un fragment dont le type de résultat est assignable à `readonly unknown[]`. Chaque batch a ce type. Dans un template `sql`, vous pouvez préciser `s.films.Selectable[]`. Le type par défaut est `any[]`. [`select()`](/fr/select#select) et [`selectRows()`](/fr/select#selectRows) conviennent, tout comme `selectExactlyOne()` lorsqu’il renvoie directement le tableau d’une sous-requête latérale. Un scalaire comme le résultat de `count()` est refusé.
 - `batchSize` : les lignes que lit chaque `FETCH`, un entier de 1 à 2147483647. Il n’y a pas de valeur par défaut : aucune taille ne convient à toutes les largeurs de ligne.
 
 Les films d’un studio, lus 100 à la fois :
@@ -479,9 +479,9 @@ COMMIT
 - `pgcast_cursor_<n>` prend le plus petit numéro qu’aucun autre `cursor()` encore en cours sur ce client ne détient : des boucles imbriquées obtiennent 1, puis 2 ; une boucle après une autre obtient de nouveau 1 ; deux en même temps obtiennent deux noms. Ne donnez pas à l’un de vos curseurs un nom de la forme `pgcast_cursor_<n>`.
 - `NO SCROLL` : le curseur ne lit qu’en avant. Sans lui, savoir si Postgres peut lire en arrière dépendrait du plan. C’est aussi la forme qu’exige une requête `FOR UPDATE`, dont les lignes sont verrouillées à mesure que chaque batch est lu, pas avant.
 - Postgres n’accepte pas de paramètre dans `FETCH FORWARD` : la taille est donc écrite dans le SQL, une fois vérifiée.
-- Le `runResultTransform` du fragment reçoit le résultat de chaque `FETCH` non vide, command tag compris. Une lecture vide termine la boucle.
-- Le `DECLARE` s’exécute sans nom, même si un fragment imbriqué est préparé. Chaque fragment conserve son nom de requête préparée pour les appels hors du curseur. Le numéro du curseur peut changer le texte de la déclaration, et `pg` exige un seul texte par nom.
-- Une requête de sélection simple lit l’instantané visible au `DECLARE`. Les lignes que la boucle insère ensuite en sont absentes. En `READ COMMITTED`, [une requête qui verrouille les lignes avec `FOR UPDATE`](/fr/cursors#work-inside-the-loop) peut lire une version plus récente d’une ligne. Un `ROLLBACK TO` vers un savepoint pris après la déclaration conserve la position du curseur.
+- Le `runResultTransform` du fragment reçoit le résultat de chaque `FETCH` qui renvoie des lignes, command tag compris. Le premier `FETCH` qui ne renvoie aucune ligne termine la boucle.
+- Le `DECLARE` est envoyé sans nom de requête préparée, même si un fragment imbriqué est préparé. Chaque fragment conserve son nom de requête préparée pour les appels hors du curseur. Le numéro du curseur peut changer le texte SQL de la déclaration. `pg` exige qu’un nom de requête préparée corresponde à un seul texte SQL.
+- Une requête de sélection simple utilise l’instantané visible lors du `DECLARE` et ignore les lignes que la boucle insère ensuite. En `READ COMMITTED`, [une requête qui verrouille les lignes avec `FOR UPDATE`](/fr/cursors#work-inside-the-loop) peut lire une version plus récente d’une ligne. Un `ROLLBACK TO` vers un savepoint établi après la déclaration conserve la position du curseur.
 - [`queryListener`](/fr/runtime-config#Config.queryListener) reçoit le `DECLARE`, chaque `FETCH` et le `CLOSE`, avec l’id de la transaction ; [`resultListener`](/fr/runtime-config#Config.resultListener) reçoit les lignes de chaque `FETCH`, le batch d’un fragment `sql`, puis `[]`. [`transactionListener`](/fr/runtime-config#Config.transactionListener) et [`transactionEventListener`](/fr/runtime-config#Config.transactionEventListener) n’en reçoivent rien.
 - Elle s’exécute, au lieu de renvoyer un fragment, pour que son type puisse demander le client d’une transaction, ce que le `run()` d’un fragment ne peut pas. Dans une requête à vous, `DECLARE`, `FETCH` et `CLOSE` s’écrivent en simple `sql`.
 
@@ -493,15 +493,15 @@ Comment elle se termine :
 |---|---|---|
 | le dernier batch est lu, ou la boucle fait `break` ou `return` | `CLOSE` | |
 | la boucle lève une erreur | `CLOSE` | l’erreur de la boucle sort, quoi que donne `CLOSE` |
-| le `runResultTransform` du fragment lève une erreur, ou `resultListener` en lève une après `DECLARE` ou `FETCH` | `CLOSE` | son erreur remonte, sauf si une erreur de `CLOSE` autre que 25P02 la remplace |
+| le `runResultTransform` du fragment lève une erreur, ou `resultListener` en lève une après `DECLARE` ou `FETCH` | `CLOSE` | l’erreur initiale remonte, sauf si une erreur autre que 25P02 survient lors du `CLOSE` et la remplace |
 | une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort, et `transaction()` réessaie un 40001 ou un 40P01. Ce statut est le dernier reçu par `pg`, et il peut arriver juste après l’erreur : un `CLOSE` peut alors encore partir. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE`. Dans les deux cas, son 25P02 est ignoré, dans un `for await` comme dans un `finally` qui appelle `return()`, et un `break` après une erreur que la boucle a interceptée termine la boucle |
 | `pg` indique que le client est hors d’un bloc de transaction : un `COMMIT` de votre part est passé avant la fin de la boucle | pas de `CLOSE`, que Postgres refuserait (34000) | le curseur est parti avec la transaction |
-| Postgres refuse un `FETCH`, par exemple avec 22012 ou 40001 | pas de `CLOSE` | son erreur remonte telle quelle. Si `transaction()` réessaie, le parcours recommence sur un nouvel instantané. Les batchs peuvent différer. |
+| Postgres refuse un `FETCH`, par exemple avec le code 22012 ou 40001 | pas de `CLOSE` | l’erreur du `FETCH` remonte telle quelle. Si `transaction()` réessaie, le parcours recommence sur un nouvel instantané. Les batchs peuvent différer. |
 | le générateur est abandonné, ni terminé ni arrêté par `return()` | rien | Postgres ferme le curseur au `COMMIT` ou au `ROLLBACK` ; son numéro reste pris sur ce client |
 
 </div>
 
-Si un écouteur de requête lève une erreur avant que le driver reçoive un `FETCH` ou un `CLOSE`, le curseur peut rester ouvert jusqu’à la fin de la transaction et le prochain appel à `cursor()` sur ce client reçoit alors 42P03.
+Si un écouteur de requête lève une erreur avant que le driver reçoive un `FETCH` ou un `CLOSE`, le curseur peut rester ouvert jusqu’à la fin de la transaction. Le prochain appel à `cursor()` sur ce client échoue alors avec le code 42P03.
 
 Deux cas tournent mal, à dessein :
 
@@ -669,7 +669,7 @@ type TxnClientLike<C, T extends IsolationLevel> = C & {
 }
 ```
 
-À partir de la 6.12.0. Le client d’un [`PoolLike`](#PoolLike), `C`, tel que le reçoit le callback d’une [`transaction()`](#transaction) : marqué pendant que la transaction s’exécute, comme un [`TxnClient`](#TxnClient), `_zapatos` étant optionnel dans le type lui aussi. Le callback imbriqué reçoit le même client. Voir [comment TypeScript infère son niveau d’isolation](#another-drivers-pool). Le type d’un `TxnClient` correspond au niveau d’isolation demandé par l’appel imbriqué. Dans une fonction générique sur `C`, un appel imbriqué ne compile pas.
+À partir de la 6.12.0. Le client `C` d’un [`PoolLike`](#PoolLike), tel que le reçoit le callback de [`transaction()`](#transaction). Comme un [`TxnClient`](#TxnClient), ce client est marqué pendant la transaction et la propriété `_zapatos` est optionnelle dans son type. Le callback imbriqué reçoit le même client. Voir [comment TypeScript infère son niveau d’isolation](#another-drivers-pool). Le type d’un `TxnClient` correspond au niveau d’isolation demandé par l’appel imbriqué. Dans une fonction générique paramétrée par `C`, un appel imbriqué ne compile pas.
 
 ## `isDatabaseError()` {#isDatabaseError}
 
