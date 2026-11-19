@@ -318,13 +318,11 @@ One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.s
 
 In 6.x, run `npx zapatos` to see which generator options would change the types for your schema.
 
-The note of [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema:
+In 7.0 a foreign enum supplies its own labels, even when the relation's schema has an enum of the same name. The `every.<name>` tuple follows Postgres declaration order. Regenerate and run `tsc` to find writes with invalid labels and code that depends on a label's position.
 
-1. Turn it on in `zapatosconfig.json`.
-2. Delete the `zapatos/custom/` placeholder of a domain over such an enum: the generator never overwrites one, so the domain would keep the placeholder it already has, typed the old way. The new one gets the labels.
-3. Regenerate, and let `tsc` show the values the enum's labels refuse.
+To update an existing domain placeholder over a foreign enum, generate into a fresh directory with `outDir`. Diff the two files, merge the new labels with your local edits, then run `tsc` again.
 
-The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose labels the generator sorts, though Postgres declares them in another order. Set it to `"declared"` and regenerate: for TypeScript, only `every.<name>` changes, so the code to read is the code that takes a label from it by index or compares it with a tuple.
+Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0.
 
 The note of [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) names each unique index that `ON CONFLICT ON CONSTRAINT` refuses, though `UniqueIndex` lists it: an index with no constraint, a materialised view's among them, the index of a `DEFERRABLE` constraint or, on Postgres 18, of a `WITHOUT OVERLAPS` key, and a constraint's index not yet valid. Turn it on and regenerate: `tsc` shows each `constraint()` that names one, which Postgres refused anyway (42704, 55000, 42809 or 42P10), and any code of yours that takes `UniqueIndex` for every unique index, such as a `Record` keyed by it.
 

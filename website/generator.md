@@ -153,8 +153,8 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`customTypesTransform`](#generate.customTypesTransform) | `"PgMy_type"` | the names of custom types |
 | [`schemaJSDoc`](#generate.schemaJSDoc) | `true` | a JSDoc comment on each relation and column |
 | [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers) | `false` | the `JSONSelectable` type of `bigint` and `numeric` |
-| [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | the type of an enum of another schema |
-| [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | the order of an enum's labels |
+| [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `true` | the type of an enum of another schema |
+| [`enumOrder`](#generate.enumOrder) | `"declared"` | the order of an enum's labels |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | whether a failed query rejects, or ends the process |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | the names in each relation's `UniqueIndex` |
@@ -318,7 +318,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions](/versions)). The type of a column whose type is an enum of another schema. `false`, as in Zapatos 6.6.1, looks the enum up by name in the schema of the column's relation; `true` looks it up in its own schema, and writes its labels:
+Omit this option or set it to `null` in JSON to use the 7.0 default, `true`. The generator looks up an enum in its own schema and writes its labels. Set `false` for the 6.x lookup by name in the relation's schema.
 
 ```sql
 CREATE SCHEMA archive;
@@ -329,17 +329,16 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 
 | Column of `prints` | `false` | `true` |
 |---|---|---|
-| `format` | `c.PgPrint_format`, an `any` placeholder | `('digital' \| 'nitrate' \| 'safety')` |
-| `formats` | `c.Pg_print_format \| null`, an `any` placeholder | `('digital' \| 'nitrate' \| 'safety')[] \| null` |
-| `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('archivist' \| 'projectionist') \| null` |
+| `format` | `c.PgPrint_format`, an `any` placeholder | `('nitrate' \| 'safety' \| 'digital')` |
+| `formats` | `c.Pg_print_format \| null`, an `any` placeholder | `('nitrate' \| 'safety' \| 'digital')[] \| null` |
+| `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
 - The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In the order of [`enumOrder`](#generate.enumOrder), as for every enum.
 - A domain over such an enum stays a custom type, `c.<name>`; its new placeholder gets the labels rather than `any`, with no import, even when a relation of the enum's own schema uses the domain as well. An existing placeholder is never overwritten.
-- `false` notes, through [`warningListener`](#generate.warningListener), the columns `true` would change, each with its type: for a domain, the type under it.
 
 ### `enumOrder` {#generate.enumOrder}
 
-`"alphabetical"` or `"declared"`, default `"alphabetical"`; an opt-in, `"declared"` by default from 7.0 ([Versions](/versions)). The order of an enum's labels. `"alphabetical"`, as in Zapatos 6.6.1, sorts them; `"declared"` keeps the order the enum declares them in, by which Postgres sorts and compares its values (`ORDER BY`, `<`, `enum_range()`):
+Omit this option or set it to `null` in JSON to use the 7.0 default, `"declared"`. Labels follow the declaration order that Postgres uses for `ORDER BY`, comparisons and `enum_range()`. Set `"alphabetical"` for the 6.x sort order.
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
@@ -352,8 +351,7 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 
 - A label added by `ALTER TYPE … ADD VALUE … BEFORE` or `AFTER` takes its place in that order, as `enum_range()` gives it.
 - For TypeScript, only `every.<name>` changes: a union is the same type in any order. With [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), the labels written out for an enum of another schema, and the new placeholder of a domain over one, take the same order.
-- Another value stops the generator before any query, and writes nothing: `enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
-- `"alphabetical"` notes, through [`warningListener`](#generate.warningListener), each generated enum whose declared order is not alphabetical.
+- Another value stops the generator before any query, and writes nothing: `enumOrder must be 'declared' (the default) or 'alphabetical', not 'declard'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
 
 ### `moduleNames` {#generate.moduleNames}
 
@@ -478,7 +476,7 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 - `false` types both as their placeholder, `any`, in all five interfaces, as Zapatos 6.6.1 does.
 - `pg` parses a domain over a domain as its innermost domain's base type, but returns an array of a domain as its text, since it doesn't know that array's type: so does a domain over such an array, directly or through other domains. An array of a domain over an array stays `any`, and so does a domain over one, or a base type the generator can't map, such as `point`.
-- An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another, with or without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas): never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a new placeholder follows `typeEnumsAcrossSchemas`: the enum's labels with it; without it, the enum of the same name in the relation's schema, or `any` if that schema has none.
+- An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another, with or without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas): never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a new placeholder follows `typeEnumsAcrossSchemas`: the enum's labels by default; with `false`, the enum of the same name in the relation's schema, or `any` if that schema has none.
 - A placeholder you edit keeps its type in all five, `unknown` included. One you edit to `any` counts as left as generated: write `unknown`, or leave the option off, to keep such a column untyped.
 - `false` notes, through [`warningListener`](#generate.warningListener), each such column, in a note of its own.
 
@@ -581,10 +579,6 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: the schemas rule of "public" gives include as a string, "films", so it is read as the list ["films"]. Zapatos 6.6.1 also matched each relation whose name is part of the string. Write the list to silence this note.`
   - after writing, for each `include` or `exclude` of a rule of [`schemas`](#generate.schemas) given as a string other than `"*"`;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
-- `` Note: public.prints.format (archive.print_format), public.prints.formats (archive.print_format[]) and public.prints.keeper (archive.crew_job) have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``
-  - once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
-- `` Note: every.crew_job lists the labels of enum public.crew_job in alphabetical order, not in their declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0. ``
-  - once per run, with [`enumOrder`](#generate.enumOrder) `"alphabetical"`, when a schema of [`schemas`](#generate.schemas) has an enum whose declared order is not alphabetical; several as `every.<name> lists the labels of enums archive.print_format and public.crew_job`;
 - `Note: UniqueIndex lists public.festival_entries.festival_entries_live_idx and public.festival_entries.festival_entries_slot_key, unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ... DO NOTHING except a WITHOUT OVERLAPS key. Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.`
   - once per run, without [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), when a generated relation has a unique index it would leave out; one as `lists public.festival_entries.festival_entries_live_idx, a unique index of no UNIQUE or PRIMARY KEY constraint`;
 - `Note: public.seat_bookings.ticket (public.ticket_no) has a domain over a type typed by context, such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a write takes more and, except for money, the shortcuts' JSON gives another type. Set domainsTypedByContext: true to type it by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.`

@@ -319,13 +319,11 @@ Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Con
 
 En 6.x, lancez `npx zapatos` pour voir quelles options du générateur changeraient les types de votre schéma.
 
-La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) nomme chaque colonne dont le type est un enum d’un autre schéma, et cet enum, typé jusque-là comme `any` ou comme l’enum du même nom dans le schéma de la relation :
+En 7.0, un enum d’un autre schéma fournit ses propres labels, même si un enum du schéma de la relation porte le même nom. Le tuple `every.<name>` suit l’ordre déclaré dans Postgres. Régénérez et lancez `tsc` pour repérer les écritures dont les labels sont refusés et le code qui dépend de la position d’un label.
 
-1. Activez-le dans `zapatosconfig.json`.
-2. Supprimez le placeholder `zapatos/custom/` d’un domaine sur un tel enum : le générateur n’en écrase jamais un, donc le domaine garderait celui qu’il a déjà, typé à l’ancienne. Le nouveau reçoit les labels.
-3. Régénérez, et laissez `tsc` montrer les valeurs que les labels de l’enum refusent.
+Pour mettre à jour le placeholder existant d’un domaine sur un tel enum, générez les types dans un nouveau dossier avec `outDir`. Comparez les deux fichiers, reportez les nouveaux labels en conservant vos modifications, puis relancez `tsc`.
 
-La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum dont le générateur trie les labels, alors que Postgres les déclare dans un autre ordre. Réglez-le sur `"declared"` et régénérez : pour TypeScript, seul `every.<name>` change, donc le code à relire est celui qui y prend un label par son indice ou le compare à un tuple.
+Pendant toute la 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique. Chaque option agit indépendamment, sans note de migration. La 8.0 retire ces deux comportements.
 
 La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
