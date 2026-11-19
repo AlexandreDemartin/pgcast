@@ -6,6 +6,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [6.12.0] - 2026-11-19
+
 ### Added
 - `QueryableLike`: `run()` takes any client whose `query({ text, values, name? })` resolves to `{ rows }`, such as a migration tool's client or a test's fake, with no cast (`sql-template.md` § `QueryableLike`, #695). `db.select('films', db.all).run(migrationClient)`<!-- tsc: const migrationClient = { query: async (query: { text: string; values?: unknown[] }) => ({ rows: [] as any[] }) }; export const films = …; --> compiles where it needed `as unknown as db.Queryable`; the query sent and its SQL are the same. A driver that ignores `name` runs a prepared fragment unprepared.
   - Unchanged: `Queryable` (`pg.ClientBase | pg.Pool`) and its `keyof`, `transaction()`, which #696 widens (below), the type `run()` resolves to, what `run()` does at run time, and, where `run`'s type is `SQLFragment`'s own, a function typed for `Queryable` assigned to `run`, overriding it, or given as a value typed `typeof frag.run` or a `Pick<db.SQLFragment<…>, 'run'>` literal.
