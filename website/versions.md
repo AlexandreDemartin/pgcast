@@ -56,7 +56,7 @@ Take an `update()` with an `undefined` value:
 
 Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column.
 
-In 7.0, `tagline: undefined` alone throws `nothing to update`. The update runs only if it assigns another column, in which case the stored tagline survives.
+With the 7.0 defaults, `tagline: undefined` alone throws `nothing to update`. The update runs only if it assigns another column, in which case the stored tagline survives.
 
 In 6.x the new reading arrives as an option, off by default, and the old one warns when it runs. You switch when you're ready, one option at a time, with your tests to show what moved.
 
@@ -75,7 +75,7 @@ With the 6.7 defaults, if a `transaction()` callback catches a query error and P
 
 In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists current warnings and their triggers. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
 
-The promise resolves as in 6.6.1, unless Node runs with `--throw-deprecation`, which ends the process ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
+The promise resolves as in 6.6.1, even with `--throw-deprecation`, after which Node ends the process on the warning ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
 
 Each code warns once per process. `node --trace-deprecation` prints the stack. To find the other calls, turn the option on and run your tests.
 
