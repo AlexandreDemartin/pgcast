@@ -2026,6 +2026,13 @@ describe('count, sum, avg, min, max', () => {
     expect(() => db.sum('accounts', all, { order: { by: 'id', direction: 'UP' } })).toThrow("Direction must be ASC/DESC, not 'UP'");
   });
 
+  it.each([{}, { aggregatesTypedByColumn: false }, { aggregatesTypedByColumn: true }])('binds the aggregate filter under %j', config => {
+    db.setConfig(config);
+    expect(db.max('accounts', { owner_id: 1 }, { columns: ['balance'] }).compile()).toEqual({
+      text: 'SELECT max("balance") AS result FROM "accounts" WHERE ("owner_id" = $1)', values: [1],
+    });
+  });
+
   it('aggregatesTypedByColumn changes no SQL, nor a refusal', () => {
     const compiled = () => [
       db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }),
@@ -2034,6 +2041,7 @@ describe('count, sum, avg, min, max', () => {
       db.max('users', all, { columns: ['display_name'], groupBy: 'mood' }),
       db.count('users', { id: 1 }),
     ].map(q => q.compile());
+    db.setConfig({ aggregatesTypedByColumn: false });
     const off = compiled();
     db.setConfig({ aggregatesTypedByColumn: true });
     expect(compiled()).toEqual(off);

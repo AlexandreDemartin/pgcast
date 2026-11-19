@@ -1,5 +1,5 @@
 ---
-english: 34cf9a77048c
+english: 39da884e9bf3
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -80,15 +80,17 @@ La promesse se résout comme en 6.6.1, même avec `--throw-deprecation`, puis No
 
 Chaque code avertit une fois par processus. `node --trace-deprecation` affiche la pile. Pour retrouver les autres appels, activez l’option et lancez vos tests.
 
-`PGCAST_DEP004` est émis après que `.run()` a reçu le résultat de `sum()`, `avg()`, `min()` ou `max()`, si `Number()` le modifie.
+Avec le comportement historique, `PGCAST_DEP004` signalait en 6.x deux cas : un résultat égal à `null` ou absent pour `sum()`, `avg()`, `min()` ou `max()`, et un minimum ou un maximum dont la valeur est d’un autre type que `number`. À partir de la 7.0, les agrégats sont typés par colonne par défaut.
 
 Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l’autre réglage, et n’avertit jamais.
 
 ## 7.0 et 8.0 {#_7-0-and-8-0}
 
+Tout au long de la série 7.x, `aggregatesTypedByColumn: false` dans `db.setConfig()` et dans `ConfigTypes` rétablit les résultats numériques de la 6.x sans avertissement. La 8.0 supprime ce comportement. [Migrer les agrégats](/fr/switching#from-7-0).
+
 La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux du générateur (plus bas), sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
-Un projet qui a activé chaque option et ne voit ni avertissement `PGCAST_DEP` ni note du générateur n’a rien à changer, sauf s’il utilise les [types de clients en lecture seule élargis en 7.0](/fr/switching#from-7-0) ou les [types des conditions sur tableaux en 7.0](/fr/switching#array-condition-types), qui changent sans avertissement. Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements. Parmi les autres options, trois conservent leur ancienne valeur : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
+Si vous n’avez activé `aggregatesTypedByColumn` qu’à l’exécution en 6.x, lancez `tsc` pour repérer les utilisations incompatibles avec les nouveaux types. Un projet qui a activé chaque option, y compris le typage des agrégats dans `ConfigTypes`, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur n’a rien à changer, sauf s’il utilise les [types de clients en lecture seule élargis en 7.0](/fr/switching#from-7-0) ou les [types des conditions sur tableaux en 7.0](/fr/switching#array-condition-types), qui changent sans avertissement. Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements. Parmi les autres options, trois conservent leur ancienne valeur : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
 
 Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui type un enum d’un autre schéma par ses labels, [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), qui rejette la promesse de `generate()` quand une requête échoue, plutôt que d’arrêter le processus, [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), qui ne liste dans `UniqueIndex` que les noms qu’accepte `ON CONFLICT ON CONSTRAINT`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), qui type un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, selon le contexte, comme l’est son type de base, et un domaine sur un domaine ou un tableau d’un domaine, `any` sans l’option, par le type de base de son domaine le plus intérieur, [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), qui type dans `Selectable` un tableau d’un enum comme le texte que renvoie `pg`, et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), qui type un `interval` dans `Selectable` comme `pg` le parse.
 
