@@ -1,5 +1,5 @@
 ---
-english: ef1572724905
+english: 0592a26e618d
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -86,7 +86,7 @@ interface Config {
 }
 ```
 
-Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours ; `getConfig()` les type `boolean | undefined`, bien qu’elle donne toujours une valeur. Une option change un type, une fois déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `aggregatesTypedByColumn`.
+Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours. Le type que renvoie `getConfig()` pour ces clés est `boolean | undefined`, même si chacune a toujours une valeur. Si vous réglez `aggregatesTypedByColumn` sur `false`, déclarez aussi cette valeur dans [`ConfigTypes`](#ConfigTypes).
 
 <div class="stack">
 
@@ -98,11 +98,11 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. | à chaque `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : la traiter comme une clé absente | à chaque appel de l’une d’elles |
-| [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | un `COMMIT` auquel Postgres répond `ROLLBACK` : être rejetée, pas se résoudre | à chaque `transaction()` |
-| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | un client à vous déjà dans un bloc de transaction : être rejetée avant son `START TRANSACTION`, pas terminer votre transaction | à chaque `transaction()` qui reçoit un tel client |
-| [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `false` | le client d’une transaction à un niveau qui ne vaut pas pour celui demandé : être rejetée, pas exécuter le callback à ce niveau | à chaque `transaction()` qui reçoit un tel client |
+| [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | rejeter la promesse si Postgres répond au `COMMIT` par `ROLLBACK` | à chaque `transaction()` |
+| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | rejeter la promesse avant `START TRANSACTION` uniquement si votre client sans marqueur signale `T` ou `E` avant et après la requête vide. Si le client ne fournit aucun statut, l’appel se poursuit | à chaque `transaction()` qui reçoit un tel client |
+| [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
-| [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne, pas son `Number()` | à chaque `run()` de l’un d’eux |
+| [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
 | [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque retry | à chaque `transaction()` |
@@ -197,14 +197,14 @@ Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`upda
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
 ```ts
-transactionRequiresCommit?: boolean  // default: false; the default in 7.0
+transactionRequiresCommit?: boolean  // default: true
 ```
 
-Quand le callback de [`transaction()`](/fr/transaction#transaction) intercepte l’erreur d’une requête et se termine normalement, Postgres a interrompu la transaction : il répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> par le command tag `ROLLBACK`, pas par une erreur, et rien n’est enregistré.
+Si Postgres répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> de [`transaction()`](/fr/transaction#transaction) par le command tag `ROLLBACK`, rien n’est enregistré.
 
 Avec `true`, `transaction()` est alors rejetée, sans retry, avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
 
-Sans l’option, elle se résout avec ce que le callback a renvoyé, comme dans Zapatos 6.6.1, avec un avertissement une fois par processus : `PGCAST_DEP003`. Que faire à la place : [Laisser passer l’erreur](/fr/retries#let-the-error-through).
+Avec `false`, la promesse se résout avec la valeur renvoyée par le callback, sans avertissement. Voir [Laisser passer l’erreur](/fr/retries#let-the-error-through).
 
 - Non couvert : un callback qui envoie lui-même `COMMIT` ou `ROLLBACK`.
 - Non testé avec `pg-native`.
@@ -212,36 +212,35 @@ Sans l’option, elle se résout avec ce que le callback a renvoyé, comme dans 
 ### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
 
 ```ts
-transactionRequiresIdleClient?: boolean  // default: false; the default in 7.0
+transactionRequiresIdleClient?: boolean  // default: true
 ```
 
 Avec un client sur lequel vous avez ouvert vous-même une transaction, par `BEGIN`, [`transaction()`](/fr/transaction#transaction) terminerait votre transaction : son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> la valide, ou son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> l’annule ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 
 Avec `true`, elle est rejetée avant d’envoyer son `START TRANSACTION`, avec "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->. Votre transaction reste ouverte, pour votre `COMMIT` ou votre `ROLLBACK`.
 
-Sans l’option, elle envoie ce qu’envoie Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP005`, avant son `START TRANSACTION`.
+Avec `false`, `transaction()` envoie `START TRANSACTION` sans vérifier de nouveau le statut du client, comme dans Zapatos 6.6.1. pgcast n’émet aucun avertissement.
 
 - pg dit si un client est dans un bloc à partir de pg 8.21 (`getTransactionStatus()`). Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, avec ou sans l’option, sans avertissement.
 - Avec `true`, quand pg signale un bloc, `transaction()` envoie d’abord une requête vide, pour relire le statut ; [`queryListener`](#Config.queryListener) et [`resultListener`](#Config.resultListener) la reçoivent, avec l’id de la transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
-- Avec `true`, une `transaction()` lancée au même moment sur ce client est transmise, comme dans la 6.6.1, et ne valide ni n’annule rien : ses requêtes s’exécutent dans votre bloc, ou, quand pg signalait un bloc déjà terminé, comme le dit le dernier point.
-- Sans l’option, rien ne relit le statut : juste après un `COMMIT` qui a échoué, pg peut encore signaler son bloc, et l’avertissement peut arriver une fois pour un client hors de tout bloc.
+- Pendant cette seconde vérification, le marqueur du premier appel contient le niveau d’isolation demandé par cet appel. Par défaut, un second appel n’exécute son callback sur ce client que si le niveau enregistré satisfait le niveau qu’il demande. Si un bloc de transaction est ouvert, les requêtes du callback s’exécutent au niveau d’isolation de ce bloc.
 - Seul un client que vous passez est vérifié : un client emprunté au pool, libéré alors qu’il était encore dans un bloc, ne l’est pas.
 - Un `BEGIN` envoyé sans `await` n’est pas encore vu : le client paraît hors de tout bloc.
 - Un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue peut lui aussi paraître hors de tout bloc : `transaction()` s’exécute alors comme dans la 6.6.1, sans avertissement.
 - Non testé avec `pg-native`.
-- Avec `true`, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est commitée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
+- Si pg signale encore un bloc après l’échec d’un `COMMIT`, la seconde vérification peut indiquer que le client est hors transaction. Les écritures du second callback peuvent être commitées séparément avant le `START TRANSACTION` du premier appel ou après la fin de sa transaction.
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
 ```ts
-transactionRequiresSatisfyingLevel?: boolean  // default: false; the default in 7.0
+transactionRequiresSatisfyingLevel?: boolean  // default: true
 ```
 
-Avec le client d’une transaction qu’elle a ouverte, [`transaction()`](/fr/transaction#transaction) le transmet, et son callback s’exécute au niveau de cette transaction, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de la transaction exécutée : `db.serializable(txnClient, …)`, avec le client de `db.readCommitted()`, s’exécute en `READ COMMITTED` ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+Un callback imbriqué s’exécute au niveau d’isolation de la transaction extérieure. Un appel à `serializable()` avec le client de `readCommitted()` ne peut donc pas garantir le niveau demandé ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 
 Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
 
-Sans l’option, elle transmet le client, comme Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP007`, seulement quand le niveau ne vaut pas pour celui demandé.
+Avec `false`, le client est transmis même si son niveau d’isolation est insuffisant. pgcast n’émet aucun avertissement.
 
 - Avec ou sans l’option, l’appel transmet le client si, dans le [tableau des niveaux d’isolation](/fr/transaction#IsolationSatisfying), son niveau figure sur la ligne correspondant au niveau demandé.
 - Seul le client d’une `transaction()` est vérifié, par sa marque `_zapatos`, que porte aussi un client simple tant qu’une `transaction()` s’exécute dessus, si bien qu’un second appel au même moment sur ce client est vérifié : un pool, un client simple inactif et un client gardé après la fin de sa transaction reçoivent leur propre transaction, comme avant.
@@ -265,17 +264,17 @@ Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté se
 ### `aggregatesTypedByColumn` {#Config.aggregatesTypedByColumn}
 
 ```ts
-aggregatesTypedByColumn?: boolean  // default: false; the default in 7.0
+aggregatesTypedByColumn?: boolean  // default: true
 ```
 
-À partir de la 6.7.0. Avec `true`, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : un `Date` pour un `timestamptz`, une chaîne pour un `text` ou un enum. Le SQL ne change pas, ni [`count()`](/fr/select#count).
+À partir de la 7.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour une valeur finie de type `timestamptz` et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
 
-Sans l’option, le résultat passe par `Number()`, comme dans Zapatos 6.6.1 : `0` quand aucune ligne ne correspond, les millisecondes d’une date, `NaN` pour un texte. `.run()` avertit alors une fois par processus, `PGCAST_DEP004`, quand `Number()` a changé ce que Postgres a envoyé, ou que la requête n’a renvoyé aucune ligne.
+Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne `0`, une date finie lue comme un `Date` donne le nombre de millisecondes depuis l’époque Unix et un texte non numérique donne `NaN`. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
 
-- Les types ne suivent qu’une fois l’option déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `setConfig()` règle le runtime, la déclaration les types.
-- Imbriquée dans un `lateral`, ou donnée comme valeur d’`extras`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; une fois l’option déclarée, elle est typée comme le `JSONSelectable` de sa colonne.
+- Pour retrouver les types de la 6.x, déclarez aussi `false` dans [`ConfigTypes`](#ConfigTypes). Si vous avez déjà déclaré l’option à `true`, cette déclaration reste valide.
+- Sous une clé de `lateral` ou comme valeur d’`extras`, le résultat de l’agrégat est renvoyé en JSON quel que soit le réglage et vaut `null` quand aucune ligne ne correspond. Par défaut, il est typé comme le type `JSONSelectable` de la colonne.
   - Pour un [`lateral` transmis](/fr/select#lateral), appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou `selectRows()` pour obtenir la colonne telle que `pg` la parse. Un `select()` extérieur renvoie du JSON. [`selectRows()`](/fr/select#selectRows) refuse à la compilation un fragment numérique transmis directement, comme `count()`.
-- L’option est lue à `.run()`, là où l’avertissement est aussi émis : une requête construite avant `setConfig()` prend l’option sous laquelle elle s’exécute, comme le dit son type, déclaré pour tout le programme. Une requête qui ne renvoie aucune ligne, un `groupBy` sans aucun groupe, se lit comme `NULL` : `null` avec l’option, `0` sans, avec l’avertissement.
+- Chaque appel à `.run()` lit l’option même si la requête a été construite avant `setConfig()`. Réglez l’option sur `true` pour rétablir la valeur par défaut. JavaScript accepte aussi `null` et `undefined`. TypeScript refuse `null` avec `strictNullChecks` et `undefined` avec `exactOptionalPropertyTypes`. Une requête qui ne renvoie aucune ligne donne alors `null`.
 - Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
 
 ### `queryListener` {#Config.queryListener}
@@ -383,16 +382,16 @@ Ce que prend [`setConfig()`](#setConfig) : n’importe quelles clés de `Config
 interface ConfigTypes { }
 ```
 
-À partir de la 6.7.0. Les options de `Config` qui changent un type, déclarées comme vous les réglez, puisque TypeScript ne peut pas lire `setConfig()`. Vide, chaque type est celui de Zapatos 6.6.1. Déclarez l’interface une fois, dans un module que votre `tsconfig.json` inclut, un fichier avec un `import` ou un `export`, et réglez l’option de la même façon :
+À partir de la 6.7.0, déclarez dans cette interface les options de `Config` qui changent un type, avec les mêmes valeurs qu’à l’exécution, puisque TypeScript ne peut pas lire `setConfig()`. Une interface vide reprend les valeurs par défaut de la 7.0. Pour retrouver les résultats numériques des agrégats de la 6.x, déclarez l’option une seule fois dans un module inclus par votre `tsconfig.json` (un fichier avec un `import` ou un `export`) et donnez-lui la même valeur à l’exécution.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 
 declare module 'zapatos/db' {
-  interface ConfigTypes { aggregatesTypedByColumn: true }
+  interface ConfigTypes { aggregatesTypedByColumn: false }
 }
 
-db.setConfig({ aggregatesTypedByColumn: true });
+db.setConfig({ aggregatesTypedByColumn: false });
 ```
 
 Un `.d.ts` qui ne contient que la déclaration a besoin d’`export {}` : sans lui, le fichier déclare son propre `zapatos/db`, qui masque celui du paquet (`db.min`, `db.all` et le reste disparaissent).
@@ -402,7 +401,7 @@ Un `.d.ts` qui ne contient que la déclaration a besoin d’`export {}` : sans 
 export {};
 
 declare module 'zapatos/db' {
-  interface ConfigTypes { aggregatesTypedByColumn: true }
+  interface ConfigTypes { aggregatesTypedByColumn: false }
 }
 ```
 
@@ -439,30 +438,19 @@ type TransactionEvent =
 
 ## Opt-ins et avertissements {#opt-ins-and-warnings}
 
-Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcast changerait, reste celui par défaut jusqu’à la 7.0 : une option active le nouveau, et l’ancien émet un avertissement. Pourquoi ce choix : [Versions](/fr/versions).
-
-<div class="stack">
-
-| Option | Avertissement | Émis quand | Par défaut à partir de |
-|---|---|---|---|
-| [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres répond au `COMMIT` de `transaction()` par `ROLLBACK`, après une erreur de requête que le callback a interceptée ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | 7.0 |
-| [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` change le résultat de `sum()`, `avg()`, `min()` ou `max()` : un `NULL` devenu `0`, ou un `min()` ou `max()` qui n’est pas un nombre ([Typé par colonne](/fr/select#typed-by-column)) | 7.0 |
-| [`transactionRequiresIdleClient: true`](#Config.transactionRequiresIdleClient) | `PGCAST_DEP005` | `transaction()` reçoit un client déjà dans un bloc de transaction, auquel son `COMMIT` ou son `ROLLBACK` mettra fin ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | 7.0 |
-| [`transactionRequiresSatisfyingLevel: true`](#Config.transactionRequiresSatisfyingLevel) | `PGCAST_DEP007` | `transaction()` reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien, et son callback s’exécute alors à ce niveau ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)) | 7.0 |
-
-</div>
+En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
 
 Le générateur a ses propres opt-ins : [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects). Les anciens comportements sont signalés une fois par exécution par des notes via [`warningListener`](/fr/generator#generate.warningListener), distinctes des `DeprecationWarning`. Ces opt-ins seront eux aussi activés par défaut en 7.0. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note. Depuis la 7.0, le générateur cherche par défaut chaque enum dans son propre schéma ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)) et écrit ses labels dans l’ordre de déclaration ([`enumOrder`](/fr/generator#generate.enumOrder)), sans note de migration.
 
-Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION` ; `PGCAST_DEP007` : quand `transaction()` est appelée, avant son callback), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
+Node émet chaque avertissement de migration une fois par processus et indique le nom de l’option dans le message. En 6.x, une réponse `ROLLBACK` à un `COMMIT` produisait l’avertissement ci-dessous sur `stderr`.
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 ```
 
-- `process.on('warning', …)` le reçoit, avec pour `name` `'DeprecationWarning'` et pour `code` `'PGCAST_DEP003'`.
+- `process.on('warning', …)` le recevait en 6.x, avec pour `name` `'DeprecationWarning'` et pour `code` `'PGCAST_DEP003'`.
 - `node --no-deprecation` le masque, y compris pour ce hook ; `node --no-warnings` le masque sur `stderr` seulement. `node --throw-deprecation` le lève comme une erreur que rien n’intercepte, donc le processus s’arrête.
 - Avec l’option activée, l’appel n’avertit jamais.
 
@@ -601,7 +589,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | un `numeric` au-delà de `Number.MAX_VALUE` | `Infinity` | ses chiffres, sous forme de chaîne |
 
-- Elle ne fait rien pour `count()`, `sum()`, `avg()`, `min()` et `max()` : leur résultat n’est pas du JSON, et passe par `Number()` ([`count()`](/fr/select#count)). Un `sum()` de `9007199254740993` donne toujours `9007199254740992`.
+- Appelés directement, [`count()`](/fr/select#count), `sum()` et `avg()` convertissent les valeurs non nulles avec `Number()`. Les appels directs à `min()` et `max()` donnent par défaut la valeur lue par `pg` et la convertissent avec `Number()` si `aggregatesTypedByColumn` vaut `false` à l’exécution. Sous une clé de `lateral`, c’est le parseur JSON de la requête extérieure qui s’applique. Activez le parseur personnalisé pour y préserver les grands nombres.
 - Elle règle les parsers de types du module `pg` que vous donnez, donc de chaque pool et chaque client de ce module, à partir de là, requêtes de pgcast ou non.
 - Elle ne change pas les types : c’est l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur qui le fait.
 - Une colonne `int8` ou `numeric` hors JSON est déjà une chaîne, par le parser de `pg` lui-même.

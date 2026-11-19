@@ -1,5 +1,5 @@
 ---
-english: e38e80b6e988
+english: 3a14eea8d4da
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -105,10 +105,23 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 
 ### À partir de la 7.0 {#from-7-0}
 
+Les agrégats sont désormais [typés par colonne](/fr/select#typed-by-column). Traitez le cas où le résultat vaut `null` avant de l’utiliser dans un calcul, ou utilisez `?? 0` si la somme doit valoir zéro en l’absence de lignes. Pour conserver les résultats numériques tout au long de la série 7.x, réglez l’option sur `false` et déclarez cette valeur dans le module que vous importez (`pgcast/db` si vous utilisez ce nom).
+
+```ts twoslash
+import * as db from 'zapatos/db';
+
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: false }
+}
+db.setConfig({ aggregatesTypedByColumn: false });
+```
+
 <div class="stack">
 
 | Votre code | Zapatos 6.6.1 et pgcast 6.x | pgcast 7.0 | Que faire |
 |---|---|---|---|
+| Une implémentation de `SelectOneSignatures` ou de `SelectExactlyOneSignatures` qui appelle `select()` avec un mode | Compile avec les signatures numériques de la 6.x | TS2322 (TS2375 avec `exactOptionalPropertyTypes`) | Appelez respectivement `selectOne()` ou `selectExactlyOne()`. |
+| Un spread exporté du fragment qui calcule le minimum d’une date, avec `declaration: true` | Compile avec les signatures numériques de la 6.x | TS4023 | Exportez le fragment lui-même. |
 | `db.serializableRO(pool, countSeats)`, où le paramètre de `countSeats` est de type `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compile | TS2345 avec `strictFunctionTypes` (activé par `strict`), car TypeScript vérifie le callback avec le type de client élargi | Avec `pg`, donnez au paramètre le type [`db.TxnClientForSerializableRO`](/fr/transaction#TxnClientForSerializableRO). Avec un adaptateur dont le client est de type `C`, utilisez `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. Si la fonction examine `_zapatos.isolationLevel`, traitez aussi le cas `SerializableRODeferrable`. Les types construits à partir de ces niveaux sont aussi concernés : ajoutez la clé `SerializableRODeferrable` à un `Record` indexé par `IsolationSatisfying<…>`, élargissez le type du client dans une signature écrite à la main et passez un discriminant explicite si des surcharges choisissaient le résultat en fonction des types de clients ordinaire et différable, puisque les deux types coïncident désormais. Les callbacks de `transaction()`, de `savepoint()` et des appels imbriqués qui conservent le client reçoivent aussi le type élargi. |
 
 </div>
@@ -286,7 +299,7 @@ Pour trouver chaque appel :
 | Avertissement | L’appel | Corrigez-le, ou activez |
 |---|---|---|
 | `PGCAST_DEP003` | une [`transaction()`](/fr/transaction#transaction) dont le callback intercepte l’erreur d’une requête et se termine : Postgres répond au `COMMIT` par `ROLLBACK`, et rien n’est enregistré ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | laissez l’erreur sortir du callback, ou faites `ROLLBACK TO` un `SAVEPOINT` avant de continuer ; ou [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), et une telle transaction est rejetée |
-| `PGCAST_DEP004` | un [`sum()`, `avg()`, `min()` ou `max()`](/fr/select#typed-by-column) dont `Number()` change le résultat : `0` pour aucune ligne, les millisecondes d’une date, `NaN` pour un texte | activez [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), déclaré dans [`ConfigTypes`](/fr/runtime-config#ConfigTypes) : `tsc` montre alors chaque appel dont le résultat est désormais `null` ou du type de la colonne, et `?? 0` garde un `0` |
+| `PGCAST_DEP004` en 6.x | un [`sum()`, `avg()`, `min()` ou `max()`](/fr/select#typed-by-column) dont le résultat vaut `null` ou est absent, ou un minimum ou un maximum dont la valeur renvoyée par `pg` est d’un autre type que `number` | activez [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn) et déclarez-le dans [`ConfigTypes`](/fr/runtime-config#ConfigTypes). `tsc` signale alors les utilisations incompatibles avec le nouveau type, et `?? 0` permet de garder `0` |
 | `PGCAST_DEP005` | une [`transaction()`](/fr/transaction#transaction) qui reçoit un client sur lequel vous avez envoyé `BEGIN` : son `COMMIT` ou son `ROLLBACK` termine votre transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | ouvrez la transaction extérieure avec `transaction()`, ou donnez le pool à cet appel, pour une transaction à lui, qui est commitée séparément de la transaction extérieure, ne voit pas les lignes non commitées de celle-ci, et reste bloquée (sauf si `lock_timeout` est défini) si elle écrit ou verrouille une ligne que la transaction extérieure a écrite ou verrouillée, ou insère une clé que celle-ci a insérée (deux verrous `FOR SHARE` n’entrent pas en conflit) ; ou [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), et un tel appel est rejeté avant d’envoyer son `START TRANSACTION` |
 | `PGCAST_DEP007` | une [`transaction()`](/fr/transaction#transaction) qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien, `serializable()` avec celui de `readCommitted()` : son callback s’exécute au niveau extérieur ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)) | ouvrez la transaction extérieure à un niveau qui vaut pour l’appel intérieur, ou donnez le pool à cet appel, pour une transaction à lui, qui est commitée séparément de la transaction extérieure, ne voit pas les lignes non commitées de celle-ci, et reste bloquée (sauf si `lock_timeout` est défini) si elle écrit ou verrouille une ligne que la transaction extérieure a écrite ou verrouillée, ou insère une clé que celle-ci a insérée (deux verrous `FOR SHARE` n’entrent pas en conflit) ; ou [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), et un tel appel est rejeté avant son callback |
 
@@ -319,11 +332,13 @@ En 7.0, `tagline: undefined` seul lève l’erreur `nothing to update`. Ici, la 
 
 Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez son option à `false` dans `db.setConfig()`. Les deux choix sont indépendants : `undefinedMeansMissing: false` conserve les valeurs `undefined` à l’écriture, et `upsertRequiresSameKeys: false` permet d’écraser des valeurs stockées même si les clés correspondantes sont absentes. Aucun des deux réglages n’émet l’avertissement de la 6.x.
 
+En 7.x, les trois vérifications de transaction sont activées par défaut. Dans `db.setConfig()`, passez à `false` uniquement les vérifications que vous voulez désactiver. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), la promesse se résout avec la valeur renvoyée par le callback si Postgres répond au `COMMIT` par `ROLLBACK`. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), le raccourci peut mettre fin à la transaction de l’appelant. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), le callback imbriqué s’exécute au niveau d’isolation de la transaction extérieure. Ces réglages n’émettent aucun avertissement en 7.x et disparaissent en 8.0.
+
 - `insert()` envoie `DEFAULT`<!-- probe: db.insert('tags', { film_id: 1000, tag: undefined }) --> pour une valeur `undefined`, un `update()` sans autre clé lève l’erreur "nothing to update: an Updatable needs at least one column"<!-- message -->, et un `upsert()` sans autre clé "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
 - Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans retry ([`transaction()`, Erreurs](/fr/transaction#errors)).
-- Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
-- Une `transaction()` qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien est rejetée avant son callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+- Si votre client sans marqueur signale `T` ou `E` avant et après la requête vide, la promesse de `transaction()` est rejetée et votre bloc reste ouvert. Si le client ne fournit aucun statut, l’appel se poursuit. Un appel concurrent peut commiter des écritures avant le début de la première transaction. Sur un même client, attendez la fin de chaque appel avant de lancer le suivant ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
+- La promesse d’un appel imbriqué à `transaction()` est rejetée avant l’exécution du callback si le niveau d’isolation enregistré à l’ouverture de la transaction extérieure ne satisfait pas le niveau demandé. Un `SET TRANSACTION` ultérieur laisse le marqueur inchangé. Ouvrez la transaction extérieure au niveau voulu avec le raccourci ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 - `sum()`, `avg()`, `min()` et `max()` donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` la valeur de leur colonne, que la déclaration dans `ConfigTypes` type ainsi ([Typé par colonne](/fr/select#typed-by-column)).
 - Aucune option n’avertit. Pour que cela dure, `NODE_OPTIONS=--throw-deprecation npm test` fait échouer l’exécution au premier avertissement.
 

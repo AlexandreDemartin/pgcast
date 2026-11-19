@@ -1,5 +1,5 @@
 ---
-english: daf35566a7c4
+english: 6b63bd0bce90
 description: "Réservez des places sous SERIALIZABLE, pour que deux requêtes HTTP simultanées n’enfreignent pas une règle, et laissez pgcast relancer la transaction refusée."
 ---
 
@@ -52,9 +52,9 @@ Si ce travail passe dans le callback, une réservation réessayée envoie deux e
 
 ## Laisser passer l’erreur {#let-the-error-through}
 
-pgcast ne réessaie que ce qui lui parvient. N’avalez pas une erreur de la base dans le callback : ensuite, Postgres refuse chaque requête de la transaction avec 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), et si le callback se termine normalement, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, que Postgres transforme en rollback sans erreur.
+pgcast ne réessaie que si l’erreur lui parvient. Après une erreur de requête, les requêtes ordinaires échouent avec 25P02 (`current transaction is aborted, commands ignored until end of transaction block`) jusqu’au rollback. Si le callback se termine normalement, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->.
 
-La promesse se résout alors avec ce que le callback a renvoyé, rien n’est enregistré, et un 40001 intercepté ainsi n’est jamais réessayé ; pgcast avertit une fois, `PGCAST_DEP003`. Avec [`transactionRequiresCommit: true`](/fr/runtime-config#Config.transactionRequiresCommit), la valeur par défaut à partir de la 7.0, la promesse est rejetée à la place, toujours sans retry : pgcast n’a jamais vu l’erreur.
+Si Postgres répond à ce `COMMIT` par `ROLLBACK`, la promesse est rejetée sans retry et rien n’est enregistré. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Une nouvelle erreur 40001 au `COMMIT` peut encore déclencher un retry.
 
 Si vous en interceptez une à l’intérieur, relancez-la.
 
@@ -71,7 +71,7 @@ Interceptez-la hors de la transaction, une fois que pgcast a abandonné, avec [`
 
 ## Réserver dans une transaction plus large {#book-inside-a-larger-transaction}
 
-Quand on lui donne le `txnClient` d’une transaction déjà ouverte, `bookSeats()` la rejoint : `serializable()` n’envoie rien qui lui soit propre et appelle aussitôt le callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)). Un couple réserve deux places, les deux ou aucune :
+Avec le `txnClient` d’une transaction ouverte, `bookSeats()` la rejoint si le niveau d’isolation enregistré pour cette transaction satisfait le niveau demandé par `serializable()`. L’appel imbriqué n’envoie alors aucune requête SQL qui lui soit propre ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)). Un couple réserve deux places, les deux ou aucune :
 
 <<< ../examples/plain/retries_larger.ts{ts twoslash}
 
@@ -95,7 +95,9 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-Typé [`db.Queryable`](/fr/sql-template#Queryable), il accepterait ce client, et `bookSeats()` s’exécuterait en `READ COMMITTED`, avec un avertissement, une fois, `PGCAST_DEP007`. Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), elle est rejetée à la place, avant son callback.
+Un paramètre de type [`db.Queryable`](/fr/sql-template#Queryable) accepte ce client. L’appel ci-dessous compile, puis sa promesse est rejetée avant que le callback de réservation soit appelé. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), la réservation s’exécuterait en `READ COMMITTED`.
+
+<<< ../examples/plain/retries_lower_level.ts{ts twoslash}
 
 ## Mettre les requêtes en file avec un lock {#queue-the-requests-with-a-lock}
 

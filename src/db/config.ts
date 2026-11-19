@@ -41,7 +41,7 @@ export interface Config {
   transactionRequiresIdleClient?: boolean;  // transaction() rejects a client already inside a transaction block, before its START TRANSACTION
   transactionRequiresSatisfyingLevel?: boolean;  // transaction() rejects the client of a transaction at a level that doesn't satisfy its own
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
-  aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value: declare it in ConfigTypes too
+  aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value; declare false in ConfigTypes for the 6.x types
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -53,7 +53,7 @@ export type NewConfig = Partial<Config>;
  * The options of `Config` that change a type, as you set them: the compiler cannot read `setConfig()`.
  * Declare each in a module of your project, a file with an `import` or an
  * `export` (`export {}` in a `.d.ts`), e.g.
- * `declare module 'zapatos/db' { interface ConfigTypes { aggregatesTypedByColumn: true } }`.
+ * `declare module 'zapatos/db' { interface ConfigTypes { aggregatesTypedByColumn: false } }`.
  */
 export interface ConfigTypes { }
 
@@ -64,11 +64,11 @@ const defaults: Config = {
   castObjectParamsToJson: false,
   upsertRequiresSameKeys: true,
   undefinedMeansMissing: true,
-  transactionRequiresCommit: false,  // the default in 7.0
-  transactionRequiresIdleClient: false,  // the default in 7.0
-  transactionRequiresSatisfyingLevel: false,  // the default in 7.0
+  transactionRequiresCommit: true,
+  transactionRequiresIdleClient: true,
+  transactionRequiresSatisfyingLevel: true,
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
-  aggregatesTypedByColumn: false,  // the default in 7.0
+  aggregatesTypedByColumn: true,
 };
 
 let config: Config = { ...defaults };

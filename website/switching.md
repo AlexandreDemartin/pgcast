@@ -104,10 +104,23 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 
 ### From 7.0 {#from-7-0}
 
+Aggregates are now [typed by column](/select#typed-by-column). Handle `null` before arithmetic, or use `?? 0` if an empty sum should be zero. To keep numeric results through 7.x, set the option and declare it in the module you import (`pgcast/db` if you use that name).
+
+```ts twoslash
+import * as db from 'zapatos/db';
+
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: false }
+}
+db.setConfig({ aggregatesTypedByColumn: false });
+```
+
 <div class="stack">
 
 | Your code | Zapatos 6.6.1 and pgcast 6.x | pgcast 7.0 | What to do |
 |---|---|---|---|
+| A `SelectOneSignatures` or `SelectExactlyOneSignatures` implementation forwarding to `select()` with a mode | Compiles with 6.x numeric signatures | TS2322 (TS2375 with `exactOptionalPropertyTypes`) | Forward to `selectOne()` or `selectExactlyOne()`, respectively. |
+| An exported spread of a date minimum with `declaration: true` | Compiles with 6.x numeric signatures | TS4023 | Export the fragment itself. |
 | `db.serializableRO(pool, countSeats)`, where the parameter of `countSeats` is typed `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compiles | TS2345 under `strictFunctionTypes` (on with `strict`) because TypeScript checks the callback against the wider client type | For `pg`, use [`db.TxnClientForSerializableRO`](/transaction#TxnClientForSerializableRO). For an adapter with client type `C`, use `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. If the helper inspects `_zapatos.isolationLevel`, handle `SerializableRODeferrable` too. Types built on the levels see it too: add the `SerializableRODeferrable` key to a `Record` keyed by `IsolationSatisfying<…>`, widen the client of a handwritten signature, and pass an explicit discriminator where overloads on the ordinary and deferrable client types chose the result, since the two types now coincide. The callbacks of `transaction()`, `savepoint()` and nested calls that keep the client get the wider type too. |
 
 </div>
@@ -285,7 +298,7 @@ To find each call:
 | Warning | The call | Fix it, or turn on |
 |---|---|---|
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
-| `PGCAST_DEP004` | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) whose result `Number()` changes: `0` for no row, a date's milliseconds, `NaN` for a text | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows each call whose result is now `null` or the column's type, and `?? 0` keeps a `0` |
+| `PGCAST_DEP004` in 6.x | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) with a null or missing result, or a minimum or maximum whose pg value is not a number | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows uses incompatible with the new type, and `?? 0` keeps a `0` |
 | `PGCAST_DEP005` | a [`transaction()`](/transaction#transaction) given a client you sent `BEGIN` on: its `COMMIT` or `ROLLBACK` ends your transaction ([Your own `BEGIN`](/transaction#your-own-begin)) | open the outer transaction with `transaction()`, or give that call the pool, for a transaction of its own, committed apart from the outer one, which doesn't see the outer one's uncommitted rows, and hangs (unless `lock_timeout` is set) if it writes or locks a row the outer one has written or locked, or inserts a key the outer one has inserted (two `FOR SHARE` locks don't conflict); or [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), and such a call rejects before sending its `START TRANSACTION` |
 | `PGCAST_DEP007` | a [`transaction()`](/transaction#transaction) given the client of a transaction at a level that doesn't satisfy its own, `serializable()` given `readCommitted()`'s: its callback runs at the outer level ([Passing a transaction through](/transaction#passing-a-transaction-through)) | open the outer transaction at a level that satisfies the inner one, or give the inner call the pool, for a transaction of its own, committed apart from the outer one, which doesn't see the outer one's uncommitted rows, and hangs (unless `lock_timeout` is set) if it writes or locks a row the outer one has written or locked, or inserts a key the outer one has inserted (two `FOR SHARE` locks don't conflict); or [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), and such a call rejects before its callback |
 
@@ -318,11 +331,13 @@ In 7.0, `tagline: undefined` alone throws `nothing to update`. This update runs 
 
 To keep a 6.x write behaviour through 7.x, set its option to `false` in `db.setConfig()`. Choose them independently: `undefinedMeansMissing: false` keeps undefined write values, and `upsertRequiresSameKeys: false` allows missing keys to overwrite stored columns. Neither setting emits the 6.x warning.
 
+In 7.x, each transaction check defaults to `true`. Set only the check you need to disable in `db.setConfig()`. [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit) returns the callback result after a rolled-back commit, [`transactionRequiresIdleClient: false`](/runtime-config#Config.transactionRequiresIdleClient) lets the helper end a caller's block, and [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel) runs the nested callback at the outer level. These overrides run without a warning through 7.x and go in 8.0.
+
 - `insert()` sends `DEFAULT`<!-- probe: db.insert('tags', { film_id: 1000, tag: undefined }) --> for an `undefined` value, an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->, and an `upsert()` with no other key "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
 - By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
-- A `transaction()` given a client already inside a transaction block rejects, and leaves that transaction open ([Your own `BEGIN`](/transaction#your-own-begin)).
-- A `transaction()` given the client of a transaction at a level that doesn't satisfy its own rejects before its callback ([Passing a transaction through](/transaction#passing-a-transaction-through)).
+- If your unmarked client reports `T` or `E` both before and after the empty query, `transaction()` rejects and leaves your block open. Without a status, the call proceeds. An overlapping call can commit writes before the first transaction starts, so await each call before the next on the same client ([Your own `BEGIN`](/transaction#your-own-begin)).
+- A nested `transaction()` rejects before its callback if the level recorded when the outer helper opened cannot satisfy its request. A later `SET TRANSACTION` leaves the marker unchanged. Open the outer helper at the level you need ([Passing a transaction through](/transaction#passing-a-transaction-through)).
 - `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, and `min()` and `max()` their column's value, typed so by the `ConfigTypes` declaration ([Typed by column](/select#typed-by-column)).
 - No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
 

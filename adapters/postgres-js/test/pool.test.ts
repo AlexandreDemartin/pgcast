@@ -146,15 +146,15 @@ describe('transactions', () => {
     expect([n.reserves(), n.releases()]).toEqual([1, 1]);
   });
 
-  it('reads the ROLLBACK that answers the COMMIT of an aborted transaction: warns PGCAST_DEP003, or rejects', async () => {
+  it('reads the ROLLBACK that answers the COMMIT of an aborted transaction by default and with transactionRequiresCommit false', async () => {
     vi.resetModules();
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
     const fdb = await import('../../../src/db');
     const swallow = async (c: db.QueryableLike) => { await db.sql`SELECT 1/0`.run(c).catch(() => { }); return 'swallowed'; };
-    expect(await fdb.readCommitted(u.pool, swallow)).toBe('swallowed');
-    expect(emitWarning.mock.calls.map(call => call[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP003' }]);
-    fdb.setConfig({ transactionRequiresCommit: true });
     await expect(fdb.readCommitted(u.pool, swallow)).rejects.toThrow('the transaction was rolled back, not committed');
+    fdb.setConfig({ transactionRequiresCommit: false });
+    expect(await fdb.readCommitted(u.pool, swallow)).toBe('swallowed');
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
   it('reads a cursor() in two batches, then sends CLOSE on a break (#743)', async () => {

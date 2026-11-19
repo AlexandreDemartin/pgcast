@@ -69,10 +69,11 @@ describe('setConfig()', () => {
     castObjectParamsToJson: false,
     upsertRequiresSameKeys: true,
     undefinedMeansMissing: true,
-    transactionRequiresCommit: false,
-    transactionRequiresIdleClient: false,
-    transactionRequiresSatisfyingLevel: false,
+    transactionRequiresCommit: true,
+    transactionRequiresIdleClient: true,
+    transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: false,
+    aggregatesTypedByColumn: true,
   };
   const changed = {
     transactionAttemptsMax: 2,
@@ -81,10 +82,11 @@ describe('setConfig()', () => {
     castObjectParamsToJson: true,
     upsertRequiresSameKeys: false,
     undefinedMeansMissing: false,
-    transactionRequiresCommit: true,
-    transactionRequiresIdleClient: true,
-    transactionRequiresSatisfyingLevel: true,
+    transactionRequiresCommit: false,
+    transactionRequiresIdleClient: false,
+    transactionRequiresSatisfyingLevel: false,
     selectExactlyOneChecksForSecondRow: true,
+    aggregatesTypedByColumn: false,
   };
 
   it.each([undefined, null])('resets each write option independently with %s', value => {

@@ -89,7 +89,7 @@ npx zapatos        # or: npx pgcast
 | `upsertRequiresSameKeys`: a multi-row `upsert()` throws, rather than overwrite a column with `DEFAULT` | retired in 7.0 | 6.7.0 |
 | `undefinedMeansMissing`: an `undefined` value acts as a missing key, so `update()` leaves the column and `insert()` sends `DEFAULT` | retired in 7.0 | 6.7.0 |
 | `transactionRequiresCommit`: a `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, after a query error the callback caught, rejects, rather than resolve with nothing saved | `PGCAST_DEP003` | 6.7.0 |
-| `aggregatesTypedByColumn`: `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, rather than `0`, and `min()` and `max()` their column's value, rather than `Number()` of it; declared in `ConfigTypes`, the types follow | `PGCAST_DEP004` | 6.7.0 |
+| `aggregatesTypedByColumn`: `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, rather than `0`, and `min()` and `max()` their column's value, as parsed by `pg`. Both values and types default to this in 7.0 | `PGCAST_DEP004`, retired in 7.0 | 6.7.0 |
 | `transactionRequiresIdleClient`: a `transaction()` given a client already inside a transaction block (a `BEGIN` of yours) rejects before sending its `START TRANSACTION`, rather than commit or roll back that transaction; needs pg 8.21 | `PGCAST_DEP005` | 6.7.0 |
 | `transactionRequiresSatisfyingLevel`: a `transaction()` given the client of a transaction at a level that doesn't satisfy its own (`serializable()` given `readCommitted()`'s) rejects, rather than run its callback at that level | `PGCAST_DEP007` | 6.7.0 |
 | `selectExactlyOneChecksForSecondRow`: a `selectExactlyOne()` run on its own throws on a second row, rather than give the first; nested in a `lateral` or a `sql` template, or as a `.copy()`, it keeps `LIMIT 1` | none | 6.7.0 |
@@ -109,7 +109,7 @@ Everything else: the [changelog](https://pgcast.dev/changelog); what the charact
 - pgcast continues Zapatos's version numbers: 6.6.2 follows Zapatos 6.6.1.
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
 - **7.0** switches the opt-in defaults of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in for good; the warnings announce it.
-  In 7.x, set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently to keep the corresponding 6.x write behaviour without a warning.
+  In 7.x, set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently to keep the corresponding 6.x write behaviour without a warning. The three transaction checks also default to `true`. Set any one to `false` for its 6.x behaviour without a warning through 7.x.
 - **8.0** removes the old paths, except those of `selectExactlyOneChecksForSecondRow` and `domainsTypedAsUnions`, and three old values asked for by choice, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` ([Versions](https://pgcast.dev/versions#_7-0-and-8-0)).
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
 
