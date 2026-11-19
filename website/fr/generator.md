@@ -111,7 +111,7 @@ if (!upToDate) process.exitCode = 1;
 ```
 
 - Elle prend la config de [`generate()`](#generate), et se résout avec `true` quand chaque fichier correspond. Le code de sortie, c’est à vous de le fixer.
-- Elle transmet le résultat de la comparaison des fichiers uniquement aux écouteurs : une ligne par fichier qui diffère ou manque via [`warningListener`](#generate.warningListener), donc avec `console.log` par défaut ; `The generated files in src/zapatos are up to date.` via [`progressListener`](#generate.progressListener). Pas la dernière ligne de la CLI, `Run the generator without --check to write them.`
+- Elle signale le résultat de la comparaison des fichiers uniquement via les écouteurs. [`warningListener`](#generate.warningListener) affiche une ligne par fichier différent ou manquant, avec `console.log` par défaut. Le message `The generated files in src/zapatos are up to date.` passe par [`progressListener`](#generate.progressListener). Seule la CLI affiche la dernière ligne, `Run the generator without --check to write them.`
 - Si une requête échoue, la promesse est rejetée avec l’erreur d’origine. Réglez [`rejectOnQueryError: false`](#generate.rejectOnQueryError) pour afficher l’erreur et quitter avec le code 1.
 
 ## `generate()` {#generate}
@@ -396,7 +396,7 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, par défaut `true` à partir de la 7.0. Si l’option est omise ou si elle vaut `null` en JSON ou `true`, tout échec de connexion ou de requête entraîne le rejet de la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) avec l’erreur d’origine avant toute écriture. Une erreur levée par un écouteur entraîne aussi le rejet de la promesse, et les messages déjà affichés restent visibles.
+`boolean`, par défaut `true` à partir de la 7.0. Si vous omettez l’option, indiquez `null` en JSON ou choisissez `true`, la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) est rejetée avec l’erreur d’origine en cas d’échec de connexion ou de requête, avant toute écriture de fichier. La promesse est aussi rejetée si un écouteur lève une erreur. Les messages que les écouteurs ont déjà affichés restent visibles.
 
 Réglez `rejectOnQueryError: false` pour afficher `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêter le processus avec le code 1 avant que la promesse se résolve ou soit rejetée. Cette valeur reste disponible et c’est celle qu’utilise [la CLI](#cli).
 
