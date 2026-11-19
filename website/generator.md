@@ -334,7 +334,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
 - The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In the order of [`enumOrder`](#generate.enumOrder), as for every enum.
-- The generator matches foreign enums by name, so a name shared with a built-in type or another type's Postgres array can give the column the wrong type.
+- The generator matches foreign enums by name. An enum named like a built-in type (`int4`) gets that type instead of its labels. An enum named as Postgres would normally name another type's array (`_tag` for `tag`) gives its labels to columns of that array type.
 - A domain over such an enum stays a custom type, `c.<name>`. Unless another type shares its placeholder name, a fresh placeholder gets the labels without an import, even when a relation of the enum's own schema uses the domain as well. An existing placeholder is never overwritten.
 
 ### `enumOrder` {#generate.enumOrder}

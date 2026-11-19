@@ -338,7 +338,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | `keeper` | `crew_job \| null` : les labels de `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
 - Les labels sont écrits en toutes lettres, pas nommés : le schéma de l’enum n’a pas besoin d’être dans [`schemas`](#generate.schemas). Dans l’ordre d’[`enumOrder`](#generate.enumOrder), comme pour chaque enum.
-- Le générateur reconnaît les enums d’autres schémas par leur nom et peut donc attribuer un type incorrect à la colonne si un type natif ou le type tableau associé à un autre type Postgres porte ce nom.
+- Le générateur reconnaît les enums d’autres schémas par leur nom. Un enum qui porte le nom d’un type natif (`int4`) reçoit ce type au lieu de ses labels. Un enum qui porte le nom que Postgres donnerait normalement au tableau d’un autre type (`_tag` pour `tag`) donne ses labels aux colonnes de ce type tableau.
 - Un domaine sur un tel enum reste un type personnalisé, `c.<name>`. Si le nom du placeholder est propre à ce domaine, le générateur y écrit les labels sans import à la première génération, même quand une relation du schéma de l’enum utilise aussi ce domaine. Un placeholder existant n’est jamais écrasé.
 
 ### `enumOrder` {#generate.enumOrder}
