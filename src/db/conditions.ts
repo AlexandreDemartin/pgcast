@@ -299,7 +299,7 @@ export const and = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) =>
  */
 export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, boolean | null, T>`(NOT (${condition}))`;
 
-// the first item, at any depth as the typed form nests (`arrayContains<number[]>([[1]])`), that is no plain value: pg
+// the first item, at any depth as the 6.6.1 spelling nests (`arrayContains<number[]>([[1]])`), that is no plain value: pg
 // sent db.all, Default and self as '{"Symbol(all)"}', and a wrapper, a Parameter, parent() or a fragment as its JSON;
 // each array is walked once, from a stack of its own, so neither a cyclic nor a deeply nested one overflows the call
 // stack, and either goes on as a parameter
@@ -330,16 +330,24 @@ const arrayParam = (fn: string, a: unknown) => {
   });
 };
 
+type ArrayCondition = {
+  (a: ParentColumn): SQLFragment<boolean | null, never>;
+  <T>(a: readonly T[]): SQLFragment<boolean | null, [T] extends [readonly any[]] ? T : T[]>;
+};
+
 /**
- * `"col" @> $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContains<number[]>([[1]])`,
- * or `` sql`${self} @> ${param([1], 'int4[]')}` ``. An item, at any depth, that is `db.Default`, `db.self`, `db.all`,
- * `db.raw()`, `db.cols()`, `db.vals()`, `db.param()`, `db.parent()` or a `sql` fragment throws as the query compiles.
+ * Match an array column containing every supplied element. On an `int4[]` column, `arrayContains([1])` gives `"col" @> $1`.
+ * An item, at any depth, that is `db.Default`, `db.self`, `db.all`, `db.raw()`, `db.cols()`, `db.vals()`, `db.param()`,
+ * `db.parent()` or a `sql` fragment throws as the query compiles.
  */
-export const arrayContains = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} @> ${arrayParam('arrayContains', a)}`;
-/** `"col" <@ $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContainedIn<number[]>([[1, 2]])`, or `` sql`${self} <@ ${param([1, 2], 'int4[]')}` ``. Refuses the items `arrayContains()` refuses. */
-export const arrayContainedIn = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} <@ ${arrayParam('arrayContainedIn', a)}`;
-/** `"col" && $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayOverlaps<number[]>([[1, 2]])`, or `` sql`${self} && ${param([1, 2], 'int4[]')}` ``. Refuses the items `arrayContains()` refuses. */
-export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} && ${arrayParam('arrayOverlaps', a)}`;
+export const arrayContains: ArrayCondition = (a: readonly unknown[] | ParentColumn) =>
+  sql<SQL, boolean | null>`${self} @> ${arrayParam('arrayContains', a)}`;
+/** Match an array column whose elements all occur in the supplied array. `arrayContainedIn([1, 2])` gives `"col" <@ $1`. Refuses the items `arrayContains()` refuses. */
+export const arrayContainedIn: ArrayCondition = (a: readonly unknown[] | ParentColumn) =>
+  sql<SQL, boolean | null>`${self} <@ ${arrayParam('arrayContainedIn', a)}`;
+/** Match an array column sharing an element with the supplied array. `arrayOverlaps([1, 2])` gives `"col" && $1`. Refuses the items `arrayContains()` refuses. */
+export const arrayOverlaps: ArrayCondition = (a: readonly unknown[] | ParentColumn) =>
+  sql<SQL, boolean | null>`${self} && ${arrayParam('arrayOverlaps', a)}`;
 
 /* === subqueries === */
 
