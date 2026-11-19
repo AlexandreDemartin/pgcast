@@ -25,7 +25,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 Les types que pgcast génère décrivent les valeurs telles que `pg` les parse ([Parser comme pg](#parse-like-pg)) : les adaptateurs ci-dessous parsent chaque colonne avec les parsers de `pg` lui-même. Quel que soit le driver qui lance les requêtes, gardez `pg` installé : `zapatos/db` le charge.
 
 ::: info Adaptateurs sur npm
-Les paquets [`@pgcast/adapter-postgres-js`](https://www.npmjs.com/package/@pgcast/adapter-postgres-js) et [`@pgcast/adapter-pglite`](https://www.npmjs.com/package/@pgcast/adapter-pglite) sont disponibles sur npm. Tous deux nécessitent pgcast 6.12.0 ou une version ultérieure. Chaque adaptateur a son propre changelog : [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) et [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
+Les paquets [`@pgcast/adapter-postgres-js`](https://www.npmjs.com/package/@pgcast/adapter-postgres-js) et [`@pgcast/adapter-pglite`](https://www.npmjs.com/package/@pgcast/adapter-pglite) sont disponibles sur npm. Il leur faut pgcast 6.12.0 ou une version plus récente. Chaque adaptateur a son propre changelog : [postgres.js](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) et [PGlite](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md).
 :::
 
 ## postgres.js {#postgres-js}
