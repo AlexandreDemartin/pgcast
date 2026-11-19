@@ -58,8 +58,6 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ## Add the package
 
-For 7.x, use `@^7` wherever a Yarn or bun command below specifies a 6.x alias range.
-
 ### Under its own name
 
 ::: code-group
@@ -84,7 +82,7 @@ bun add pgcast@npm:@pgcast/pgcast@^7 pg
 
 Then set `"moduleNames": "pgcast"` in `pgcastconfig.json`, the generator's config file ([The CLI](/generator#cli)), and import `pgcast/db` and `pgcast/schema` ([`moduleNames`](/generator#generate.moduleNames)).
 
-Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4 write none without one: hence the `@^6.7`, the first release with `moduleNames`.
+The `^7` range selects pgcast 7.x. Yarn 2 and later require a range in an alias. Yarn 1 and Bun before 1.4 only save a range if you specify one.
 
 ### Under the `zapatos` alias
 
