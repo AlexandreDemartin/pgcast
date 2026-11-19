@@ -263,14 +263,14 @@ With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own a
 aggregatesTypedByColumn?: boolean  // default: true
 ```
 
-From 7.0, by default, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()`](/select#min) and [`max()`](/select#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it: a `Date` for a `timestamptz`, a string for a `text` or an enum. The SQL doesn't change, nor does [`count()`](/select#count).
+From 7.0, by default, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()`](/select#min) and [`max()`](/select#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it: with the default parsers, a `Date` for a finite `timestamptz` and a string for `text` or an enum. The SQL doesn't change, nor does [`count()`](/select#count).
 
-With `false`, `.run()` applies `Number()` to the result. An empty set gives `0`, a date gives its epoch milliseconds and non-numeric text gives `NaN`. This setting runs silently through 7.x and goes in 8.0.
+With `false`, `.run()` applies `Number()` to the result. An empty set gives `0`, a finite date read as a `Date` gives its epoch milliseconds and non-numeric text gives `NaN`. This setting runs silently through 7.x and goes in 8.0.
 
 - For the 6.x types, also declare `false` in [`ConfigTypes`](#ConfigTypes). An existing `true` declaration still works.
-- Nested in a `lateral` or as an `extras` value, the value comes back as JSON, option or not, and `null` when no row matches; by default it is typed as its column's `JSONSelectable`.
+- Under a `lateral` key or as an `extras` value, the value comes back as JSON, option or not, and `null` when no row matches; by default it is typed as its column's `JSONSelectable`.
   - For a [passed-through `lateral`](/select#lateral), calling `.run()` on the outer `selectOne()`, `selectExactlyOne()` or `selectRows()` gives the column as `pg` parses it. An outer `select()` gives JSON. [`selectRows()`](/select#selectRows) refuses a direct numeric fragment such as `count()` at compile time.
-- Each `.run()` reads the setting, even for a query built before `setConfig()`. Resetting it with `null` or `undefined` restores the default. A query that returns no row then gives `null`.
+- Each `.run()` reads the setting, even for a query built before `setConfig()`. Set it to `true` to restore the default. JavaScript also accepts `null` or `undefined`. TypeScript rejects `null` with `strictNullChecks` and `undefined` with `exactOptionalPropertyTypes`. A query that returns no row then gives `null`.
 - Examples, and each type: [Typed by column](/select#typed-by-column).
 
 ### `queryListener` {#Config.queryListener}
@@ -595,7 +595,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | a `numeric` past `Number.MAX_VALUE` | `Infinity` | its digits, as a string |
 
-- It does nothing for `count()`, `sum()`, `avg()`, `min()` and `max()`: their result is not JSON, and goes through `Number()` ([`count()`](/select#count)). A `sum()` of `9007199254740993` still gives `9007199254740992`.
+- Direct [`count()`](/select#count), `sum()` and `avg()` convert non-null values with `Number()`. Direct `min()` and `max()` use the pg value by default and `Number()` with runtime `aggregatesTypedByColumn: false`. Under a lateral key the outer JSON parser applies, so enabling it preserves large numbers there.
 - It sets the type parsers of the `pg` module you give, so every pool and client of that module, from then on, pgcast's queries or not.
 - It does not change the types: the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) does.
 - An `int8` or `numeric` column outside JSON is a string already, by `pg`'s own parser.

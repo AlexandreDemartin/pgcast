@@ -69,12 +69,14 @@ export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `C
 export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
 export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragment<any> | ColumnForTable<T> }
 // the type a typed min() or max() has nested in a query, as JSON, where it differs from what run() gives;
-// read unless ConfigTypes asks for the 6.x signatures, and behind `unknown extends RunResult`, so that `any` still gives `{} | null`
+// read unless ConfigTypes asks for the 6.x signatures, and behind `unknown extends RunResult`, so `any` gives `unknown` on TS 4.1 and `{} | null` from TS 5.x
 declare const nestedResult: unique symbol;
 
 /**
- * A `min()` or `max()` typed by its column: `run()` gives `RunResult`, and nested in a
- * `lateral` or as an `extras` value it comes back as JSON, `NestedResult`. Its own members name a symbol
+ * A column-typed `min()` or `max()`: with the default runtime setting, `run()` gives the pg value.
+ * A single lateral of `selectOne()`, `selectExactlyOne()` or `selectRows()` also gives the pg value.
+ * `ConfigTypes` selects the types: `RunResult` there, `NestedResult` for JSON under a lateral key,
+ * in `extras` or under `select()`. Its own members name a symbol
  * `zapatos/db` does not export, so a package built with `declaration: true` cannot write them out (TS4023 on a
  * spread of `min()`); it can name the type itself, as a function returning `min()` does.
  */
@@ -1212,8 +1214,10 @@ export interface NumericAggregateSignatures {
   ): SQLFragment<number>;
 }
 
-// by default: null on an empty set, and min() / max() typed by their column
-type TypedByColumn = ConfigTypes extends { aggregatesTypedByColumn: false } ? false : true;
+// Only literal false selects the legacy signatures. Exclude any, then check assignability both ways.
+type TypedByColumn = ConfigTypes extends { aggregatesTypedByColumn: infer Setting } ?
+  true extends Setting ? true : [Setting, false] extends [false, Setting] ? false : true :
+  true;
 type ColumnValueOrNull<S, C> = C extends readonly (keyof S)[] ? S[C[number]] | null : never;
 
 export interface NullableNumericAggregateSignatures {
@@ -1304,8 +1308,8 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * `sum("col")`; no column, several, a string in place of the array, or a
  * single query as `lateral`, throw as the query compiles, so `run()` rejects
  * before any query is sent.
- * An empty set or a query returning no row gives `null`, or `0` with
- * `aggregatesTypedByColumn: false` in `setConfig()` and `ConfigTypes`.
+ * An empty set or a query returning no row gives `null`, or `0` with `aggregatesTypedByColumn: false`
+ * in `setConfig()`. Only a literal `false` in `ConfigTypes` selects the `number` return type.
  */
 export const sum: TypedByColumn extends true ? NullableNumericAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'sum');

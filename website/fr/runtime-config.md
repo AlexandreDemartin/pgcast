@@ -268,14 +268,14 @@ Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté se
 aggregatesTypedByColumn?: boolean  // default: true
 ```
 
-À partir de la 7.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : un `Date` pour un `timestamptz`, une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
+À partir de la 7.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour un `timestamptz` fini et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
 
-Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne `0`, une date donne le nombre de millisecondes depuis l’époque Unix et un texte non numérique donne `NaN`. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
+Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne `0`, une date finie lue comme un `Date` donne le nombre de millisecondes depuis l’époque Unix et un texte non numérique donne `NaN`. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
 
 - Pour retrouver les types de la 6.x, déclarez aussi `false` dans [`ConfigTypes`](#ConfigTypes). Si vous avez déjà déclaré l’option à `true`, cette déclaration reste valide.
-- Qu’il soit imbriqué dans un `lateral` ou utilisé comme valeur d’`extras`, le résultat de l’agrégat revient en JSON quel que soit le réglage et vaut `null` quand aucune ligne ne correspond. Par défaut, il est typé comme le `JSONSelectable` de sa colonne.
+- Sous une clé de `lateral` ou comme valeur d’`extras`, le résultat de l’agrégat revient en JSON quel que soit le réglage et vaut `null` quand aucune ligne ne correspond. Par défaut, il est typé comme le `JSONSelectable` de sa colonne.
   - Pour un [`lateral` transmis](/fr/select#lateral), appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou `selectRows()` pour obtenir la colonne telle que `pg` la parse. Un `select()` extérieur renvoie du JSON. [`selectRows()`](/fr/select#selectRows) refuse à la compilation un fragment numérique transmis directement, comme `count()`.
-- `.run()` lit l’option même si la requête a été construite avant `setConfig()`. Réglez l’option sur `null` ou `undefined` pour rétablir la valeur par défaut. Une requête qui ne renvoie aucune ligne donne alors `null`.
+- `.run()` lit l’option même si la requête a été construite avant `setConfig()`. Réglez l’option sur `true` pour rétablir la valeur par défaut. JavaScript accepte aussi `null` et `undefined`. TypeScript refuse `null` avec `strictNullChecks` et `undefined` avec `exactOptionalPropertyTypes`. Une requête qui ne renvoie aucune ligne donne alors `null`.
 - Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
 
 ### `queryListener` {#Config.queryListener}
@@ -600,7 +600,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | un `numeric` au-delà de `Number.MAX_VALUE` | `Infinity` | ses chiffres, sous forme de chaîne |
 
-- Elle ne fait rien pour `count()`, `sum()`, `avg()`, `min()` et `max()` : leur résultat n’est pas du JSON, et passe par `Number()` ([`count()`](/fr/select#count)). Un `sum()` de `9007199254740993` donne toujours `9007199254740992`.
+- Appelés directement, [`count()`](/fr/select#count), `sum()` et `avg()` convertissent les valeurs non nulles avec `Number()`. Les appels directs à `min()` et `max()` donnent la valeur lue par pg par défaut et la convertissent avec `Number()` si `aggregatesTypedByColumn` vaut `false` à l’exécution. Sous une clé de `lateral`, activer le parseur JSON de la requête extérieure préserve les grands nombres.
 - Elle règle les parsers de types du module `pg` que vous donnez, donc de chaque pool et chaque client de ce module, à partir de là, requêtes de pgcast ou non.
 - Elle ne change pas les types : c’est l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur qui le fait.
 - Une colonne `int8` ou `numeric` hors JSON est déjà une chaîne, par le parser de `pg` lui-même.
