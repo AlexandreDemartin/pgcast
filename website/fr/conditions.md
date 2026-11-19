@@ -340,18 +340,23 @@ Le type en accepte davantage, et chacune de ces valeurs lève une erreur à la c
 
 ## Les tableaux {#arrays}
 
-Chacune prend un tableau, envoyé comme un seul paramètre, ou [`parent()`](/fr/sql-template#parent) : `<T>(a: T[] | ParentColumn)`. Elles comparent les éléments, quelles que soient les dimensions : `{drama,romance}` chevauche `{{romance,thriller}}`.
-
-`T` est l’élément, comme dans Zapatos 6.6.1, là où le Whereable attend le type tableau de la colonne : sur `genres`, un `text[]`, le type refuse `arrayOverlaps(['romance'])`.
+À partir de la 7.0, chaque condition accepte un tableau d’éléments du type de ceux de la colonne, même en lecture seule, ou une [colonne parente](/fr/sql-template#parent). Pour `films.genres`, de type `text[]`, passez un tableau de chaînes.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
-// @ts-expect-error genres takes a string[], and arrayOverlaps(['romance']) gives a string (TS2322)
 db.select('films', { genres: db.conditions.arrayOverlaps(['romance']) });
+// @ts-expect-error genres holds strings
+db.select('films', { genres: db.conditions.arrayOverlaps([1]) });
+// @ts-expect-error a parent column can be the operand, but cannot be a genre
+db.select('films', { genres: db.conditions.arrayContains([db.parent('id')]) });
 ```
 
-Cela reste ainsi : chaque type que j’ai essayé sur la colonne cassait du code qui compile sous 6.6.1, soit un mock écrit selon sa signature, soit le résultat typé de `.map(db.conditions.arrayContains)` ([#40](https://github.com/AlexandreDemartin/pgcast/issues/40)). Deux façons compilent. Avec le type de la colonne comme `T`, la valeur est un tableau de tableaux :
+Le fragment renvoyé par `arrayContains(['drama'])` a pour contrainte `string[]`. Dans un rappel, écrivez `.map(genres => db.conditions.arrayContains(genres))` pour conserver le type des éléments. Un mock écrit avec la signature de la 6.6.1 doit prendre en charge les deux surcharges.
+
+TypeScript accepte encore un tableau littéral vide, une variable de type `never[]` ou `parent()` sur une colonne scalaire. Postgres refuse la comparaison de tableaux sur une colonne d’entiers.
+
+La forme de la 6.6.1 ci-dessous compile aussi. Elle envoie un tableau à deux dimensions en un seul paramètre. Ces opérateurs comparent les éléments quelles que soient les dimensions, donc `{drama,romance}` chevauche `{{romance,thriller}}`.
 
 <CastPanel example="conditions_arrays">
 
@@ -367,11 +372,11 @@ Ou écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et caste
 
 </CastPanel>
 
-Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) activé, une condition envoie son tableau en `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, un tableau de tableaux aussi, que Postgres refuse (42883 : `text[] @> json`). Le type de la condition refuse un `Parameter` d’un tableau (TS2345), mais dans le fragment, le cast donné à `param()` l’emporte sur l’option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)) : il s’exécute dans les deux cas.
+Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) activé, une condition envoie son tableau en `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, un tableau de tableaux aussi, que Postgres refuse (42883 : `text[] @> json`). Le type de la condition refuse un `Parameter` d’un tableau (TS2769), mais dans le fragment, le cast donné à `param()` l’emporte sur l’option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)) : il s’exécute dans les deux cas.
 
 Comme dans Zapatos 6.6.1, le type accepte aussi `{}`, `{ value: … }` et `db.param()` d’un nom de colonne, qui passent pour un `ParentColumn`, dont tous les membres sont optionnels ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` est envoyé en `'{}'`, le tableau vide : `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> trouve chaque ligne dont le tableau n’est pas `NULL`, `arrayContainedIn({})` les tableaux vides, et `arrayOverlaps({})` aucune ligne. Postgres refuse `{ value: 'title' }` et `db.param('title')` (22P02, `malformed array literal`), et, avec [`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson) activé, `{}` et `{ value: … }` aussi (42883).
 
-Le tableau est un seul paramètre, donc chaque élément, à toute profondeur, est une valeur simple, comme dans [`eqAny()`](#conditions.eqAny) : `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête ([valeurs refusées](#refused-values)). Le type refuse chacun, sauf `parent()` et un fragment comme seuls éléments, `arrayContains([db.parent('id')])`<!-- tsc: db.select('films', { genres: db.conditions.… }) -->. Zapatos 6.6.1 envoyait `Default` en `'{"Symbol(DEFAULT)"}'` et `self` en `'{"Symbol(self)"}'`, les autres en leur JSON : aucune ligne, les tableaux vides avec `arrayContainedIn()`, chaque ligne sous `not()`, 22P02 sur un `int4[]`. Pour du SQL, écrivez la valeur en fragment `sql` ci-dessus.
+Le tableau est un seul paramètre, donc chaque élément, à toute profondeur, est une valeur simple, comme dans [`eqAny()`](#conditions.eqAny) : `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête ([valeurs refusées](#refused-values)). Sur `genres`, TypeScript refuse chacun de ces éléments (TS2322). Zapatos 6.6.1 envoyait `Default` en `'{"Symbol(DEFAULT)"}'` et `self` en `'{"Symbol(self)"}'`, les autres en leur JSON : aucune ligne, les tableaux vides avec `arrayContainedIn()`, chaque ligne sous `not()`, 22P02 sur un `int4[]`. Pour du SQL, écrivez la valeur en fragment `sql` ci-dessus.
 
 ### `arrayContains()` {#conditions.arrayContains}
 
@@ -731,7 +736,7 @@ Le type ne vérifie pas un fragment : un `int4` sur une colonne `timestamptz` p
 
 ## Les valeurs qu’une condition refuse {#refused-values}
 
-`Default`, `self`, `all`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()`, `websearchToTsquery()` ; TS2769 comme liste d’`eqAny()`, comme valeur de `jsonbContains()` et comme chemin ou variables de `jsonbPathExists()`).
+`Default`, `self`, `all`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, `add()`, `subtract()`, `websearchToTsquery()` ; TS2769 comme opérande d’une condition de tableau, comme liste d’`eqAny()`, comme valeur de `jsonbContains()` et comme chemin ou variables de `jsonbPathExists()`).
 
 À l’exécution, c’est la compilation de la condition qui lève l’erreur, pas son appel : `run()` est donc rejetée avec une simple `Error` avant toute requête.
 

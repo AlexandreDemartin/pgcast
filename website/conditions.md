@@ -335,18 +335,23 @@ The type takes more than that, and each of these throws as the query compiles, b
 
 ## Arrays {#arrays}
 
-Each takes an array, sent as one parameter, or [`parent()`](/sql-template#parent): `<T>(a: T[] | ParentColumn)`. They compare the elements, whatever the dimensions: `{drama,romance}` overlaps `{{romance,thriller}}`.
-
-`T` is the element, as in Zapatos 6.6.1, where the Whereable expects the column's array type: on `genres`, a `text[]`, the type refuses `arrayOverlaps(['romance'])`.
+From 7.0, each condition takes an array of the column's elements, including a readonly array, or a [parent column](/sql-template#parent). On `films.genres`, a `text[]`, pass an array of strings.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
-// @ts-expect-error genres takes a string[], and arrayOverlaps(['romance']) gives a string (TS2322)
 db.select('films', { genres: db.conditions.arrayOverlaps(['romance']) });
+// @ts-expect-error genres holds strings
+db.select('films', { genres: db.conditions.arrayOverlaps([1]) });
+// @ts-expect-error a parent column can be the operand, but cannot be a genre
+db.select('films', { genres: db.conditions.arrayContains([db.parent('id')]) });
 ```
 
-It stays that way: every type I tried on the column broke some code that compiles under 6.6.1, either a mock written to its signature or the typed result of `.map(db.conditions.arrayContains)` ([#40](https://github.com/AlexandreDemartin/pgcast/issues/40)). Two ways compile. Given the column's type as `T`, the value is an array of arrays:
+A saved `arrayContains(['drama'])` has the constraint `string[]`. In a callback, write `.map(genres => db.conditions.arrayContains(genres))` to preserve the element type. A mock written to the 6.6.1 signature needs both overloads.
+
+TypeScript still accepts an empty literal, a `never[]` variable or `parent()` on a scalar column. Postgres rejects the array comparison on an integer column.
+
+The 6.6.1 spelling below also compiles. It sends a two-dimensional array as one parameter. These operators compare elements across dimensions, so `{drama,romance}` overlaps `{{romance,thriller}}`.
 
 <CastPanel example="conditions_arrays">
 
@@ -362,11 +367,11 @@ Or write a `sql` fragment value, where `db.self` is the column, and cast its par
 
 </CastPanel>
 
-With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, a condition sends its array as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, an array of arrays too, which Postgres refuses (42883: `text[] @> json`). The condition's type refuses a `Parameter` of an array (TS2345), but in the fragment, the cast given to `param()` wins over the option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)): it runs either way.
+With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, a condition sends its array as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, an array of arrays too, which Postgres refuses (42883: `text[] @> json`). The condition's type refuses a `Parameter` of an array (TS2769), but in the fragment, the cast given to `param()` wins over the option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)): it runs either way.
 
 As in Zapatos 6.6.1, the type also takes `{}`, `{ value: … }` and `db.param()` of a column's name, which pass as a `ParentColumn`, whose members are all optional ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` is sent as `'{}'`, the empty array: `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> matches every row whose array is not `NULL`, `arrayContainedIn({})` the empty arrays, and `arrayOverlaps({})` no row. Postgres refuses `{ value: 'title' }` and `db.param('title')` (22P02, `malformed array literal`), and under [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson), `{}` and `{ value: … }` too (42883).
 
-The array is one parameter, so each item, at any depth, is a plain value, as in [`eqAny()`](#conditions.eqAny): `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` throws as the query compiles ([refused values](#refused-values)). The type refuses each, but `parent()` and a fragment as the only items, `arrayContains([db.parent('id')])`<!-- tsc: db.select('films', { genres: db.conditions.… }) -->. Zapatos 6.6.1 sent `Default` as `'{"Symbol(DEFAULT)"}'` and `self` as `'{"Symbol(self)"}'`, the others as their JSON: no row, the empty arrays with `arrayContainedIn()`, every row under `not()`, 22P02 on an `int4[]`. For SQL, write the `sql` fragment value above.
+The array is one parameter, so each item, at any depth, is a plain value, as in [`eqAny()`](#conditions.eqAny): `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` throws as the query compiles ([refused values](#refused-values)). On `genres`, TypeScript refuses each of these items (TS2322). Zapatos 6.6.1 sent `Default` as `'{"Symbol(DEFAULT)"}'` and `self` as `'{"Symbol(self)"}'`, the others as their JSON: no row, the empty arrays with `arrayContainedIn()`, every row under `not()`, 22P02 on an `int4[]`. For SQL, write the `sql` fragment value above.
 
 ### `arrayContains()` {#conditions.arrayContains}
 
@@ -726,7 +731,7 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `all`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`, `websearchToTsquery()`; TS2769 as the list of `eqAny()`, the value of `jsonbContains()` and the path or variables of `jsonbPathExists()`).
+`Default`, `self`, `all`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, `add()`, `subtract()`, `websearchToTsquery()`; TS2769 as the operand of an array condition, the list of `eqAny()`, the value of `jsonbContains()` and the path or variables of `jsonbPathExists()`).
 
 At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
 
