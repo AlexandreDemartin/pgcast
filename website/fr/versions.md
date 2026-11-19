@@ -1,5 +1,5 @@
 ---
-english: 3f5aae2b3299
+english: 34cf9a77048c
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
