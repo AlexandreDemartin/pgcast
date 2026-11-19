@@ -85,7 +85,8 @@ describe('insert', () => {
     // a key in one row is a column for all: DEFAULT elsewhere
     expect(db.insert('users', [{}, { mood: 'ok' }]).compile().text)
       .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) RETURNING to_jsonb("users".*) AS result');
-    // an undefined value: NULL by default, DEFAULT with undefinedMeansMissing
+    // an undefined value: DEFAULT by default, NULL with the legacy setting
+    db.setConfig({ undefinedMeansMissing: false });
     expect(db.insert('users', { mood: undefined }).compile().text)
       .toBe('INSERT INTO "users" ("mood") VALUES ($1) RETURNING to_jsonb("users".*) AS result');
     db.setConfig({ undefinedMeansMissing: true });
@@ -113,7 +114,8 @@ describe('insert', () => {
   });
 
   it('values: SQLFragment, Parameter with a cast, Default, undefined', () => {
-    // without undefinedMeansMissing (deprecated, PGCAST_DEP002), an undefined value is sent as a parameter (NULL)
+    // without undefinedMeansMissing, an undefined value is sent as a parameter (NULL)
+    db.setConfig({ undefinedMeansMissing: false });
     const q = () => db.insert('accounts', {
       owner_id: 1, balance: sql`1 + 1`, ratio: param('0.5', 'float8'), lifetime_ops: Default, overdraft_limit: undefined,
     }).compile();
@@ -157,6 +159,7 @@ describe('upsert', () => {
   });
 
   it('several conflict columns and several rows', () => {
+    db.setConfig({ upsertRequiresSameKeys: false });
     expect(db.upsert('products', [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
@@ -769,11 +772,11 @@ describe('upsert', () => {
     ['one row', () => db.upsert('users', { mood: undefined }, 'email')],
     ['several rows', () => db.upsert('users', [{ mood: undefined }, { mood: undefined }], 'email')],
   ])('with undefinedMeansMissing, only undefined values: no column, throws, %s (#251)', (_, write) => {
-    db.setConfig({ undefinedMeansMissing: true });
     expect(write).toThrow(nothingToInsert);
   });
 
   it('an undefined value is a column without undefinedMeansMissing, and a key in some row with it', () => {
+    db.setConfig({ undefinedMeansMissing: false });
     expect(db.upsert('users', { mood: undefined }, 'email').compile().text).toContain('INSERT INTO "users" ("mood") VALUES ($1) ON CONFLICT');
     db.setConfig({ undefinedMeansMissing: true });
     expect(db.upsert('users', [{ mood: undefined }, { mood: 'ok' }], 'email', { updateColumns: ['mood'] }).compile().text)
@@ -791,7 +794,6 @@ describe('upsertRequiresSameKeys', () => {
     sameKeys = [{ ...rows[0], title: 'Tee' }, rows[1]];
 
   it('with it, rows with different keys throw before any query', () => {
-    db.setConfig({ upsertRequiresSameKeys: true });
     expect(() => db.upsert('products', rows, ['sku', 'variant']))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
     expect(() => db.upsert('products', rows, ['sku', 'variant'], { updateValues: { price_cents: 1 } }))
@@ -805,6 +807,7 @@ describe('upsertRequiresSameKeys', () => {
       db.upsert('products', rows, ['sku', 'variant'], { updateColumns: ['title'] }),
       db.upsert('products', rows, ['sku', 'variant'], { updateColumns: db.doNothing }),
     ].map(q => q.compile());
+    db.setConfig({ upsertRequiresSameKeys: false });
     const without = queries();
     db.setConfig({ upsertRequiresSameKeys: true });
     expect(queries()).toEqual(without);
@@ -833,79 +836,150 @@ const fresh = async () => {
   return { fdb: await import('../../src/db'), emitWarning };
 };
 
-describe('upsert of rows with different keys, without upsertRequiresSameKeys', () => {
+describe('write defaults and legacy settings', () => {
   afterEach(() => { vi.restoreAllMocks(); });
-  const rows = [
-    { sku: 'TEE', variant: 'S', price_cents: 1300 },
-    { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
-  ];
+  const returning = `RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
+  const ada = { display_name: 'A', email: 'Ada@Example.com' };
 
-  it('emits a DeprecationWarning once per process, PGCAST_DEP001, naming the option', async () => {
-    // the SQL is unchanged: see 'several conflict columns and several rows' above
-    const { fdb, emitWarning } = await fresh();
-    fdb.upsert('products', rows, ['sku', 'variant']);
-    fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { price_cents: 1 } });
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    const [message, options] = emitWarning.mock.calls[0];
-    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
-    expect(message).toMatch(/upsertRequiresSameKeys: true/);
-    expect(message).toMatch(/default in pgcast 7\.0/);
+  it.each([{}, { undefinedMeansMissing: false }])('keeps explicit null as a parameter with %j', config => {
+    db.setConfig(config);
+    expect(db.insert('users', { ...ada, mood: null }).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) RETURNING to_jsonb("users".*) AS result',
+      values: ['A', ada.email, null],
+    });
+    expect(db.update('users', { mood: null }, { id: 1 }).compile()).toEqual({
+      text: 'UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result',
+      values: [null, 1],
+    });
+    expect(db.upsert('users', { ...ada, mood: null }, 'email').compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "mood") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."mood") ${returning}`,
+      values: ['A', ada.email, null],
+    });
+    expect(db.upsert('users', ada, 'email', { updateValues: { mood: null } }).compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "mood") = ROW(EXCLUDED."display_name", EXCLUDED."email", $3) ${returning}`,
+      values: ['A', ada.email, null],
+    });
   });
 
-  it('emits none for rows with the same keys, one row, updateColumns or doNothing, nor with the option', async () => {
-    const { fdb, emitWarning } = await fresh();
-    fdb.upsert('products', [{ ...rows[0], title: 'Tee' }, rows[1]], ['sku', 'variant']);
-    fdb.upsert('products', rows[0], ['sku', 'variant']);
-    fdb.upsert('products', rows, ['sku', 'variant'], { updateColumns: ['title'] });
-    fdb.upsert('products', rows, ['sku', 'variant'], { updateColumns: fdb.doNothing });
-    fdb.setConfig({ upsertRequiresSameKeys: true });
-    expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).toThrow();
-    expect(emitWarning).not.toHaveBeenCalled();
+  it('uses DEFAULT for every undefined insert cell and omits undefined upsert keys', () => {
+    expect(db.insert('accounts', { balance: undefined }).compile()).toEqual({
+      text: 'INSERT INTO "accounts" ("balance") VALUES (DEFAULT) RETURNING to_jsonb("accounts".*) AS result', values: [],
+    });
+    expect(db.insert('accounts', { balance: undefined, owner_id: 1 }).compile()).toEqual({
+      text: 'INSERT INTO "accounts" ("balance", "owner_id") VALUES (DEFAULT, $1) RETURNING to_jsonb("accounts".*) AS result', values: [1],
+    });
+    for (const first of [{ balance: undefined, owner_id: 1 }, { owner_id: 1 }]) {
+      expect(db.insert('accounts', [first, { balance: 5, owner_id: 1 }]).compile()).toEqual({
+        text: 'INSERT INTO "accounts" ("balance", "owner_id") VALUES (DEFAULT, $1), ($2, $3) RETURNING to_jsonb("accounts".*) AS result',
+        values: [1, 5, 1],
+      });
+    }
+    expect(db.upsert('users', { ...ada, mood: undefined }, 'email').compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email") = ROW(EXCLUDED."display_name", EXCLUDED."email") ${returning}`,
+      values: ['A', ada.email],
+    });
+    expect(() => db.update('users', { mood: undefined }, { id: 1 })).toThrow('nothing to update');
+  });
+
+  it('keeps explicit update columns, defined overrides and conflict columns in a batch', () => {
+    const tee = { sku: 'TEE', variant: 'S', price_cents: 1300 };
+    const cap = { sku: 'CAP', price_cents: 900 };
+    const rows = [tee, { ...cap, variant: '', title: 'Cap' }];
+    const target: ('sku' | 'variant')[] = ['sku', 'variant'];
+    const end = `RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
+    const insert = 'INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant")';
+    const binds = [1300, 'TEE', 'S', 900, 'CAP', 'Cap', ''];
+    expect(db.upsert('products', rows, target, { updateColumns: ['price_cents'] }).compile()).toEqual({
+      text: `${insert} DO UPDATE SET ("price_cents") = ROW(EXCLUDED."price_cents") ${end}`, values: binds,
+    });
+    expect(db.upsert('products', rows, target, { updateValues: { title: 'Tee' } }).compile()).toEqual({
+      text: `${insert} DO UPDATE SET ("sku", "variant", "price_cents", "title") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", $8) ${end}`,
+      values: [...binds, 'Tee'],
+    });
+    expect(db.upsert('products', [tee, cap], target).compile()).toEqual({
+      text: `INSERT INTO "products" ("price_cents", "sku", "variant") VALUES ($1, $2, $3), ($4, $5, DEFAULT) ON CONFLICT ("sku", "variant") DO UPDATE SET ("sku", "variant", "price_cents") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents") ${end}`,
+      values: [1300, 'TEE', 'S', 900, 'CAP'],
+    });
+    for (const id of ['id', ['id']] as ('id' | 'id'[])[]) {
+      expect(db.upsert('products', [{ ...tee, id: 1 }, { ...cap, variant: '' }], id).compile()).toEqual({
+        text: `INSERT INTO "products" ("id", "price_cents", "sku", "variant") VALUES ($1, $2, $3, $4), (DEFAULT, $5, $6, $7) ON CONFLICT ("id") DO UPDATE SET ("sku", "variant", "price_cents", "id") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", EXCLUDED."id") ${end}`,
+        values: [1, 1300, 'TEE', 'S', 900, 'CAP', ''],
+      });
+    }
+  });
+
+  it.each([{}, { upsertRequiresSameKeys: false }, { undefinedMeansMissing: false },
+    { undefinedMeansMissing: false, upsertRequiresSameKeys: false }])('handles missing and undefined batch keys independently with %j', async config => {
+    const tee = { sku: 'TEE', variant: 'S', price_cents: 1300 };
+    for (const first of [tee, { ...tee, title: undefined }]) {
+      const { fdb, emitWarning } = await fresh();
+      fdb.setConfig(config);
+      const rows = [first, { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' }];
+      const upsert = () => fdb.upsert('products', rows, ['sku', 'variant']);
+      const boundTitle = 'title' in first && config.undefinedMeansMissing === false;
+      if (!boundTitle && config.upsertRequiresSameKeys !== false) {
+        expect(upsert).toThrow('rows have different keys');
+      } else {
+        const cells = boundTitle ? '($1, $2, $3, $4), ($5, $6, $7, $8)' : '($1, $2, DEFAULT, $3), ($4, $5, $6, $7)';
+        expect(upsert().compile()).toEqual({
+          text: `INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ${cells} ON CONFLICT ("sku", "variant") DO UPDATE SET ("sku", "variant", "price_cents", "title") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
+          values: boundTitle ? [1300, 'TEE', undefined, 'S', 900, 'CAP', 'Cap', ''] : [1300, 'TEE', 'S', 900, 'CAP', 'Cap', ''],
+        });
+      }
+      expect(emitWarning).not.toHaveBeenCalled();
+    }
+    for (const write of [
+      (f: typeof db) => f.insert('accounts', { balance: undefined, owner_id: 1 }),
+      (f: typeof db) => f.update('users', { mood: 'sad', manager_id: undefined }, { id: 2 }),
+      (f: typeof db) => f.upsert('users', { ...ada, mood: undefined }, 'email'),
+      (f: typeof db) => f.upsert('users', ada, 'email', { updateValues: { settings: undefined } }),
+    ]) {
+      const { fdb, emitWarning } = await fresh();
+      fdb.setConfig(config);
+      write(fdb).compile();
+      expect(emitWarning).not.toHaveBeenCalled();
+    }
   });
 });
 
 describe('upsert of rows with different keys: only a missing key still set from EXCLUDED counts', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  /** Whether `call` warns without upsertRequiresSameKeys, and what it throws with it. */
   const outcome = async (call: (fdb: typeof db) => unknown) => {
     const { fdb, emitWarning } = await fresh();
-    call(fdb);
-    const warns = emitWarning.mock.calls.length > 0;
-    fdb.setConfig({ upsertRequiresSameKeys: true });
-    try { call(fdb); return { warns, throws: undefined }; }
-    catch (err: any) { return { warns, throws: err.message as string }; }
+    const result = failure(() => call(fdb));
+    expect(emitWarning).not.toHaveBeenCalled();
+    return result;
   };
-  const none = { warns: false, throws: undefined };
-  const both = { warns: true, throws: 'rows have different keys: pass updateColumns, or give every row the same keys' };
+  const refused = { name: 'Error', message: 'rows have different keys: pass updateColumns, or give every row the same keys' };
 
-  it('new rows without their serial id, conflict target id, among existing rows: neither', async () => {
+  it('new rows without their serial id, conflict target id, among existing rows: accepted', async () => {
     // a missing id is inserted as DEFAULT, a new serial value; on conflict, EXCLUDED.id is the existing id
     const rows = [
       { id: 1, sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'NEW', variant: '', price_cents: 900 },
     ];
-    expect(await outcome(fdb => fdb.upsert('products', rows, 'id'))).toEqual(none);
-    expect(await outcome(fdb => fdb.upsert('products', rows, ['id']))).toEqual(none);
+    expect(await outcome(fdb => fdb.upsert('products', rows, 'id'))).toBe('compiled');
+    expect(await outcome(fdb => fdb.upsert('products', rows, ['id']))).toBe('compiled');
   });
 
-  it('a missing key given in updateValues: neither', async () => {
+  it('a missing key given in updateValues: accepted', async () => {
     // it compiles to ROW(..., $n), never to EXCLUDED."title"
     const rows = [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
     ];
     expect(await outcome(fdb => fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } })))
-      .toEqual(none);
+      .toBe('compiled');
   });
 
-  it('a missing key really overwritten from EXCLUDED: both, even with another conflict column missing', async () => {
+  it('a missing key really overwritten from EXCLUDED: throws even with another conflict column missing', async () => {
     const rows = [
       { id: 1, sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
     ];
-    expect(await outcome(fdb => fdb.upsert('products', rows, 'id'))).toEqual(both);
-    expect(await outcome(fdb => fdb.upsert('products', rows, 'id', { noNullUpdateColumns: 'title' }))).toEqual(both);
+    expect(await outcome(fdb => fdb.upsert('products', rows, 'id'))).toEqual(refused);
+    expect(await outcome(fdb => fdb.upsert('products', rows, 'id', { noNullUpdateColumns: 'title' }))).toEqual(refused);
   });
 
   it('a constraint() target keeps the plain rule: a missing column of the constraint counts', async () => {
@@ -914,8 +988,8 @@ describe('upsert of rows with different keys: only a missing key still set from 
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'MUG', price_cents: 900 },
     ];
-    expect(await outcome(fdb => fdb.upsert('products', rows, fdb.constraint('products_sku_variant_key')))).toEqual(both);
-    expect(await outcome(fdb => fdb.upsert('products', rows, ['sku', 'variant']))).toEqual(none);
+    expect(await outcome(fdb => fdb.upsert('products', rows, fdb.constraint('products_sku_variant_key')))).toEqual(refused);
+    expect(await outcome(fdb => fdb.upsert('products', rows, ['sku', 'variant']))).toBe('compiled');
   });
 });
 
@@ -923,7 +997,6 @@ describe('undefinedMeansMissing', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('insert of several rows: an undefined cell sends DEFAULT, the columns are the union of the keys', () => {
-    db.setConfig({ undefinedMeansMissing: true });
     expect(db.insert('users', [
       { email: 'a@x.org', display_name: 'A', mood: undefined },
       { email: 'b@x.org', display_name: 'B', manager_id: 1 },
@@ -949,7 +1022,6 @@ describe('undefinedMeansMissing', () => {
         { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
       ],
       several = (r: any[]) => db.upsert('products', r, ['sku', 'variant'], { updateColumns: ['price_cents'] }).compile();
-    db.setConfig({ undefinedMeansMissing: true });
     // one row: neither inserted nor updated
     expect(db.upsert('users', { ...ada, mood: undefined }, 'email').compile())
       .toEqual(db.upsert('users', ada, 'email').compile());
@@ -960,7 +1032,6 @@ describe('undefinedMeansMissing', () => {
 
   it('upsert: an undefined key named in updateColumns is left out of the insert, but still set from EXCLUDED', () => {
     // as for a missing key, an existing row takes the column DEFAULT
-    db.setConfig({ undefinedMeansMissing: true });
     expect(db.upsert('users', { email: 'a@x.org', display_name: 'A', mood: undefined }, 'email',
       { updateColumns: ['mood'] }).compile()).toMatchInlineSnapshot(`
         {
@@ -973,24 +1044,6 @@ describe('undefinedMeansMissing', () => {
       `);
   });
 
-  it('upsert: an undefined key counts as missing for upsertRequiresSameKeys, and for PGCAST_DEP001', async () => {
-    const rows = [
-      { sku: 'TEE', variant: 'S', price_cents: 1300, title: undefined },
-      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
-    ];
-    const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ undefinedMeansMissing: true });
-    fdb.upsert('products', rows, ['sku', 'variant']);
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
-    fdb.setConfig({ upsertRequiresSameKeys: true });
-    expect(() => fdb.upsert('products', rows, ['sku', 'variant']))
-      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
-    // without undefinedMeansMissing, the key is there, and its NULL overwrites
-    fdb.setConfig({ undefinedMeansMissing: false });
-    expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).not.toThrow();
-  });
-
   it('without an undefined value, or with one in a Whereable: the same SQL with it as without it', () => {
     // an undefined key of upsert() updateValues changes since #168: see below
     const queries = () => [
@@ -1000,6 +1053,7 @@ describe('undefinedMeansMissing', () => {
       db.update('users', { mood: 'ok' }, { manager_id: undefined }),
       db.deletes('users', { manager_id: undefined }),
     ].map(q => q.compile());
+    db.setConfig({ undefinedMeansMissing: false });
     const without = queries();
     db.setConfig({ undefinedMeansMissing: true });
     expect(queries()).toEqual(without);
@@ -1013,6 +1067,7 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
     upsert = (options: any, values: any = ada) => db.upsert('users', values, 'email', options).compile();
 
   it('with it, adds no column, so the existing value stays; without it, sets it from EXCLUDED', () => {
+    db.setConfig({ undefinedMeansMissing: false });
     expect(upsert({ updateValues: { settings: undefined } })).toMatchInlineSnapshot(`
       {
         "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "settings") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -1046,7 +1101,6 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
   });
 
   it('with it, nothing left to update: DO NOTHING, as doNothing alone', () => {
-    db.setConfig({ undefinedMeansMissing: true });
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }))
       .toEqual(upsert({ updateColumns: db.doNothing }));
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
@@ -1060,6 +1114,7 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
   });
 
   it('without it, doNothing and an undefined key: the key is set from EXCLUDED, alone or beside a param()', () => {
+    db.setConfig({ undefinedMeansMissing: false });
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
       .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings") = ROW(EXCLUDED."settings") RETURNING');
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }))
@@ -1089,6 +1144,7 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
   });
 
   it('without it, a class instance or an Object.create() value: the undefined key is set from EXCLUDED, as on master', () => {
+    db.setConfig({ undefinedMeansMissing: false });
     for (const updateValues of patches()) expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues })).toEqual({
       text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood", "settings") = ROW(EXCLUDED."display_name", $3, EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
       values: ['E', 'e@x.org', 'ok'],
@@ -1101,101 +1157,20 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
       upsert({ updateColumns: ['settings'], updateValues: { settings: undefined } }),
       upsert({ updateColumns: 'settings', updateValues: { settings: undefined } }),
     ];
+    db.setConfig({ undefinedMeansMissing: false });
     const without = queries();
     db.setConfig({ undefinedMeansMissing: true });
     expect(queries()).toEqual(without);
     expect(without[1].text).toContain('DO UPDATE SET ("settings") = ROW(EXCLUDED."settings")');
   });
 
-  it('a key missing from some row still counts for upsertRequiresSameKeys and PGCAST_DEP001', async () => {
-    // it is set from EXCLUDED, with undefinedMeansMissing or without it
+  it('an undefined override still exposes a missing key to the implicit update', () => {
     const rows = [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
     ];
-    const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ undefinedMeansMissing: true });
-    fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: undefined } });
-    expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP001' }]);
-    fdb.setConfig({ upsertRequiresSameKeys: true });
-    expect(() => fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: undefined } }))
-      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
-    expect(() => fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } })).not.toThrow();
-  });
-
-  it('without it, emits PGCAST_DEP002 once, only when the key adds a column', async () => {
-    const quiet: ((fdb: typeof db) => unknown)[] = [
-      fdb => fdb.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: { mood: undefined } }),
-      fdb => fdb.upsert('users', ada, 'email', { updateColumns: 'settings', updateValues: { settings: undefined } }),
-      fdb => fdb.upsert('users', ada, 'email', { updateValues: { mood: null } }),
-      fdb => (fdb.setConfig({ undefinedMeansMissing: true }), fdb.upsert('users', ada, 'email', { updateValues: { settings: undefined } })),
-    ];
-    for (const call of quiet) {
-      const { fdb, emitWarning } = await fresh();
-      call(fdb);
-      expect(emitWarning).not.toHaveBeenCalled();
-    }
-    const adds: ((fdb: typeof db) => unknown)[] = [
-      fdb => fdb.upsert('users', ada, 'email', { updateValues: { settings: undefined } }),
-      fdb => fdb.upsert('users', ada, 'email', { updateColumns: fdb.doNothing, updateValues: { settings: undefined } }),
-      fdb => fdb.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateColumns: 'display_name', updateValues: { mood: undefined } }),
-    ];
-    for (const call of adds) {
-      const { fdb, emitWarning } = await fresh();
-      call(fdb);
-      expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP002' }]);
-    }
-    const { fdb, emitWarning } = await fresh();
-    for (const call of adds) call(fdb);
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    const [message, options] = emitWarning.mock.calls[0];
-    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP002' });
-    expect(message).toMatch(/upsert\(\) updateValues/);
-    expect(message).toMatch(/undefinedMeansMissing: true/);
-  });
-});
-
-describe('an undefined value, without undefinedMeansMissing', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
-
-  it('emits a DeprecationWarning once per process, PGCAST_DEP002, naming the option', async () => {
-    // the SQL is unchanged: see the snapshots of insert and update
-    const { fdb, emitWarning } = await fresh();
-    fdb.update('users', { mood: undefined }, { id: 1 });
-    fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: undefined });
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    const [message, options] = emitWarning.mock.calls[0];
-    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP002' });
-    expect(message).toMatch(/undefinedMeansMissing: true/);
-    expect(message).toMatch(/default in pgcast 7\.0/);
-  });
-
-  it('emits it from insert, update and upsert, one row or several', async () => {
-    const calls: ((fdb: typeof db) => unknown)[] = [
-      fdb => fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: undefined }),
-      fdb => fdb.insert('users', [{ email: 'a@x.org', display_name: 'A' }, { email: 'b@x.org', display_name: 'B', mood: undefined }]),
-      fdb => fdb.update('users', { mood: undefined }, { id: 1 }),
-      fdb => fdb.upsert('users', { email: 'e@x.org', display_name: 'E', mood: undefined }, 'email'),
-      fdb => fdb.upsert('users', [{ email: 'a@x.org', display_name: 'A', mood: undefined }], 'email'),
-    ];
-    for (const call of calls) {
-      const { fdb, emitWarning } = await fresh();
-      call(fdb);
-      expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP002' }]);
-    }
-  });
-
-  it('emits none without an undefined value, for one in a Whereable, nor with the option', async () => {
-    // one in upsert() updateValues: see 'undefinedMeansMissing: an undefined key of upsert() updateValues'
-    const { fdb, emitWarning } = await fresh();
-    fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: null });
-    fdb.update('users', { mood: 'ok' }, { manager_id: undefined });
-    fdb.deletes('users', { manager_id: undefined });
-    fdb.setConfig({ undefinedMeansMissing: true });
-    fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: undefined });
-    fdb.update('users', { mood: 'ok', manager_id: undefined }, { id: 1 });
-    fdb.upsert('users', { email: 'e@x.org', display_name: 'E', mood: undefined }, 'email');
-    expect(emitWarning).not.toHaveBeenCalled();
+    expect(() => db.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: undefined } }))
+      .toThrow('rows have different keys');
   });
 });
 
@@ -1269,6 +1244,7 @@ describe('update', () => {
     expect(() => db.update('accounts', {}, { id: 1 }))
       .toThrow('nothing to update: an Updatable needs at least one column');
     // without undefinedMeansMissing, a key whose value is undefined is still a column (see below)
+    db.setConfig({ undefinedMeansMissing: false });
     expect(db.update('accounts', { ratio: undefined }, { id: 1 }).compile()).toMatchInlineSnapshot(`
       {
         "text": "UPDATE "accounts" SET ("ratio") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
@@ -1308,7 +1284,8 @@ describe('update', () => {
   });
 
   it('an undefined value: set to NULL without undefinedMeansMissing, left out with it', () => {
-    // without it (deprecated, PGCAST_DEP002), the key is kept and the column set to NULL
+    // without it, the key is kept and the column set to NULL
+    db.setConfig({ undefinedMeansMissing: false });
     const q = () => db.update('users', { mood: 'ok', manager_id: undefined }, { id: 2 }).compile();
     expect(q()).toMatchInlineSnapshot(`
       {
@@ -2149,18 +2126,18 @@ describe('a null or primitive row in insert(), upsert() and update()', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('upsert of a null or undefined row among others compiles as in 6.6.1, a row of defaults, and warns PGCAST_DEP001', async () => {
+  it('upsert of a null or undefined row among others compiles as a row of defaults with the key check off', async () => {
     // since #27, hasOwnProperty.call(null, …) threw a TypeError at the call; the row is read as `{}`, as insert() reads
-    // it, so it misses every key, which is then set from EXCLUDED: the case PGCAST_DEP001 is about. DO UPDATE SET
+    // it, so it misses every key, which is then set from EXCLUDED: the case the key check rejects. DO UPDATE SET
     // takes the key order of the first completed row, unsorted, as in 6.6.1
     const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ upsertRequiresSameKeys: false });
     const upsertSQL = (defaultsFirst: boolean) =>
       `INSERT INTO "users" ("display_name", "email") VALUES ${defaultsFirst ? '(DEFAULT, DEFAULT), ($1, $2)' : '($1, $2), (DEFAULT, DEFAULT)'} ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
     expect(fdb.upsert('users', [row, null as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
     expect(fdb.upsert('users', [null as any, row], 'email').compile()).toEqual({ text: upsertSQL(true), values: ['A', 'a@x.org'] });
     expect(fdb.upsert('users', [row, undefined as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
-    expect(emitWarning).toHaveBeenCalledTimes(1);
-    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
+    expect(emitWarning).not.toHaveBeenCalled();
     fdb.setConfig({ upsertRequiresSameKeys: true });
     expect(() => fdb.upsert('users', [row, null as any], 'email'))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
@@ -2475,6 +2452,7 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
   });
 
   it('a Proxy row, with own keys or none, has its traps called as without a key added to Object.prototype', () => {
+    db.setConfig({ upsertRequiresSameKeys: false });
     // master, with the key, skipped the prototype read of a Proxy row with no own key, and read one more own key in upsert()
     const traps = (withKey: boolean) => {
       const counts: Record<string, Record<string, number> | string> = {};
@@ -3064,6 +3042,7 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
   });
 
   it('without undefinedMeansMissing, beside an undefined value, which pg sends as NULL', () => {
+    db.setConfig({ undefinedMeansMissing: false });
     expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile()).toEqual({
       text: 'INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), $3) RETURNING to_jsonb("users".*) AS result',
       values: ['Ada', 'ada@example.com', undefined],
@@ -3141,7 +3120,7 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
     db.update('users', row('update, a shortcut', query), { id: 2 }).compile();
     db.upsert('users', row('upsert, a shortcut', query), 'email').compile();
     db.insert('users', [row('insert rows, a shortcut', query), ada]).compile();
-    db.upsert('users', [row('upsert rows, a shortcut', query), { ...ada, mood: 'sad' }], 'email').compile();
+    db.upsert('users', [row('upsert rows, a shortcut', query), { ...ada, mood: 'sad', manager_id: 1 }], 'email').compile();
     expect(reads).toEqual({
       insert: 2, update: 2, upsert: 2, 'insert rows': 3, 'upsert rows': 3,
       'insert, a shortcut': 1, 'update, a shortcut': 1, 'upsert, a shortcut': 1, 'insert rows, a shortcut': 3, 'upsert rows, a shortcut': 3,
