@@ -118,7 +118,7 @@ A read shortcut is a subquery there: `select()`, `selectOne()`, `selectExactlyOn
   - When you call `.run()` on the outer `selectOne()`, `selectExactlyOne()` or [`selectRows()`](#selectRows), `pg` reads the passed-through `result` column with its configured type parser. An outer `select()` returns the values in a JSON array. A `sql` template keeps its result annotation in both cases.
   - By default, `pg` reads a [`count()`](#count) of two rows as `"2"`. It also reads `bigint` or `numeric` results from `sum()` and `avg()` as strings. With `Number` as its `int8` parser, the same count gives `2`. The aggregate is typed as `number`, or `number | null` for `sum()` and `avg()` by default.
   - Apply `Number()` only to a string. A missing aggregate row gives `null`, as do `sum()` and `avg()` when no rows match. With no parent row, `selectOne()` gives `undefined`.
-  - If a single `lateral` of `selectOne()` or `selectExactlyOne()` can be either a date minimum or a count, nesting that query under a key types the JSON date string as `Date`, and passing it to `selectRows()` accepts the count although the default pg parser returns a string.
+  - With the column-typed signatures, if a single `lateral` of `selectOne()` or `selectExactlyOne()` can be either a date minimum or a count, nesting that query under a key types the JSON date string as `Date`, and passing it to `selectRows()` accepts the count although the default pg parser returns a string.
 - **`null`**: `lateral: null`, or a key whose subquery is `null` or `undefined`, throws while compiling, so `.run()` rejects before any query: "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", or "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 threw a `TypeError` at the call.
 
 Give the count a key to read it as JSON. The ungrouped count below returns one row, giving `{ n: 2 }`. A grouped count that returns no row gives `{ n: null }`.
@@ -359,7 +359,7 @@ With `columns`, it counts two of the four screenings: the other two have `subtit
 db.sum(table, where, options?)
 ```
 
-`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number | null` by default. Otherwise as [`count()`](#count). Give one column in `columns`: without it, `.run()` rejects before any query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. With no matching rows, the sum is `null`, or `0` with `aggregatesTypedByColumn: false` in `setConfig()`. Only a literal `false` in `ConfigTypes` gives the type `number`.
+`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number | null` by default. Otherwise as [`count()`](#count). Give one column in `columns`: without it, `.run()` rejects before any query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. With no matching rows, the sum is `null`, or `0` with `aggregatesTypedByColumn: false` in `setConfig()`. Only a literal `false` in `ConfigTypes` selects the legacy `number` signature.
 
 <CastPanel example="sum">
 

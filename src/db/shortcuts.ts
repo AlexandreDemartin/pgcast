@@ -1309,7 +1309,7 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * single query as `lateral`, throw as the query compiles, so `run()` rejects
  * before any query is sent.
  * An empty set or a query returning no row gives `null`, or `0` with `aggregatesTypedByColumn: false`
- * in `setConfig()`. Only a literal `false` in `ConfigTypes` selects the `number` return type.
+ * in `setConfig()`. Only a literal `false` in `ConfigTypes` selects the legacy `number` signature.
  */
 export const sum: TypedByColumn extends true ? NullableNumericAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'sum');
