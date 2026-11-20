@@ -56,7 +56,7 @@ Puis un `tsconfig.json` qui les compile comme Node les exécute :
 
 ## 2. Configurer le générateur {#configure-the-generator}
 
-Complétez le fichier `pgcastconfig.json` créé lors de l’installation, à la racine du projet :
+À la racine de votre projet, complétez le fichier `pgcastconfig.json` préparé à l’étape d’installation :
 
 ::: code-group
 
@@ -369,7 +369,7 @@ Après une mise à jour de pgcast, une erreur de type sur `schemaVersionCanary` 
 
 ## Ce que vous avez appris {#what-you-ve-learnt}
 
-- Pointer le générateur vers une base de données, et trouver ses types dans `pgcast/schema`.
+- Configurer le générateur pour votre base de données et retrouver les types dans `pgcast/schema`.
 - Demander une ligne avec `selectOne()`, plusieurs avec `select()`, et seulement certaines colonnes avec `columns`.
 - Ajouter une ligne avec `insert()`, et la récupérer telle que Postgres l’a stockée.
 - Lire le SQL qu’exécute une requête avec `.compile()`, et son type sous votre curseur.
