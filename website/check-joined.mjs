@@ -18,7 +18,7 @@ import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 const
   root = fileURLToPath(new URL('.', import.meta.url)),
   { config } = ts.readConfigFile(`${root}tsconfig.json`, ts.sys.readFile),
-  parsed = ts.parseJsonConfigFileContent({ ...config, include: ['zapatos'] }, ts.sys, root),
+  parsed = ts.parseJsonConfigFileContent({ ...config, include: ['zapatos', 'first-query.d.ts'] }, ts.sys, root),
   options = { ...parsed.options, skipLibCheck: true },  // the `tsc` before it in `docs:build` checks the declarations
   schemaFiles = parsed.fileNames,
   problems = [],

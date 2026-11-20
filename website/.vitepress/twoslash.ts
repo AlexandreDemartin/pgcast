@@ -25,6 +25,7 @@ export const twoslashOptions: TwoslashOptions = {
     },
   },
   extraFiles: {
+    'first-query.d.ts': readFileSync(new URL('../first-query.d.ts', import.meta.url), 'utf8'),
     'zapatos-schema.d.ts': readFileSync(new URL('../zapatos/schema.d.ts', import.meta.url), 'utf8'),
     // custom/ exists only once the schema has a type the generator leaves to the user
     ...Object.fromEntries((existsSync(custom) ? readdirSync(custom) : []).map(file =>
