@@ -1,10 +1,6 @@
 # @pgcast/typegen
 
-This unpublished package contains the private Postgres statement describer for pgcast's [raw SQL types](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md).
-
-On a dedicated `pg.Client`, the describer sends Parse, Describe and Sync for one statement. Postgres returns the parameter type OIDs and, for each result field in order, its name, type OID, source table OID and attribute number. An expression can have zero for both origin fields. A command such as `DELETE` produces NoData, while `SELECT FROM films` describes a row with zero fields.
-
-Each description runs in a read-only transaction with a one-second lock timeout. The client rolls back after a successful description or a refusal, before describing the next statement.
+Version 0.1.0 is unpublished. It contains the private Postgres statement describer and its protocol tests for pgcast's [raw SQL types](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md). The command to generate result types comes in [#804](https://github.com/AlexandreDemartin/pgcast/issues/804).
 
 ## Development
 
