@@ -1,0 +1,12 @@
+{
+  "include": ["src/**/*.ts"],
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "target": "ES2019",
+    "module": "CommonJS",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true
+  }
+}
