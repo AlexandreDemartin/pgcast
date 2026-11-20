@@ -1,0 +1,29 @@
+import type { JSONValue } from "zapatos/db";
+
+export interface Queries {
+  "delete": {
+    text: "DELETE FROM public.users";
+  };
+  "empty": {
+    text: "SELECT FROM public.users";
+    row: {
+    };
+  };
+  "odd\"\u2028\u2029": {
+    text: "SELECT $q$' \"` ${} */ \\\n\u2028\u2029$q$ AS \"field\"\"\u2028\u2029\"";
+    row: {
+      "field\"\u2028\u2029": string | null;
+    };
+  };
+  "values": {
+    text: "SELECT ARRAY[1,NULL] AS items, id, settings FROM public.users";
+    row: {
+      "items": PgArray<number> | null;
+      "id": number | null;
+      "settings": JSONValue | null;
+    };
+  };
+}
+
+export type Row<N extends keyof Queries> = Extract<Queries[N], { row: unknown }>['row'];
+export type PgArray<T> = (T | null | PgArray<T>)[];

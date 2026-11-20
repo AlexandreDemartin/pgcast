@@ -434,11 +434,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+      - run: npm run test:types
       - name: Check the exact package contents
         run: |
           npm pack --dry-run --json --ignore-scripts | node -e "
             const paths = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map(f => f.path).sort();
-            require('assert/strict').deepEqual(paths, ['CHANGELOG.md', 'LICENCE', 'README.md', 'dist/describe.js', 'package.json']);"
+            require('assert/strict').deepEqual(paths, [
+              'CHANGELOG.md', 'LICENCE', 'README.md', 'dist/describe.js', 'dist/values.js', 'dist/write.js', 'package.json',
+            ]);"
 
   ci-passed:
     # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
