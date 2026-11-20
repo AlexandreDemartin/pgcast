@@ -60,7 +60,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
 - `adapters/<driver>/`: the official extensions that run pgcast on another driver, each a package of its own, `@pgcast/adapter-<driver>` (`adapters/postgres-js/`, `adapters/pglite/`). Decision [013](docs/decisions/013-package-model.md).
   - Each has its own `package.json`, lockfile, `npm ci`, version, `CHANGELOG.md` and README; no npm workspaces.
   - Its types fit the core's structurally (`QueryableLike`, `PoolLike`), with no import; a peer dependency on `@pgcast/pgcast`, with an explicit range, only to read the core's types or config.
-- `tools/<name>/`: later, the official tools in packages of their own (`@pgcast/typegen`), laid out as the adapters.
+- `tools/<name>/`: the official tools, packaged like the adapters. `tools/typegen/` describes SQL query fields and parameters over the Postgres protocol.
 
 ### Watch out: module names
 
