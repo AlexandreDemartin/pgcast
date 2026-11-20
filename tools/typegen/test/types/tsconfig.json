@@ -1,0 +1,12 @@
+{
+  "files": ["rows.ts"],
+  "compilerOptions": {
+    "target": "ES2019",
+    "module": "CommonJS",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": { "zapatos/db": ["../../../../db.d.ts"] }
+  }
+}

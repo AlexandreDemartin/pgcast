@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../../../../node_modules/.cache/pgcast-ts41/node_modules/@types"],
+    "paths": { "zapatos/db": ["../../../../node_modules/.cache/pgcast-ts41/node_modules/zapatos/db.d.ts"] }
+  }
+}
