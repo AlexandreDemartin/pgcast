@@ -17,8 +17,9 @@ interface StatementMessages {
 /**
  * Describe one statement with Parse, Describe and Sync in a read-only transaction with a one-second lock timeout.
  * The caller owns a dedicated, connected client with query_timeout disabled, listens for its error event and
- * describes statements in sequence. Each description awaits ROLLBACK. A send failure or a lost connection
- * ends the client. Its owner must discard it.
+ * describes statements in sequence. After BEGIN succeeds, each description awaits ROLLBACK.
+ * A failure sending Parse, Describe or Sync ends the client. Transaction commands follow pg's client.query
+ * error handling. After any rejection, the owner discards the client unless it chooses to reuse it.
  * Return parameter OIDs and ordered fields with their names, type OIDs, table OIDs and attribute numbers.
  * An expression can have zero for both origin fields.
  * NoData (e.g. DELETE without RETURNING) gives null fields. A zero-column row gives an empty array.
