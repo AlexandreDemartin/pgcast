@@ -1,0 +1,31 @@
+{
+  "name": "@pgcast/typegen",
+  "version": "0.1.0",
+  "description": "Describe SQL query fields using Postgres.",
+  "license": "MIT",
+  "author": "Alexandre Demartin (https://github.com/AlexandreDemartin)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexandreDemartin/pgcast.git",
+    "directory": "tools/typegen"
+  },
+  "type": "commonjs",
+  "exports": {},
+  "files": ["dist", "README.md", "CHANGELOG.md", "LICENCE"],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "npm run build",
+    "lint": "eslint --config ../../eslint.config.mjs --parser-options project:true src/*.ts",
+    "typecheck": "tsc --noEmit && tsc -p test",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@pgcast/pgcast": ">=7.1.0 <8",
+    "pg": ">=8.6.0",
+    "typescript": ">=4.1 <7"
+  },
+  "devDependencies": {
+    "pg": "8.23.1",
+    "typescript": "5.9.3"
+  }
+}
