@@ -13,7 +13,7 @@ description: "À la fin de cette page, vous aurez généré les types d’une ba
 - pgcast installé sous le nom `pgcast`, avec `pg` et `@types/pg` : [Installation](/fr/install).
 - TypeScript 5.7 ou plus récent dans votre projet : `npm install --save-dev typescript`.
 - Node 22.18 ou plus récent, qui exécute un fichier TypeScript tel quel, en retirant ses types.
-- Une base Postgres vide, sa chaîne de connexion dans la variable d’environnement `DATABASE_URL`, et `psql`, le client en ligne de commande de Postgres. Pour charger le schéma, votre rôle doit pouvoir créer des rôles.
+- Une base Postgres vide, sa chaîne de connexion dans la variable d’environnement `DATABASE_URL` et `psql`, le client en ligne de commande de Postgres. Le rôle utilisé pour charger le schéma doit avoir le droit de créer des rôles.
 - Les films de cette doc dans cette base : [`schema.sql`](https://github.com/AlexandreDemartin/pgcast/blob/master/website/schema.sql) contient `studios`, leurs `films`, les `actors` et les `roles` qu’ils jouent, et quelques autres tables, avec des lignes à interroger. Téléchargez-le et chargez-le :
 
 ```sh
