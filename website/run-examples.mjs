@@ -230,7 +230,7 @@ async function check(example, pool, on) {
   }
 }
 
-/** Run First query's complete file in a consumer with just the alias from Install. */
+/** Run First query's complete file and check its steps in a consumer with just the alias from Install. */
 function checkFirstQuery() {
   const
     page = file => readFileSync(new URL(file, import.meta.url), 'utf8'),
@@ -252,12 +252,13 @@ function checkFirstQuery() {
     for (const [, file, source] of configs) writeFileSync(join(consumer, file), source);
     assert.ok(['pgcastconfig.json', 'zapatosconfig.json'].some(file => existsSync(join(consumer, file))),
       'first-query.md must supply the generator config');
-    const run = script => execFileSync(process.execPath, [script], {
+    const run = (...args) => execFileSync(process.execPath, args, {
       cwd: consumer, env: { ...process.env, DATABASE_URL: urlOf(name) }, stdio: 'inherit',
     });
     run(fileURLToPath(new URL('../dist/generate/cli.js', import.meta.url)));
     run('src/films.ts');
     run(fileURLToPath(new URL('../node_modules/typescript/bin/tsc', import.meta.url)));
+    run(fileURLToPath(new URL('check-joined.mjs', import.meta.url)), 'first-query.md');
     console.log('First query ran and type-checked under the alias from Install.');
   } finally {
     rmSync(consumer, { recursive: true, force: true });
