@@ -9,7 +9,7 @@ english: 053c751ab17f
 
 ## Prérequis {#requirements}
 
-- Postgres. La suite de tests tourne sur les versions 14, 16 et 18.
+- Postgres. La suite de tests tourne sur les versions 14, 16, 18 et 19.
 - Node et `pg` (node-postgres) pour exécuter des requêtes et lancer le générateur en JavaScript.
 - À partir de la 7.0.0, les peer dependencies `typescript` et `@types/pg`, utilisées pour la vérification des types, sont facultatives. Ajoutez-les à vos `devDependencies` pour vérifier les types. TypeScript 5.7 ou plus récent est nécessaire pour vérifier les déclarations de `@types/node` et de `pg-protocol`, qu’installe `@types/pg`, ainsi que le type de retour de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
 

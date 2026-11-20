@@ -98,7 +98,7 @@ pgcast 6.x vous permet d’activer les corrections avant leur activation par dé
 
 Zapatos 6.6.1 n’avait pas de suite de tests à lui (les tests de son premier utilisateur exerçaient « <span lang="en">most of the code base at least a little</span> ») ; sa CI faisait le lint et le build. Sa feuille de route en jugeait une « <span lang="en">kind of indispensable</span> », une qui teste « <span lang="en">not just returned values but also inferred types</span> ».
 
-Les tests de pgcast vérifient le SQL que compile chaque appel, l’exécutent sur Postgres 14, 16 et 18, vérifient les types, acceptés et refusés, et mesurent ce qu’ils coûtent au compilateur.
+Les tests de pgcast vérifient le SQL que compile chaque appel, l’exécutent sur Postgres 14, 16, 18 et 19, vérifient les types, acceptés et refusés, et mesurent ce qu’ils coûtent au compilateur.
 
 Cette doc est l’ajout le plus récent. Chaque exemple compile contre la bibliothèque au build : son SQL vient de son propre `.compile()`, son type de TypeScript, et un exemple qui ne colle plus fait échouer le build.
 
