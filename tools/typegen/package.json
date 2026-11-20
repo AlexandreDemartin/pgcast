@@ -18,7 +18,7 @@
     "lint": "eslint --config ../../eslint.config.mjs --parser-options project:true src/*.ts",
     "typecheck": "tsc --noEmit && tsc -p test",
     "test": "vitest run",
-    "test:types": "npm --prefix ../.. run check:floor && node ../../node_modules/.cache/pgcast-ts41/node_modules/typescript/bin/tsc -p test/types/tsconfig.floor.json && tsc -p test/types"
+    "test:types": "npm --prefix ../.. run check:floor && node ../../node_modules/.cache/pgcast-ts41/node_modules/typescript/bin/tsc -p test/types/tsconfig.floor.json && tsc -p test/types && npm run build && node --test test/types/bytea.cjs"
   },
   "peerDependencies": {
     "@pgcast/pgcast": ">=7.1.0 <8",
