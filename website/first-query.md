@@ -12,12 +12,12 @@ By the end of this page, you'll have generated the types of a database, asked it
 - pgcast installed as `pgcast`, with `pg` and `@types/pg`: [Install](/install).
 - TypeScript 5.7 or later in your project: `npm install --save-dev typescript`.
 - Node 22.18 or later, which runs a TypeScript file as it is, stripping its types.
-- An empty Postgres database you can connect to, its connection string in the `DATABASE_URL` environment variable, and `psql`, Postgres's command-line client.
+- An empty Postgres database, its connection string in the `DATABASE_URL` environment variable, and `psql`, Postgres's command-line client. Loading the schema needs a role that can create roles.
 - The films of these docs in it: [`schema.sql`](https://github.com/AlexandreDemartin/pgcast/blob/master/website/schema.sql) holds `studios`, their `films`, the `actors` and the `roles` they play, and a few more tables, with some rows to query. Download it and load it:
 
 ```sh
 curl -O https://raw.githubusercontent.com/AlexandreDemartin/pgcast/master/website/schema.sql
-psql "$DATABASE_URL" -f schema.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f schema.sql
 ```
 
 Every example below runs on that schema. A database of your own works too: swap in your table and column names as you go.

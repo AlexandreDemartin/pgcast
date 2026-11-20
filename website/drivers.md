@@ -123,7 +123,7 @@ It sends what it sends on a `pg.Pool` ([The SQL it sends](/transaction#the-sql-i
 
 - On PGlite, or any pool of one connection (`max: 1` for a `pg.Pool` or a postgres.js `sql`), a query on the pool waits until the transaction releases the connection. Awaited inside the callback, `.run(pool)` waits forever: run the callback's queries on `txnClient`.
 - With postgres.js 3.4 and `max: 1`, if the backend is lost during an adapter transaction, the next transaction can hang or the process can crash. See the [results by driver version](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#how-it-differs-from-pg).
-- PGlite's own `query()` and `exec()` share the adapter transaction's connection without waiting. A native `pglite.transaction()` that commits also commits the adapter's writes ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
+- PGlite's own `query()` and `exec()` can run before the adapter releases the connection. A native `pglite.transaction()` that commits also commits the adapter's writes ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
 - A nested transaction takes the callback's client with no cast. By default its callback gets that client only if the marked outer level satisfies the request ([Another driver's pool](/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
 
 ## A driver of your own
