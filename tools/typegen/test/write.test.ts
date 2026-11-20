@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Alexandre Demartin
 
 import { promises as fs } from 'node:fs';
-import { chmod, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdtemp, open, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
@@ -51,8 +51,9 @@ it('accepts an empty scan and preserves an existing file on duplicate fields', a
   expect(await readdir(dir)).toEqual(['queries.ts']);
 });
 
-it.each(['new', 'existing'])('writes privately and sets the final mode for a %s file', async destination => {
-  const previousMask = process.umask(0o027);
+it.each(['new', 'existing'])('uses the final mode while writing the %s file without reading the process mask', async destination => {
+  const previousMask = process.umask(0o027), umask = vi.spyOn(process, 'umask'),
+    expectedMode = destination === 'existing' ? 0o604 : 0o640;
   try {
     if (destination === 'existing') {
       await writeFile(path, 'previous result');
@@ -69,11 +70,23 @@ it.each(['new', 'existing'])('writes privately and sets the final mode for a %s 
       return file;
     });
     await writeQueries(path, 'zapatos/db', new Map());
-    expect.soft(modeDuringWrite).toBe(0o600);
-    expect((await stat(path)).mode & 0o777).toBe(destination === 'existing' ? 0o604 : 0o640);
+    expect.soft(umask).not.toHaveBeenCalled();
+    expect.soft(modeDuringWrite).toBe(expectedMode);
+    expect((await stat(path)).mode & 0o777).toBe(expectedMode);
   } finally {
+    umask.mockRestore();
     process.umask(previousMask);
   }
+});
+
+it('replaces a stale output symlink whose target parent is a regular file', async () => {
+  const oldOutput = join(dir, 'old-output');
+  await writeFile(oldOutput, 'previous result');
+  await symlink(join(oldOutput, 'queries.ts'), path);
+  await writeQueries(path, 'zapatos/db', new Map());
+  expect((await lstat(path)).isFile()).toBe(true);
+  expect(await readFile(path, 'utf8')).toContain('export interface Queries');
+  expect(await readFile(oldOutput, 'utf8')).toBe('previous result');
 });
 
 it('keeps the original bytes and removes the temporary when rename fails', async () => {
