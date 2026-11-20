@@ -9,15 +9,15 @@ By the end of this page, you'll have generated the types of a database, asked it
 
 ## Before you start
 
-- pgcast installed under the `zapatos` alias, with `pg` and `@types/pg`: [Install](/install).
+- pgcast installed as `pgcast`, with `pg` and `@types/pg`: [Install](/install).
 - TypeScript 5.7 or later in your project: `npm install --save-dev typescript`.
 - Node 22.18 or later, which runs a TypeScript file as it is, stripping its types.
-- An empty Postgres database you can connect to, its connection string in the `DATABASE_URL` environment variable, and `psql`, Postgres's command-line client.
+- An empty Postgres database, its connection string in the `DATABASE_URL` environment variable, and `psql`, Postgres's command-line client. Loading the schema needs a role that can create roles.
 - The films of these docs in it: [`schema.sql`](https://github.com/AlexandreDemartin/pgcast/blob/master/website/schema.sql) holds `studios`, their `films`, the `actors` and the `roles` they play, and a few more tables, with some rows to query. Download it and load it:
 
 ```sh
 curl -O https://raw.githubusercontent.com/AlexandreDemartin/pgcast/master/website/schema.sql
-psql "$DATABASE_URL" -f schema.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f schema.sql
 ```
 
 Every example below runs on that schema. A database of your own works too: swap in your table and column names as you go.
@@ -51,17 +51,18 @@ Then a `tsconfig.json` that compiles them as Node runs them:
 - `"module": "nodenext"` makes `import pg from 'pg'` and the top-level `await` compile, as in a `"type": "module"` project.
 - `strict` turns on `strictNullChecks`, which the generated types need. Without it, a query that names its `columns` (as one does below) gets the type of every column, and a missing row stops showing up as `undefined`.
 - `noEmit`: `tsc` only checks your code; Node runs the `.ts` file itself.
-- The generator writes ordinary `.d.ts` files into your source tree, and `zapatos/schema` is declared in one of them, so they must be part of your compilation. With `"include": ["src"]` and the `outDir` below, they are.
+- The generator writes ordinary `.d.ts` files into your source tree, and `pgcast/schema` is declared in one of them, so they must be part of your compilation. With `"include": ["src"]` and the `outDir` below, they are.
 
 ## 2. Configure the generator {#configure-the-generator}
 
-Add `zapatosconfig.json` at the root of your project, where you'll run the generator:
+Complete the `pgcastconfig.json` from Install at the root of your project:
 
 ::: code-group
 
-```json [zapatosconfig.json]
+```json [pgcastconfig.json]
 {
   "db": { "connectionString": "{{DATABASE_URL}}" },
+  "moduleNames": "pgcast",
   "outDir": "./src"
 }
 ```
@@ -69,8 +70,8 @@ Add `zapatosconfig.json` at the root of your project, where you'll run the gener
 :::
 
 - `db` takes what you'd give `new pg.Pool()`.
-- `outDir` is where the `zapatos` folder goes; without it, the folder you run the generator in.
-- <code v-pre>{{DATABASE_URL}}</code> is filled in from the environment, so the connection string stays out of your repository. If the variable isn't set, the generator stops with `Error: If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist: Environment variable 'DATABASE_URL' is not set`.
+- `outDir` is where the `pgcast` folder goes; without it, the folder you run the generator in.
+- <code v-pre>{{DATABASE_URL}}</code> is filled in from the environment, so the connection string stays out of your repository. If the variable isn't set, the generator stops with `Error: If present, pgcastconfig.json must be a valid JSON file, and all referenced environment variables must exist: Environment variable 'DATABASE_URL' is not set`.
 
 Every other option, from the schemas to include to per-column settings, is in [Generator](/generator).
 
@@ -82,22 +83,24 @@ Run the generator. It's installed under both names, `pgcast` and `zapatos`:
 npx pgcast
 ```
 
-It prints a line for each placeholder it writes, here for the docs schema's two types that Postgres alone can't describe to TypeScript:
+It prints a line for each placeholder it writes, here for three types in the docs schema:
 
 ```txt
-Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts
-Writing new custom type or domain placeholder file: src/zapatos/custom/PgSeat_label.d.ts
+Writing new custom type or domain placeholder file: src/pgcast/custom/PgPoint.d.ts
+Writing new custom type or domain placeholder file: src/pgcast/custom/PgTsvector.d.ts
+Writing new custom type or domain placeholder file: src/pgcast/custom/PgSeat_label.d.ts
 ```
 
 And you have:
 
 ```txt
-src/zapatos/
+src/pgcast/
 ├── schema.d.ts            every table, written again on each run: don't edit it
 └── custom/
     ├── index.d.ts         written again on each run too
     ├── PgPoint.d.ts       cinemas.location, a POINT: any, until you say otherwise
-    └── PgSeat_label.d.ts  seat_bookings.seat, the seat_label domain: string
+    ├── PgSeat_label.d.ts  seat_bookings.seat, the seat_label domain: string
+    └── PgTsvector.d.ts    films.title_search, a tsvector: any, until you say otherwise
 ```
 
 The placeholders in `custom/` are yours: the generator writes each one once and never overwrites it, while `index.d.ts` is written again on each run. In `schema.d.ts`, each table is a namespace of types, and the shortcuts pick the right one for you:
@@ -117,7 +120,7 @@ The run-time code never opens a connection of its own: each query runs on the po
 ::: code-group
 
 ```ts twoslash [src/films.ts]
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import pg from 'pg';
 
 const pool = new pg.Pool({
@@ -150,7 +153,7 @@ The title went to Postgres as a parameter, `("title" = $1)`<!-- probe: examples/
 
 ```ts twoslash
 // @errors: 18048
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool);
@@ -161,7 +164,7 @@ console.log(film.release_year);
 Check for it instead, and the type narrows to the row (hover `film` to see). Run the file, and it prints `1974`:
 
 ```ts twoslash
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool);
@@ -172,7 +175,7 @@ if (film) console.log(film.release_year);  // 1974
 To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it gives the `text` (on one line) and `values` the panel shows, and sends nothing. Add this line to the file:
 
 ```ts twoslash
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 // ---cut---
 console.log(db.selectOne('films', { title: 'The Salt Orchard' }).compile());
 ```
@@ -201,7 +204,7 @@ Each column name shows up twice in `jsonb_build_object($1::text, "title", …)`<
 The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Print them:
 
 ```ts twoslash
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 const films = await db.select('films', { studio_id: 1000 }, {
@@ -228,7 +231,7 @@ With no matching film, the array is empty: `select()` never gives `undefined`.
 `insert()` takes a `films.Insertable` and gives back the row as Postgres stored it. Type the row first, with the schema's types. Add this import at the top of the file, with the other two:
 
 ```ts twoslash
-import type * as s from 'zapatos/schema';
+import type * as s from 'pgcast/schema';
 ```
 
 Then the row and the query:
@@ -244,8 +247,8 @@ Then the row and the query:
 The row's `films.Insertable` asks for the `NOT NULL` columns with no default and leaves the others optional; typed on its own, the row gets errors that name the column at fault. Print the new film:
 
 ```ts twoslash
-import * as db from 'zapatos/db';
-import type * as s from 'zapatos/schema';
+import * as db from 'pgcast/db';
+import type * as s from 'pgcast/schema';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 declare const row: s.films.Insertable;
@@ -276,7 +279,7 @@ A `NOT NULL` column with no default can't be left out. Forget the running time, 
 
 ```ts twoslash
 // @errors: 2741
-import type * as s from 'zapatos/schema';
+import type * as s from 'pgcast/schema';
 // ---cut---
 const row: s.films.Insertable = {
   studio_id: 1002,
@@ -296,8 +299,8 @@ With the running time back in the row, here is your whole file, the steps of thi
 ::: code-group
 
 ```ts twoslash [src/films.ts]
-import * as db from 'zapatos/db';
-import type * as s from 'zapatos/schema';
+import * as db from 'pgcast/db';
+import type * as s from 'pgcast/schema';
 import pg from 'pg';
 
 const pool = new pg.Pool({
@@ -365,7 +368,7 @@ After you upgrade pgcast, a type error on `schemaVersionCanary` in `schema.d.ts`
 
 ## What you've learnt
 
-- Point the generator at a database, and find its types in `zapatos/schema`.
+- Point the generator at a database, and find its types in `pgcast/schema`.
 - Ask for one row with `selectOne()`, several with `select()`, and only some columns with `columns`.
 - Add a row with `insert()`, and get it back as Postgres stored it.
 - Read the SQL a query runs with `.compile()`, and its type under your cursor.

@@ -9,17 +9,21 @@
 // checks it only against its own setup. If the first `ts twoslash` block under the line is titled with the file
 // (`ts twoslash [src/films.ts]`), it shows the whole file: it must be the join, imports in any order and blank lines
 // aside. The join is checked in memory, with the options of tsconfig.json but `skipLibCheck`, against the built
-// `zapatos/db` and the docs schema. Run by `npm run docs:build`.
+// `zapatos/db` and the docs schema. With a page argument, check that page in the consumer in the working directory.
 import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 
 const
   root = fileURLToPath(new URL('.', import.meta.url)),
-  { config } = ts.readConfigFile(`${root}tsconfig.json`, ts.sys.readFile),
-  parsed = ts.parseJsonConfigFileContent({ ...config, include: ['zapatos'] }, ts.sys, root),
-  options = { ...parsed.options, skipLibCheck: true },  // the `tsc` before it in `docs:build` checks the declarations
+  consumerPage = process.argv[2],
+  project = consumerPage ? process.cwd() : root,
+  { config } = ts.readConfigFile(join(project, 'tsconfig.json'), ts.sys.readFile),
+  parsed = ts.parseJsonConfigFileContent(consumerPage ? config : { ...config, include: ['zapatos', 'first-query.d.ts'] },
+    ts.sys, project),
+  options = { ...parsed.options, skipLibCheck: true },  // the preceding tsc checks the declarations in each project
   schemaFiles = parsed.fileNames,
   problems = [],
   checked = [];
@@ -112,7 +116,7 @@ function errorsOf(name, lines) {
  * give exactly the errors it lists, and compare the join with `whole`: each error names the line of the page it is on.
  */
 function check({ file, at, pieces, shown, whole }) {
-  const lines = pieces.flatMap(belowCut), name = root + file;
+  const lines = pieces.flatMap(belowCut), name = join(project, file);
   if (lines.length === 0) return problems.push(`${at}: nothing above it to join as ${file}`);
   for (const { line, where, text } of errorsOf(name, lines)) {
     problems.push(`${line !== undefined ? lines[line].at : where ?? at} (joined as ${file}): ${text}`);
@@ -122,11 +126,12 @@ function check({ file, at, pieces, shown, whole }) {
       { at: shownAt } = block.find(({ text }) => text.startsWith('// @errors:')),
       steps = pieces.slice(0, above).flatMap(belowCut),
       probe = [...steps, { text: '{', at: shownAt }, ...belowCut(block), { text: '}', at: shownAt }],
-      errors = errorsOf(name, probe).filter(({ line }) => line >= steps.length),  // those above are reported above
-      same = (a, b) => [...new Set(a)].sort().join() === [...new Set(b)].sort().join();
-    if (!same(errors.map(({ code }) => code), codes)) problems.push(`${shownAt} (joined as ${file}): it shows TS${
+      errors = errorsOf(name, probe),
+      inBlock = errors.every(({ line }) => line >= steps.length),
+      raised = errors.map(({ code }) => code).sort().join();
+    if (!inBlock || raised !== [...codes].sort().join()) problems.push(`${shownAt} (joined as ${file}): it shows TS${
       codes.join(', TS')}, but below the steps above it the code gives ${
-      errors.map(({ line, text }) => `${probe[line].at}: ${text}`).join('; ') || 'no error'}`);
+      errors.map(({ line, where, text }) => `${probe[line]?.at ?? where ?? at}: ${text}`).join('; ') || 'no error'}`);
   }
   if (whole) {
     const
@@ -147,7 +152,7 @@ const missed = [];
 joinsOf('the self-check', `${earlyCloser}<!-- joined -->`, missed);
 if (missed.length !== 1) throw new Error('check-joined.mjs: a marker after a ```md block went unread: check fences.ts');
 
-for (const page of readdirSync(root).filter(file => file.endsWith('.md')))
+for (const page of consumerPage ? [consumerPage] : readdirSync(root).filter(file => file.endsWith('.md')))
   joinsOf(page, readFileSync(root + page, 'utf8'), problems).forEach(check);
 
 if (problems.length > 0) {

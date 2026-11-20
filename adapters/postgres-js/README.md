@@ -39,6 +39,7 @@ await db.serializable(pool, async txn => {
 
 - `asPool(sql)` never creates, configures nor ends `sql`: you do, as with a `pg.Pool`, which Zapatos "doesn't manage" for you either. It takes the `sql` that `postgres()` returns, and throws on a transaction's or a reserved connection's, which has no `reserve()`.
 - `run(pool)` runs each query with `sql.unsafe()`, unprepared, on whichever connection postgres.js picks. `transaction()` and its shortcuts (`serializable()`…) take a connection with `sql.reserve()`, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end.
+- With postgres.js 3.4 and `max: 1`, see [connection loss during a transaction](#how-it-differs-from-pg).
 - postgres.js 4 is an ES module only: `import postgres from 'postgres'`, or, from CommonJS on Node 20.19 or 22.12 and later, `require('postgres').default`. The adapter is CommonJS and takes either major.
 
 ## What it reads
@@ -99,7 +100,7 @@ npm test                  # the tables above, through pg and through the adapter
 npm run test:types        # the tests, and asPool() against the root's db.d.ts
 ```
 
-CI runs them on postgres.js 3.4.0, the lockfile's version, 4.0.0 and 4.1.1, on Postgres 14 and 18.
+CI runs them on postgres.js 3.4.0, the lockfile's version, 4.0.0 and 4.1.1, on Postgres 14, 18 and 19.
 
 ## Publishing
 

@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---|---|
-| The latest 6.x minor of `pgcast` | yes: fixes ship in the next release, a patch, or a minor when master already holds features (SemVer) |
-| Older `pgcast` versions | no: upgrade to the latest minor, a drop-in |
+| The latest minor of the current pgcast major (7.x) | yes: fixes ship in the next release, a patch, or a minor when master already holds features (SemVer) |
+| Older `pgcast` versions | no: upgrade to the supported version |
 | `zapatos` (Zapatos itself) | not maintained here; a flaw that pgcast shares is reported here, and its fix offered upstream |
 
 ## Reporting a vulnerability

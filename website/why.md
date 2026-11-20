@@ -94,7 +94,7 @@ pgcast 6.x lets projects opt into fixes before they become defaults. In 7.0, six
 
 Zapatos 6.6.1 shipped no test suite of its own (its first consumer's tests exercised "most of the code base at least a little"); its CI linted and built. Its roadmap called one "kind of indispensable", one that tests "not just returned values but also inferred types".
 
-pgcast's tests check the SQL each call compiles, run it on Postgres 14, 16 and 18, check the types, accepted and refused, and measure what they cost the compiler.
+pgcast's tests check the SQL each call compiles, run it on Postgres 14, 16, 18 and 19, check the types, accepted and refused, and measure what they cost the compiler.
 
 These docs are the latest addition. Every example compiles against the library at build: its SQL comes from its own `.compile()`, its type from TypeScript, and an example that no longer fits fails the build.
 

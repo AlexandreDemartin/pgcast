@@ -2469,7 +2469,10 @@ export type cover = 'matt' | 'gloss';`);
     expect(domainsOf(schema)).toContain(`}\n/**\n * **edition**\n * - Domain in database\n */\nexport type edition = 'first';`);
   });
 
-  it('keeps the placeholder of a domain whose value holds a backslash, with standard_conforming_strings off', async () => {
+  it('keeps the placeholder of a domain whose value holds a backslash, with standard_conforming_strings off', async ({ skip }) => {
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    // Postgres 19 release notes § E.1.2: force standard_conforming_strings to always be on in the database server.
+    if (version >= 190000) skip();
     // pg_get_constraintdef() then writes 'back\\slash'::text for back\slash, with no E before the quote
     const offStrings = { ...on, ...quiet, db: { ...db(), options: '-c standard_conforming_strings=off' } };
     const [{ ts: schema, customTypeSourceFiles: files }, off] = [

@@ -1,5 +1,5 @@
 ---
-english: 7c8d521b9e57
+english: dc343e3ffa41
 description: "À la fin de cette page, vous aurez généré les types d’une base, demandé des films et ajouté un film, avec sous les yeux le SQL et le type de chaque requête."
 ---
 
@@ -10,15 +10,15 @@ description: "À la fin de cette page, vous aurez généré les types d’une ba
 
 ## Avant de commencer {#before-you-start}
 
-- pgcast installé sous l’alias `zapatos`, avec `pg` et `@types/pg` : [Installation](/fr/install).
+- pgcast installé sous le nom `pgcast`, avec `pg` et `@types/pg` : [Installation](/fr/install).
 - TypeScript 5.7 ou plus récent dans votre projet : `npm install --save-dev typescript`.
 - Node 22.18 ou plus récent, qui exécute un fichier TypeScript tel quel, en retirant ses types.
-- Une base Postgres vide à laquelle vous pouvez vous connecter, sa chaîne de connexion dans la variable d’environnement `DATABASE_URL`, et `psql`, le client en ligne de commande de Postgres.
+- Une base Postgres vide, sa chaîne de connexion dans la variable d’environnement `DATABASE_URL` et `psql`, le client en ligne de commande de Postgres. Le rôle utilisé pour charger le schéma doit avoir le droit de créer des rôles.
 - Les films de cette doc dans cette base : [`schema.sql`](https://github.com/AlexandreDemartin/pgcast/blob/master/website/schema.sql) contient `studios`, leurs `films`, les `actors` et les `roles` qu’ils jouent, et quelques autres tables, avec des lignes à interroger. Téléchargez-le et chargez-le :
 
 ```sh
 curl -O https://raw.githubusercontent.com/AlexandreDemartin/pgcast/master/website/schema.sql
-psql "$DATABASE_URL" -f schema.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f schema.sql
 ```
 
 Chaque exemple ci-dessous tourne sur ce schéma. Votre propre base convient aussi : remplacez les noms de tables et de colonnes au fur et à mesure.
@@ -52,17 +52,18 @@ Puis un `tsconfig.json` qui les compile comme Node les exécute :
 - `"module": "nodenext"` fait compiler `import pg from 'pg'` et le top-level `await`, comme dans un projet `"type": "module"`.
 - `strict` active `strictNullChecks`, dont les types générés ont besoin. Sans lui, une requête qui nomme ses `columns` (comme plus bas) reçoit le type de toutes les colonnes, et une ligne absente cesse d’apparaître comme `undefined`.
 - `noEmit` : `tsc` ne fait que vérifier votre code ; Node exécute lui-même le fichier `.ts`.
-- Le générateur écrit des fichiers `.d.ts` ordinaires dans votre arborescence source, et `zapatos/schema` est déclaré dans l’un d’eux : ils doivent donc faire partie de votre compilation. Avec `"include": ["src"]` et l’`outDir` ci-dessous, c’est le cas.
+- Le générateur écrit des fichiers `.d.ts` ordinaires dans votre arborescence source, et `pgcast/schema` est déclaré dans l’un d’eux : ils doivent donc faire partie de votre compilation. Avec `"include": ["src"]` et l’`outDir` ci-dessous, c’est le cas.
 
 ## 2. Configurer le générateur {#configure-the-generator}
 
-Ajoutez `zapatosconfig.json` à la racine de votre projet, là où vous lancerez le générateur :
+À la racine de votre projet, complétez le fichier `pgcastconfig.json` préparé à l’étape d’installation :
 
 ::: code-group
 
-```json [zapatosconfig.json]
+```json [pgcastconfig.json]
 {
   "db": { "connectionString": "{{DATABASE_URL}}" },
+  "moduleNames": "pgcast",
   "outDir": "./src"
 }
 ```
@@ -70,8 +71,8 @@ Ajoutez `zapatosconfig.json` à la racine de votre projet, là où vous lancerez
 :::
 
 - `db` prend ce que vous donneriez à `new pg.Pool()`.
-- `outDir` indique où placer le dossier `zapatos` ; sans lui, c’est le dossier où vous lancez le générateur.
-- <code v-pre>{{DATABASE_URL}}</code> est lu dans l’environnement, si bien que la chaîne de connexion reste hors de votre dépôt. Si la variable n’est pas définie, le générateur s’arrête avec `Error: If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist: Environment variable 'DATABASE_URL' is not set`.
+- `outDir` indique où placer le dossier `pgcast` ; sans lui, c’est le dossier où vous lancez le générateur.
+- <code v-pre>{{DATABASE_URL}}</code> est lu dans l’environnement, si bien que la chaîne de connexion reste hors de votre dépôt. Si la variable n’est pas définie, le générateur s’arrête avec `Error: If present, pgcastconfig.json must be a valid JSON file, and all referenced environment variables must exist: Environment variable 'DATABASE_URL' is not set`.
 
 Toutes les autres options, des schémas à inclure aux réglages par colonne, sont dans [Générateur](/fr/generator).
 
@@ -83,22 +84,24 @@ Lancez le générateur. Il est installé sous deux noms, `pgcast` et `zapatos` 
 npx pgcast
 ```
 
-Il affiche une ligne pour chaque placeholder qu’il écrit, ici pour les deux types du schéma de la doc que Postgres ne sait pas, à lui seul, décrire à TypeScript :
+Il affiche une ligne pour chaque placeholder qu’il écrit, ici pour trois types du schéma de la doc :
 
 ```txt
-Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts
-Writing new custom type or domain placeholder file: src/zapatos/custom/PgSeat_label.d.ts
+Writing new custom type or domain placeholder file: src/pgcast/custom/PgPoint.d.ts
+Writing new custom type or domain placeholder file: src/pgcast/custom/PgTsvector.d.ts
+Writing new custom type or domain placeholder file: src/pgcast/custom/PgSeat_label.d.ts
 ```
 
 Et vous avez :
 
 ```txt
-src/zapatos/
+src/pgcast/
 ├── schema.d.ts            every table, written again on each run: don't edit it
 └── custom/
     ├── index.d.ts         written again on each run too
     ├── PgPoint.d.ts       cinemas.location, a POINT: any, until you say otherwise
-    └── PgSeat_label.d.ts  seat_bookings.seat, the seat_label domain: string
+    ├── PgSeat_label.d.ts  seat_bookings.seat, the seat_label domain: string
+    └── PgTsvector.d.ts    films.title_search, a tsvector: any, until you say otherwise
 ```
 
 Les placeholders de `custom/` sont à vous : le générateur écrit chacun d’eux une seule fois et ne l’écrase jamais, alors que `index.d.ts` est réécrit à chaque exécution. Dans `schema.d.ts`, chaque table est un espace de noms de types, et les raccourcis choisissent le bon pour vous :
@@ -118,7 +121,7 @@ Le runtime n’ouvre jamais de connexion de lui-même : chaque requête tourne 
 ::: code-group
 
 ```ts twoslash [src/films.ts]
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import pg from 'pg';
 
 const pool = new pg.Pool({
@@ -151,7 +154,7 @@ Le titre est parti à Postgres en paramètre, `("title" = $1)`<!-- probe: exampl
 
 ```ts twoslash
 // @errors: 18048
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool);
@@ -162,7 +165,7 @@ console.log(film.release_year);
 Testez plutôt ce cas, et le type s’affine à celui de la ligne (survolez `film` pour le voir). Exécutez le fichier, et il affiche `1974` :
 
 ```ts twoslash
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool);
@@ -173,7 +176,7 @@ if (film) console.log(film.release_year);  // 1974
 Pour voir le SQL dans votre propre code, appelez `.compile()` là où vous appelleriez `.run()` : il donne le `text` (sur une ligne) et les `values` que montre le cast panel, et n’envoie rien. Ajoutez cette ligne au fichier :
 
 ```ts twoslash
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 // ---cut---
 console.log(db.selectOne('films', { title: 'The Salt Orchard' }).compile());
 ```
@@ -202,7 +205,7 @@ Chaque nom de colonne apparaît deux fois dans `jsonb_build_object($1::text, "ti
 Le type suit la requête : deux colonnes demandées, deux dans le type. Omettez `columns` et vous recevez toutes les colonnes, `films.JSONSelectable[]`. Affichez-les :
 
 ```ts twoslash
-import * as db from 'zapatos/db';
+import * as db from 'pgcast/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 const films = await db.select('films', { studio_id: 1000 }, {
@@ -229,7 +232,7 @@ Si aucun film ne correspond, le tableau est vide : `select()` ne donne jamais `
 `insert()` prend un `films.Insertable` et renvoie la ligne telle que Postgres l’a stockée. Typez d’abord la ligne, avec les types du schéma. Ajoutez cet import en haut du fichier, avec les deux autres :
 
 ```ts twoslash
-import type * as s from 'zapatos/schema';
+import type * as s from 'pgcast/schema';
 ```
 
 Puis la ligne et la requête :
@@ -245,8 +248,8 @@ Puis la ligne et la requête :
 Le `films.Insertable` de la ligne exige les colonnes `NOT NULL` sans valeur par défaut et laisse les autres facultatives ; typée à part, la ligne reçoit des erreurs qui nomment la colonne fautive. Affichez le nouveau film :
 
 ```ts twoslash
-import * as db from 'zapatos/db';
-import type * as s from 'zapatos/schema';
+import * as db from 'pgcast/db';
+import type * as s from 'pgcast/schema';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 declare const row: s.films.Insertable;
@@ -277,7 +280,7 @@ Une colonne `NOT NULL` sans valeur par défaut ne peut pas être omise. Oubliez 
 
 ```ts twoslash
 // @errors: 2741
-import type * as s from 'zapatos/schema';
+import type * as s from 'pgcast/schema';
 // ---cut---
 const row: s.films.Insertable = {
   studio_id: 1002,
@@ -297,8 +300,8 @@ Avec la durée remise dans la ligne, voici votre fichier complet, les étapes de
 ::: code-group
 
 ```ts twoslash [src/films.ts]
-import * as db from 'zapatos/db';
-import type * as s from 'zapatos/schema';
+import * as db from 'pgcast/db';
+import type * as s from 'pgcast/schema';
 import pg from 'pg';
 
 const pool = new pg.Pool({
@@ -366,7 +369,7 @@ Après une mise à jour de pgcast, une erreur de type sur `schemaVersionCanary` 
 
 ## Ce que vous avez appris {#what-you-ve-learnt}
 
-- Pointer le générateur vers une base de données, et trouver ses types dans `zapatos/schema`.
+- Configurer le générateur pour votre base de données et retrouver les types dans `pgcast/schema`.
 - Demander une ligne avec `selectOne()`, plusieurs avec `select()`, et seulement certaines colonnes avec `columns`.
 - Ajouter une ligne avec `insert()`, et la récupérer telle que Postgres l’a stockée.
 - Lire le SQL qu’exécute une requête avec `.compile()`, et son type sous votre curseur.

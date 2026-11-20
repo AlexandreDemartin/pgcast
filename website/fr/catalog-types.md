@@ -1,5 +1,5 @@
 ---
-english: 2dd94eb32124
+english: 7b9e4cf16c41
 ---
 
 # Le catalogue
@@ -74,6 +74,7 @@ Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos :
 - `UniqueIndex` liste les contraintes utilisables avec `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la liste de tous les index uniques de la relation.
 - Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, suit son type de base dans chaque contexte tant que son placeholder contient le type généré.
 - Un domaine imbriqué ou un tableau de domaines suit le type de base du domaine au dernier niveau d’imbrication si le générateur reconnaît ce type. [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext) rétablit le type du placeholder dans les cinq interfaces.
+- La contrainte `NOT NULL` de la colonne s’applique au tableau lui-même. Même si les éléments ont pour type un domaine `NOT NULL`, une affectation au-delà de la fin, comme `a[3] = 3` sur `{1}`, enregistre `{1,NULL,3}`. Comme Zapatos 6.6.1, pgcast type `int4[] NOT NULL` en `number[]`, mais `pg` lit `{1,NULL}` comme `[1, null]`.
 - Un tableau d’enums est représenté par du texte dans `Selectable` et par un tableau de labels dans le JSON des raccourcis. [`enumArraysTypedAsText: false`](/fr/generator#generate.enumArraysTypedAsText) convient à un parser qui renvoie un tableau.
 - Un domaine sur `text` dont le `CHECK` liste les valeurs, `CHECK (VALUE IN ('U', 'PG', '12'))`, est une `string`, le type de son placeholder tel que généré, sauf si [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) est activé.
 - Un `interval` est représenté par un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) dans une ligne renvoyée par `pg` et par du texte en JSON. [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects) convient à un parser qui renvoie du texte.

@@ -1,5 +1,5 @@
 ---
-english: 0131c3b46e7a
+english: a6c6ad16cf5f
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -123,7 +123,8 @@ const booked = await bookSeat(pool, 'F12', 'Ines Calloway');
 Elle envoie ce qu’elle envoie sur un `pg.Pool` ([Le SQL envoyé](/fr/transaction#the-sql-it-sends)), sur une seule connexion : l’adaptateur de postgres.js en réserve une (`sql.reserve()`), et celui de PGlite prend la seule qu’il a.
 
 - Sur PGlite, ou sur tout pool d’une seule connexion (`max: 1` pour un `pg.Pool` ou un `sql` de postgres.js), une requête sur le pool attend que la transaction libère la connexion. Avec un `await` dans le callback, `.run(pool)` attend indéfiniment : lancez les requêtes du callback sur `txnClient`.
-- Les `query()` et `exec()` de PGlite lui-même n’attendent pas : dans la transaction, ils s’y exécutent ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
+- Avec postgres.js 3.4 et `max: 1`, si la connexion au serveur est perdue pendant une transaction de l’adaptateur, la transaction suivante peut rester bloquée ou le processus peut s’arrêter brutalement. Voir les [résultats par version du driver](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#how-it-differs-from-pg).
+- Les appels natifs `query()` et `exec()` de PGlite peuvent s’exécuter avant que l’adaptateur libère la connexion. Quand une transaction native `pglite.transaction()` est commitée, les écritures de l’adaptateur le sont aussi ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
 - Vous pouvez passer le client du callback à une transaction imbriquée sans cast. Par défaut, le callback imbriqué ne reçoit ce client que si le niveau d’isolation enregistré pour la transaction extérieure satisfait le niveau demandé ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
 
 ## Un driver à vous {#a-driver-of-your-own}

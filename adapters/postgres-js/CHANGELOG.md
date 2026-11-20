@@ -4,6 +4,9 @@ All notable changes to `@pgcast/adapter-postgres-js` are documented here. Format
 
 ## [Unreleased]
 
+### Changed
+- Document connection loss during an adapter transaction with postgres.js 3.4.x and `max: 1`.
+
 ## [0.1.1] - 2026-11-19
 
 ### Changed

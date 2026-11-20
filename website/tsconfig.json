@@ -11,5 +11,5 @@
     "skipLibCheck": false,
     "types": []
   },
-  "include": ["zapatos", "examples"]
+  "include": ["zapatos", "examples", "first-query.d.ts"]
 }

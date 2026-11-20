@@ -9,7 +9,11 @@
 // (PGlite, decision 005) must parse the docs schema's types as `pg` does, and every example runs again on its pool, as
 // a Run gives it to the code. Run by `npm run docs:examples`, after the root `npm run build`.
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { inspect } from 'node:util';
 import pg from 'pg';
 import * as db from 'zapatos/db';
@@ -226,6 +230,41 @@ async function check(example, pool, on) {
   }
 }
 
+/** Run First query's complete file and check its steps in a consumer with just the alias from Install. */
+function checkFirstQuery() {
+  const
+    page = file => readFileSync(new URL(file, import.meta.url), 'utf8'),
+    alias = page('install.md').match(/^npm install ([\w-]+)@npm:@pgcast\/pgcast\b/m)?.[1],
+    tutorial = page('first-query.md'),
+    configs = tutorial.matchAll(/^```json \[((?:pgcast|zapatos|ts)config\.json)\]\n([\s\S]*?)^```/gm),
+    whole = tutorial.split('<!-- joined: src/films.ts -->')[1]?.match(
+      /^```ts twoslash \[src\/films\.ts\]\n([\s\S]*?)^```/m)?.[1],
+    consumer = mkdtempSync(join(tmpdir(), 'pgcast-first-query-'));
+  try {
+    assert.ok(alias, 'install.md must name the npm alias');
+    mkdirSync(join(consumer, 'src'));
+    mkdirSync(join(consumer, 'node_modules'));
+    for (const [name, target] of [[alias, '..'], ['pg', '../node_modules/pg'], ['@types', '../node_modules/@types']])
+      symlinkSync(fileURLToPath(new URL(target, import.meta.url)), join(consumer, 'node_modules', name), 'dir');
+    writeFileSync(join(consumer, 'package.json'), '{"type":"module"}');
+    assert.ok(whole, 'first-query.md must show the complete src/films.ts after the joined marker');
+    writeFileSync(join(consumer, 'src/films.ts'), whole);
+    for (const [, file, source] of configs) writeFileSync(join(consumer, file), source);
+    assert.ok(['pgcastconfig.json', 'zapatosconfig.json'].some(file => existsSync(join(consumer, file))),
+      'first-query.md must supply the generator config');
+    const run = (...args) => execFileSync(process.execPath, args, {
+      cwd: consumer, env: { ...process.env, DATABASE_URL: urlOf(name) }, stdio: 'inherit',
+    });
+    run(fileURLToPath(new URL('../dist/generate/cli.js', import.meta.url)));
+    run('src/films.ts');
+    run(fileURLToPath(new URL('../node_modules/typescript/bin/tsc', import.meta.url)));
+    run(fileURLToPath(new URL('check-joined.mjs', import.meta.url)), 'first-query.md');
+    console.log('First query ran and type-checked under the alias from Install.');
+  } finally {
+    rmSync(consumer, { recursive: true, force: true });
+  }
+}
+
 await admin.connect();
 await dropOrphanDocsDatabases(admin);
 await admin.query(`CREATE DATABASE "${name}"`);
@@ -286,6 +325,7 @@ try {
       await pglite.close();
     }
   }
+  checkFirstQuery();
 } finally {
   await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
   await admin.end();

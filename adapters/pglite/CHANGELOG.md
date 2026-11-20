@@ -4,6 +4,9 @@ All notable changes to `@pgcast/adapter-pglite` are documented here. Format: [Ke
 
 ## [Unreleased]
 
+### Changed
+- Point out where native PGlite calls share an adapter transaction in the README.
+
 ## [0.1.1] - 2026-11-19
 
 ### Changed
