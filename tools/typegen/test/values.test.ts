@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
-import { describe, expect, inject, it } from 'vitest';
+import { describe, expect, inject, it, vi } from 'vitest';
 import { urlForDatabase } from '../../../test/helpers/databases';
 import { useTestDatabase } from '../../../test/helpers/db';
 import { describeQuery } from '../src/describe';
@@ -68,7 +68,7 @@ const cases: [number | null, string, string, unknown][] = [
   [null, "ARRAY['happy'::public.mood]", 'string', '{happy}'],
 ];
 for (const [oid, arrayOid, type] of [[1082, 1182, 'date'], [1114, 1115, 'timestamp'], [1184, 1185, 'timestamptz']] as const) {
-  for (const [literal, value] of [['2000-01-02', expect.any(Date)], ['infinity', Infinity], ['-infinity', -Infinity]] as const) {
+  for (const [literal, value] of [['2000-01-02', new Date('2000-01-02T00:00:00.000Z')], ['infinity', Infinity], ['-infinity', -Infinity]] as const) {
     cases.push([oid, `'${literal}'::${type}`, date, value],
       [arrayOid, `ARRAY['${literal}'::${type}]`, 'PgArray<Date | number>', [value]]);
   }
@@ -80,7 +80,9 @@ describe('driver values', () => {
     const client = new pg.Client({ connectionString: urlForDatabase(inject('pgcastDb')!.url, db.name) }),
       dir = await mkdtemp(join(tmpdir(), 'pgcast-values-')), path = join(dir, 'queries.ts');
     try {
+      vi.stubEnv('TZ', 'UTC');
       await client.connect();
+      await client.query("SET TIME ZONE 'UTC'");
       await client.query("SET lc_monetary = 'C'");
       await client.query('CREATE DOMAIN public.amount_list AS numeric[]');
       await client.query('CREATE TEMP TABLE balances (amounts public.amount_list)');
@@ -97,6 +99,7 @@ describe('driver values', () => {
         expect(row['c' + i], sql).toEqual(value);
       }
     } finally {
+      vi.unstubAllEnvs();
       await client.end();
       await rm(dir, { recursive: true, force: true });
     }
