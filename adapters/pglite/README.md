@@ -41,7 +41,7 @@ await db.serializable(pool, async txn => {
 - `asPool(pglite)` never creates, configures nor closes the PGlite: you do, as with a `pg.Pool`, which Zapatos "doesn't manage" for you either. It takes the PGlite that `PGlite.create()` or `new PGlite()` returns, and throws on the `tx` of `pglite.transaction()`, which has no `execProtocol()`.
 - `run(pool)` sends each query as `pg` sends it, through `execProtocol()`: with no value and no name, a simple `Query`, which may hold several statements; otherwise `Parse`, `Bind`, `Describe`, `Execute` and `Sync`. `.prepared(name)` parses the query once on that PGlite, as `pg` does once on a connection, whichever `asPool()` gave the pool; an empty name is no name, as in `pg`.
 - `COPY … FROM STDIN` gets `pg`'s answer, a `CopyFail`, so it rejects with 57014 and the next query runs.
-- The pool has the PGlite's one connection. `transaction()` and its shortcuts (`serializable()`…) take it with `connect()`, in turn, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end. Meanwhile a query on the pool waits, as with a `pg.Pool` with `max: 1`.
+- The pool has the PGlite's one connection. `transaction()` and its shortcuts (`serializable()`…) take it with `connect()`, in turn, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end. A query on the pool waits for that connection. [Native PGlite calls](#how-it-differs-from-pg) share it immediately.
 - In a page, the adapter imports no Node built-in, but `pg`'s parser for a `bytea` reads a global `Buffer` as it loads: set `globalThis.Buffer` (the `buffer` package's) in a module imported before the adapter. For `zapatos/db`, follow the [core browser setup](https://pgcast.dev/drivers#pglite).
 
 ## What it reads
@@ -106,7 +106,7 @@ npm run test:types        # the tests, and asPool() against the root's db.d.ts
 npm run check:browser     # dist/ bundled for a page, with no Node built-in, and run given only TextEncoder and Buffer
 ```
 
-CI runs them on PGlite 0.5.0, 0.5.13 and the lockfile's version, on Postgres 14 and 18.
+CI runs them on PGlite 0.5.0, 0.5.13 and the lockfile's version, on Postgres 14, 18 and 19.
 
 ## Publishing
 
