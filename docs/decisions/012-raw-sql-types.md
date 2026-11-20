@@ -1,8 +1,8 @@
 # 012 — Raw SQL types: how a hand-written `sql` query gets its types from Postgres
 
-- **Status**: accepted (2026-11-18), decided alone under the owner's delegation: each choice below is decided under the philosophy, and carries its own status.
+- **Status**: accepted 2026-11-18. Revised 2026-11-20 under the owner's delegation after [#798](https://github.com/AlexandreDemartin/pgcast/issues/798).
 - **Scope**: feature [#62](https://github.com/AlexandreDemartin/pgcast/issues/62), its step [#710](https://github.com/AlexandreDemartin/pgcast/issues/710) (this note) and its planned PRs; the chapter's epic [#21](https://github.com/AlexandreDemartin/pgcast/issues/21).
-- **In short**: **option A, in a separate package**, `@pgcast/typegen` (`tools/typegen/`, note [013](./013-package-model.md)). Opted-in queries are found by the row type they name, `Row<'name'>`; a query's text is fully static, or its interpolations are `param()` calls and string literals, neutralised as `core.ts` compiles them, and any other interpolation refuses the query; the query is described, never executed, by the extended protocol's Parse / Describe over `pg`; a result column is `NOT NULL` only where its origin column is proved so, down every inheritance child, and no guard word (an outer join, a grouping set, `MERGE`, `OLD`, `NEW`) sits in the text; the types land in a committed file that `--check` compares. Compiling a condition written in place into the text is not accepted: § Deferred gives what it would need. The core, the default codegen output and the bench are unchanged; Epic #20 (drivers) is not needed.
+- **In short**: the first release of `@pgcast/typegen` is results-only. `Row<'name'>` opts a hand-written `sql` query into a committed row type that `--check` verifies. The separate tool describes static SQL and supported `param()` and literal identifier interpolations over `pg`, without executing the query. Every field follows the default `pg` text parser for its RowDescription type OID. Choice 2 governs column nullability. Parameter checking and composed conditions are deferred.
 
 ## Context
 
@@ -97,15 +97,28 @@ What the replays show, over the table's 30 texts with a typed result and their 5
 
 Also replayed, outside the table: a scalar subquery, inner `USING` and `NATURAL` joins, an inner lateral, `CASE`, `UPDATE … FROM … RETURNING` and `MERGE … INSERT … RETURNING`. None is wrong; the last has its 3 columns loose.
 
+### Driver value types (replayed 2026-11-20)
+
+These runs used Postgres 17.3 and `pg` 8.23.1. They are separate from the 59-column nullability sample.
+
+| Field or query | RowDescription and decoded value |
+|---|---|
+| `SELECT ARRAY['G','PG']::rating[]` for `CREATE TYPE rating AS ENUM ('G', 'PG')` | Origin 0/0, unregistered enum-array OID, string `"{G,PG}"`. In the `Selectable` context, `tsTypeForPgType('_rating', { rating: ['G', 'PG'] }, 'Selectable', {})` gives `rating[]`. Passing `true` as its fifth argument (`inlineEnums`) gives `('G' \| 'PG')[]`. A bare column of scalar type `rating` returned the strings `'G'` and `'PG'`. |
+| `int4[] NOT NULL` and `SELECT ARRAY[[1,NULL],[2,3]]::int4[]` | OID 1007 for both. `SELECT ARRAY[1,NULL]::int4[]` also returned `[1, null]` with origin 0/0. The same column held `[1, null]` and then `[[1, null], [2, 3]]`. Both `selectExactlyOne` and raw `sql` returned the flat value. Reading the matrix with `scores.forEach(x => x?.toFixed())` threw a `TypeError`. |
+| `numeric[]` and a domain `AS numeric[]` | Both bare columns reported OID 1231 and returned `[1.25, null]` and `[2.5, null]` respectively. A computed value of the domain also reported 1231. |
+| `timestamptz` | OID 1184. A finite timestamp decoded to a `Date`. Stored `'infinity'` and `'-infinity'` decoded to the numbers `Infinity` and `-Infinity`. |
+| `pg_catalog.pg_class.relname` for `'films'::regclass` and `id` from a schema omitted by the generator | The catalogue field had origin 1259/2 and returned `'films'`. The other field had a column origin and returned `1` (OID 23). Neither relation has a namespace in the public-only schema. |
+| `SELECT 1::int8` | The same raw query returned `'1'` with the default parser and `1n` after `client.setTypeParser(20, BigInt)`. |
+
 ## 1. Whether to build it, and where
 
-**Status**: accepted (2026-11-18), by delegation.
+**Status**: Revised 2026-11-20, by delegation.
 
 | | A. A tool beside the codegen | B. A SafeQL plugin | C. No inference, as today |
 |---|---|---|---|
 | **What it is** | `@pgcast/typegen`: finds opted-in `sql` templates, neutralises each `param()`, describes each query, writes a committed `.ts` keyed by name | a package for SafeQL, an ESLint plugin ("It's a plugin, not an SQL library"): it checks the row type you write and suggests a fix | the row type written by hand, `sql`'s type argument (note 010) |
-| **The core** | unchanged; a peer on `@pgcast/pgcast` for `tsTypeForPgType()` | unchanged | unchanged |
-| **Dependencies for the user** | none new: `pg`, `typescript`, `@pgcast/pgcast` | SafeQL, ESLint, `postgres` (postgres.js, its connection) and `libpg-query` (1.8 MB unpacked, `npm view`) | none |
+| **The core** | the CLI imports the public compiler from its core peer during generation and offline checking (below) | unchanged | unchanged |
+| **Dependencies for the user** | `pg`, `@pgcast/pgcast` and a `typescript` with the JavaScript parser API for the scan (choice 3) | SafeQL, ESLint, `postgres` (postgres.js, its connection) and `libpg-query` (1.8 MB unpacked, `npm view`) | none |
 | **Database** | at generation only, the generator's; compiling needs none (committed file) | at every lint run, or a "shadow database" built from migrations; no offline mode | none |
 | **Composed queries** | a `param()` or a string literal is compiled into the text as `core.ts` compiles it; any other interpolation refuses the query | "Conditional fragment selection" ❌ in its own postgres.js matrix; `onExpression` may inline a string or skip the query | typed by hand, unchecked |
 | **Nullability** | Describe's origin and a guard (choice 2) | its AST walk over libpg-query, `attnotnull` as fallback | as written |
@@ -117,7 +130,8 @@ Also replayed, outside the table: a scalar subquery, inner `USING` and `NATURAL`
 - **Security first.** A never executes a query: Parse / Describe refuses a second statement, where `PREPARE` over the simple protocol ran it (§ Replays). B's checks run through postgres.js, not `pg`.
 - **Compat with Zapatos 6.6.1.** A adds nothing to the core: a query you do not opt in is today's, and an opted-in one is still `sql<…, RunResult>` with a type argument, as 6.6.1 takes it.
 - **The principles.** The database is the source of truth (principle 1); the `sql` text is unchanged and sent as written (principle 3); a separate package, opt-in (principle 4); the tool is a CLI that reads the database and writes a file (principle 5).
-- **Why not B.** It types nothing: it checks what you wrote, at lint time, against a live database, through a second driver, on an experimental API; the shape the market asks for, a committed output (Prisma#25124), it cannot give.
+- **Core peer.** Decision 013 gives adapters structural types and permits an explicit core peer for types or config. This tool also needs that peer's public runtime exports during generation and `--check`. With `@pgcast/pgcast/db` 7.1.0, compiling a literal identifier and `param(undefined, 'int4')` gave `SELECT CAST($1 AS "int4") FROM "films"`. The preview requires `@pgcast/pgcast` `>=7.1.0 <8` and uses the application's installed peer so both compile the same SQL. Importing the generated row types requires no compiler at run time. [Decision 013](./013-package-model.md#the-model)
+- **Editing loop.** SafeQL's ESLint rule runs in the editor and in CI. Its autofix writes an inline type annotation that can be committed. After the four preview PRs, `--watch` will regenerate pgcast's separate file of named rows on source edits, so offline `--check` can compare the source with that committed file. [SafeQL autofix](https://safeql.dev/guide/configuration.html#example-1-single-database-connected-to-your-app)
 - **Why not C.** It is the baseline A keeps: every query not opted in, every refused one.
 
 ## 2. Nullability
@@ -150,7 +164,7 @@ The guard only removes proofs, never adds one: a word in a literal or a comment 
 
 ## 3. Naming, finding, writing, checking
 
-**Status**: accepted (2026-11-18), by delegation.
+**Status**: Revised 2026-11-20, by delegation.
 
 | Point | Design |
 |---|---|
@@ -159,10 +173,14 @@ The guard only removes proofs, never adds one: a word in a literal or a comment 
 | **Binding** | two forms only, for the tag and for each `param()` callee. **`sql` and `param`**, each a value import from pgcast's `db` module whose imported name is the local one (`import { sql, param }`). **`<ns>.sql` and `<ns>.param`**, where `<ns>` is a value namespace import of that module (`import * as db`). Each name is the file's one declaration of it. Any other tag or callee refuses the query: `this.sql`, `<ns>.sql` from another module, `db.x.sql`, `import * as sql`, `const { sql } = db`, `raw as param`, a type-only import, or a `param` declared as a parameter, a local, a destructured name, a `catch` binding, a function or an import from elsewhere. A callee or tag of one's own would otherwise be described from the text the tool builds while the run sends another: with `raw as param` and `x = 'true GROUP BY ROLLUP (owner_id)'`, the tool describes `WHERE $1`, `owner_id` proved not null, and the run returns an `owner_id` `NULL`; a `this.sql` that appends `GROUP BY ROLLUP (owner_id)` is described from its static text and returns a `NULL` too. Replayed: 19 forms refused, each one above among them, with `this.param`, a `param` the file never declares and a `db` parameter; 5 accepted, named and namespace imports (`db`, `zdb`) from `zapatos/db` and `pgcast/db`; the corpus's 27 all pass |
 | **Neutralising** | per interpolation, by its syntax, as `core.ts` compiles it (the list below); a refusal names the template and the placeholder. The static chunks are read cooked, as the tag receives them (the parser's `text`, `head.text` and each span's `literal.text`), never as source: `` /*\x2a\x2f \x4cEFT \x2f\x2a*/ JOIN `` shows no guard word in source, but the run sends `/**/ LEFT /**/ JOIN` and returns a `NULL` `balance`; read cooked, the guard finds `LEFT` (replayed) |
 | **Output** | one committed `.ts`, a plain module beside the schema (no `declare module`, so note 002's names are untouched): `export interface Queries { 'films-by-studio': { text: '…'; row: { … } } }` and `type Row<N extends keyof Queries>`. `text` is the neutralised text, readable in review, as a string literal type: a JSDoc cannot hold it, since a text may hold `*/` (skill `codegen-output`). It is written by `JSON.stringify`, U+2028 and U+2029 escaped, since TypeScript 4.1.6 ends a string at a raw one (TS1002); a text holding `*/`, `$$`, quotes, backticks and both separators reads back equal through the parser of 4.1.6 and 5.9.3 |
-| **Column types** | a column with an origin is the schema's own type, `s.films.Selectable['title']`, plus `\| null` where choice 2 says; any other through `tsTypeForPgType()`; `json`, `jsonb` and `json_agg` are `db.JSONValue`, never a shape the database does not state |
-| **Parameters** | not written: nothing would read them, since `sql` takes its interpolations untyped, and checking them would need a change to `core.ts` (a stop point) |
+| **Column types** | For every field, start with the value returned by the default `pg` text parser for its RowDescription type OID. An unregistered OID gives `string`. Built-in `json` and `jsonb` give `db.JSONValue`, including JSON `null` and the result of `json_agg`. Choice 2 governs SQL `NULL`. [node-postgres data types](https://node-postgres.com/features/types) |
+| **Column origins** | Use the origin for choice 2. A generated column type may refine the value only if it admits every possible decoded value, as the catalogue labels do for a scalar enum decoded as text. For catalogue or excluded relations, use the OID type directly without indexing `Selectable`. |
+| **SQL arrays** | For Postgres arrays that decode to JavaScript arrays, the generated file declares `export type PgArray<T> = (T \| null \| PgArray<T>)[]`, with `T` the decoded element type. Postgres does not enforce declared dimensions. The preview has no separate proof of rank or non-null elements. A proved non-null `int4[]` gives `PgArray<number>`, an originless one `PgArray<number> \| null`. [Postgres array declarations](https://www.postgresql.org/docs/current/arrays.html#ARRAYS-DECLARATION) |
+| **Parameters** | Results only. Describe reads parameter OIDs, but the generated contract contains only the query text and row type. See § Deferred for call-site parameter checking. |
 | **`--check`** | without a database: each found template's neutralised text against the stored `text`, so a changed, new, renamed or removed query fails (an entry no template names is stale); with one, each query described again, so a schema change fails too. A renamed query not regenerated also fails to compile: `Row<'old-name'>` gives TS2344 (5.9.3 and 4.1.6) |
-| **What stays manual** | any interpolation but a `param()` or a string literal (a condition, a variable, a helper's call, `raw()`, a `sql` template, `db.cols()`), wherever it sits, a shape inside `json`/`jsonb`, a loose column (choice 4), a query not opted in |
+| **What stays manual** | any interpolation but a `param()` or a string literal (a condition, a variable, a helper's call, `raw()`, a `sql` template, `db.cols()`), wherever it sits, a shape inside `json`/`jsonb`, a loose column (choice 4), a query not opted in, or a row whose client overrides a relevant parser with an incompatible return type |
+
+**Compatibility.** This opt-in row deliberately differs from the schema where the observed values require it. For the replayed columns, `Selectable` gives `db.NumericString[]` for both numeric arrays and `Date` for the timestamp. The named row gives `PgArray<number>` and `Date | number` respectively. For the same flat `[1, null]`, both `Selectable` and the shortcut's `JSONSelectable` give `number[]`, while the named row admits the null element and additional dimensions. Existing schema users keep the inherited types.
 
 Each interpolation is neutralised as `core.ts` compiles it (§ Replays), which this note reads and does not change:
 
@@ -178,14 +196,32 @@ Each interpolation is neutralised as `core.ts` compiles it (§ Replays), which t
 
 **Measured** (`tsc --extendedDiagnostics`, the bench's options on the fixture's schema, net of an empty floor): 50 calls `` sql<s.users.SQL, R[]>`… ${whereable} … ${param(i)}` `` (`${whereable}`, which choice 3 refuses, stands in for any interpolation: a row type does not depend on them, and each variant runs the same calls), each row of 5 columns read, cost **+2,007** Instantiations and +810 Types with hand-written interfaces; **+2,507** and +970 with a generated `Queries` (each entry its `text` and `row`) and `Row<'…'>`; +2,357 and +970 with `Queries['…']['row']` spelled out: about 10 Instantiations per call above today's. `bench:types` is unchanged: nothing in the core or the bench moves.
 
-**TypeScript floor**: the generated file is interfaces, string-literal keys and one indexed-access alias, as the schema already is; on 4.1.6 it compiles, and a renamed key (TS2344), a nullable column read as `number` (TS2322), a misspelt column (TS2339) and another `text` (TS2322) are refused, as on 5.9.3. The tool itself reads TypeScript's parser of the user's install, which every version since 4.1 has; TypeScript 7's port has no JS API yet (note 001), so the tool runs on a `typescript` that has one (4.1 to 6).
+**Array compile cost.** A second 5.9.3 probe used the bench options and fixture schema for 50 named queries, each reading five fields including one array. Against the same floor, the flat `(number | null)[]` cost 1,224 instantiations and 918 types. The recursive alias cost 1,235 and 927 respectively (+11 instantiations, +9 types across all 50 calls).
+
+**TypeScript floor.** On both 4.1.6 and 5.9.3, a consumer imported `PgArray` and `Row`, assigned both replayed array shapes and narrowed a numeric leaf with `typeof x === 'number'`. Both compilers rejected an unchecked `x?.toFixed()`, a nested string leaf and a whole-column null assigned to a non-null array. In the original row probe, a renamed key (TS2344), a nullable column read as `number` (TS2322), a misspelt column (TS2339) and another `text` (TS2322) were refused on both versions.
+
+**Running the scan.** Generation and `--check` need a `typescript` installation with the JavaScript parser API (`ts.createSourceFile`, versions 4.1 to 6). A project with only TypeScript 7 can run the tool in a separate development or CI installation with `typescript@6`, then compile the committed row types with 7. [TypeScript's side-by-side guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0)
 
 ## 4. Overrides
 
-**Status**: accepted (2026-11-18), by delegation.
+**Status**: Revised 2026-11-20, by delegation.
 
 - A loose column (`COALESCE(x, 0)`, `count(*)`, a `UNION`, a view) is narrowed by the caller, in TypeScript, at the call site: `NotNull<Row<'films-by-studio'>, 'runtime_minutes'>`, a type the generated file exports, its key checked by `keyof`: probed on 5.9.3 and 4.1.6, a misspelt column gives TS2344 and the other columns keep `| null` (TS2322). Explicit, visible in review, and never sent to Postgres.
+- Narrow the array in TypeScript at the call site, visible in review. For example, `typeof x === 'number'` lets the caller use `x.toFixed()` on that element. `NotNull` narrows only the whole column and leaves the element type and dimensions intact.
 - No override in the SQL text, and no config file of overrides: the reason sits where the query is.
+
+## Deferred: checking parameters
+
+**Status**: Revised 2026-11-20, by delegation. The first release generates result types only.
+
+Postgres describes the type of each `$n`, but `sql` accepts its interpolations without a per-position input type. Checking a value at this tag would require relating each `param(value)` to its described position and the values `pg` accepts as input. Enforcing that relationship in `src/db/core.ts` is a stop point requiring owner approval.
+
+| Tool | Where the caller's input is checked |
+|---|---|
+| pgTyped | The generated query type gives each named parameter a TypeScript type. The caller passes those values in an object to `.run()`. [Typed queries](https://pgtyped.dev/docs/ts-file) |
+| sqlc | sqlc's `query_parameter_limit` setting for Go controls how many typed parameters a method takes individually. Its default of 1 gives a struct for two parameters. With a limit of 2, sqlc's generated `CreateNotice` takes `cnt int32` and `createdAt time.Time` separately. [Generated method](https://github.com/sqlc-dev/sqlc/blob/main/internal/endtoend/testdata/query_parameter_limit_param_only/postgresql/go/query.sql.go) · [sqlc configuration](https://docs.sqlc.dev/en/latest/reference/config.html#go) |
+| SQLx | The Rust `query!` macro checks binds against live or saved query metadata by default. On Postgres, `value as _` skips the inferred placeholder-type check for that bind. [SQLx bind overrides](https://docs.rs/sqlx/latest/sqlx/macro.query.html#type-overrides-bind-parameters-postgres-only) |
+| Prisma TypedSQL | Generation against Postgres infers the types of positional parameters in a SQL file. Its generated TypeScript function checks the arguments at the call site. [Passing arguments](https://www.prisma.io/docs/orm/v7/prisma-client/using-raw-sql/typedsql) |
 
 ## Deferred: a condition written in place
 
@@ -218,11 +254,14 @@ A PR that takes it up revises this section and replays each point at its first c
 
 ## What changes in the plan
 
-- **#62**, its planned PRs, each `high`, every lens, in `tools/typegen/` (note 013):
-  1. "Describe each fully static named sql query against the database" (the package, the scan and its binding rule, `param()` and string literals neutralised, any other interpolation refused, Parse / Describe, the nullability rule, the writer);
-  2. "Fail --check when a named sql query is out of date" (offline, then with the database);
-  3. "Add NotNull to narrow a described column";
-  4. "Document typed raw SQL" (EN and FR, the TypeScript, the SQL and the type side by side).
+#62 has four planned PRs in `tools/typegen/` under note 013. Each is `high` and receives every review lens.
+
+1. Generate result types only for named queries. The scanner binds imports and neutralises the supported interpolations in choice 3. Parse / Describe supplies field origins and OIDs. Every value type follows the default `pg` text parser for its field OID. Apply choice 3's rules for schema refinements, origins outside the schema and recursive arrays, and choice 2 for SQL nullability.
+2. Add `--check` for source drift offline and schema drift against the database.
+3. Add `NotNull` to narrow a described column at the call site.
+4. Document typed raw SQL in English and French, with the TypeScript, SQL and result type side by side.
+
+- **After those four PRs**, add `--watch` to regenerate the committed types on source edits.
 - No PR compiles a condition written in place: § Deferred holds the idea, unaccepted, and what a PR would first have to settle.
 - **#62's Order** and **#21's Order**: they no longer need ⑦ (Epic #20, drivers): types are found at generation time over `pg`, which the generator already uses.
 - **Note 001**'s TypeScript 6 / 7 reassessment: answered for this tool by § 3's floor; the core's toolchain is not touched.
@@ -230,7 +269,7 @@ A PR that takes it up revises this section and replays each point at its first c
 ## Risks
 
 - **The Submittable's connection methods** (`parse`, `describe`, `sync`, the `parameterDescription` event) are what pg-cursor uses, not a documented API of their own: a `pg` major could move them. The tool's peer is `pg >= 8.6.0`, against the core's `>= 7.18.2`: `pg` parses ParameterDescription only from `pg-protocol` 1.5.0, which 8.6.0 is the first to ask for (8.5.1 asks `^1.4.0`, and 1.4.0's parser has none; 7.18.2's `connection.js` has none either). It is tested at that floor and at the latest.
-- **Nullability is loose by design**: 13 of the replays' 59 columns need `NotNull`; the docs show it beside each case.
+- **Column nullability.** Choice 2's origin proof and whole-query guard together left 13 of 59 columns unnecessarily nullable. Even without a guard word, `SELECT count(*) FROM films WHERE false` had origin 0/0 and returned `'0'`. Callers can use `NotNull`. If users need greater precision, revisit optional `libpg-query` analysis for the three preserved-side columns identified in choice 2.
 - **A `NOT NULL` that does not hold**: Postgres 18 accepts `NOT NULL … NOT VALID`, which does not check old rows; the first PR replays what `attnotnull` says then, and proves only a validated constraint (`pg_constraint.convalidated`).
 - **The scan is syntactic**: a `sql` renamed on import (`import { sql as q }`), or a row type behind an alias, is not found; the query stays as typed by hand, and the docs say how a query is opted in. A `sql` or `param` declared anywhere in the file but in a form choice 3 accepts refuses the query (its binding), even where that declaration does not reach the template.
 - **Coverage**: 27 of the corpus's 58 row types, the static ones and those with `param()` and string literals only. A condition, written in place, built in a variable or by a helper (the corpus's usual form), stays typed by hand: describing it as a boolean `$k` would type a text the run does not send (§ Replays), which principle 1 forbids.
