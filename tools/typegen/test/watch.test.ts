@@ -2,7 +2,7 @@
 
 import type { ChildProcess } from 'node:child_process';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Client } from 'pg';
@@ -153,6 +153,26 @@ it('keeps the rows of a plain run made after a migration', { timeout: 20_000 }, 
     await admin.query('DROP TABLE IF EXISTS public.migrated');
     await admin.end();
   }
+});
+
+it.each(['tsconfig.json', 'app/project.json'])('reports a removed %s, keeps watching, and recovers when it is back', { timeout: 20_000 }, async config => {
+  put('tsconfig.json', { files: [], references: [{ path: './app/project.json' }] });
+  put('app/project.json', { files: ['app.ts'], compilerOptions: { composite: true, types: [] } });
+  symlinkSync(join(dir, 'app/node_modules'), join(dir, 'node_modules'), 'dir');
+  const { child, seen } = start('tsconfig.json');
+  await until(() => rows().includes('"id": number;'), 'the first write');
+  await settle();
+  renameSync(join(dir, config), join(dir, config + '.off'));
+  await until(() => seen.stderr !== '', 'the error');
+  await new Promise(done => setTimeout(done, 500));
+  expect(seen.stderr).toContain(config);
+  expect(child.exitCode).toBe(null);
+  const printed = seen.stdout.length;
+  renameSync(join(dir, config + '.off'), join(dir, config));
+  await until(() => seen.stdout.length > printed, 'the recovery');
+  put('app/app.ts', source('SELECT id, email FROM public.users'));
+  await until(() => rows().includes('"email"'), 'the rewrite');
+  expect(seen.code).toBeUndefined();
 });
 
 it('closes on SIGINT and SIGTERM with exit 0', async () => {
