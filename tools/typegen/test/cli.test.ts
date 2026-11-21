@@ -18,7 +18,7 @@ function put(file: string, contents: string | object) {
   writeFileSync(path, typeof contents === 'string' ? contents : JSON.stringify(contents));
 }
 function run(...args: string[]) {
-  return spawnSync(process.execPath, [cli, ...args], { cwd: dir, encoding: 'utf8', env: {
+  return spawnSync(process.execPath, [cli, ...args], { cwd: dir, encoding: 'utf8', timeout: 10_000, env: {
     ...process.env, TYPEGEN_DB: urlForDatabase(inject('pgcastDb')!.url, db.name), TYPEGEN_OUT: 'generated',
   } });
 }
@@ -157,4 +157,75 @@ it('omits JSON excerpts when the config is malformed', () => {
   expect(result.status).toBe(1);
   expect(result.stderr).toContain('pgcastconfig.json');
   expect((result.stdout + result.stderr).includes(secret)).toBe(false);
+});
+
+it.each(['URL', 'discrete', 'expanded'])('redacts an asynchronous connection failure with %s settings', mode => {
+  const secret = 'test/804', encoded = 'test%2F804', url = 'postgres://reader:' + encoded + '@localhost/db';
+  const value = mode === 'expanded' ? '{{TYPEGEN_TEST_URI}}' : url;
+  put('zapatosconfig.json', { db: mode === 'discrete'
+    ? { password: secret, ssl: secret } : { connectionString: value, ssl: value } });
+  // Deliver both kinds of callback failure without depending on a TLS server or pg's TLS negotiation version.
+  put('callback.cjs', `
+    require(${JSON.stringify(require.resolve('pg'))}).Client.prototype.connect = function () {
+      ${mode === 'discrete' ? "this.password = 'resolved-at-connect';" : ''}
+      const error = Object.assign(new Error('TLS setting ' + this.ssl + ' for ' + this.password), { code: 'ETEST' });
+      setImmediate(() => { ${mode === 'expanded' ? 'Promise.reject({ message: error.message, code: error.code })' : 'throw error'} });
+      return new Promise(() => {});
+    };
+  `);
+  const result = spawnSync(process.execPath, ['--unhandled-rejections=warn', '--require', './callback.cjs', cli, '--project', project], {
+    cwd: dir, encoding: 'utf8', timeout: 5000, env: { ...process.env, TYPEGEN_TEST_URI: url },
+  });
+  expect(result.status).toBe(1);
+  expect(result.stderr.trim()).toMatch(/^(?:[^\n]* )?ETEST: TLS setting \[redacted\] for \[redacted\]$/);
+  expect([url, secret, encoded].some(s => (result.stdout + result.stderr).includes(s))).toBe(false);
+});
+
+it('redacts credentials in the both-files note', () => {
+  put('pgcastconfig.json', { db: { password: 'option', query_timeout: 0 } });
+  const result = run('--project', project);
+  expect(result.stderr).toContain('only pgcastconfig.json is read');
+  expect(result.stderr).not.toContain('option');
+});
+
+it.each(['postgres://reader:sample@localhost/db', 'two words', ''])('reports a malformed placeholder by file alone (%#)', name => {
+  put('zapatosconfig.json', { outDir: '{{' + name + '}}' });
+  const result = run('--project', project);
+  expect(result.status).toBe(1);
+  expect(result.stderr.trim()).toBe('zapatosconfig.json: a placeholder is not a variable name');
+});
+
+it('refuses query_timeout in a Unix-socket URI and keeps the previous file', () => {
+  put(output, '// previous rows\n');
+  put('zapatosconfig.json', { db: { connectionString: 'postgres://reader@/db?host=/unused&query_timeout=1' }, outDir: 'generated' });
+  const result = run('--project', project);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('Remove query_timeout');
+  expect(readFileSync(join(dir, output), 'utf8')).toBe('// previous rows\n');
+});
+
+it.each([65536, 'invalid'])('keeps the connection failure for invalid port %s', port => {
+  put(output, '// previous rows\n');
+  put('zapatosconfig.json', { db: { host: '127.0.0.1', port }, outDir: 'generated' });
+  const result = run('--project', project);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toMatch(/app\.ts:3:22 .*people.*ERR_SOCKET_BAD_PORT/);
+  expect(readFileSync(join(dir, output), 'utf8')).toBe('// previous rows\n');
+});
+
+it('redacts a parsed password that also occurs in a config diagnostic', () => {
+  put('zapatosconfig.json', { outDir: '{{TYPEGEN_MISSING_804}}',
+    db: { connectionString: 'postgres://reader:TYPEGEN_%4DISSING_804@localhost/db' } });
+  const result = run('--project', project);
+  expect(result.status).toBe(1);
+  expect(result.stderr.trim()).toBe("Environment variable '[redacted]' is not set in zapatosconfig.json");
+});
+
+it('redacts the password as written in a socket URI and as pg decodes it', () => {
+  const raw = 'sample%2f804', parsed = 'sample/804';
+  put('zapatosconfig.json', { db: { password: 'sample', connectionString: 'postgres://reader:' + raw + '@/db?host=/unused' }, outDir: 'generated' });
+  put('app/app.ts', source('SELECT ${1}', raw + ' ' + parsed));
+  const result = run('--project', project);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('[redacted] [redacted]');
 });
