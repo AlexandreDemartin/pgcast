@@ -131,6 +131,17 @@ it('reports both changed text and changed row online', () => {
   check([stale('people', 'changed text'), stale('people', 'changed row'), closing]);
 });
 
+it('regenerates a queries.ts with conflict markers, then passes --check', () => {
+  config(live);
+  const good = readFileSync(path, 'utf8');
+  writeFileSync(path, '<<<<<<< HEAD\n' + good + '=======\n' + good + '>>>>>>> feature\n');
+  const result = run();
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(0);
+  expect(readFileSync(path, 'utf8')).toBe(good);
+  check([current(true)]);
+});
+
 it('checks changed module bytes online', () => {
   config(live);
   writeFileSync(path, readFileSync(path, 'utf8').trimEnd());

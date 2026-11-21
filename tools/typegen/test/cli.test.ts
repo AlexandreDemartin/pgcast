@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Alexandre Demartin
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Client } from 'pg';
@@ -74,6 +74,31 @@ it.each(['static', 'app compiler', 'two compilers'])('generates from a reference
     expect(rows).toContain('SELECT CAST($1 AS \\"int4\\") AS id');
     expect(existsSync(marker) && readFileSync(marker, 'utf8')).toBe('app');
   }
+});
+
+it.each(['--project', '--watch'])('names a typescript without the JavaScript API (%s)', flag => {
+  rmSync(join(dir, 'app/node_modules/typescript'));
+  put('app/node_modules/typescript/package.json', { name: 'typescript', version: '7.0.2', main: 'index.js' });
+  put('app/node_modules/typescript/index.js', "exports.version = '7.0.2';");
+  const result = run(...(flag === '--watch' ? ['--watch', '--project', project] : ['--project', project]));
+  expect(result.stdout).toBe('');
+  const file = join(realpathSync(dir), project);
+  expect(result.stderr).toBe(file + ':1:1 typescript 7.0.2 from ' + file +
+    ' has no JavaScript API; point --project at a tsconfig that resolves typescript 4.1 to 6\n');
+  expect(result.status).toBe(1);
+});
+
+it.each(['@pgcast/pgcast', 'pg'])('names the missing peer %s in one line', peer => {
+  const tool = join(dir, 'tool');
+  cpSync(dirname(cli), join(tool, 'dist'), { recursive: true });
+  mkdirSync(join(tool, 'node_modules/@pgcast'), { recursive: true });
+  const [present, installed] = peer === 'pg' ? ['@pgcast/pgcast', dirname(require.resolve('@pgcast/pgcast/db'))] :
+    ['pg', dirname(require.resolve('pg/package.json'))];
+  symlinkSync(installed, join(tool, 'node_modules', present), 'dir');
+  const result = spawnSync(process.execPath, [join(tool, 'dist/cli.js')], { cwd: dir, encoding: 'utf8', timeout: 10_000 });
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe(`${peer} is not installed: @pgcast/typegen needs it as a peer dependency. Install it with npm install ${peer}\n`);
+  expect(result.status).toBe(1);
 });
 
 it('prints help without reading the project or database config', () => {
