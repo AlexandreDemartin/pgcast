@@ -21,7 +21,11 @@ The file is `<outDir>/zapatos/queries.ts` by default. With `moduleNames: "pgcast
 
 Named templates can interpolate a string literal as an identifier, `param(value, 'int4')` as `CAST($n AS "int4")`, or `param(value, false)` as `$n`. An identifier or cast can also use a template literal without substitutions. Import `sql` and `param` by name or through a namespace from `zapatos/db` or `pgcast/db`. Both must resolve to the same db installation.
 
-The tool compiles the SQL with the application's `@pgcast/pgcast`. Its version and the db import's version must match the generator's peer. The value expression stays unevaluated. Other interpolations need a hand-written row. Support for `param(value)` and `param(value, true)` comes in a later release.
+The tool compiles the SQL with the application's `@pgcast/pgcast`. Its version and the db import's version must match the generator's peer. The value expression stays unevaluated.
+
+For `param(value)` and `param(value, true)`, the value and run-time settings can produce either `$n` or `CAST($n AS "json")`. The tool describes every combination of up to four such slots. For five or more, give slots a literal cast or `false` until at most four remain. Other interpolations need a hand-written row.
+
+A form rejected by Parse for its SQL contributes no row. At least one form must parse, and all successful forms must agree on field names, order, types and nullability. The stored text is the first successful form, starting with all slots plain and toggling the first ambiguous slot fastest.
 
 Field types follow pg's default text parsers. A scalar enum column on an included relation uses its verified labels.
 
