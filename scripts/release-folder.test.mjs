@@ -10,6 +10,7 @@ for (const [folder, prefix] of [
   ['.', 'v'],
   ['adapters/postgres-js', '@pgcast/adapter-postgres-js@'],
   ['adapters/pglite', '@pgcast/adapter-pglite@'],
+  ['tools/typegen', '@pgcast/typegen@'],
 ]) {
   test(`resolves the release tag for ${folder}`, () => {
     const {version} = JSON.parse(readFileSync(`${folder}/package.json`, 'utf8'));
@@ -19,7 +20,7 @@ for (const [folder, prefix] of [
   });
 }
 
-for (const tag of ['v0.0.0-unknown', '@pgcast/adapter-pglite@0.0.0-unknown', '@pgcast/unknown@1.0.0']) {
+for (const tag of ['v0.0.0-unknown', '@pgcast/adapter-pglite@0.0.0-unknown', '@pgcast/typegen@0.0.0-unknown', '@pgcast/unknown@1.0.0']) {
   test(`rejects unmatched tag ${tag}`, () => {
     const {status, stdout, stderr} = resolve(tag);
     assert.equal(status, 1);

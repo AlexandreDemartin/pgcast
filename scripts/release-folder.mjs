@@ -2,7 +2,8 @@
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 
 const tag = process.argv[2];
-for (const folder of ['.', ...readdirSync('adapters').map(name => `adapters/${name}`)]) {
+const packages = ['adapters', 'tools'].flatMap(dir => readdirSync(dir).map(name => `${dir}/${name}`));
+for (const folder of ['.', ...packages]) {
   const manifest = `${folder}/package.json`;
   if (!existsSync(manifest)) continue;
   const {name, version} = JSON.parse(readFileSync(manifest, 'utf8'));
