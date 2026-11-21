@@ -21,7 +21,7 @@ The file is `<outDir>/zapatos/queries.ts` by default. With `moduleNames: "pgcast
 
 Only static templates qualify. Field types follow pg's default text parsers. A scalar enum column on an included relation uses its verified labels.
 
-A field admits `null` unless its origin and every descendant are ordinary or partitioned tables with the same column marked `NOT NULL`. On Postgres 18 and later, each constraint must also be enforced and validated. Any guard word in the SQL, even in a literal, quoted identifier or comment, makes every field nullable. [Decision 012 lists the guard words.](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#2-nullability)
+A field admits `null` unless its origin and every descendant are ordinary or partitioned tables without rewrite rules, with the same column marked `NOT NULL`. On Postgres 18 and later, each constraint must also be enforced and validated. A guard word or `U&` anywhere in the SQL makes every field nullable, regardless of case, even in a literal, quoted identifier or comment. [Decision 012 lists the guard words.](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#2-nullability)
 
 ## Development
 
