@@ -102,7 +102,7 @@ An agent knows only what its brief says.
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`). Like any method PR, it rewrites § Current workflow of Epic #836 and adds its row to § History, and § Watch is reread against the method (what it shows becomes a comment or a sub-issue there).
 3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
 4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it rather than compacting a long one (one session reached 966K tokens of context, #732).
-5. Within a chapter, the orchestrator brings its hand-over up to date after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`) and lose nothing: no one has to be there to start a new session (#812).
+5. Within a chapter, the orchestrator brings its hand-over up to date after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`, set in `.claude/settings.json`) and lose nothing: no one has to be there to start a new session (#812).
 
 ## Checklist
 
