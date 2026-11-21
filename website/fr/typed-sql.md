@@ -1,5 +1,5 @@
 ---
-english: 97085c507f0d
+english: a90a1b848f1e
 ---
 
 # SQL typé
@@ -20,7 +20,7 @@ Pour générer ou vérifier les types, l’outil lit vos sources avec l’API Ja
 Avec TypeScript 7, installez l’outil dans un dossier à part, avec `typescript@6` et la même version de `@pgcast/pgcast` que votre application :
 
 ```sh
-npm install --save-dev --prefix typegen @pgcast/typegen @pgcast/pgcast pg typescript@6
+npm install --save-dev --prefix typegen @pgcast/typegen @pgcast/pgcast@<your version> pg typescript@6
 ```
 
 Donnez à ce dossier un `tsconfig.json` qui étend celui du projet, `typegen/tsconfig.json` :
@@ -29,11 +29,15 @@ Donnez à ce dossier un `tsconfig.json` qui étend celui du projet, `typegen/tsc
 { "extends": "../tsconfig.json" }
 ```
 
+Si le tsconfig du projet n’a ni `include` ni `files`, comme celui qu’écrit `tsc --init`, ajoutez `"include": ["../**/*"]` : sinon, TypeScript cherche les sources dans `typegen/`.
+
 Lancez l’outil depuis la racine du projet, avec ce fichier pour `--project`. Il parcourt les mêmes fichiers, et TypeScript 7 compile toujours l’application.
 
 ```sh
 typegen/node_modules/.bin/pgcast-typegen --project typegen/tsconfig.json
 ```
+
+Les étapes 3 et 4 lancent alors cette commande, avec `--check` pour l’étape 4. La CI installe le dossier avec `npm ci --prefix typegen`.
 
 ## 2. Nommer la requête {#name-the-query}
 
