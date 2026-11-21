@@ -116,10 +116,11 @@ pgcast's documentation, in English and French: <https://pgcast.dev/>, built from
 The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin/pgcast/issues?q=label%3A%22type%3A%20epic%22) per chapter, one sub-issue per step, each closed by its pull request. Steps come in order of how much of the last mile they cover, their value for their risk, and what they depend on.
 
 1. Done: [Fix what the characterisation found](https://github.com/AlexandreDemartin/pgcast/issues/18): the surprises of 6.6.1, fixed outright, behind an opt-in, or documented.
-2. [Type the schema and the conditions real code writes by hand](https://github.com/AlexandreDemartin/pgcast/issues/19): `--check`, conditions, domains.
-3. [Run on any driver, with savepoints, RLS context and cursors](https://github.com/AlexandreDemartin/pgcast/issues/20).
-4. [Infer the types of raw SQL](https://github.com/AlexandreDemartin/pgcast/issues/21).
+2. Done: [Type the schema and the conditions real code writes by hand](https://github.com/AlexandreDemartin/pgcast/issues/19): `--check`, conditions, domains.
+3. Done: [Run on any driver, with savepoints, RLS context and cursors](https://github.com/AlexandreDemartin/pgcast/issues/20).
+4. Done: [Infer the types of raw SQL](https://github.com/AlexandreDemartin/pgcast/issues/21).
 5. Done: [Give pgcast its own documentation](https://github.com/AlexandreDemartin/pgcast/issues/85), alongside the others: a site in the spirit of Zapatos's docs, then docs that move with the code.
+6. [Ready pgcast for its first users](https://github.com/AlexandreDemartin/pgcast/issues/850).
 
 ## Relationship with Zapatos
 
