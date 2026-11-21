@@ -1,6 +1,10 @@
 # Changelog
 
+All notable changes to `@pgcast/typegen` are documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/). pgcast's own changes are in [its changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md).
+
 ## [Unreleased]
+
+## [0.1.0] - 2026-11-21
 
 ### Added
 
