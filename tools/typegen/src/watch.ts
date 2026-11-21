@@ -25,7 +25,7 @@ export interface Hooks {
 export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks) {
   const key = (file: string) => ts.sys.useCaseSensitiveFileNames ? resolve(file) : resolve(file).toLowerCase();
   const rows = key(path), watches = new Map<string, TS.WatchOfConfigFile<TS.BuilderProgram>>();
-  const cache = new Map<string, { signature: string; described: Described }>();
+  const cache = new Map<string, { signature: string; described: Described }>(), timers = new Set<ReturnType<typeof setTimeout>>();
   let closed = false, queued = false, settled = false, running = Promise.resolve();
   const parented = new WeakSet<TS.SourceFile>();
 
@@ -61,6 +61,13 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
         // The scan reports a tsconfig that cannot be read. The default handler would exit the process.
         onUnRecoverableConfigFileDiagnostic: () => undefined,
         afterProgramCreate: () => { if (created) trigger(); },
+        // A watch's close() leaves its pending update, which would build the program and watch again.
+        setTimeout: (callback: (...args: unknown[]) => void, ms: number, ...args: unknown[]) => {
+          const timer = setTimeout(() => { timers.delete(timer); if (!closed) callback(...args); }, ms);
+          timers.add(timer);
+          return timer;
+        },
+        clearTimeout: (timer: ReturnType<typeof setTimeout>) => { timers.delete(timer); clearTimeout(timer); },
       });
       existing = ts.createWatchProgram(host);
       created = true;
@@ -111,6 +118,7 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
     async close() {
       closed = true;
       for (const watched of watches.values()) watched.close();
+      for (const timer of timers) clearTimeout(timer);
       await running;
     },
   };
