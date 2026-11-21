@@ -91,9 +91,9 @@ it('follows an edit in a referenced project', { timeout: 20_000 }, async () => {
   } finally { await watcher.close(); }
 });
 
-function start(...extra: string[]) {
-  const child = spawn(process.execPath, [cli, '--watch', '--project', 'app/project.json', ...extra], { cwd: dir, env: {
-    ...process.env, WATCH_DB: urlForDatabase(inject('pgcastDb')!.url, db.name), PGPASSWORD: secret } });
+const env = () => ({ ...process.env, WATCH_DB: urlForDatabase(inject('pgcastDb')!.url, db.name), PGPASSWORD: secret });
+function start(project = 'app/project.json') {
+  const child = spawn(process.execPath, [cli, '--watch', '--project', project], { cwd: dir, env: env() });
   children.push(child);
   const seen = { stdout: '', stderr: '', code: undefined as number | null | undefined };
   child.stdout.on('data', chunk => seen.stdout += chunk);
@@ -150,6 +150,17 @@ it('prints no password from a failing watch round', async () => {
   expect(seen.stderr).toContain('ECONNREFUSED');
   expect(seen.stdout + seen.stderr).not.toContain(secret);
   expect(seen.stdout + seen.stderr).not.toContain('%22');
+});
+
+it('closes with exit 0 on SIGINT right after an edit', { timeout: 20_000 }, async () => {
+  const { child, seen } = start();
+  await until(() => rows().includes('"id": number;'), 'the first write');
+  await settle();
+  put('app/app.ts', source('SELECT id, email FROM public.users'));
+  await new Promise(done => setTimeout(done, 50));
+  child.kill('SIGINT');
+  await until(() => seen.code !== undefined, 'the exit');
+  expect(seen).toMatchObject({ code: 0, stderr: '' });
 });
 
 it.each([['--watch', '--check'], ['--check', '--watch'], ['--watch', '--watch'], ['--watch', '--help']])('rejects %s with usage', async (...args) => {
