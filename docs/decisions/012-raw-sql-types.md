@@ -140,7 +140,7 @@ These runs used Postgres 17.3 and `pg` 8.23.1. They are separate from the 59-col
 
 A result column is `NOT NULL` only when both hold; otherwise `T | null`:
 
-- **The origin proves it.** Describe gives the column an origin, and that relation and every relation below it in `pg_inherits` is a table (`relkind` `r`) or a partitioned table (`p`) whose column of the same name is `attnotnull`, and that relation has no rules (`NOT relhasrules`: a rule can rewrite what the query returns). On Postgres 18 the column also needs a validated, enforced `NOT NULL` constraint (`convalidated` and `conenforced`). A view, a materialised view or a foreign table never proves. Replayed: proved for a plain table (`users`) and for `events`, whose partitions are all `r`; not proved under a foreign partition, even two levels down, or below an inheritance parent:
+- **The origin proves it.** Describe gives the column an origin, and that relation and every relation below it in `pg_inherits` is a table (`relkind` `r`) or a partitioned table (`p`) whose column of the same name is `attnotnull`, and none of them has rules (`NOT relhasrules`: a rule can rewrite what the query returns). On Postgres 18 the column also needs a validated, enforced `NOT NULL` constraint (`convalidated` and `conenforced`). A view, a materialised view or a foreign table never proves. Replayed: proved for a plain table (`users`) and for `events`, whose partitions are all `r`; not proved under a foreign partition, even two levels down, or below an inheritance parent:
 
   ```sql
   WITH RECURSIVE tree (relid) AS (
@@ -148,7 +148,10 @@ A result column is `NOT NULL` only when both hold; otherwise `T | null`:
     UNION
     SELECT i.inhrelid FROM pg_inherits i JOIN tree t ON i.inhparent = t.relid
   )
-  SELECT bool_and(c.relkind IN ('r', 'p') AND coalesce(a.attnotnull, false)) AS proved
+  SELECT bool_and(c.relkind IN ('r', 'p') AND NOT c.relhasrules AND coalesce(a.attnotnull, false)
+    AND EXISTS (SELECT FROM pg_constraint k WHERE k.conrelid = a.attrelid AND k.conkey = ARRAY[a.attnum]
+      AND k.contype = 'n' AND k.convalidated AND k.conenforced)  -- Postgres 18 and later only
+  ) AS proved
   FROM tree t
   JOIN pg_class c ON c.oid = t.relid
   LEFT JOIN pg_attribute a ON a.attrelid = t.relid AND NOT a.attisdropped
@@ -156,7 +159,7 @@ A result column is `NOT NULL` only when both hold; otherwise `T | null`:
   ```
 
   On Postgres 14 to 17, `attnotnull` alone proves nothing below a parent: a child can `DROP NOT NULL`, `ALTER TABLE ONLY parent … SET NOT NULL` leaves a child's `NULL` in place, and Postgres does not enforce `NOT NULL` on a foreign table or partition (§ Replays).
-- **No guard word.** The query's text after neutralisation (choice 3) holds none of `LEFT`, `RIGHT`, `FULL`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD`, `NEW`, nor the sequence `U&` (a Unicode escape, `U&"\006fld"`, spells `old` without the word). The match ignores case and skips nothing: literals, quoted identifiers and comments are read too. A word is cut where a Postgres identifier could not go on, `/(?<![a-z_])(left|right|full|rollup|cube|grouping|merge|old|new)(?![a-z0-9_$])/i`. A digit may come before it, since Postgres 14 reads `1LEFT` as `1` then `LEFT` ("Previously, query text like `123abc` would be interpreted as `123` followed by a separate token `abc`", [15.0 release notes](https://www.postgresql.org/docs/release/15.0/); 17.3 refuses it, "trailing junk after numeric literal").
+- **No guard word.** The query's text after neutralisation (choice 3) holds none of `LEFT`, `RIGHT`, `FULL`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD`, `NEW`, nor the sequence `U&` (a Unicode escape, `U&"\006fld"`, spells `old` without the word). The match ignores case and skips nothing: literals, quoted identifiers and comments are read too. A word is cut where a Postgres identifier could not go on, `/U&|(?<![a-z_])(left|right|full|rollup|cube|grouping|merge|old|new)(?![a-z0-9_$])/i`. A digit may come before it, since Postgres 14 reads `1LEFT` as `1` then `LEFT` ("Previously, query text like `123abc` would be interpreted as `123` followed by a separate token `abc`", [15.0 release notes](https://www.postgresql.org/docs/release/15.0/); 17.3 refuses it, "trailing junk after numeric literal").
   - `MERGE`: `WHEN NOT MATCHED BY SOURCE … RETURNING` null-extends the source with no join word (§ Replays).
   - `OLD` and `NEW`: Postgres 18's `RETURNING old.*` and `new.*`, where "typically old values will be `NULL` for an `INSERT`, and new values will be `NULL` for a `DELETE`" ([docs](https://www.postgresql.org/docs/18/dml-returning.html)); `RETURNING WITH (OLD AS o)` still holds the word. Not replayed here (17.3): the first PR replays them in CI's matrix, on Postgres 18.
 
