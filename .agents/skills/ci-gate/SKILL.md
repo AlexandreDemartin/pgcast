@@ -37,7 +37,7 @@ We validate locally while iterating; CI runs **once ready**.
 - **Proofs on a draft**: **CI passed** is green with every job skipped; they are local only.
 - **`[skip ci]` on the last commit**: no check, the merge is blocked; push a commit without it.
 - **A conflicting PR**: GitHub runs no CI on it (CodeQL only). Before review, `gh pr ready` and merge, `gh pr view <n> --json mergeable` says `MERGEABLE` and **CI passed** is in `statusCheckRollup`; a French page's `english:` hash conflicts each time master edits its English page (#43, #183, #341, #442, #460, #483).
-- **A job added to `ci.yml`**: add it to the `needs` of **CI passed** and its result to `RESULTS`, otherwise its failure does not block the merge.
+- **A job added to `ci.yml`**: add it to the `needs` of **CI passed** and its result to `RESULTS`, otherwise its failure does not block the merge. `ci.yml` also holds lists a PR extends and no local check runs: a docs input outside `website/` (a Twoslash `paths` entry) in `changes`, or the break first shows on master's deploy (#729); a file added to a package (`tools/<name>/dist/`) in the exact list of its package-contents step (#830).
 
 ## Rerun
 

@@ -79,4 +79,5 @@ Ritual of a step: skill `run-step`; on one page for a human: [docs/WORKFLOW.md](
 - **Criterion**: a review remark enters a skill if it prevents a real bug that recurs or has cost dearly, and is general and verifiable. A preference of form does not.
 - **Preference**: an automatic check (ESLint, test, `check:agents`); otherwise an existing rule amended; last, a skill line.
 - **As soon as ready**: a method change goes out at once, whether the owner asks for it, the watch of Epic #836 shows it or a tool brings a new feature, so that pgcast uses it now.
+- **A method PR that moves or cuts a rule** names each new home, found there by a grep of the rule's key phrase; `git log -S` each removed heading for why it was added, since a heading a harness reads (`### Compact instructions`) works only where it is; and diffs Epic #836 against the skills it changes, at each place that states the rule (#841, #842, #844).
 - **Batched**: only the agents' "learnings"; they return them apart, the orchestrator writes them in [docs/LEARNINGS.md](../docs/LEARNINGS.md), judged at the end-of-chapter method PR (skill `run-step`).

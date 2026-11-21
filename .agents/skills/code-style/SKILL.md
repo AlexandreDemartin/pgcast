@@ -32,6 +32,7 @@ const
 - Declarations grouped in a single `const`, cascading ternaries aligned vertically.
 - Overloads: an exported `XSignatures` interface, then `export const x: XSignatures = function (…) {…}` (`select`, `deletes`), or the signatures in place on the `const` (`insert`, `eqAny`). A type a public signature names is exported or a module-local alias, never an unexported interface, class or `unique symbol`, which a consumer's re-export cannot name (TS4023, TS2742); each new public function gets its re-export line in `test/types-opt-in/declarations.ts` (#573, #576, #579, #581, #583).
 - Section markers `/* === insert === */`.
+- `String.prototype.replace` with a string pattern replaces the first occurrence only, and a string replacement turns `$$` into `$`: a global regex and a function replacement, in tests and scripts too (CodeQL fails a test on it after green CI, #746, #830).
 - A comment explains a Postgres oddity, with its link (the `ROW()` note of `update`).
 - Postgres vocabulary for names (`isDistinctFrom`, `arrayOverlaps`, `selectExactlyOne`); a reserved name is worked around (`deletes`).
 - Single quotes, semicolons, 2 spaces.

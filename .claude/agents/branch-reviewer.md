@@ -41,7 +41,7 @@ Style is not reviewed: ESLint, `tsc` and `check:agents` cover it.
 ## Scope
 
 - Read-only Bash: `git fetch`, `git diff`, `git log`, `git show`, `git blame`, `gh pr view`, `gh pr diff`, `grep`, `ls`.
-- You may run `npm test` or `npm run test:types` **in a temporary detached worktree** that you then remove, never in the main checkout (its shared cache: skill `run-step` § Ritual rules); name it after the PR and your PID (agents share the scratchpad), and probe databases as agent `builder` § Where to work does.
+- You may run `npm test` or `npm run test:types` **in a temporary detached worktree** that you then remove, never in the main checkout (its shared cache: skill `run-step` § Ritual rules); name it after the PR and your PID (agents share the scratchpad), and probe databases as agent `builder` § Where to work does; its § Known pitfalls hold for your shell too (zsh: `"${ref}:path"`, #741).
 - Untouched code is flagged only if it contradicts the change.
 
 ## Output
