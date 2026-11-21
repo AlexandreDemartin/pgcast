@@ -8,10 +8,6 @@ import { refineOrigins } from './origins';
 
 type Field = ResultField & Pick<FieldDef, 'tableID' | 'columnID'>;
 
-// Connection, transaction, resource, operator intervention, system and internal failures can affect valid SQL.
-// https://www.postgresql.org/docs/current/errcodes-appendix.html
-const operationalState = /^(?:08|24|25|28|2D|3B|40|53|55|57|58|72|F0|HV|XX)/;
-
 export class RejectedParse extends Error {
   constructor(readonly serverError: DatabaseError) { super(serverError.message); }
 }
@@ -76,9 +72,9 @@ export async function describeQuery(client: Client, text: string, schemas?: Comp
         handleReadyForQuery() { this.callback(); },
         // On ErrorResponse pg clears its active query, so ReadyForQuery will not reach this object.
         handleError(error: Error) {
-          // Only statement errors before ParseComplete belong to this text. Resource and protocol failures are fatal.
+          // Only type-resolution errors during Parse can rule out a parameter form.
           const rejected = variant && !parsed && error instanceof DatabaseError && error.code &&
-            /^[0-9A-Z]{5}$/.test(error.code) && !operationalState.test(error.code);
+            ['42883', '42804', '42846', '42725', '42P18'].includes(error.code);
           this.callback(rejected ? new RejectedParse(error) : error);
         },
         callback(error?: Error) {

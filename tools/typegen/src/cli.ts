@@ -42,7 +42,10 @@ async function describeCandidates(client: Client, query: Query, schemas: Complet
       if (!first) first = { text, fields };
       else difference ??= differingField(first.fields, fields);
     } catch (error) {
-      if (!(error instanceof RejectedParse)) throw error;
+      if (!(error instanceof RejectedParse)) {
+        if (query.variants) context += `SQL (${text}): `;
+        throw error;
+      }
       firstError ??= error.serverError;
     }
   }

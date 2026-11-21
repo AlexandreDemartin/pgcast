@@ -25,7 +25,9 @@ The tool compiles the SQL with the application's `@pgcast/pgcast`. Its version a
 
 For `param(value)` and `param(value, true)`, the value and run-time settings can produce either `$n` or `CAST($n AS "json")`. The tool describes every combination of up to four such slots. For five or more, give slots a literal cast or `false` until at most four remain. Other interpolations need a hand-written row.
 
-A form rejected by Parse for its SQL contributes no row. At least one form must parse, and all successful forms must agree on field names, order, types and nullability. The stored text is the first successful form, starting with all slots plain and toggling the first ambiguous slot fastest.
+The tool drops a form only if Parse returns `42883`, `42804`, `42846`, `42725` or `42P18`. This assumes the application and CLI resolve names with the same `search_path` and role and no temporary objects.
+
+At least one form must parse, and all successful forms must agree on field names, order, types and nullability. The stored text is the first successful form, starting with all slots plain and toggling the first ambiguous slot fastest.
 
 Field types follow pg's default text parsers. A scalar enum column on an included relation uses its verified labels.
 
