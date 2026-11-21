@@ -41,6 +41,8 @@ export async function describeQuery(client: Client, text: string, schemas?: Comp
   let succeeded = false;
   try {
     await client.query("SET LOCAL lock_timeout = '1s'");
+    const dateStyle = (await client.query('SHOW DateStyle')).rows[0].DateStyle;
+    const intervalStyle = (await client.query('SHOW IntervalStyle')).rows[0].IntervalStyle;
     const description = await new Promise<Description>((resolve, reject) => {
       let fields: Field[] | null | undefined, parameterOIDs: number[] | undefined;
       let parsed = false;
@@ -87,6 +89,15 @@ export async function describeQuery(client: Client, text: string, schemas?: Comp
         },
       });
     });
+    for (const { dataTypeID } of description.fields ?? []) {
+      // pg-types uses the same date and interval parsers for array elements.
+      if (!dateStyle.startsWith('ISO,') && [1082, 1114, 1184, 1182, 1115, 1185].includes(dataTypeID)) {
+        throw new Error('Set DateStyle to ISO for date and timestamp fields');
+      }
+      if (intervalStyle !== 'postgres' && [1186, 1187].includes(dataTypeID)) {
+        throw new Error('Set IntervalStyle to postgres for interval fields');
+      }
+    }
     if (schemas && description.fields) await refineOrigins(client, text, description.fields, schemas);
     succeeded = true;
     return description;
