@@ -212,7 +212,7 @@ it('names the output file, not the last described query, when an idle connection
   const admin = new Client({ connectionString: env().WATCH_DB });
   await admin.connect();
   try {
-    const pids = async () => (await admin.query('SELECT pid FROM pg_stat_activity WHERE datname = current_database()')).rows.map(row => row.pid as number);
+    const pids = async () => (await admin.query("SELECT pid FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend'")).rows.map(row => row.pid as number);
     const before = await pids();
     const { seen } = start();
     await until(() => rows().includes('"id": number;'), 'the first write');
