@@ -5,13 +5,13 @@ From `@pgcast/typegen` 0.1.0. Ask Postgres for the row type of a [raw SQL query]
 
 ## 1. Install {#install}
 
-In your pgcast project, add the tool as a development dependency once published. Its peers are `@pgcast/pgcast`, `pg` and `typescript`. The core package and the alias you import as `zapatos/db` must have the same version.
+[Install the core](/install#add-the-package), then add the tool. Its peers are `@pgcast/pgcast`, `pg` and `typescript`. Your application's core, its imported alias (`zapatos` or `pgcast`) and the `@pgcast/pgcast` peer resolved by the tool must have the same version.
 
 ```sh
 npm install --save-dev @pgcast/typegen
 ```
 
-Generation and checking use TypeScript's JavaScript parser API. If your compiler falls outside the [supported parser range](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking), run the tool with a compatible TypeScript installation in development or CI. Your application can compile the committed types separately.
+For generation and checking, the tsconfig passed to `--project` (default `tsconfig.json`) must resolve a [supported TypeScript parser](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking). Your application can compile the committed types separately.
 
 ## 2. Name the query {#name-the-query}
 
@@ -25,13 +25,13 @@ Import `Row` from the file the tool will generate. Put a literal query name in t
 
 ## 3. Generate the rows {#generate-the-rows}
 
-From the directory with your pgcast config, connect to the migrated database using the config's `db` or pg's environment variables. Use the same role and `search_path` as the application.
+From the directory with your pgcast config, connect to the migrated database using `db` (omit `query_timeout`) or pg's environment variables. Use the application's role and `search_path`, with no temporary objects, so names resolve to the same objects in both sessions.
 
 ```sh
 npx --no-install pgcast-typegen
 ```
 
-The tool scans `tsconfig.json` (or `--project <tsconfig>`) and asks Postgres to describe the named queries without running them. Commit `<outDir>/zapatos/queries.ts` beside your schema. With `moduleNames: "pgcast"`, import from the generated `pgcast/queries.ts` and use `pgcast/db`.
+The tool scans the project and asks Postgres to describe the named queries without running them. Commit `<outDir>/zapatos/queries.ts` beside your schema. With `moduleNames: "pgcast"`, import from the generated `pgcast/queries.ts` and use `pgcast/db`.
 
 ## 4. Check in CI {#check-in-ci}
 
@@ -48,7 +48,7 @@ Either check leaves the file untouched. A difference or an error exits with code
 
 ## 5. Narrow a column {#narrow-a-column}
 
-The generated `total` is `string | null`: Postgres gives the count no source column. Even for an empty table, `count(*)` returns a number and pg decodes that `bigint` as a string. Use `NotNull` for a field whose **decoded value** you know can never be null.
+The generated `total` is `string | null`: Postgres gives the count no source column. Even for an empty table, `count(*)` returns a number and pg decodes that `bigint` as a string. Use `NotNull` to narrow `total` to `string`.
 
 <CastPanel example="typed_sql_count">
 
@@ -58,7 +58,9 @@ The generated `total` is `string | null`: Postgres gives the count no source col
 
 ## What stays manual
 
-- **Parameters.** Check input values yourself. The tool describes results using pg's default text parsers.
-- **Interpolations.** Use literal identifiers or `param()`. A literal cast or `false` fixes the parameter's SQL. At most four calls without a cast or with `true` may vary between plain and JSON forms. For conditions, variables interpolated directly, helper calls, `raw()` or nested fragments, write the row type yourself.
-- **Nullability.** A field keeps `| null` when the tool cannot prove a non-null table origin. An outer join can loosen every field. Leave the union in place unless your query guarantees the decoded value.
+- **Parameters.** Check input values yourself.
+- **Decoding.** Row types follow pg's default text parsers. If `setTypeParser` changes a field's type, supply your own row type. You also supply the shape inside a JSON value.
+- **Interpolations.** Use literal identifiers or `param()`. Conditions, bare variables, helper calls, `raw()` and nested fragments need a hand-written row type.
+- **Parameter forms.** Up to four `param()` calls without a cast or with `true` can vary between plain and JSON forms. At least one form must parse and all successful forms must agree on the row. Give a parameter a literal cast or `false` to fix its form ([full rules](https://github.com/AlexandreDemartin/pgcast/tree/master/tools/typegen#readme)).
+- **Nullability.** A field keeps `| null` when the tool cannot prove a non-null table origin. An outer join can loosen every field. Leave the union in place unless the decoded field can never be `null`.
 - **Regeneration.** Rerun the command when the SQL or schema changes. The tool has no `--watch` yet.
