@@ -35,7 +35,7 @@ A field admits `null` unless its origin and every descendant are ordinary or par
 
 ## Narrow a nullable column
 
-Use `NotNull` when your SQL guarantees a value. Here `COALESCE` makes `runtime_minutes` a `number` in every result row.
+Use `NotNull` when you know the decoded field is never `null`. A SQL guarantee is not always enough: pg decodes the JSON value `null` to `null`, so `COALESCE(payload, 'null'::jsonb)` can still give `null`. Here `COALESCE` makes `runtime_minutes` a `number` in every result row.
 
 ```ts
 import { param, sql } from 'zapatos/db';
