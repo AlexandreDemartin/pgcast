@@ -1,10 +1,11 @@
 // Copyright (C) 2026 Alexandre Demartin
 
 import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { Client } from 'pg';
 import type ts from 'typescript';
 import { afterEach, beforeEach, expect, inject, it } from 'vitest';
 import { urlForDatabase } from '../../../test/helpers/databases';
@@ -129,6 +130,29 @@ it('prints a rejected query, keeps watching, and recovers once it is fixed', asy
   put('app/app.ts', source('SELECT id, email FROM public.users'));
   await until(() => rows().includes('"email"'), 'the recovery');
   expect(seen.code).toBeUndefined();
+});
+
+it('keeps the rows of a plain run made after a migration', { timeout: 20_000 }, async () => {
+  const admin = new Client({ connectionString: env().WATCH_DB });
+  await admin.connect();
+  try {
+    await admin.query('CREATE TABLE public.migrated (id int NOT NULL)');
+    put('app/app.ts', source('SELECT id FROM public.migrated'));
+    put('app/other.ts', source("SELECT 'a' AS label", 'films'));
+    put('app/project.json', { files: ['app.ts', 'other.ts'], compilerOptions: { types: [] } });
+    start();
+    await until(() => rows().includes('"id": number;') && rows().includes('"label"'), 'the first write');
+    await settle();
+    await admin.query('ALTER TABLE public.migrated ALTER COLUMN id TYPE bigint');
+    expect(spawnSync(process.execPath, [cli, '--project', 'app/project.json'], { cwd: dir, env: env() }).status).toBe(0);
+    expect(rows()).toContain('"id": string;');
+    put('app/other.ts', source("SELECT 'a' AS label, 2 AS rank", 'films'));
+    await until(() => rows().includes('"rank"'), 'the rewrite');
+    expect(rows()).toContain('"id": string;');
+  } finally {
+    await admin.query('DROP TABLE IF EXISTS public.migrated');
+    await admin.end();
+  }
 });
 
 it('closes on SIGINT and SIGTERM with exit 0', async () => {
