@@ -236,6 +236,9 @@ Candidates for a check, a rule or a skill line.
 - #755 — Probe both initial list lengths when a condition chooses its SQL at construction and reads its values at compilation: an `isIn([])` that later gets `db.all` compiles to `((false))` — codex
 - #756 — A documented pass-through type depends on two things a reader configures: the int8 type parser (a count is `"2"` by default, `2` with `Number`) and the outer selector (`selectOne`/`selectExactlyOne`/`selectRows` give pg's parse, `select()` gives JSON); probe each selector under each parser — codex
 - #756 — A keyed count holds only when its subquery returns a row: a grouped count with no matching group gives JSON `null` under the key — codex
+- #811 — A scanner that reads a tsconfig's roots is not the compiler's selection: build the program (no checker) to follow import-only files, skip composite sources replaced by declarations and inherit the extension rules of each TypeScript version — branch-reviewer
+- #811 — Reversing project references makes order-dependent binding decisions visible: a file two projects share keeps each project's verdict, and a disagreement drops the template in either order — codex
+- #811 — Accept a `zapatos/db` / `pgcast/db` import by resolving it under the project's options to an external library, not by its specifier: a `paths` entry can map the name to a local file — branch-reviewer
 
 ## Minors kept
 
@@ -260,4 +263,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #748 — cursor(): a `COMMIT` of yours that fails and is caught inside the loop leaves `T` for a moment, so a `break` can reject with CLOSE's 34000 (1/40 direct, 20/20 through a chunk-splitting proxy); drop CLOSE's 34000 too, or name the case in the `I` row of `website/transaction.md:467` — branch-reviewer
 - #748 — `website/transaction.md:466` (FR `:470`) "a `break` after an error the loop caught ends the loop": add that the transaction stays aborted, so `COMMIT` gets `ROLLBACK` (`PGCAST_DEP003`, or a rejection under `transactionRequiresCommit`), link to `:62` — branch-reviewer
 - #750 — website/select.md:265 (and FR :269): the cast shown, `l as db.SQLFragmentMap`, fits the map forwarder only; for a `db.SQLFragment<R>` forwarder the cast is `l as db.SQLFragment<any>` (TS2352 otherwise) — branch-reviewer
-
+- #811 — `tools/typegen/test/scan.test.ts:217`: in a cyclic composite reference graph, TypeScript 5.9 and 6.0 select neither project's source and 4.1.6 both; the test pins the compiler's choice without asserting the cycle's diagnostic — orchestrator
