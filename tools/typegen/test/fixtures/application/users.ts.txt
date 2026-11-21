@@ -1,0 +1,7 @@
+import * as db from 'zapatos/db';
+import type { Row } from './generated/zapatos/queries';
+
+export const users = db.sql<never, Row<'users'>[]>`SELECT id, settings FROM public.users`;
+const row: Row<'users'> = { id: 1, settings: { enabled: true } };
+// @ts-expect-error pg decodes an int4 as a number
+row.id = 'one';
