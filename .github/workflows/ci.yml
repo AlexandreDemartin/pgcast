@@ -237,6 +237,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             website/package-lock.json
+            tools/typegen/package-lock.json
       - run: npm ci && npm run build
         working-directory: .
       - name: Lint the site's scripts and code too
@@ -244,10 +245,16 @@ jobs:
         run: npm run lint
         working-directory: .
       - run: npm ci
-      - name: Committed docs schema types match schema.sql
+      - name: Build typegen with the same core as the examples
+        working-directory: tools/typegen
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false ../..
+          npm run build
+      - name: Committed docs types match the schema and queries
         # --intent-to-add: a new file the generator writes (a custom type placeholder) shows in the diff too.
         run: |
-          npm run docs:schema
+          npm run docs:schema -- --queries
           git add --intent-to-add zapatos
           git diff --exit-code -- zapatos
       - name: Each deprecation message of src/ has its CHANGELOG.md line, and no entry is written twice

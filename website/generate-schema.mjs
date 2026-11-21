@@ -2,6 +2,8 @@
 // Regenerates zapatos/schema.d.ts from schema.sql with pgcast's own generator, as a user would: loads schema.sql into
 // a temporary database on the server of TEST_DATABASE_URL (the environment, else ../src/.env), runs generate(), then
 // drops the database. Run by `npm run docs:schema`, after the root `npm run build`.
+// With --queries, also regenerate the example rows with the built typegen CLI.
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
@@ -34,6 +36,18 @@ try {
     outDir: fileURLToPath(new URL('.', import.meta.url)),
     constraintNames: true,
   });
+  if (process.argv.includes('--queries')) {
+    execFileSync(process.execPath, ['../../tools/typegen/dist/cli.js', '--project', '../tsconfig.json'], {
+      cwd: new URL('./typegen/', import.meta.url),
+      env: {
+        ...process.env,
+        PGCAST_DOCS_DATABASE: url,
+        // The site installs only the zapatos alias. Resolve its scoped core from typegen's peers.
+        NODE_PATH: fileURLToPath(new URL('../tools/typegen/node_modules', import.meta.url)),
+      },
+      stdio: 'inherit',
+    });
+  }
 } finally {
   // No FORCE: it would terminate a connection of generate()'s pool still closing (pool.end() does not wait for the
   // sockets), and the pool has no 'error' handler. A plain DROP waits up to 5 s for those sessions to go.
