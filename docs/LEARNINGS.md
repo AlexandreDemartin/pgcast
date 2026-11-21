@@ -9,7 +9,10 @@ What the agents returned during the chapter and what waits for its end. Written 
 ## Learnings
 
 Candidates for a check, a rule or a skill line.
+- #853 — `check:agents` cannot read a `§` heading that holds `'` or `-`: a reference heading meant to be cited is plain letters and spaces — builder
+- #853 — a `reference.md` nears the 1,800-word cap fast (`codegen-output` at 1,799): split it before its next addition — builder
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
+- #853 — six skills keep a `## Checklist` (`backward-compat`, `code-style`, `consumer-usage`, `merge-gate`, `review-comments`, `zero-abstraction`) after #853 cut the six others as duplicates: one rule for all, at the next method PR

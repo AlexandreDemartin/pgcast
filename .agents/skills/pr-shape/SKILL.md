@@ -15,7 +15,6 @@ Measured on the 212 Zapatos commits that touch `src/`: a median of 14 lines chan
 - **`src/`: ~100 lines changed at most per PR** (Zapatos's p90). Beyond that, split into independent PRs, each useful on its own.
 - **The whole PR: ~400 hand-written lines**, not counting generated snapshots.
 - **Tests in proportion**: a tests-only PR stays readable in one go (~800 hand-written lines). Beyond that, split by subject (types, injection, a module).
-- Example of the right size: "Add conditions with array operators", 4 lines in `conditions.ts`.
 - Counter-example: PR #5, ~2,900 lines; today split into core, shortcuts, conditions and transaction.
 
 ## Splitting like Zapatos
@@ -31,17 +30,7 @@ Dependent steps make a stack of PRs (§ Stacking); otherwise, separate PRs. The 
 - **Big exploratory work**: first a decision note, then a series of small PRs. Never a giant PR.
 - **The reason in the title** when it is not obvious, short, at the end: "… to count(*) rather than count(alias.*) for performance reasons".
 
-Example for step ③ (foreign keys), each of 1 to 4 with its docs page:
-
-1. "Generate foreign key metadata for each table" (`src/generate`, opt-in)
-2. "Add related() for many-to-one lateral joins" (`src/db`)
-3. "Add relatedMany() for one-to-many lateral joins" (`src/db`)
-4. "Allow lateral results to be referenced in order and groupBy" (`src/db`)
-5. "Document lateral joins on foreign keys" (a how-to that spans the series)
-
 ## Stacking
-
-Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (*Caution*), Graphite, cubic (2026).
 
 - **Stack** the steps of the **same feature** that depend on each other (PR 2 needs PR 1's code), when waiting for the bottom would block: #54, FK metadata → `related()` → `relatedMany()`. **Do not stack** independent changes, like most fixes of Epic #18, nor a PR that stands on its own: separate PRs to `master`.
 - Each layer is a PR the size of a Zapatos commit, readable on its own; never a stack as "an excuse to write one enormous change" (Thoughtworks).
@@ -59,7 +48,6 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 - **Zapatos, not its author**, in issues, PRs and commits ("the Zapatos style"); his name only where credit and the licence call for it (README credit line, docs footer, `LICENCE`, copyright headers, `package.json`) and where a skill cites its sources.
 - API names as they are, without backticks: "Allow db.all as value of noNullUpdateColumns".
 - **The step's issue at the end, always**: `(closes #n)`, as in Zapatos ("Stop generating .eslintrc.json (closes #184)"); the body's `Closes #n` closes the issue on merge. `(addresses #n)` for a PR that does only part of it.
-- Example: "Fix not() so it parenthesises its condition (closes #30)".
 
 ## Branch
 
@@ -80,12 +68,3 @@ Same voice as PR titles.
 - **A fix ahead of its advisory** is neutral from the first commit, in its messages, `CHANGELOG.md`, comments and test values; `git log -p origin/master..HEAD` before the first push (#550, #551).
 - No Conventional Commits, no commits that tick a box: merging the PR closes its issue.
 - No body, except a reason that does not fit on the line; the requested `Co-Authored-By` line always stays.
-- Old format (`test: …`, `fix: …`): history of PRs #1 to #12, not rewritten.
-
-## Checklist
-
-- [ ] A single visible change, described in one sentence
-- [ ] `src/` ≤ ~100 lines, the PR ≤ ~400, otherwise split
-- [ ] A feature's docs page in the same PR
-- [ ] Branch `<type>/<issue>-<slug>`; a bug's failing test before its fix
-- [ ] Title in plain English, no prefix, British spelling, `(closes #n)` at the end

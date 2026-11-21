@@ -62,16 +62,16 @@ description: 'What the skill does. USE FOR: … DO NOT USE FOR: …'
 
 | Agent | Mission |
 |---|---|
-| `builder` | Builds a step (an issue): plan comment, code, draft PR that closes it; or fixes the blocking items of a review, started afresh; on sonnet at `medium` effort, on the session's model at `high` for a `high` step and a round of fixes; hands over past about 80 calls; only the tools it uses |
-| `branch-reviewer` | Senior read-only review at `high` effort with the pgcast lenses, returned in Conventional Comments; `verify` mode |
-| `chores` | Mechanical work on sonnet, with only the tools it uses: merge from below, CI rerun, regeneration; stops at the first choice |
+| `builder` | Builds a step (an issue): plan comment, code, draft PR that closes it; or fixes the blocking items of a review, started afresh; model and effort per Risk (skill `run-step` reference § Models) |
+| `branch-reviewer` | Senior read-only review with the pgcast lenses, in Conventional Comments; `verify` mode |
+| `chores` | Mechanical work: merge from below, CI rerun, regeneration; stops at the first choice |
 
 Ritual of a step: skill `run-step`; on one page for a human: [docs/WORKFLOW.md](../docs/WORKFLOW.md).
 
 ## Method checks
 
 - `guard.mjs` refuses before execution what has no exception: `push --force`, `rebase`, `--amend`, `commit` or `merge` with `--no-edit`, npm publication or release, a pushed tag (a `v*` tag starts `release.yml`), writes to generated files (`db.mjs`, `generate.mjs`, `dist/`) or to a `.env`.
-- `npm run check:agents` (`scripts/check-agents.mjs`, in CI): frontmatter of skills and agents, description length, the size of each (a skill or an agent over 150 lines or 1,800 words fails), cited skills that exist, each module of `src/db` and `src/generate` named in `AGENTS.md` § Architecture (`scripts/check-architecture.mjs`), a `CHANGELOG.md` § Deprecated line, in any release, for each "Set <option>:" message of `src/` (`scripts/check-deprecations.mjs`, also in the `docs` job), no entry written twice in one release (`scripts/check-changelog-entries.mjs`, also in the `docs` job), the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections (`scripts/check-report.mjs`), the tests of the hook, of the release-folder resolver (`scripts/release-folder.test.mjs`) and of these checks.
+- `npm run check:agents` (`scripts/check-agents.mjs`, in CI): skills and agents (frontmatter, description length, size: over 150 lines or 1,800 words fails, cited skills), `AGENTS.md` § Architecture, `CHANGELOG.md` deprecations and duplicate entries, the report's summary, and the tests of the hook and of these checks; each check is a script beside it in `scripts/`.
 
 ## Self-improvement
 
