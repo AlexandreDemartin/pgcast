@@ -12,7 +12,9 @@ import type * as TS from 'typescript';
 import { readConfig } from './config';
 import { describeQuery, RejectedParse } from './describe';
 import { scan } from './scan';
-import { aliases, buildQueries, header, literal, writeQueries } from './write';
+import { textTypes } from './values';
+import type { StoredQuery } from './write';
+import { aliases, buildQueries, header, literal, typedQueries, writeQueries } from './write';
 
 const usage = 'Usage: pgcast-typegen [--check] [--project <tsconfig>]';
 
@@ -71,13 +73,29 @@ let context = '', client: Client | undefined;
 
 function redact(line: string) {
   const strings = [...secrets, client?.password].filter((s): s is string => typeof s === 'string' && s.length > 0);
-  for (const secret of strings.sort((a, b) => b.length - a.length)) line = line.split(secret).join('[redacted]');
-  return line;
+  const spellings = strings.flatMap(s => [s, JSON.stringify(s).slice(1, -1), literal(s).slice(1, -1)]);
+  for (const secret of spellings.sort((a, b) => b.length - a.length)) line = line.split(secret).join('[redacted]');
+  return line.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
 }
 
 function fail(error: unknown): never {
   writeSync(2, redact(context + message(error)) + '\n');
   process.exit(1);
+}
+
+const fieldTypes = new Set(Object.values(textTypes));
+
+function storedType(ts: typeof TS, node: TS.TypeNode) {
+  const type = node.getText();
+  if (fieldTypes.has(type.replace(/ \| null$/, ''))) return type;
+  const members = ts.isUnionTypeNode(node) ? node.types : [node], labels: string[] = [];
+  for (const member of members) {
+    if (!ts.isLiteralTypeNode(member)) return;
+    if (ts.isStringLiteral(member.literal)) labels.push(literal(member.literal.text));
+    else if (labels.length && member === members[members.length - 1] && member.literal.kind === ts.SyntaxKind.NullKeyword) labels.push('null');
+    else return;
+  }
+  return labels.join(' | ');
 }
 
 /** Read only the generated declarations. The committed module is never loaded as JavaScript. */
@@ -95,7 +113,7 @@ function storedQueries(ts: typeof TS, path: string, content: string, dbModule: s
 
   const property = (node: TS.TypeElement): node is TS.PropertySignature & { type: TS.TypeNode } =>
     ts.isPropertySignature(node) && !node.modifiers?.length && !node.questionToken && !('initializer' in node && node.initializer) && !!node.type;
-  const stored = new Map<string, { text: string; row?: string }>();
+  const stored = new Map<string, StoredQuery>();
   for (const entry of queries.members) {
     if (!property(entry) || !ts.isStringLiteral(entry.name)) return invalid;
     const label = `Query ${literal(entry.name.text)}: `;
@@ -104,22 +122,27 @@ function storedQueries(ts: typeof TS, path: string, content: string, dbModule: s
     const [text, row] = entry.type.members;
     if (!text || !property(text) || !ts.isIdentifier(text.name) || text.name.text !== 'text' || entry.type.members.length > 2) return label + invalid;
     if (!ts.isLiteralTypeNode(text.type) || !ts.isStringLiteral(text.type.literal)) return label + 'nonliteral text';
+    let fields: StoredQuery['fields'] = null;
     if (row) {
       if (!property(row) || !ts.isIdentifier(row.name) || row.name.text !== 'row' || !ts.isTypeLiteralNode(row.type)) return label + invalid;
-      const fields = new Set<string>();
+      const names = new Set<string>();
+      fields = [];
       for (const field of row.type.members) {
-        if (!property(field) || !ts.isStringLiteral(field.name) || fields.has(field.name.text) || field.name.text === '__proto__') return label + invalid;
-        fields.add(field.name.text);
+        if (!property(field) || !ts.isStringLiteral(field.name) || names.has(field.name.text) || field.name.text === '__proto__') return label + invalid;
+        const type = storedType(ts, field.type);
+        if (!type) return label + invalid;
+        names.add(field.name.text);
+        fields.push({ name: field.name.text, type });
       }
     }
-    stored.set(entry.name.text, { text: text.type.literal.text, ...(row && { row: row.getText(file) }) });
+    stored.set(entry.name.text, { text: text.type.literal.text, fields });
   }
   return stored;
 }
 
-async function checkQueries(ts: typeof TS, path: string, dbModule: string, queries: Query[], expected?: string) {
+async function checkQueries(ts: typeof TS, path: string, dbModule: 'zapatos/db' | 'pgcast/db', queries: Query[], fresh?: Map<string, StoredQuery>) {
   const scanned = new Map(queries.map(query => [query.name, query])), names = [...scanned.keys()].sort().map(literal).join(', ');
-  const differences: string[] = [];
+  const differences: string[] = [], expected = fresh && buildQueries(dbModule, fresh);
   const bytes = await readFile(path).catch((error: Error & { code?: string }) => {
     if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
   });
@@ -129,8 +152,6 @@ async function checkQueries(ts: typeof TS, path: string, dbModule: string, queri
     const prefix = `Out of date: ${path} - `;
     if (typeof stored === 'string') differences.push(prefix + stored);
     else {
-      const fresh = expected === undefined ? undefined : storedQueries(ts, path, expected, dbModule);
-      if (typeof fresh === 'string') throw new Error(fresh);
       for (const name of [...new Set([...scanned.keys(), ...stored.keys()])].sort()) {
         const before = stored.get(name), query = scanned.get(name), after = fresh?.get(name);
         const label = prefix + `Query ${literal(name)}: `;
@@ -139,10 +160,12 @@ async function checkQueries(ts: typeof TS, path: string, dbModule: string, queri
         else {
           const texts = after ? [after.text] : [query.text, ...(query.variants?.texts ?? [])];
           if (!texts.includes(before.text)) differences.push(label + 'changed text');
-          if (after && before.row !== after.row) differences.push(label + 'changed row');
+          if (after && !isDeepStrictEqual(before.fields, after.fields)) differences.push(label + 'changed row');
         }
       }
-      if (fresh && !differences.length) differences.push(prefix + 'changed module bytes' + (names ? ` (${names})` : ''));
+      if (!differences.length && (fresh || !bytes.equals(Buffer.from(buildQueries(dbModule, stored))))) {
+        differences.push(prefix + 'changed module bytes' + (names ? ` (${names})` : ''));
+      }
     }
   }
   if (differences.length) {
@@ -223,7 +246,7 @@ async function run(args: string[]) {
   if (connectionError) throw connectionError;
   if (process.exitCode) return;
   context = `${path}:1:1 `;
-  if (check) return checkQueries(ts, path, `${moduleNames}/db`, queries, buildQueries(`${moduleNames}/db`, rows));
+  if (check) return checkQueries(ts, path, `${moduleNames}/db`, queries, typedQueries(rows));
   await mkdir(dirname(path), { recursive: true });
   await writeQueries(path, `${moduleNames}/db`, rows);
   console.log(redact(`${path}: ${rows.size} ${rows.size === 1 ? 'query' : 'queries'}`));
