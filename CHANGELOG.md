@@ -12,7 +12,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Fixed
 
-- `likeAny('abc')` and `ilikeAny('abc')` say "write `likeAny([pattern])`", not `[value]`. [#833](https://github.com/AlexandreDemartin/pgcast/issues/833)
+- `likeAny('abc')` and `ilikeAny('abc')` say "for one pattern, write `likeAny([pattern])`" and "for one pattern, write `ilikeAny([pattern])`", not "for one value … `[value]`". [#833](https://github.com/AlexandreDemartin/pgcast/issues/833)
 
 ## [7.1.0] - 2026-11-19
 
