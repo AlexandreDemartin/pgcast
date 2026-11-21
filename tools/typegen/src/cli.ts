@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Alexandre Demartin
 
 import { writeSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -12,14 +12,12 @@ import type * as TS from 'typescript';
 import { readConfig } from './config';
 import { describeQuery, RejectedParse } from './describe';
 import { scan } from './scan';
-import { writeQueries } from './write';
+import { aliases, buildQueries, header, literal, writeQueries } from './write';
 
-const usage = 'Usage: pgcast-typegen [--project <tsconfig>]';
+const usage = 'Usage: pgcast-typegen [--check] [--project <tsconfig>]';
 
-function scanProject(project: string, path: string) {
-  let ts: typeof TS;
-  try { ts = createRequire(project)('typescript'); } catch { throw new Error('Cannot load typescript from the project'); }
-  return scan(ts, project, path);
+function projectCompiler(project: string): typeof TS {
+  try { return createRequire(project)('typescript'); } catch { throw new Error('Cannot load typescript from the project'); }
 }
 
 type Query = ReturnType<typeof scan>['queries'][number];
@@ -82,35 +80,124 @@ function fail(error: unknown): never {
   process.exit(1);
 }
 
+/** Read only the generated declarations. The committed module is never loaded as JavaScript. */
+function storedQueries(ts: typeof TS, path: string, content: string, dbModule: string) {
+  const file = ts.createSourceFile(path, content.replace(/\r\n/g, '\n'), ts.ScriptTarget.Latest, true);
+  if ((file as TS.SourceFile & { parseDiagnostics: readonly TS.Diagnostic[] }).parseDiagnostics.length) return 'invalid syntax';
+  const queries = file.statements.find(ts.isInterfaceDeclaration), invalid = 'invalid generated module';
+  if (!queries || queries.name.text !== 'Queries' || queries.modifiers?.length !== 1 ||
+      queries.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword || queries.typeParameters || queries.heritageClauses ||
+      !file.text.startsWith(header) || file.text.slice(queries.end).trim() !== aliases) return invalid;
+  const preamble = file.text.slice(header.length, queries.getStart(file)).trim()
+    .replace(/^\/\/\/ <reference types="node" \/>/, '').trim();
+  if (preamble && !['JSONValue', 'PostgresInterval', 'JSONValue, PostgresInterval'].some(names =>
+    preamble === `import type { ${names} } from "${dbModule}";`)) return invalid;
+
+  const property = (node: TS.TypeElement): node is TS.PropertySignature & { type: TS.TypeNode } =>
+    ts.isPropertySignature(node) && !node.modifiers?.length && !node.questionToken && !('initializer' in node && node.initializer) && !!node.type;
+  const stored = new Map<string, { text: string; row?: string }>();
+  for (const entry of queries.members) {
+    if (!property(entry) || !ts.isStringLiteral(entry.name)) return invalid;
+    const label = `Query ${literal(entry.name.text)}: `;
+    if (stored.has(entry.name.text)) return label + 'duplicate name';
+    if (!ts.isTypeLiteralNode(entry.type)) return label + invalid;
+    const [text, row] = entry.type.members;
+    if (!text || !property(text) || !ts.isIdentifier(text.name) || text.name.text !== 'text' || entry.type.members.length > 2) return label + invalid;
+    if (!ts.isLiteralTypeNode(text.type) || !ts.isStringLiteral(text.type.literal)) return label + 'nonliteral text';
+    if (row) {
+      if (!property(row) || !ts.isIdentifier(row.name) || row.name.text !== 'row' || !ts.isTypeLiteralNode(row.type)) return label + invalid;
+      const fields = new Set<string>();
+      for (const field of row.type.members) {
+        if (!property(field) || !ts.isStringLiteral(field.name) || fields.has(field.name.text) || field.name.text === '__proto__') return label + invalid;
+        fields.add(field.name.text);
+      }
+    }
+    stored.set(entry.name.text, { text: text.type.literal.text, ...(row && { row: row.getText(file) }) });
+  }
+  return stored;
+}
+
+async function checkQueries(ts: typeof TS, path: string, dbModule: string, queries: Query[], expected?: string) {
+  const scanned = new Map(queries.map(query => [query.name, query])), names = [...scanned.keys()].sort().map(literal).join(', ');
+  const differences: string[] = [];
+  const bytes = await readFile(path).catch((error: Error & { code?: string }) => {
+    if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+  });
+  if (!bytes) differences.push(`Missing: ${path}` + (names ? ' - ' + names : ''));
+  else if (expected === undefined || !bytes.equals(Buffer.from(expected))) {
+    const stored = storedQueries(ts, path, bytes.toString('utf8'), dbModule);
+    const prefix = `Out of date: ${path} - `;
+    if (typeof stored === 'string') differences.push(prefix + stored);
+    else {
+      const fresh = expected === undefined ? undefined : storedQueries(ts, path, expected, dbModule);
+      if (typeof fresh === 'string') throw new Error(fresh);
+      for (const name of [...new Set([...scanned.keys(), ...stored.keys()])].sort()) {
+        const before = stored.get(name), query = scanned.get(name), after = fresh?.get(name);
+        const label = prefix + `Query ${literal(name)}: `;
+        if (!before) differences.push(label + 'new query');
+        else if (!query) differences.push(label + 'stale entry (no source query)');
+        else {
+          const texts = after ? [after.text] : [query.text, ...(query.variants?.texts ?? [])];
+          if (!texts.includes(before.text)) differences.push(label + 'changed text');
+          if (after && before.row !== after.row) differences.push(label + 'changed row');
+        }
+      }
+      if (fresh && !differences.length) differences.push(prefix + 'changed module bytes' + (names ? ` (${names})` : ''));
+    }
+  }
+  if (differences.length) {
+    for (const line of [...differences, 'Run the generator without --check to write it.']) console.log(redact(line));
+    process.exitCode = 1;
+  } else {
+    const offline = expected === undefined ? ' Rows were not checked against a database (no db in the config).' : '';
+    console.log(redact(`The generated files in ${dirname(path)} are up to date.` + offline));
+  }
+}
+
 async function run(args: string[]) {
   if (args.length === 1 && args[0] === '--help') return console.log(redact(usage));
+  const check = args[0] === '--check' || args[args.length - 1] === '--check';
+  if (check) args = args[0] === '--check' ? args.slice(1) : args.slice(0, -1);
   if (args.length && !(args.length === 2 && args[0] === '--project' && args[1] && !args[1].startsWith('-'))) {
     throw new Error(usage);
   }
   const project = resolve(args[1] ?? './tsconfig.json'), { config, problem, note } = readConfig('.');
   const db = config.db, moduleNames = config.moduleNames ?? 'zapatos';
-  if (db != null && typeof db !== 'object') throw new Error(problem ?? 'db must be a Postgres connection config');
+  const offline = check && !('db' in config);
+  if ((check && !offline && (!db || Array.isArray(db))) || (db != null && typeof db !== 'object')) {
+    throw new Error(problem ?? 'db must be a Postgres connection config');
+  }
   const uri = db?.connectionString;
   secrets.push(uri, db?.password);
   if (typeof uri === 'string') {
     // Keep the original spelling as well as pg's decoded password, including for socket URIs.
     secrets.push(uri.match(/^[^:]+:\/\/[^/@?#:]*:([^/@?#]*)@/)?.[1], uri.match(/[?&]password=([^&#]*)/)?.[1]);
   }
-  try { client = new Client(db); } catch { throw new Error(problem ?? 'Invalid Postgres connection settings'); }
+  if (!offline) {
+    try { client = new Client(db); } catch { throw new Error(problem ?? 'Invalid Postgres connection settings'); }
+  }
   if (problem) throw new Error(problem);
-  if (note) console.error(redact(note));
+  if (note && !check) console.error(redact(note));
   if (moduleNames !== 'zapatos' && moduleNames !== 'pgcast') throw new Error("moduleNames must be 'zapatos' or 'pgcast'");
   if (typeof config.outDir !== 'string') throw new Error('outDir must be a directory name');
   const path = resolve(config.outDir, moduleNames, 'queries.ts');
-  const { connectionParameters } = client as Client & { connectionParameters: { query_timeout: number | false } };
-  if ((db && 'query_timeout' in db) || connectionParameters.query_timeout) throw new Error('Remove query_timeout from db before describing statements');
+  if (client) {
+    const { connectionParameters } = client as Client & { connectionParameters: { query_timeout: number | false } };
+    if ((db && 'query_timeout' in db) || connectionParameters.query_timeout) throw new Error('Remove query_timeout from db before describing statements');
+  }
 
   context = `${project}:1:1 `;
-  const { queries, diagnostics } = scanProject(project, path);
+  const ts = projectCompiler(project), result = scan(ts, project, path), queries = result.queries;
+  // checkQueries reports invalid output with the regeneration advice, even when the project imports it.
+  const diagnostics = result.diagnostics.filter(d => !check || resolve(d.file) !== path);
   if (diagnostics.length) {
     for (const d of diagnostics) console.error(redact(`${d.file}:${d.line}:${d.column} ${d.message}`));
     process.exitCode = 1;
     return;
+  }
+  if (!client) {
+    context = `${path}:1:1 `;
+    return checkQueries(ts, path, `${moduleNames}/db`, queries);
   }
   if (queries.length) context = site(queries[0]) + ' ';
   let connectionError: Error | undefined;
@@ -136,6 +223,7 @@ async function run(args: string[]) {
   if (connectionError) throw connectionError;
   if (process.exitCode) return;
   context = `${path}:1:1 `;
+  if (check) return checkQueries(ts, path, `${moduleNames}/db`, queries, buildQueries(`${moduleNames}/db`, rows));
   await mkdir(dirname(path), { recursive: true });
   await writeQueries(path, `${moduleNames}/db`, rows);
   console.log(redact(`${path}: ${rows.size} ${rows.size === 1 ? 'query' : 'queries'}`));
