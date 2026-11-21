@@ -33,7 +33,7 @@ A typed placeholder for run-time content (an interpolation, a condition) proves 
 
 A `NOT NULL` proof from the catalog:
 
-- withdraws for an inheritance child (`ALTER TABLE child … DROP NOT NULL`, `ALTER TABLE ONLY parent … SET NOT NULL`), a foreign table or a partition, where Postgres 14 to 17 do not enforce it, and for a `RETURNING` a rewrite rule supplies (`relhasrules` anywhere in the origin's tree); Postgres refuses most other states that would break a name-matched `pg_inherits` proof (#746, #815);
+- withdraws unless every table of the origin's inheritance tree holds it (`ALTER TABLE child … DROP NOT NULL`, `ALTER TABLE ONLY parent … SET NOT NULL` on Postgres 14 to 17), for a foreign table or foreign partition, where `NOT NULL` is not enforced, and for a `RETURNING` a rewrite rule supplies (`relhasrules` anywhere in the origin's tree); Postgres refuses most other states that would break a name-matched `pg_inherits` proof (#746, #815);
 - holds no outer join with no keyword: `MERGE … RETURNING` with `WHEN NOT MATCHED BY SOURCE` null-extends the source, and Describe still gives its column's origin (#746);
 - is read inside Describe's transaction while Parse holds its locks, at `READ COMMITTED`: a later lookup can read a renamed column by its attribute number, and a `REPEATABLE READ` snapshot predates Parse's lock wait (#815);
 - reads a domain from the origin column: RowDescription gives the base type (`citext`) (#746);
