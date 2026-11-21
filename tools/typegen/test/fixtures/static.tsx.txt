@@ -1,0 +1,7 @@
+import type { Row } from '../generated/queries.js';
+import * as db from 'pgcast/db';
+
+throw new Error('The scanner must never execute this file');
+const view = <div>sql</div>;
+export const films =
+  db.sql<never, NotNull<Row<'films'>[], 'id'> | null>`SELECT '\x4cEFT', '\`', '\${', ' '`;

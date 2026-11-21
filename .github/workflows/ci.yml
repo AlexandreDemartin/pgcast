@@ -435,12 +435,21 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run test:types
+      - name: Scan with TypeScript 4.1.6 and 6.0.3
+        if: matrix.postgres == 16 && matrix.pg == 'lockfile'
+        run: |
+          cache="$GITHUB_WORKSPACE/node_modules/.cache"
+          npm install --prefix "$cache/pgcast-ts60" --no-save --package-lock=false typescript@6.0.3
+          for version in 41 60; do
+            PGCAST_TEST_TYPESCRIPT="$cache/pgcast-ts$version/node_modules/typescript" npm test -- test/scan.test.ts
+          done
       - name: Check the exact package contents
         run: |
           npm pack --dry-run --json --ignore-scripts | node -e "
             const paths = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map(f => f.path).sort();
             require('assert/strict').deepEqual(paths, [
-              'CHANGELOG.md', 'LICENCE', 'README.md', 'dist/describe.js', 'dist/values.js', 'dist/write.js', 'package.json',
+              'CHANGELOG.md', 'LICENCE', 'README.md', 'dist/bindings.js', 'dist/describe.js', 'dist/scan.js',
+              'dist/values.js', 'dist/write.js', 'package.json',
             ]);"
 
   ci-passed:
