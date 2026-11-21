@@ -1,6 +1,5 @@
 // Copyright (C) 2026 Alexandre Demartin
 
-import { createRequire } from 'node:module';
 import { dirname, resolve, sep } from 'node:path';
 import type * as TS from 'typescript';
 import { bindings } from './bindings';
@@ -41,7 +40,7 @@ interface Template {
 }
 
 /** Find named Row templates using the application's compiler and its project's source files. */
-export function scan(ts: typeof TS, project: string, rowsFile: string, fromProject = createRequire(resolve(project))) {
+export function scan(ts: typeof TS, project: string, rowsFile: string) {
   const projects = new Set<string>(), diagnostics: Diagnostic[] = [], templates = new Map<string, Template>();
   const key = (path: string) => ts.sys.useCaseSensitiveFileNames ? resolve(path) : resolve(path).toLowerCase();
   const rows = key(rowsFile), root = resolve(project), host = {
@@ -88,12 +87,12 @@ export function scan(ts: typeof TS, project: string, rowsFile: string, fromProje
     if (!program) return;
     for (const error of program.getOptionsDiagnostics()) report(error, file);
     for (const source of program.getSourceFiles()) {
-      if (!source.isDeclarationFile && !program.isSourceFileFromExternalLibrary(source)) parse(source.fileName, () => readFile(source, program));
+      if (!source.isDeclarationFile && !program.isSourceFileFromExternalLibrary(source)) parse(source.fileName, () => readFile(source, program, file));
     }
     for (const ref of program.getResolvedProjectReferences() ?? []) if (ref) readProject(ref.sourceFile.fileName);
   }
 
-  function readFile(source: TS.SourceFile, program: TS.Program) {
+  function readFile(source: TS.SourceFile, program: TS.Program, projectFile: string) {
     const file = source.fileName, options = program.getCompilerOptions(), syntax = program.getSyntacticDiagnostics(source)[0];
     const bound = bindings(ts, source, options, host), row = bound.imported('Row');
     // On 4.1 an explicit relative .ts suffix needs a second resolution without the suffix.
@@ -118,7 +117,7 @@ export function scan(ts: typeof TS, project: string, rowsFile: string, fromProje
         else if (!module) current.error = `Query ${label} has an unsupported tag: ${tag.getText(source)}.`;
         else {
           try {
-            current.text = neutralise(ts, source, node.template, fromProject, module, callee => bound.matches(callee, 'param'));
+            current.text = neutralise(ts, source, node.template, projectFile, module, callee => bound.matches(callee, 'param'));
           } catch (error) { current.error = `Query ${label}: ${(error as Error).message}`; }
         }
       }

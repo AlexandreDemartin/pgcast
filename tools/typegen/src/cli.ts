@@ -15,10 +15,9 @@ import { writeQueries } from './write';
 const usage = 'Usage: pgcast-typegen [--project <tsconfig>]';
 
 function scanProject(project: string, path: string) {
-  const fromProject = createRequire(project);
   let ts: typeof TS;
-  try { ts = fromProject('typescript'); } catch { throw new Error('Cannot load typescript from the project'); }
-  return scan(ts, project, path, fromProject);
+  try { ts = createRequire(project)('typescript'); } catch { throw new Error('Cannot load typescript from the project'); }
+  return scan(ts, project, path);
 }
 
 function site(query: ReturnType<typeof scan>['queries'][number]) {
