@@ -104,6 +104,10 @@ function start(project = 'app/project.json') {
 }
 const rows = () => { try { return readFileSync(out(), 'utf8'); } catch { return ''; } };
 
+it('gives the spawned CLI the compiler the suite loads', () => {
+  expect(require(join(dir, 'app/node_modules/typescript')).version).toBe(compiler.version);
+});
+
 it('rewrites the file on an edit and writes nothing when its bytes stay the same', { timeout: 20_000 }, async () => {
   const { child, seen } = start();
   await until(() => rows().includes('"id": number;'), 'the first write');
