@@ -8,6 +8,7 @@
 // Retries are provoked deterministically: the callback raises the SQLSTATE
 // itself on its first attempts (a DO block with RAISE ... USING ERRCODE).
 
+import net from 'node:net';
 import pg from 'pg';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
@@ -2223,6 +2224,80 @@ describe('cursor()', () => {
       expect(await batches.return()).toEqual({ value: undefined, done: true });
     } finally { client.release(); }
     expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
+  /**
+   * A pool whose connections go through a proxy that writes each server message as a chunk of its own, 30 ms after an
+   * ErrorResponse: pg rejects the query at the ErrorResponse and reads the status at the ReadyForQuery, a chunk later.
+   * It reads the messages as type, length and body, so the server must answer without TLS, as in CI.
+   */
+  const splitting = async (run: (pool: pg.Pool) => Promise<void>) => {
+    const sockets = new Set<net.Socket>();
+    const url = new URL(t.pool.options.connectionString!), upstream = { host: url.hostname, port: Number(url.port || 5432) };
+    const proxy = net.createServer(client => {
+      const server = net.connect(upstream);
+      for (const s of [client, server]) { sockets.add(s); s.on('error', () => s.destroy()); s.on('close', () => { sockets.delete(s); client.destroy(); server.destroy(); }); }
+      client.pipe(server);
+      let buffered = Buffer.alloc(0), written = Promise.resolve();
+      server.on('data', data => {
+        buffered = Buffer.concat([buffered, data]);
+        while (buffered.length >= 5 && buffered.length >= 1 + buffered.readUInt32BE(1)) {
+          const message = buffered.subarray(0, 1 + buffered.readUInt32BE(1));
+          buffered = buffered.subarray(message.length);
+          written = written.then(async () => {
+            client.write(message);
+            if (message[0] === 0x45) await new Promise(resolve => setTimeout(resolve, 30));  // 'E', an ErrorResponse
+          });
+        }
+      });
+    });
+    await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve));
+    url.hostname = '127.0.0.1';
+    url.port = String((proxy.address() as net.AddressInfo).port);
+    const pool = new pg.Pool({ connectionString: url.href });
+    try { await run(pool); }
+    finally {
+      await pool.end();
+      for (const s of sockets) s.destroy();
+      await new Promise(resolve => proxy.close(resolve));
+    }
+  };
+
+  // pg rejects your COMMIT at its ErrorResponse, while the status still reads T: CLOSE goes out after the COMMIT's
+  // ReadyForQuery, outside any transaction block, and Postgres refuses it with 34000, as the cursor went with the COMMIT
+  it('drops the 34000 that Postgres gives a CLOSE after a COMMIT of yours that failed, so a break after it ends the loop', async () => {
+    await splitting(async pool => {
+      const texts = sent();
+      let committed: unknown;
+      await db.readCommitted(pool, async c => {
+        await sql`CREATE TEMPORARY TABLE ${'once'} (${'id'} int UNIQUE DEFERRABLE INITIALLY DEFERRED)`.run(c);
+        await sql`INSERT INTO ${'once'} VALUES (1), (1)`.run(c);
+        for await (const _ of db.cursor(c, series(3), { batchSize: 1 })) {
+          committed = await sql`COMMIT`.run(c).catch((e: unknown) => e);
+          break;
+        }
+      });
+      expect(codeOf(committed)).toBe('23505');
+      expect(texts).toEqual(['START TRANSACTION', 'CREATE TEMPORARY', 'INSERT INTO', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'COMMIT', 'CLOSE pgcast_cursor_1', 'COMMIT']);
+    });
+  });
+
+  // its CLOSE goes out in the next attempt's transaction block, which the 34000 aborts: dropped, it would leave the
+  // attempt to end in a COMMIT that Postgres answers with ROLLBACK, and the cause unknown
+  it('rejects with the 34000 of a CLOSE inside a transaction block: a generator read in one attempt and return()ed in the next', async () => {
+    listen();
+    const texts = sent();
+    let stale: AsyncGenerator<G[], void, undefined> | undefined;
+    const err = await db.serializable(t.pool, async c => {
+      if (!stale) {
+        stale = db.cursor(c, series(3), { batchSize: 1 });
+        await stale.next();
+        await raise(c, '40001');
+      }
+      await stale.return();
+    }).catch((e: unknown) => e);
+    expect(codeOf(err)).toBe('34000');
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'ROLLBACK', 'START TRANSACTION', 'CLOSE pgcast_cursor_1', 'ROLLBACK']);
   });
 
   it('runs on a pg.PoolClient after a BEGIN of yours, which carries no mark, and refuses a generator iterated after transaction()', async () => {
