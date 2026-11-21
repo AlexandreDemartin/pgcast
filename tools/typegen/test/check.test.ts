@@ -142,6 +142,21 @@ it('regenerates a queries.ts with conflict markers, then passes --check', () => 
   check([current(true)]);
 });
 
+// On a case-sensitive file system, ./ZAPATOS/queries names another file, which the tool does not write.
+const caseSensitive: boolean = require(process.env.PGCAST_TEST_TYPESCRIPT || 'typescript').sys.useCaseSensitiveFileNames;
+it.skipIf(caseSensitive)('regenerates a queries.ts with conflict markers imported by a case variant of its path', () => {
+  source([['people', sql]], '.', 'ZAPATOS');
+  config(live);
+  const good = readFileSync(path, 'utf8');
+  writeFileSync(path, '<<<<<<< HEAD\n' + good + '=======\n' + good + '>>>>>>> feature\n');
+  check(['Out of date: ' + path + ' - invalid syntax', closing]);
+  const result = run();
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(0);
+  expect(readFileSync(path, 'utf8')).toBe(good);
+  check([current(true)]);
+});
+
 it('checks changed module bytes online', () => {
   config(live);
   writeFileSync(path, readFileSync(path, 'utf8').trimEnd());
