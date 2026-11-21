@@ -19,14 +19,14 @@ export interface Hooks {
 
 /**
  * Scan the project now and after each change of its sources, then describe the queries whose text changed
- * and write their module. A program per tsconfig, the root and each project reference, is kept between rounds.
+ * and write their module. When the module differs from the one the last round left, every query is described again. A program per tsconfig, the root and each project reference, is kept between rounds.
  * Rounds run one at a time. A failing round prints its errors and keeps watching.
  */
 export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks) {
   const key = (file: string) => ts.sys.useCaseSensitiveFileNames ? resolve(file) : resolve(file).toLowerCase();
   const rows = key(path), watches = new Map<string, TS.WatchOfConfigFile<TS.BuilderProgram>>();
   const cache = new Map<string, { signature: string; described: Described }>(), timers = new Set<ReturnType<typeof setTimeout>>();
-  let closed = false, queued = false, settled = false, running = Promise.resolve();
+  let closed = false, queued = false, settled = false, running = Promise.resolve(), left: string | undefined;
   const parented = new WeakSet<TS.SourceFile>();
 
   function trigger() {
@@ -86,6 +86,8 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
         settled = false;
         return;
       }
+      // Another run, such as a plain one after a migration, wrote rows the cache may not match.
+      if (ts.sys.readFile(path) !== left) cache.clear();
       const described = new Map<string, Described>();
       let failed = false;
       for (const query of queries) {
@@ -104,6 +106,7 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
       for (const name of cache.keys()) if (!queries.some(query => query.name === name)) cache.delete(name);
       if (failed || closed) { settled = false; return; }
       const written = await hooks.write(described);
+      left = ts.sys.readFile(path);
       if (written || !settled) hooks.log(`${path}: ${described.size} ${described.size === 1 ? 'query' : 'queries'}`);
       settled = true;
     } catch (error) {
