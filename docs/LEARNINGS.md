@@ -242,6 +242,9 @@ Candidates for a check, a rule or a skill line.
 - #814 — On pg 8.6.0 and 8.23.1, awaiting `end()` after a rejected `connect()` can never settle (invalid port): a CLI that awaits it exits 0 in silence; end the client only after a connection succeeded — codex
 - #814 — Check a client option as the driver parses it, not on the URL: pg reads `query_timeout` from a Unix-socket URI (`postgres://user@/db?host=/tmp&...`) that `URL.searchParams` on the configured string misses — branch-reviewer
 - #814 — A CLI's credential guard is one redactor on every printed line plus `uncaughtException` / `unhandledRejection` handlers installed before connecting: pg throws some errors from socket callbacks, outside any `try` — branch-reviewer
+- #815 — A nullability guard that reads words in the text misses a Unicode-escaped identifier (`U&"\006fld"` is `old`): treat `U&` itself as a guard — branch-reviewer
+- #815 — A table's `NOT NULL` does not hold for a `RETURNING` a rewrite rule supplies (`DO INSTEAD … RETURNING`): `relhasrules` anywhere in the origin's tree withdraws the proof — branch-reviewer
+- #815 — Prove origins inside Describe's transaction while Parse holds its locks, at `READ COMMITTED`: a later lookup can read a renamed column by its attribute number, and a `REPEATABLE READ` snapshot predates Parse's lock wait — branch-reviewer
 
 ## Minors kept
 
@@ -268,3 +271,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #750 — website/select.md:265 (and FR :269): the cast shown, `l as db.SQLFragmentMap`, fits the map forwarder only; for a `db.SQLFragment<R>` forwarder the cast is `l as db.SQLFragment<any>` (TS2352 otherwise) — branch-reviewer
 - #811 — `tools/typegen/test/scan.test.ts:217`: in a cyclic composite reference graph, TypeScript 5.9 and 6.0 select neither project's source and 4.1.6 both; the test pins the compiler's choice without asserting the cycle's diagnostic — orchestrator
 - #814 — `tools/typegen/src/cli.ts:63`: when `new Client(db)` throws (an invalid `db.sslnegotiation`), the missing-variable diagnostic is printed before the redactor knows the parsed password; only a variable whose name equals the password shows it — orchestrator
+
