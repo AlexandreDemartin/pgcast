@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+
+- First release of [`@pgcast/typegen`](https://github.com/AlexandreDemartin/pgcast/blob/master/tools/typegen/CHANGELOG.md), at 0.1.0: row types for named `sql` queries, described by Postgres ([Typed SQL](https://pgcast.dev/typed-sql)).
+
 ## [7.1.0] - 2026-11-19
 
 ### Added
