@@ -258,6 +258,13 @@ Candidates for a check, a rule or a skill line.
 - #826 — A test that expects a word in a message breaks where that word is the database password and the CLI redacts it; CI's credentials are `postgres` — orchestrator
 - #825 — A docs example can compile and run with a stale row type: only regenerating it against Postgres in the docs job shows the changed field — codex
 - #825 — A guide on generated types must separate one row's fields from the result shape (`Row` or `Row[]`) and the caller's decoders, which the tool cannot see — branch-reviewer
+- #830 — TypeScript's watch `close()` does not clear its pending 250 ms update timer (4.1 to 6): a watcher closed with an edit pending rebuilds and reopens its file watchers, so a signal test must send the signal right after an edit — branch-reviewer
+- #830 — a cache of described rows is stale as soon as another process writes the same output file (a plain run after a migration): invalidate on the file's bytes, not on the query text alone — branch-reviewer
+- #830 — on macOS, an edit made within about a second of TypeScript's watchers starting goes unseen: watch tests settle before editing — builder
+- #830 — the TypeScript watch host exits the process on a deleted or unreadable tsconfig unless `onUnRecoverableConfigFileDiagnostic` is overridden, and a no-op override then throws from its timer — builder
+- #830 — after a tsconfig is removed, TypeScript's watch keeps its config watcher open: once the throw from its update timer is caught, the same watch reloads by itself when the file comes back — builder
+- #830 — an end-to-end test that spawns a watcher sets its own timeout: Vitest's default 5 s sat within 0.3–1 s of these tests' normal duration on CI — branch-reviewer
+- #830 — a PR that adds a file under a tool's `dist/` also updates the exact list of its package-contents check in `ci.yml`; a draft's local checks do not run that step — branch-reviewer
 
 ## Minors kept
 
@@ -284,4 +291,8 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #750 — website/select.md:265 (and FR :269): the cast shown, `l as db.SQLFragmentMap`, fits the map forwarder only; for a `db.SQLFragment<R>` forwarder the cast is `l as db.SQLFragment<any>` (TS2352 otherwise) — branch-reviewer
 - #811 — `tools/typegen/test/scan.test.ts:217`: in a cyclic composite reference graph, TypeScript 5.9 and 6.0 select neither project's source and 4.1.6 both; the test pins the compiler's choice without asserting the cycle's diagnostic — orchestrator
 - #814 — `tools/typegen/src/cli.ts:63`: when `new Client(db)` throws (an invalid `db.sslnegotiation`), the missing-variable diagnostic is printed before the redactor knows the parsed password; only a variable whose name equals the password shows it — orchestrator
-
+- #830 — defect: `tools/typegen/src/cli.ts:190`: `context` keeps the last described query after a round, so an idle connection loss (57P01) names an unrelated query; reset it to the output file when a round ends — branch-reviewer
+- #830 — form: CI's TypeScript 4.1/6.0 loop runs `test/watch.test.ts`, but only its two in-process tests use that compiler; the end-to-end ones link the dev 5.9.3 — branch-reviewer
+- #830 — form: a watch round that writes nothing prints nothing, where #829 asked for one line per round (Decided alone); say it in the README — branch-reviewer
+- #830 — form: `tools/typegen/src/watch.ts:63`: a tsconfig read by two watch programs queues two rounds, so its diagnostic prints twice — branch-reviewer
+- #830 — form: a removed referenced tsconfig prints its `File … not found.` twice, once per diagnostic source of the watch program (with nitpick 9) — builder
