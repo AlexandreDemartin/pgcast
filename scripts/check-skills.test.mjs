@@ -114,6 +114,8 @@ test('fails on a section the old reading let through', () => {
   assert.deepEqual(sectionsOf(`Read ${link} § iterable.`), missing('iterable'));
   assert.deepEqual(sectionsOf('Read `reference.md` § Lookup.'), missing('Lookup'));
   assert.deepEqual(sectionsOf('Read reference.md § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('Read [the reference](reference.md) § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('Read [`reference.md`](reference.md) § Lookup.'), missing('Lookup'));
   assert.deepEqual(sectionsOf(`Read ${link} § Step 3.`), missing('Step 3'));
   assert.deepEqual(sectionsOf(`Read ${link} § Step 2b.`), missing('Step 2b'));
 });
