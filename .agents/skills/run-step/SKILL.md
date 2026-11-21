@@ -23,6 +23,7 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 ## Finding the step
 
 - Open Epics: `gh issue list --repo AlexandreDemartin/pgcast --label 'type: epic' --state open`. The workflow Epic (#836) is not a chapter and stays open: skip it, the next step never comes from it.
+- Before it: if `docs/LEARNINGS.md` § Learnings passes about 60 lines (`awk '/^## Learnings/{f=1;next}/^## /{f=0}f' docs/LEARNINGS.md | wc -l`), the next step is a method PR on them, whatever the chapter: § End of chapter 2, without the Epic's closing.
 - The next one: the first open sub-issue of the first open Epic:
   `gh api 'repos/AlexandreDemartin/pgcast/issues/<epic>/sub_issues?per_page=100' -q '.[] | select(.state == "open") | "\(.number) \(.title)"' | head -1`.
 - Read it: `gh issue view <n> --repo AlexandreDemartin/pgcast`; only it, and its Epic if the order requires.
@@ -97,6 +98,8 @@ An agent knows only what its brief says.
 - Stacking dependent steps: skill `pr-shape` § Stacking.
 
 ## End of chapter
+
+Applies to every Epic that closes, a release chapter included; an Epic never closes before its method PR.
 
 1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept; its fixes in a follow-up PR.
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`). Like any method PR, it rewrites § Current workflow of Epic #836 and adds its row to § History, and § Watch is reread against the method (what it shows becomes a comment or a sub-issue there).
