@@ -273,6 +273,7 @@ Candidates for a check, a rule or a skill line.
 - #843 — A compaction replay that ignores the 80-call hand-over overstates its saving (−4.3 % at 200K, +0.3 % once runs are cut at 80 calls): a lever is replayed with the levers already in place — builder
 - #841 — The workflow Epic's body was ahead of the skills (its "As soon as possible" bullet existed before the PR); a method PR diffs Epic #836 against the skills it changes — builder
 - #841 — `docs/WORKFLOW.md` and the `merge-gate` checklist both still said "the owner's OK" for `high`; when a gate changes, grep `needs-owner` and "OK" across the docs — builder
+- #844 — Epic #836 states the learnings rule in three places (§ Strategy table, § What enforces the method, § Gaps): a method change to that rule rewrites all three — builder
 
 ## Minors kept
 
