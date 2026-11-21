@@ -459,7 +459,7 @@ jobs:
             require('assert/strict').deepEqual(paths, [
               'CHANGELOG.md', 'LICENCE', 'README.md', 'dist/bindings.js', 'dist/cli.js', 'dist/config.js',
               'dist/describe.js', 'dist/neutralise.js', 'dist/origins.js', 'dist/scan.js',
-              'dist/values.js', 'dist/write.js', 'package.json',
+              'dist/values.js', 'dist/watch.js', 'dist/write.js', 'package.json',
             ]);"
 
   ci-passed:
