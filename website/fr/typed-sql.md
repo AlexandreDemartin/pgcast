@@ -15,7 +15,7 @@ La génération et la vérification utilisent l’API JavaScript du parseur de T
 
 ## 2. Nommer la requête {#name-the-query}
 
-Importez `Row` depuis le fichier que l’outil va générer. Dans le second argument de type de `db.sql`, donnez à la requête un nom littéral. Ici, `Row<'films-by-studio'>` décrit un film et `[]` donne au résultat de `.run(pool)` son type de tableau.
+Importez `Row` depuis le fichier que l’outil va générer. Donnez un nom littéral à la requête dans le second argument de type de `db.sql`. Ici, `Row<'films-by-studio'>` décrit un film et `[]` indique que `.run(pool)` renvoie un tableau de ces films.
 
 <CastPanel example="typed_sql_films">
 
@@ -25,7 +25,7 @@ Importez `Row` depuis le fichier que l’outil va générer. Dans le second argu
 
 ## 3. Générer les types de ligne {#generate-the-rows}
 
-Depuis le dossier de votre configuration pgcast, connectez-vous à la base après migration avec l’option `db` ou les variables d’environnement de pg. Utilisez le même rôle et le même `search_path` que l’application.
+Placez-vous dans le dossier de votre configuration pgcast. Pour vous connecter à la base où les migrations ont été appliquées, utilisez l’option `db` ou les variables d’environnement de `pg`. Reprenez le rôle et le `search_path` de l’application.
 
 ```sh
 npx --no-install pgcast-typegen
@@ -41,14 +41,14 @@ npx --no-install pgcast-typegen --check
 
 | Configuration | Ce que l’outil compare |
 |---|---|
-| Omettre `db` | Hors ligne, même si les variables d’environnement de pg sont définies. Compare les noms des requêtes et leur SQL avec ses paramètres au fichier commité, et vérifie son format. Les types de ligne restent sans vérification. |
-| Faire pointer `db` vers la base après migration | Décrit à nouveau chaque requête et compare le fichier généré octet par octet, types de ligne compris. |
+| Omettre `db` | La vérification s’effectue hors ligne, même si les variables d’environnement de `pg` sont définies. L’outil compare les noms des requêtes et leur SQL (avec les paramètres `$1`, `$2`, etc.) au contenu du fichier commité. Il en vérifie le format. Les types de ligne ne sont pas vérifiés. |
+| Faire pointer `db` vers la base où les migrations ont été appliquées | Demande à Postgres de décrire à nouveau chaque requête et compare le résultat au fichier commité octet par octet, types de ligne compris. |
 
-Dans les deux cas, le fichier reste intact. Une différence ou une erreur donne le code de sortie 1. Après une modification de la requête ou du schéma, régénérez le fichier et commitez les changements.
+Dans les deux cas, le fichier reste intact. L’outil se termine avec le code `1` s’il trouve une différence ou rencontre une erreur. Après une modification de la requête ou du schéma, régénérez le fichier et commitez les changements.
 
 ## 5. Affiner le type d’une colonne {#narrow-a-column}
 
-Le type généré de `total` est `string | null` : Postgres n’associe aucune colonne d’origine au résultat du comptage. Même sur une table vide, `count(*)` renvoie un nombre et pg décode ce `bigint` en chaîne. Utilisez `NotNull` pour un champ dont vous savez que la **valeur décodée** ne peut jamais être nulle.
+Le type généré de `total` est `string | null` car Postgres n’associe le résultat du comptage à aucune colonne d’origine. Même sur une table vide, `count(*)` renvoie un nombre et `pg` décode ce `bigint` en chaîne. Utilisez `NotNull` si vous savez que la **valeur décodée** du champ ne peut jamais être nulle.
 
 <CastPanel example="typed_sql_count">
 
@@ -58,7 +58,7 @@ Le type généré de `total` est `string | null` : Postgres n’associe aucune 
 
 ## Ce qui reste manuel {#what-stays-manual}
 
-- **Paramètres.** Vérifiez vous-même les valeurs en entrée. L’outil décrit les résultats selon les parseurs de texte par défaut de pg.
-- **Interpolations.** Utilisez des identifiants littéraux ou `param()`. Un cast littéral ou `false` fixe le SQL du paramètre. Au plus quatre appels sans cast ou avec `true` peuvent prendre deux formes, avec ou sans cast en JSON. Pour les conditions, les variables interpolées directement, les appels de fonctions utilitaires, `raw()` ou les fragments imbriqués, écrivez vous-même le type de ligne.
-- **Nullabilité.** Un champ garde `| null` quand l’outil ne peut pas prouver qu’il provient d’une colonne de table non nullable. Une jointure externe peut rendre tous les champs nullables dans le type. Gardez l’union sauf si la requête garantit que la valeur décodée ne peut pas être nulle.
+- **Paramètres.** Vérifiez vous-même les valeurs d’entrée. L’outil décrit les résultats selon les parseurs de texte par défaut de `pg`.
+- **Interpolations.** Utilisez des identifiants littéraux ou `param()`. Un cast littéral ou `false` fixe le SQL du paramètre. L’outil accepte jusqu’à quatre appels à `param()` sans cast ou avec `true`. Leur SQL peut prendre deux formes, avec ou sans cast en JSON. Pour les conditions, les variables interpolées directement, les appels de fonctions utilitaires, `raw()` ou les fragments imbriqués, écrivez vous-même le type de ligne.
+- **Nullabilité.** Un champ garde `| null` quand l’outil ne peut pas établir qu’il provient d’une colonne de table non nullable. Une jointure externe peut rendre tous les champs nullables dans le type. Gardez `| null` sauf si la requête garantit que la valeur décodée ne peut pas être nulle.
 - **Régénération.** Relancez la commande après chaque modification du SQL ou du schéma. L’outil ne propose pas encore `--watch`.
