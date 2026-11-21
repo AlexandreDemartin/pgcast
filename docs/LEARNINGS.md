@@ -260,6 +260,8 @@ Candidates for a check, a rule or a skill line.
 - #825 — A guide on generated types must separate one row's fields from the result shape (`Row` or `Row[]`) and the caller's decoders, which the tool cannot see — branch-reviewer
 - #834 — a check built on a regex is only as good as the forms it parses: probe it with the forms it should refuse, not only the one form the tree uses — branch-reviewer
 - #834 — a mutant `isDate` that reads `getTime` is killed only by a class instance: a plain object fails the prototype test before `getTime` is read — builder
+- #843 — Builder runs often send test output to a file, so the tool result is empty: a transcript measure counts a test green when `npm test` returned no error result, and leaves out runs that never ran it (67 of 198, mostly docs) — builder
+- #843 — A compaction replay that ignores the 80-call hand-over overstates its saving (−4.3 % at 200K, +0.3 % once runs are cut at 80 calls): a lever is replayed with the levers already in place — builder
 
 ## Minors kept
 
