@@ -26,7 +26,7 @@ A type over drivers' clients (`PoolLike`, `TxnClientLike`):
 - is probed on a subclass that overrides an overloaded method with one signature, not only `interface X extends pg.Pool { extra }`, and on each union both mixed and all-foreign (#701, #751);
 - tests a marker by its property's type, not its key: a string index signature puts `_zapatos` in `keyof` of a bare client; once a fallback is detected one way, every type branching on it uses that same test (#751);
 - backs a docs claim that a driver "gives" a field with that driver's declarations, optional or required, not only a run (#701).
-- that accepts a pool or a marked client tests each run-time path against what the type inferred from it (the callback's isolation level, #751).
+- tests each run-time path against what the type inferred, when it accepts a pool or a marked client (#751).
 
 ## Fragment refusals
 
