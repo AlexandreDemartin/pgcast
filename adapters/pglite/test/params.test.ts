@@ -100,6 +100,7 @@ const cases: [string, string, unknown][] = [
   ['a Date of another realm to timestamp, as util.types.isDate() tells it', into('c_ts'), runInNewContext("new Date('2026-06-01T10:00:00.123Z')")],
   ['a Date tagged otherwise to timestamp, as util.types.isDate() tells it', into('c_ts'), Object.assign(new Date(at.getTime()), { [Symbol.toStringTag]: 'Moment' })],
   ['an object tagged Date, with toPostgres(), to text, as util.types.isDate() tells it', into('c_text'), { [Symbol.toStringTag]: 'Date', toPostgres: () => 'tp' }],
+  ['an instance of a class with a getTime() that is not a Date\'s, and toPostgres(), to text, as util.types.isDate() tells it', into('c_text'), new (class { getTime = () => 0; toPostgres = () => 'tp'; })()],
   ['a Date of a subclass to timestamp, as util.types.isDate() tells it', into('c_ts'), new (class extends Date {})(at.getTime())],
   ['an object of another realm to jsonb, as util.types.isDate() tells it', into('c_jsonb'), runInNewContext('({ a: 1 })')],
   ['an object of no prototype to jsonb, as util.types.isDate() tells it', into('c_jsonb'), Object.assign(Object.create(null), { a: 1 })],

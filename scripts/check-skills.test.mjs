@@ -70,3 +70,29 @@ test('fails on a reference.md over 150 lines', () => {
 test('fails on a reference.md over 1,800 words', () => {
   assert.deepEqual(errorsOf({'alpha/reference.md': 'word '.repeat(1801)}), ['alpha/reference.md: 1801 words, max 1800']);
 });
+
+const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n';
+
+test('passes on a reference.md cited with a section that is one of its headings', () => {
+  assert.deepEqual(errorsOf({
+    'alpha/SKILL.md': head + 'Read [reference.md](reference.md) § Lookups.\n',
+    'alpha/reference.md': '# Alpha\n\n## Lookups\n',
+  }), []);
+});
+
+test('fails on a cited section that is no heading of reference.md', () => {
+  assert.deepEqual(errorsOf({
+    'alpha/SKILL.md': head + 'Read [reference.md](reference.md) § Lookup.\n',
+    'alpha/reference.md': '# Alpha\n\n## Lookups\n',
+  }), ["alpha/SKILL.md: cites section 'Lookup' that reference.md has no heading for"]);
+});
+
+test('fails on a link to a reference.md that does not exist', () => {
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': head + 'Read [reference.md](reference.md).\n'}),
+    ['alpha/SKILL.md: links reference.md, which does not exist']);
+});
+
+test('fails on a reference.md that its SKILL.md does not cite', () => {
+  assert.deepEqual(errorsOf({'alpha/reference.md': '# Alpha\n'}),
+    ['alpha/reference.md: not cited by its SKILL.md']);
+});
