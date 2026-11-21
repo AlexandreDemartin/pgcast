@@ -62,8 +62,13 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
         onUnRecoverableConfigFileDiagnostic: () => undefined,
         afterProgramCreate: () => { if (created) trigger(); },
         // A watch's close() leaves its pending update, which would build the program and watch again.
+        // An update throws when its tsconfig is gone: the round reports it, and the update reruns once the file is back.
         setTimeout: (callback: (...args: unknown[]) => void, ms: number, ...args: unknown[]) => {
-          const timer = setTimeout(() => { timers.delete(timer); if (!closed) callback(...args); }, ms);
+          const timer = setTimeout(() => {
+            timers.delete(timer);
+            if (closed) return;
+            try { callback(...args); } catch { trigger(); }
+          }, ms);
           timers.add(timer);
           return timer;
         },
@@ -80,7 +85,12 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
     queued = false;
     if (closed) return;
     try {
-      const { queries, diagnostics } = scan(ts, project, path, programOf);
+      let found: ReturnType<typeof scan>;
+      // The scan throws when the root tsconfig cannot be read, as when it is removed: a plain run reports it here too.
+      try { found = scan(ts, project, path, programOf); } catch (error) {
+        found = { queries: [], diagnostics: [{ file: project, line: 1, column: 1, message: (error as Error).message }] };
+      }
+      const { queries, diagnostics } = found;
       if (diagnostics.length) {
         for (const d of diagnostics) hooks.error(`${d.file}:${d.line}:${d.column} ${d.message}`);
         settled = false;
