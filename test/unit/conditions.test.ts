@@ -1134,9 +1134,9 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     for (const [fn, f] of Object.entries({ likeAny: dc.likeAny, ilikeAny: dc.ilikeAny })) {
       expect(Object.fromEntries(Object.entries(lists).map(([name, x]) => [name, thrown(f(x as any))]))).toEqual({
         Set: `\`${fn}()\` takes an array, not \`Set\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`,
-        string: `\`${fn}()\` takes an array, not \`string\`: for one value, write \`${fn}([value])\`.`,
-        null: `\`${fn}()\` takes an array, not \`null\`: for one value, write \`${fn}([value])\`.`,
-        undefined: `\`${fn}()\` takes an array, not \`undefined\`: for one value, write \`${fn}([value])\`.`,
+        string: `\`${fn}()\` takes an array, not \`string\`: for one pattern, write \`${fn}([pattern])\`.`,
+        null: `\`${fn}()\` takes an array, not \`null\`: for one pattern, write \`${fn}([pattern])\`.`,
+        undefined: `\`${fn}()\` takes an array, not \`undefined\`: for one pattern, write \`${fn}([pattern])\`.`,
         ...Object.fromEntries(Object.entries(named).map(([name, w]) =>
           [name, `\`${fn}()\` takes an array of patterns, not ${w}: write \`${fn}(patterns)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`])),
       });

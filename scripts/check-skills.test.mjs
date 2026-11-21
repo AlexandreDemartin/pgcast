@@ -26,6 +26,8 @@ function errorsOf(files) {
   return checkSkills(directory).errors.map(e => e.startsWith(directory + sep) ? e.slice(directory.length + 1) : e);
 }
 
+const ref = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\nSee reference.md.\n';
+
 test('passes on the current tree', () => {
   assert.deepEqual(checkSkills('.agents/skills').errors, []);
 });
@@ -48,7 +50,7 @@ test('fails on a SKILL.md over 150 lines or 1,800 words', () => {
 test('passes on a SKILL.md and a reference.md of exactly 150 lines and 1,800 words', () => {
   const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n';
   assert.deepEqual(errorsOf({
-    'alpha/SKILL.md': head + 'line\n'.repeat(145) + 'word '.repeat(1647) + '\n',
+    'alpha/SKILL.md': head + 'line\n'.repeat(145) + 'word '.repeat(1646) + 'reference.md\n',
     'alpha/reference.md': 'line\n'.repeat(149) + 'word '.repeat(1651) + '\n',
   }), []);
 });
@@ -59,14 +61,40 @@ test('fails on a SKILL.md with no frontmatter for its size too', () => {
 });
 
 test('fails on a reference.md that cites an unknown skill', () => {
-  assert.deepEqual(errorsOf({'alpha/reference.md': '# Alpha: reference\n\nSee skill `beta`, then skill `gamma`.\n'}),
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': ref, 'alpha/reference.md': '# Alpha: reference\n\nSee skill `beta`, then skill `gamma`.\n'}),
     ["alpha/reference.md: cites unknown skill 'gamma'"]);
 });
 
 test('fails on a reference.md over 150 lines', () => {
-  assert.deepEqual(errorsOf({'alpha/reference.md': 'line\n'.repeat(151)}), ['alpha/reference.md: 151 lines, max 150']);
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': ref, 'alpha/reference.md': 'line\n'.repeat(151)}), ['alpha/reference.md: 151 lines, max 150']);
 });
 
 test('fails on a reference.md over 1,800 words', () => {
-  assert.deepEqual(errorsOf({'alpha/reference.md': 'word '.repeat(1801)}), ['alpha/reference.md: 1801 words, max 1800']);
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': ref, 'alpha/reference.md': 'word '.repeat(1801)}), ['alpha/reference.md: 1801 words, max 1800']);
+});
+
+const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n';
+
+test('passes on a reference.md cited with a section that is one of its headings', () => {
+  assert.deepEqual(errorsOf({
+    'alpha/SKILL.md': head + 'Read [reference.md](reference.md) § Lookups.\n',
+    'alpha/reference.md': '# Alpha\n\n## Lookups\n',
+  }), []);
+});
+
+test('fails on a cited section that is no heading of reference.md', () => {
+  assert.deepEqual(errorsOf({
+    'alpha/SKILL.md': head + 'Read [reference.md](reference.md) § Lookup.\n',
+    'alpha/reference.md': '# Alpha\n\n## Lookups\n',
+  }), ["alpha/SKILL.md: cites section 'Lookup' that reference.md has no heading for"]);
+});
+
+test('fails on a link to a reference.md that does not exist', () => {
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': head + 'Read [reference.md](reference.md).\n'}),
+    ['alpha/SKILL.md: links reference.md, which does not exist']);
+});
+
+test('fails on a reference.md that its SKILL.md does not cite', () => {
+  assert.deepEqual(errorsOf({'alpha/reference.md': '# Alpha\n'}),
+    ['alpha/reference.md: not cited by its SKILL.md']);
 });

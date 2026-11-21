@@ -32,6 +32,14 @@ export function citationErrors(path, text, skills) {
     .map(([, cited]) => `${path}: cites unknown skill '${cited}'`);
 }
 
+/** One error per `reference.md § X` of a SKILL.md whose X is no heading of `reference`, its text; empty if none. */
+export function sectionErrors(path, text, reference) {
+  const headings = new Set([...reference.matchAll(/^#+ (.+?)\s*$/gm)].map(([, heading]) => heading));
+  return [...text.matchAll(/reference\.md(?:\]\(reference\.md\))? § ([A-Z][A-Za-z ,]*[a-z])/g)]
+    .filter(([, section]) => !headings.has(section))
+    .map(([, section]) => `${path}: cites section '${section}' that reference.md has no heading for`);
+}
+
 /** The frontmatter's keys, or `undefined` if it has none. */
 export function frontmatterOf(text) {
   const match = text.match(/^---\n([\s\S]*?)\n---\n/);
@@ -56,8 +64,12 @@ export function checkSkills(directory) {
     files.push(path);
     const reference = join(directory, skill, 'reference.md');
     if (existsSync(reference)) {
+      const referenceText = readFileSync(reference, 'utf8');
       files.push(reference);
-      errors.push(...sizeErrors(reference, readFileSync(reference, 'utf8')));
+      errors.push(...sizeErrors(reference, referenceText), ...sectionErrors(path, text, referenceText));
+      if (!/reference\.md/.test(text)) errors.push(`${reference}: not cited by its SKILL.md`);
+    } else if (/reference\.md/.test(text)) {
+      errors.push(`${path}: links reference.md, which does not exist`);
     }
     const frontmatter = frontmatterOf(text);
     if (!frontmatter) {

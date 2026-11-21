@@ -265,6 +265,12 @@ Candidates for a check, a rule or a skill line.
 - #830 — after a tsconfig is removed, TypeScript's watch keeps its config watcher open: once the throw from its update timer is caught, the same watch reloads by itself when the file comes back — builder
 - #830 — an end-to-end test that spawns a watcher sets its own timeout: Vitest's default 5 s sat within 0.3–1 s of these tests' normal duration on CI — branch-reviewer
 - #830 — a PR that adds a file under a tool's `dist/` also updates the exact list of its package-contents check in `ci.yml`; a draft's local checks do not run that step — branch-reviewer
+- #835 — Postgres releases an advisory xact lock at the failing query, when the transaction or savepoint aborts, not at the later ROLLBACK or ROLLBACK TO — builder
+- #835 — a CLOSE that gets 34000 inside a live block aborts that block: dropping an error by its code alone hides why the COMMIT comes back as ROLLBACK; gate it on the status that makes it harmless — builder
+- #835 — a lock claim needs a probe per place the lock is taken (before the savepoint, inside it) and per error (a query error, 40001, a JS throw): the builder probed the lock taken before only with 23505 — branch-reviewer
+- #835 — a wording a review proposes still needs every probe case: the proposed advisory-lock sentence was false for a 40001 thrown in JavaScript after a lock taken in the savepoint — builder
+- #834 — a check built on a regex is only as good as the forms it parses: probe it with the forms it should refuse, not only the one form the tree uses — branch-reviewer
+- #834 — a mutant `isDate` that reads `getTime` is killed only by a class instance: a plain object fails the prototype test before `getTime` is read — builder
 
 ## Minors kept
 
@@ -296,3 +302,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #830 — form: a watch round that writes nothing prints nothing, where #829 asked for one line per round (Decided alone); say it in the README — branch-reviewer
 - #830 — form: `tools/typegen/src/watch.ts:63`: a tsconfig read by two watch programs queues two rounds, so its diagnostic prints twice — branch-reviewer
 - #830 — form: a removed referenced tsconfig prints its `File … not found.` twice, once per diagnostic source of the watch program (with nitpick 9) — builder
+- #835 — form: `test/integration/transaction.test.ts:2257`: the message-splitting proxy pool keeps any `sslmode` of `TEST_DATABASE_URL`, so on a TLS server the test hangs to the Vitest timeout instead of failing clearly (not run: no TLS locally or in CI) — branch-reviewer
+- #834 — defect: `scripts/check-skills.mjs:38` `sectionErrors` reads only a capitalised section after a `](reference.md)` link: `` § `toPostgres` ``, `§ iterables`, `` `reference.md` § X `` or another link text pass unchecked, and `§ Step 2` is read as 'Step'; the reviewer's regex `/(?:\]\(reference\.md\)|`?reference\.md`?) § ([^.;:\n]+)/g` passes the tree and every probe — branch-reviewer
+- #834 — form: `scripts/check-skills.mjs:70`: the "links" and "cited" checks match any mention of `reference.md`, not a link to the skill's own file (`/\]\(reference\.md\)/`) — branch-reviewer
