@@ -10,6 +10,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 - First release of [`@pgcast/typegen`](https://github.com/AlexandreDemartin/pgcast/blob/master/tools/typegen/CHANGELOG.md), at 0.1.0: row types for named `sql` queries, described by Postgres ([Typed SQL](https://pgcast.dev/typed-sql)).
 
+### Fixed
+
+- `cursor()`: a `break` after a `COMMIT` of yours that failed and was caught in the loop resolves. It could reject with the 34000 of its `CLOSE`, sent while `pg` still read the client as inside a transaction block; that 34000 is now dropped once `pg` reports the client outside one (#832).
+
 ## [7.1.0] - 2026-11-19
 
 ### Added
