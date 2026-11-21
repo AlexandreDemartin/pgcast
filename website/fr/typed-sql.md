@@ -1,3 +1,7 @@
+---
+english: 4cd58ebd6f45
+---
+
 # SQL typé
 
 À partir de `@pgcast/typegen` 0.1.0. Demandez à Postgres le type de ligne d’une [requête SQL brute](/fr/raw-sql) et conservez-le à côté du schéma généré.
