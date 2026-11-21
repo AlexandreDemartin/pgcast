@@ -245,6 +245,8 @@ Candidates for a check, a rule or a skill line.
 - #815 — A nullability guard that reads words in the text misses a Unicode-escaped identifier (`U&"\006fld"` is `old`): treat `U&` itself as a guard — branch-reviewer
 - #815 — A table's `NOT NULL` does not hold for a `RETURNING` a rewrite rule supplies (`DO INSTEAD … RETURNING`): `relhasrules` anywhere in the origin's tree withdraws the proof — branch-reviewer
 - #815 — Prove origins inside Describe's transaction while Parse holds its locks, at `READ COMMITTED`: a later lookup can read a renamed column by its attribute number, and a `REPEATABLE READ` snapshot predates Parse's lock wait — branch-reviewer
+- #816 — In a solution tsconfig, resolve the application's db module from the project whose program selected the file, not from the entry point: identical SQL hides which installed compiler ran, so count the application compiler's calls in the test — branch-reviewer
+- #816 — Two copies of one pgcast version can compile a parameter differently, since the tag recognises it by class identity: every alias of the db module must resolve to one installation — codex
 
 ## Minors kept
 
