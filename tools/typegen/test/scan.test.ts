@@ -227,6 +227,7 @@ it('uses the compiler selection in cyclic composite projects with declaration ou
     put(folder + '/call.d.ts', 'export {};');
   }
   const result = scan(compiler, join(dir, 'a/tsconfig.json'), join(dir, 'generated/queries.ts'));
+  expect(result.diagnostics).toEqual([]);
   expect(result.queries.map(q => q.name)).toEqual(compiler.version === '4.1.6' ? ['a', 'b'] : []);
 });
 

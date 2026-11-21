@@ -90,7 +90,8 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
       try { found = scan(ts, project, path, programOf); } catch (error) {
         found = { queries: [], diagnostics: [{ file: project, line: 1, column: 1, message: (error as Error).message }] };
       }
-      const { queries, diagnostics } = found;
+      // The output file is ours to rewrite, as in a plain run.
+      const { queries } = found, diagnostics = found.diagnostics.filter(d => key(d.file) !== rows);
       if (diagnostics.length) {
         for (const d of diagnostics) hooks.error(`${d.file}:${d.line}:${d.column} ${d.message}`);
         settled = false;
