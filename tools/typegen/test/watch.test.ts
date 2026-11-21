@@ -190,6 +190,16 @@ it.each(['tsconfig.json', 'app/project.json'])('reports a removed %s, keeps watc
   expect(seen.code).toBeUndefined();
 });
 
+it.each([['missing', undefined], ['malformed', '{ "include": [ }']])('exits 1 on a %s tsconfig at start, as a plain run does', { timeout: 20_000 }, async (_, contents) => {
+  if (contents) put('app/watch.json', contents);
+  const plain = spawnSync(process.execPath, [cli, '--project', 'app/watch.json'], { cwd: dir, env: env(), encoding: 'utf8' });
+  expect(plain.status).toBe(1);
+  expect(plain.stderr).toContain(join(dir, 'app/watch.json') + ':1:');
+  const { seen } = start('app/watch.json');
+  await until(() => seen.code !== undefined, 'the exit');
+  expect(seen).toMatchObject({ code: 1, stdout: '', stderr: plain.stderr });
+});
+
 it('closes on SIGINT and SIGTERM with exit 0', { timeout: 20_000 }, async () => {
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     rmSync(out(), { force: true });
