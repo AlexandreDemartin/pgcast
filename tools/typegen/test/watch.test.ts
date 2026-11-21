@@ -60,6 +60,7 @@ it('describes again only the queries whose text changed', { timeout: 20_000 }, a
     write: async () => ++writes > 0,
     log: line => lines.push(line),
     error: line => lines.push('error ' + line),
+    end: () => lines.push('end'),
   });
   try {
     await until(() => writes === 1, 'the first round');
@@ -82,6 +83,7 @@ it('follows an edit in a referenced project', { timeout: 20_000 }, async () => {
   const watcher = watch(compiler, join(dir, 'tsconfig.json'), out(), {
     describe: async query => { described.push(query.text); return { text: query.text, fields: [field] }; },
     write: async () => true, log: () => undefined, error: line => described.push('error ' + line),
+    end: () => described.push('end'),
   });
   try {
     await until(() => described.length === 1, 'the first round');

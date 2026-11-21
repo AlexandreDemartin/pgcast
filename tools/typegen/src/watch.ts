@@ -15,12 +15,14 @@ export interface Hooks {
   write(rows: ReadonlyMap<string, Described>): Promise<boolean>;
   log(line: string): void;
   error(line: string): void;
+  /** End the session: the first round could not read the root tsconfig, so nothing watches it. */
+  end(): void;
 }
 
 /**
  * Scan the project now and after each change of its sources, then describe the queries whose text changed
  * and write their module. When the module differs from the one the last round left, every query is described again. A program per tsconfig, the root and each project reference, is kept between rounds.
- * Rounds run one at a time. A failing round prints its errors and keeps watching.
+ * Rounds run one at a time. A failing round prints its errors and keeps watching, except a first one that could not read the root tsconfig.
  */
 export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks) {
   const key = (file: string) => ts.sys.useCaseSensitiveFileNames ? resolve(file) : resolve(file).toLowerCase();
@@ -95,6 +97,7 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
       if (diagnostics.length) {
         for (const d of diagnostics) hooks.error(`${d.file}:${d.line}:${d.column} ${d.message}`);
         settled = false;
+        if (!watches.has(key(project))) hooks.end();
         return;
       }
       // Another run, such as a plain one after a migration, wrote rows the cache may not match.

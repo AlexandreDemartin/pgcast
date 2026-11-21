@@ -206,6 +206,7 @@ async function watchProject(ts: typeof TS, client: Client, project: string, path
     },
     log: line => console.log(redact(line)),
     error: line => console.error(redact(line)),
+    end: () => { process.exitCode = 1; stop(); },
   });
   const stop = () => {
     if (stopping) return;
