@@ -5,10 +5,12 @@ import { writeSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
+import type { CompleteConfig } from '@pgcast/pgcast/generate';
 import { Client } from 'pg';
 import type * as TS from 'typescript';
 import { readConfig } from './config';
-import { describeQuery } from './describe';
+import { describeQuery, RejectedParse } from './describe';
 import { scan } from './scan';
 import { writeQueries } from './write';
 
@@ -20,7 +22,38 @@ function scanProject(project: string, path: string) {
   return scan(ts, project, path);
 }
 
-function site(query: ReturnType<typeof scan>['queries'][number]) {
+type Query = ReturnType<typeof scan>['queries'][number];
+type Fields = Awaited<ReturnType<typeof describeQuery>>['fields'];
+
+function differingField(a: Fields, b: Fields) {
+  if (a === null || b === null) return a === b ? undefined : (a ?? b)?.[0]?.name ?? '(row)';
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i], y = b[i];
+    if (!x || !y || x.name !== y.name || x.dataTypeID !== y.dataTypeID ||
+        !!x.notNull !== !!y.notNull || !isDeepStrictEqual(x.enumLabels, y.enumLabels)) return (x ?? y).name;
+  }
+}
+
+async function describeCandidates(client: Client, query: Query, schemas: CompleteConfig['schemas']) {
+  let first: { text: string; fields: Fields } | undefined, firstError: Error | undefined, difference: string | undefined;
+  for (const text of [query.text, ...(query.variants?.texts ?? [])]) {
+    try {
+      const { fields } = await describeQuery(client, text, schemas, !!query.variants);
+      if (!first) first = { text, fields };
+      else difference ??= differingField(first.fields, fields);
+    } catch (error) {
+      if (!(error instanceof RejectedParse)) throw error;
+      firstError ??= error.serverError;
+    }
+  }
+  if (!first) throw firstError;
+  if (difference !== undefined) {
+    throw new Error(`Field ${JSON.stringify(difference)} differs between forms of ${query.variants!.sites.join(', ')}. Give each a cast or false.`);
+  }
+  return first;
+}
+
+function site(query: Query) {
   const { file, line, column } = query.locations[0];
   return `${file}:${line}:${column} Query ${JSON.stringify(query.name)}:`;
 }
@@ -81,14 +114,13 @@ async function run(args: string[]) {
   client.on('error', (error: Error) => { connectionError ??= error; });
   // pg's end() can wait indefinitely when connect() rejects before opening a socket.
   await client.connect();
-  const rows = new Map<string, { text: string; fields: Awaited<ReturnType<typeof describeQuery>>['fields'] }>();
+  const rows = new Map<string, { text: string; fields: Fields }>();
   try {
     for (const query of queries) {
       context = site(query) + ' ';
       if (connectionError) throw connectionError;
       try {
-        const { fields } = await describeQuery(client, query.text, config.schemas);
-        rows.set(query.name, { text: query.text, fields });
+        rows.set(query.name, await describeCandidates(client, query, config.schemas));
       } catch (error) {
         console.error(redact(context + message(connectionError ?? error)));
         process.exitCode = 1;
