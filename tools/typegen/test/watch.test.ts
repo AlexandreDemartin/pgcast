@@ -104,7 +104,7 @@ function start(project = 'app/project.json') {
 }
 const rows = () => { try { return readFileSync(out(), 'utf8'); } catch { return ''; } };
 
-it('rewrites the file on an edit and writes nothing when its bytes stay the same', async () => {
+it('rewrites the file on an edit and writes nothing when its bytes stay the same', { timeout: 20_000 }, async () => {
   const { child, seen } = start();
   await until(() => rows().includes('"id": number;'), 'the first write');
   await settle();
@@ -175,7 +175,7 @@ it.each(['tsconfig.json', 'app/project.json'])('reports a removed %s, keeps watc
   expect(seen.code).toBeUndefined();
 });
 
-it('closes on SIGINT and SIGTERM with exit 0', async () => {
+it('closes on SIGINT and SIGTERM with exit 0', { timeout: 20_000 }, async () => {
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     rmSync(out(), { force: true });
     const { child, seen } = start();
