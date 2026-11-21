@@ -10,6 +10,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 - First release of [`@pgcast/typegen`](https://github.com/AlexandreDemartin/pgcast/blob/master/tools/typegen/CHANGELOG.md), at 0.1.0: row types for named `sql` queries, described by Postgres ([Typed SQL](https://pgcast.dev/typed-sql)).
 
+### Fixed
+
+- `likeAny('abc')` and `ilikeAny('abc')` say "for one pattern, write `likeAny([pattern])`" and "for one pattern, write `ilikeAny([pattern])`", not "for one value … `[value]`". [#833](https://github.com/AlexandreDemartin/pgcast/issues/833)
+
 ## [7.1.0] - 2026-11-19
 
 ### Added
