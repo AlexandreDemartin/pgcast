@@ -250,6 +250,8 @@ Candidates for a check, a rule or a skill line.
 - #807 — Postgres reports `42883` both for an incompatible operator and for a function the describing session cannot see; a SQLSTATE alone cannot prove a form impossible at run time, so only type-resolution codes drop a form and the same-session condition is documented — codex
 - #807 — An untyped `$n` fails Parse with `42P18` where the JSON-cast form of the same query succeeds; it belongs to the form, like `42725` — orchestrator
 - #818 — A count of matrix jobs written into a skill (`ci-gate`: "3 release-dry-run jobs") goes stale with each new package folder; name the job, not its count — orchestrator
+- #823 — An offline check that compares only the entries it parses accepts a module the writer cannot produce (a deleted import, CRLF); re-render the parsed entries with the writer and compare bytes, and leave row types to the database check — orchestrator
+- #823 — `after-fix.sh` copied the raw reviewer report over the triaged review it hands to the verify; a triaged file is never overwritten — orchestrator
 
 ## Minors kept
 
