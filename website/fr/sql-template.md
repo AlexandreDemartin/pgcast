@@ -1,5 +1,5 @@
 ---
-english: 21f1ac1fde72
+english: f616d584ac29
 ---
 
 # Template SQL
@@ -667,7 +667,7 @@ const films = await db.select('films', db.all).run(migrationClient);
 - [`transaction()`](/fr/transaction#transaction) prend un `Queryable`, un `TxnClient` ou un [`PoolLike`](/fr/transaction#PoolLike), dont le client est un `QueryableLike` dont le résultat a aussi un `command`, avec un `release()` ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool)).
 - `Queryable` ne change pas, pas plus que, là où le type de `run` est celui que déclare `SQLFragment`, une fonction typée pour lui affectée à `run`, qui le redéfinit, ou donnée comme valeur typée `typeof fragment.run` ou comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>`. Là où TypeScript infère ou lit le paramètre de `run`, il est `QueryableLike`, et un corps qui lit un membre de `pg` sur lui ne compile plus : `query('SELECT 1')` avec une chaîne (TS2345), `rowCount` (TS2339), le résultat de `query()` renvoyé comme la `Promise` de `run` (TS2739). Les chemins :
   - une fonction fléchée sans type affectée à `run`, `fragment.run = async queryable => …`, ou donnée comme valeur typée `typeof fragment.run`, comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>` ou au `vi.spyOn(fragment, 'run').mockImplementation()` de Vitest : typer le paramètre `db.Queryable` garde le type de Zapatos 6.6.1, sauf dans l’espion ;
-  - un générique ou un `infer` qui lit le paramètre de `run`, `Parameters<typeof fragment.run>[0]` compris : `.connect()` dessus donne TS2339 ;
+  - un générique ou un `infer` qui lit le paramètre de `run`, `Parameters<typeof fragment.run>[0]` compris : `.connect()` dessus donne TS2339. Nommez `db.Queryable` au lieu de lire le type sur `run` ;
   - une copie du type de `run` en type de fonction, dans le `mockImplementation()` de Vitest ou dans le `.d.ts` d’une bibliothèque qui réexporte `run` : avec `strictFunctionTypes`, une fonction typée pour `Queryable` n’y compile plus (TS2345, TS2322). Faites un cast dans le corps, `(queryable as db.Queryable).query('SELECT 1')`, ou typez le paramètre `db.QueryableLike`.
 
 ## `SQL` {#SQL}
