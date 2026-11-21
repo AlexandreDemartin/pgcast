@@ -254,6 +254,8 @@ Candidates for a check, a rule or a skill line.
 - #823 — `after-fix.sh` copied the raw reviewer report over the triaged review it hands to the verify; a triaged file is never overwritten — orchestrator
 - #824 — A type that removes `null` is safe only on the decoded field: pg decodes JSON `null` to `null`, so a SQL guarantee (`COALESCE(x, 'null'::jsonb)`) is not enough — branch-reviewer
 - #824 — A micro-measure of an opt-in type (50 calls all using it) is its cost where written, not the compile benchmark; a builder that reads it as the +20 % stop point must give one verdict — orchestrator
+- #826 — A placeholder in `{{…}}` is a variable name only by convention: a credential pasted there reaches the diagnostic unless only POSIX names are printed — codex
+- #826 — A test that expects a word in a message breaks where that word is the database password and the CLI redacts it; CI's credentials are `postgres` — orchestrator
 
 ## Minors kept
 

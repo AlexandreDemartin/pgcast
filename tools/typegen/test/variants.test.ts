@@ -156,7 +156,7 @@ it('names all five ambiguous slots and the explicit cast alternatives', () => {
   const result = generate('SELECT ' + slots.join(', '));
   expect(result.status).toBe(1);
   for (const s of slots) expect(result.stderr).toContain(s);
-  expect(result.stderr).toMatch(/cast.*false/i);
+  expect(result.stderr).toMatch(/cast.*false.*leave at most four ambiguous parameters/i);
 });
 
 it.each(['nullability', 'lock timeout'])('keeps the previous file after a %s change between descriptions', async reason => {
