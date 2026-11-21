@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Alexandre Demartin
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Client } from 'pg';
@@ -31,11 +31,48 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-'));
   put(project, { files: ['app.ts'], compilerOptions: { types: [] } });
   put('app/app.ts', source('SELECT id FROM public.users'));
-  put('app/node_modules/zapatos/db.d.ts', 'export declare const sql: any;');
+  const core = dirname(require.resolve('@pgcast/pgcast/db'));
+  mkdirSync(join(dir, 'app/node_modules/@pgcast'), { recursive: true });
+  for (const name of ['zapatos', '@pgcast/pgcast']) symlinkSync(core, join(dir, 'app/node_modules', name), 'dir');
   symlinkSync(dirname(require.resolve('typescript/package.json')), join(dir, 'app/node_modules/typescript'), 'dir');
   put('zapatosconfig.json', { db: { connectionString: '{{ TYPEGEN_DB }}' }, outDir: '{{TYPEGEN_OUT}}' });
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+it.each(['static', 'app compiler', 'two compilers'])('generates from a referenced project with %s', layout => {
+  mkdirSync(join(dir, 'node_modules'));
+  renameSync(join(dir, 'app/node_modules/typescript'), join(dir, 'node_modules/typescript'));
+  put('tsconfig.json', { files: [], references: [{ path: './' + project }] });
+  const shared = layout === 'two compilers', file = shared ? 'shared/query.ts' : 'app/app.ts';
+  put(project, { files: [shared ? '../' + file : 'app.ts'], compilerOptions: { composite: true, rootDir: '..', types: [] } });
+  const peer = 'node_modules/@pgcast/pgcast', appPeer = 'app/' + peer, core = dirname(require.resolve('@pgcast/pgcast/db'));
+  if (shared) {
+    mkdirSync(join(dir, 'node_modules/@pgcast'));
+    symlinkSync(core, join(dir, peer), 'dir');
+    symlinkSync('@pgcast/pgcast', join(dir, 'node_modules/zapatos'), 'dir');
+  }
+  rmSync(join(dir, appPeer));
+  put(appPeer + '/package.json', readFileSync(join(core, 'package.json'), 'utf8'));
+  const marker = join(dir, 'compiled');
+  if (layout !== 'static') put(appPeer + '/db.js', `
+    const db = require('zapatos/db');
+    exports.param = db.param;
+    exports.sql = (...args) => {
+      require('node:fs').appendFileSync(${JSON.stringify(marker)}, 'app');
+      return db.sql(...args);
+    };
+  `);
+  put(file, source(layout === 'static' ? 'SELECT\\n7 AS id' : "SELECT ${db.param(7, 'int4')} AS id"));
+  const result = run('--project', 'tsconfig.json');
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(0);
+  const rows = readFileSync(join(dir, output), 'utf8');
+  if (layout === 'static') expect(rows).toContain(JSON.stringify('SELECT\n7 AS id'));
+  else {
+    expect(rows).toContain('SELECT CAST($1 AS \\"int4\\") AS id');
+    expect(existsSync(marker) && readFileSync(marker, 'utf8')).toBe('app');
+  }
+});
 
 it('prints help without reading the project or database config', () => {
   put('pgcastconfig.json', 'invalid');
@@ -103,7 +140,7 @@ it('keeps the good file across scanner and Postgres failures and replaces it on 
   expect(generate().status).toBe(0);
   const first = read();
   expect(first.toString()).toContain('"id": number;');
-  for (const [sql, message] of [['SELECT ${1}', 'static'], ['SELECT absent FROM public.users', '42703']]) {
+  for (const [sql, message] of [['SELECT ${1}', 'placeholder'], ['SELECT absent FROM public.users', '42703']]) {
     put('app/app.ts', source(sql));
     const result = generate();
     expect(result.status).toBe(1);
@@ -147,7 +184,7 @@ it('redacts the URL password even when it occurs in a source diagnostic', () => 
   put('app/app.ts', source('SELECT ${1}', secret));
   const result = run('--project', project);
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain('only static templates');
+  expect(result.stderr).toContain('placeholder');
   expect((result.stdout + result.stderr).includes(secret)).toBe(false);
 });
 it('omits JSON excerpts when the config is malformed', () => {
@@ -228,4 +265,18 @@ it('redacts the password as written in a socket URI and as pg decodes it', () =>
   const result = run('--project', project);
   expect(result.status).toBe(1);
   expect(result.stderr).toContain('[redacted] [redacted]');
+});
+
+it('writes the row returned by pg and guards an interpolated identifier', async () => {
+  const app: typeof import('@pgcast/pgcast/db') = require('@pgcast/pgcast/db');
+  const { id } = (await db.client.query("INSERT INTO public.users (email, display_name) VALUES ('user@example.com', 'User') RETURNING id")).rows[0];
+  const body = "SELECT ${'id'} AS ${'left'}, ${db.param(fail(), `text`)} AS label FROM ${`public.users`} WHERE id IN (${db.param(id, 'int4')}, ${db.param(id, false)})";
+  put('app/app.ts', source(body));
+  expect(run('--project', project).status).toBe(0);
+  const actual = app.sql<unknown>`SELECT ${'id'} AS ${'left'}, ${app.param('User', `text`)} AS label FROM ${`public.users`} WHERE id IN (${app.param(id, 'int4')}, ${app.param(id, false)})`.compile();
+  const written = readFileSync(join(dir, output), 'utf8');
+  expect(written).toContain('text: ' + JSON.stringify(actual.text));
+  expect(written).toContain('"left": number | null;');
+  expect(written).toContain('"label": string | null;');
+  expect((await db.client.query(actual)).rows).toEqual([{ left: id, label: 'User' }]);
 });

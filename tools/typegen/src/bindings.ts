@@ -31,14 +31,16 @@ export function bindings(ts: typeof TS, file: TS.SourceFile, options: TS.Compile
       ts.getModeForUsageLocation?.(file, specifier, options)).resolvedModule;
     return { node, module, resolve, typeOnly: clause.isTypeOnly || (ts.isImportSpecifier(node) && node.isTypeOnly) };
   }
+  /** Return the db module supplying this value import. */
   function matches(expression: TS.Expression, name: string) {
     const member = ts.isPropertyAccessExpression(expression), local = member ? expression.expression : expression;
-    if (!ts.isIdentifier(local)) return false;
+    if (!ts.isIdentifier(local)) return;
     const binding = imported(local.text);
     if (!binding || binding.typeOnly || !['zapatos/db', 'pgcast/db'].includes(binding.module) ||
-        !binding.resolve()?.isExternalLibraryImport) return false;
-    if (member) return !expression.questionDotToken && expression.name.text === name && ts.isNamespaceImport(binding.node);
-    return local.text === name && ts.isImportSpecifier(binding.node) && (binding.node.propertyName?.text ?? name) === name;
+        !binding.resolve()?.isExternalLibraryImport) return;
+    const valid = member ? !expression.questionDotToken && expression.name.text === name && ts.isNamespaceImport(binding.node) :
+      local.text === name && ts.isImportSpecifier(binding.node) && (binding.node.propertyName?.text ?? name) === name;
+    return valid ? binding.module : undefined;
   }
   return { imported, matches };
 }

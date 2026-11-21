@@ -3,6 +3,7 @@
 import { dirname, resolve, sep } from 'node:path';
 import type * as TS from 'typescript';
 import { bindings } from './bindings';
+import { neutralise } from './neutralise';
 
 interface Location { file: string; line: number; column: number }
 interface Diagnostic extends Location { message: string }
@@ -30,19 +31,6 @@ function rowNames(ts: typeof TS, template: TS.TaggedTemplateExpression) {
   return [...names];
 }
 
-// Tagged literals suppress escape diagnostics. Scan the token as an ordinary literal to recover them.
-function invalidEscape(ts: typeof TS, raw: string) {
-  if (!raw.includes('\\')) return false;
-  // 4.1 does not report decimal escapes. Consume escaped backslashes in pairs.
-  if (/\\(?:[1-9]|0\d)/.test(raw.replace(/\\\\/g, ' '))) return true;
-  let invalid = false;
-  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, raw, () => { invalid = true; });
-  scanner.scan();
-  // Newer scanners defer errors until they know the template is untagged.
-  scanner.reScanTemplateHeadOrNoSubstitutionTemplate();
-  return invalid;
-}
-
 interface Template {
   pos: Location;
   name: string;
@@ -51,7 +39,7 @@ interface Template {
   ambiguous?: boolean;
 }
 
-/** Find static Row templates using the application's compiler and its project's source files. */
+/** Find named Row templates using the application's compiler and its project's source files. */
 export function scan(ts: typeof TS, project: string, rowsFile: string) {
   const projects = new Set<string>(), diagnostics: Diagnostic[] = [], templates = new Map<string, Template>();
   const key = (path: string) => ts.sys.useCaseSensitiveFileNames ? resolve(path) : resolve(path).toLowerCase();
@@ -99,12 +87,12 @@ export function scan(ts: typeof TS, project: string, rowsFile: string) {
     if (!program) return;
     for (const error of program.getOptionsDiagnostics()) report(error, file);
     for (const source of program.getSourceFiles()) {
-      if (!source.isDeclarationFile && !program.isSourceFileFromExternalLibrary(source)) parse(source.fileName, () => readFile(source, program));
+      if (!source.isDeclarationFile && !program.isSourceFileFromExternalLibrary(source)) parse(source.fileName, () => readFile(source, program, file));
     }
     for (const ref of program.getResolvedProjectReferences() ?? []) if (ref) readProject(ref.sourceFile.fileName);
   }
 
-  function readFile(source: TS.SourceFile, program: TS.Program) {
+  function readFile(source: TS.SourceFile, program: TS.Program, projectFile: string) {
     const file = source.fileName, options = program.getCompilerOptions(), syntax = program.getSyntacticDiagnostics(source)[0];
     const bound = bindings(ts, source, options, host), row = bound.imported('Row');
     // On 4.1 an explicit relative .ts suffix needs a second resolution without the suffix.
@@ -124,14 +112,14 @@ export function scan(ts: typeof TS, project: string, rowsFile: string) {
       }
       const current: Template = { pos, name };
       if (generated) {
-        const literal = node.template;
+        const module = bound.matches(tag, 'sql');
         if (names.length > 1) current.error = 'Multiple query names: ' + names.map(n => JSON.stringify(n)).join(', ');
-        else if (!bound.matches(tag, 'sql')) current.error = `Query ${label} has an unsupported tag: ${tag.getText(source)}.`;
-        else if (ts.isTemplateExpression(literal)) {
-          const from = literal.head.end - 2, end = literal.templateSpans[0].literal.getStart(source) + 1;
-          current.error = `Query ${label}: only static templates are supported yet. Found ${source.text.slice(from, end)} at ${at(location(file, source, from))}.`;
-        } else if (invalidEscape(ts, literal.getText(source))) current.error = `Query ${label} contains an invalid template escape.`;
-        else current.text = literal.text;
+        else if (!module) current.error = `Query ${label} has an unsupported tag: ${tag.getText(source)}.`;
+        else {
+          try {
+            current.text = neutralise(ts, source, node.template, projectFile, module, callee => bound.matches(callee, 'param'));
+          } catch (error) { current.error = `Query ${label}: ${(error as Error).message}`; }
+        }
       }
       const id = key(ts.sys.realpath?.(file) ?? file) + ':' + start, previous = templates.get(id);
       if (!previous) templates.set(id, current);
