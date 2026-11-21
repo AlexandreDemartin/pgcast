@@ -260,6 +260,10 @@ Candidates for a check, a rule or a skill line.
 - #825 — A guide on generated types must separate one row's fields from the result shape (`Row` or `Row[]`) and the caller's decoders, which the tool cannot see — branch-reviewer
 - #834 — a check built on a regex is only as good as the forms it parses: probe it with the forms it should refuse, not only the one form the tree uses — branch-reviewer
 - #834 — a mutant `isDate` that reads `getTime` is killed only by a class instance: a plain object fails the prototype test before `getTime` is read — builder
+- #842 — A section of `AGENTS.md` that the harness reads (`### Compact instructions`, read by the compaction) loses its effect when moved to a skill or `docs/`: before cutting `AGENTS.md`, `git log -S` each removed heading and read why it was added; a map of homes says who reads each line, not only where its text sits — branch-reviewer
+- #842 — A PR's map of homes named a home that does not hold the rule (`index.ts`'s `export *`); each named home is checked by a grep for the rule's key phrase in that file — branch-reviewer
+- #842 — `claude -p "reply ok" --agent builder --output-format json` gives a builder's start context from a worktree; its `usage` splits input, cache creation and cache read, so all three are added — builder
+- #842 — A fix brief said to reply `→ fixed in <sha>` on the PR while skill `review-comments` gives that marking to the orchestrator, as an edit of the review comment; briefs follow the skill — builder
 
 ## Minors kept
 
