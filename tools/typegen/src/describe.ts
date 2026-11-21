@@ -2,9 +2,16 @@
 
 import type { CompleteConfig } from '@pgcast/pgcast/generate';
 import type { Client, Connection, FieldDef, MessageConfig, QueryParse } from 'pg';
+import { DatabaseError } from 'pg';
+import type { ResultField } from './values';
 import { refineOrigins } from './origins';
 
-type Field = Pick<FieldDef, 'name' | 'dataTypeID' | 'tableID' | 'columnID'>;
+type Field = ResultField & Pick<FieldDef, 'tableID' | 'columnID'>;
+
+export class RejectedParse extends Error {
+  constructor(readonly serverError: DatabaseError) { super(serverError.message); }
+}
+
 interface Description {
   fields: Field[] | null;
   parameterOIDs: number[];
@@ -27,7 +34,7 @@ interface StatementMessages {
  * An expression can have zero for both origin fields.
  * NoData (e.g. DELETE without RETURNING) gives null fields. A zero-column row gives an empty array.
  */
-export async function describeQuery(client: Client, text: string, schemas?: CompleteConfig['schemas']): Promise<Description> {
+export async function describeQuery(client: Client, text: string, schemas?: CompleteConfig['schemas'], variant = false): Promise<Description> {
   const { connectionParameters } = client as Client & { connectionParameters: { query_timeout: number | false } };
   if (connectionParameters.query_timeout) throw new Error('Disable query_timeout on the client used to describe statements');
   await client.query('BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY');
@@ -36,11 +43,14 @@ export async function describeQuery(client: Client, text: string, schemas?: Comp
     await client.query("SET LOCAL lock_timeout = '1s'");
     const description = await new Promise<Description>((resolve, reject) => {
       let fields: Field[] | null | undefined, parameterOIDs: number[] | undefined;
+      let parsed = false;
+      const parseComplete = () => { parsed = true; };
       const parameters = (message: { dataTypeIDs: number[] }) => { parameterOIDs = message.dataTypeIDs; },
         noData = () => { fields = null; };
 
       client.query({
         submit(connection: Connection) {
+          connection.on('parseComplete', parseComplete);
           connection.on('parameterDescription', parameters);
           connection.on('noData', noData);
           const statement = connection as Connection & StatementMessages;
@@ -61,8 +71,14 @@ export async function describeQuery(client: Client, text: string, schemas?: Comp
         },
         handleReadyForQuery() { this.callback(); },
         // On ErrorResponse pg clears its active query, so ReadyForQuery will not reach this object.
-        handleError(error: Error) { this.callback(error); },
+        handleError(error: Error) {
+          // Only type-resolution errors during Parse can rule out a parameter form.
+          const rejected = variant && !parsed && error instanceof DatabaseError && error.code &&
+            ['42883', '42804', '42846', '42725', '42P18'].includes(error.code);
+          this.callback(rejected ? new RejectedParse(error) : error);
+        },
         callback(error?: Error) {
+          client.connection.removeListener('parseComplete', parseComplete);
           client.connection.removeListener('parameterDescription', parameters);
           client.connection.removeListener('noData', noData);
           if (error) reject(error);
@@ -76,7 +92,7 @@ export async function describeQuery(client: Client, text: string, schemas?: Comp
     return description;
   } finally {
     await client.query('ROLLBACK').catch(error => {
-      if (succeeded) throw error;
+      if (succeeded || variant) throw error;
     });
   }
 }

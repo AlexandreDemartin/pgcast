@@ -1,13 +1,15 @@
 // Copyright (C) 2026 Alexandre Demartin
 
 import { dirname, resolve, sep } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import type * as TS from 'typescript';
 import { bindings } from './bindings';
+import type { CandidateTexts } from './neutralise';
 import { neutralise } from './neutralise';
 
 interface Location { file: string; line: number; column: number }
 interface Diagnostic extends Location { message: string }
-interface Query { name: string; text: string; locations: Location[] }
+interface Query extends CandidateTexts { name: string; locations: Location[] }
 
 function location(file: string, source?: TS.SourceFile, offset = 0): Location {
   const position = source?.getLineAndCharacterOfPosition(offset);
@@ -34,9 +36,13 @@ function rowNames(ts: typeof TS, template: TS.TaggedTemplateExpression) {
 interface Template {
   pos: Location;
   name: string;
-  text?: string;
+  sql?: CandidateTexts;
   error?: string;
   ambiguous?: boolean;
+}
+
+function sameTexts(a?: CandidateTexts, b?: CandidateTexts) {
+  return a?.text === b?.text && isDeepStrictEqual(a?.variants?.texts, b?.variants?.texts);
 }
 
 /** Find named Row templates using the application's compiler and its project's source files. */
@@ -117,13 +123,13 @@ export function scan(ts: typeof TS, project: string, rowsFile: string) {
         else if (!module) current.error = `Query ${label} has an unsupported tag: ${tag.getText(source)}.`;
         else {
           try {
-            current.text = neutralise(ts, source, node.template, projectFile, module, callee => bound.matches(callee, 'param'));
+            current.sql = neutralise(ts, source, node.template, projectFile, module, callee => bound.matches(callee, 'param'));
           } catch (error) { current.error = `Query ${label}: ${(error as Error).message}`; }
         }
       }
       const id = key(ts.sys.realpath?.(file) ?? file) + ':' + start, previous = templates.get(id);
       if (!previous) templates.set(id, current);
-      else if (previous.text !== current.text || previous.error !== current.error) previous.ambiguous = true;
+      else if (!sameTexts(previous.sql, current.sql) || previous.error !== current.error) previous.ambiguous = true;
     }
     function visit(node: TS.Node) {
       if (ts.isTaggedTemplateExpression(node)) template(node);
@@ -136,14 +142,14 @@ export function scan(ts: typeof TS, project: string, rowsFile: string) {
   readProject(root);
   const order = (a: Location, b: Location) => a.file < b.file ? -1 : a.file > b.file ? 1 : a.line - b.line || a.column - b.column;
   const queries = new Map<string, Query>(), conflicts = new Set<string>();
-  for (const { pos, name, text, error, ambiguous } of [...templates.values()].sort((a, b) => order(a.pos, b.pos))) {
+  for (const { pos, name, sql, error, ambiguous } of [...templates.values()].sort((a, b) => order(a.pos, b.pos))) {
     const label = JSON.stringify(name);
     if (ambiguous) diagnostics.push({ ...pos, message: `Query ${label} resolves differently between projects.` });
     else if (error) diagnostics.push({ ...pos, message: error });
-    else if (text !== undefined) {
+    else if (sql) {
       const previous = queries.get(name);
-      if (!previous) queries.set(name, { name, text, locations: [pos] });
-      else if (previous.text === text) previous.locations.push(pos);
+      if (!previous) queries.set(name, { name, ...sql, locations: [pos] });
+      else if (sameTexts(previous, sql)) previous.locations.push(pos);
       else {
         conflicts.add(name);
         diagnostics.push({ ...pos, message: `Query ${label} has different SQL at ${at(previous.locations[0])} and ${at(pos)}.` });

@@ -76,7 +76,7 @@ it('reads the written cooked SQL back on TypeScript ' + ts.version, async () => 
 
 it.each([
   'v', '{ id: v }', 'and(v)', 'or(v)', 'not(v)', 'raw(v)', 'sql`nested`', 'cols(v)', 'vals(v)', 'v ? a : b', 'f(v)',
-  'param(v, cast)', 'param(...xs, false)', 'param?.(v, false)', 'param(v, false, 3)', 'param(v)', 'param(v, true)',
+  'param(v, cast)', 'param(...xs, false)', 'param?.(v, false)', 'param(v, false, 3)',
   "param(v, '')",
 ])('identifies the placeholder %s after an accepted slot', expression => {
   const slot = '${ /* slot */ ' + expression + ' }', result = read("SELECT ${'id'},\n  " + slot);
@@ -85,7 +85,6 @@ it.each([
   const { message } = result.diagnostics[0];
   expect(message).toContain('Query "films"');
   expect(message).toContain('app.ts:4:3');
-  if (expression === 'param(v)' || expression === 'param(v, true)') expect(message).toContain('comes in a later release');
   if (expression === "param(v, '')") {
     expect(message).toContain("param() cast '' gives an empty name");
     try { db.sql`${db.param(1, '')}`.compile(); } catch (error) { expect(message).toContain((error as Error).message); }
@@ -152,4 +151,30 @@ it.each([false, true])('checks mixed aliases with a separate installation: %s', 
     expect(result.diagnostics[0].message).toContain(slot);
     expect(result.diagnostics[0].message).toContain('same db installation');
   } else expect(result.queries.map(q => q.text)).toEqual([actual.text]);
+});
+
+it('distinguishes equal plain texts with different possible casts', () => {
+  const body = "SELECT ${param(x)}`; sql<unknown, Row<'films'>>`SELECT ${param(x, false)}";
+  expect(read(body).diagnostics[0]?.message).toContain('different SQL');
+});
+
+it('keeps the plain and JSON texts under either application cast setting', () => {
+  const settings = db.getConfig(), slot = '${param(fail())}', forced = '${param(fail(), true)}';
+  try {
+    for (const castArrayParamsToJson of [false, true]) for (const castObjectParamsToJson of [false, true]) {
+      db.setConfig({ castArrayParamsToJson, castObjectParamsToJson });
+      const { queries, diagnostics } = read('SELECT ' + slot + ', ' + forced);
+      const plain = db.param('x', true), json = db.param([1], true);
+      const texts = [db.sql`SELECT ${plain}, ${plain}`, db.sql`SELECT ${json}, ${plain}`,
+        db.sql`SELECT ${plain}, ${json}`, db.sql`SELECT ${json}, ${json}`].map(q => q.compile().text);
+      expect(diagnostics).toEqual([]);
+      expect(queries[0]).toMatchObject({ text: texts[0], variants: { texts: texts.slice(1) } });
+      expect(db.getConfig()).toEqual({ ...settings, castArrayParamsToJson, castObjectParamsToJson });
+      for (const v of ['x', [1, 2], { a: 1 }]) {
+        const expected = Array.isArray(v) ? castArrayParamsToJson : typeof v === 'object' && castObjectParamsToJson;
+        const actual = db.sql`SELECT ${db.param(v)}, ${db.param(v, true)}`.compile();
+        expect(actual.text).toBe(texts[Number(expected) + (typeof v === 'object' ? 2 : 0)]);
+      }
+    }
+  } finally { db.setConfig(settings); }
 });

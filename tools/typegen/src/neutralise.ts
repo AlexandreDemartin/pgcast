@@ -7,7 +7,7 @@ import type * as TS from 'typescript';
 // Describe the public compiler calls without requiring an application schema to build the tool.
 interface Db {
   sql(chunks: TemplateStringsArray, ...slots: unknown[]): { compile(): { text: string } };
-  param(value: undefined, cast: string | false): unknown;
+  param(value: unknown, cast: string | boolean): unknown;
 }
 type Require = ReturnType<typeof createRequire>;
 const scoped = '@pgcast/pgcast/db';
@@ -35,10 +35,16 @@ function invalidEscape(ts: typeof TS, raw: string) {
   return invalid;
 }
 
+export interface CandidateTexts {
+  text: string;
+  variants?: { texts: string[]; sites: string[] };
+}
+
 /** Compile the cooked chunks with inert parameters, without evaluating any source expression. */
 export function neutralise(ts: typeof TS, source: TS.SourceFile, literal: TS.TemplateLiteral, projectFile: string,
-  tagModule: string, paramModule: (callee: TS.Expression) => string | undefined) {
+  tagModule: string, paramModule: (callee: TS.Expression) => string | undefined): CandidateTexts {
   const chunks: string[] = [], raw: string[] = [], slots: unknown[] = [], sites: string[] = [];
+  const ambiguous: number[] = [];
   function chunk(token: TS.TemplateLiteralLikeNode) {
     const followedBySlot = token.kind === ts.SyntaxKind.TemplateHead || token.kind === ts.SyntaxKind.TemplateMiddle;
     const spelling = token.getText(source).slice(1, followedBySlot ? -2 : -1);
@@ -48,7 +54,7 @@ export function neutralise(ts: typeof TS, source: TS.SourceFile, literal: TS.Tem
   }
   if (ts.isNoSubstitutionTemplateLiteral(literal)) {
     chunk(literal);
-    return literal.text;
+    return { text: literal.text };
   }
   const project = createRequire(projectFile), fromSource = createRequire(source.fileName), tagEntry = checkedEntry(fromSource, tagModule);
   const db: Db = project(checkedEntry(project, scoped));
@@ -64,23 +70,38 @@ export function neutralise(ts: typeof TS, source: TS.SourceFile, literal: TS.Tem
       const module = call && paramModule(call.expression);
       if (!call || !module || !call.arguments.length || ts.isSpreadElement(call.arguments[0])) throw new Error(`Unsupported ${site}.`);
       const args = call.arguments, cast = args[1];
-      if (args.length === 1 || (args.length === 2 && cast.kind === ts.SyntaxKind.TrueKeyword)) {
-        throw new Error(`Unsupported ${site}. Support for this param() comes in a later release.`);
+      const variable = args.length === 1 || (args.length === 2 && cast.kind === ts.SyntaxKind.TrueKeyword);
+      if (!variable && !(args.length === 2 && (ts.isStringLiteralLike(cast) || cast.kind === ts.SyntaxKind.FalseKeyword))) {
+        throw new Error(`Unsupported ${site}.`);
       }
-      if (args.length !== 2 || !(ts.isStringLiteralLike(cast) || cast.kind === ts.SyntaxKind.FalseKeyword)) throw new Error(`Unsupported ${site}.`);
       if (module !== tagModule) {
         try {
           // Each installed copy has its own Parameter class.
           if (checkedEntry(fromSource, module) !== tagEntry) throw new Error('Import sql and param from the same db installation');
         } catch (error) { throw new Error(`${site}: ${(error as Error).message}`); }
       }
-      slots.push(db.param(undefined, ts.isStringLiteralLike(cast) ? cast.text : false));
+      if (variable) ambiguous.push(slots.length);
+      slots.push(db.param(undefined, cast && ts.isStringLiteralLike(cast) ? cast.text : variable));
     }
     chunk(tail);
     start = tail.end - 2;
   }
-  try { return db.sql(Object.assign(chunks, { raw }), ...slots).compile().text; }
-  catch (error) {
+  const variableSites = ambiguous.map(i => sites[i]);
+  if (ambiguous.length > 4) throw new Error(`More than four ambiguous parameters. Give each a cast or false: ${variableSites.join(', ')}.`);
+  const template = Object.assign(chunks, { raw });
+  try {
+    const text = db.sql(template, ...slots).compile().text;
+    if (!ambiguous.length) return { text };
+    const texts: string[] = [];
+    for (let mask = 1; mask < 2 ** ambiguous.length; mask++) {
+      const combination = slots.slice();
+      for (const [bit, index] of ambiguous.entries()) {
+        if (mask & (1 << bit)) combination[index] = db.param([], true);
+      }
+      texts.push(db.sql(template, ...combination).compile().text);
+    }
+    return { text, variants: { texts, sites: variableSites } };
+  } catch (error) {
     // Locate a rejected cast with the same compiler that rejected the complete template.
     for (const [i, slot] of slots.entries()) {
       try { db.sql`${slot}`.compile(); } catch (cause) { throw new Error(`${sites[i]}: ${(cause as Error).message}`); }
