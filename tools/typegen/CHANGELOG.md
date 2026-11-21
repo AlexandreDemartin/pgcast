@@ -12,3 +12,4 @@
 - Named queries accept literal identifiers, literal parameter casts and `param(value, false)`. [#806](https://github.com/AlexandreDemartin/pgcast/issues/806)
 - Named queries accept up to four `param(value)` or `param(value, true)` slots when their successful plain and JSON forms agree on the row. [#807](https://github.com/AlexandreDemartin/pgcast/issues/807)
 - `pgcast-typegen --check` checks committed query names and SQL offline, and row types against a configured database. [#819](https://github.com/AlexandreDemartin/pgcast/issues/819)
+- Generated row modules export `NotNull<R, K>` to remove `null` from selected columns. [#820](https://github.com/AlexandreDemartin/pgcast/issues/820)

@@ -32,3 +32,6 @@ export interface Queries {
 
 export type Row<N extends keyof Queries> = Extract<Queries[N], { row: unknown }>['row'];
 export type PgArray<T> = (T | null | PgArray<T>)[];
+export type NotNull<R, K extends keyof R> = {
+  [P in keyof R]: P extends K ? Exclude<R[P], null> : R[P];
+};

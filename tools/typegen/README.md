@@ -33,6 +33,23 @@ Field types follow pg's default text parsers. A scalar enum column on an include
 
 A field admits `null` unless its origin and every descendant are ordinary or partitioned tables without rewrite rules, with the same column marked `NOT NULL`. On Postgres 18 and later, each constraint must also be enforced and validated. A guard word or `U&` anywhere in the SQL makes every field nullable, regardless of case, even in a literal, quoted identifier or comment. [Decision 012 lists the guard words.](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#2-nullability)
 
+## Narrow a nullable column
+
+Use `NotNull` when you know the decoded field is never `null`. A SQL guarantee is not always enough: pg decodes the JSON value `null` to `null`, so `COALESCE(payload, 'null'::jsonb)` can still give `null`. Here `COALESCE` makes `runtime_minutes` a `number` in every result row.
+
+```ts
+import { param, sql } from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+import type { NotNull, Row } from './zapatos/queries';
+
+export const filmsByStudio = (studioId: number) =>
+  sql<s.films.SQL, NotNull<Row<'films-by-studio'>, 'runtime_minutes'>[]>`
+    SELECT title, COALESCE(runtime_minutes, 0) AS runtime_minutes
+    FROM films WHERE studio_id = ${param(studioId, 'int4')}`;
+```
+
+You vouch for each named column. For an array column, check its dimensions and nullable elements before using them.
+
 ## Check committed rows
 
 Commit the generated `queries.ts`. In CI, install the tool and its peers, then run the check.
