@@ -22,7 +22,7 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 
 ## Finding the step
 
-- Open Epics: `gh issue list --repo AlexandreDemartin/pgcast --label 'type: epic' --state open`.
+- Open Epics: `gh issue list --repo AlexandreDemartin/pgcast --label 'type: epic' --state open`. The workflow Epic (#836) is not a chapter and stays open: skip it, the next step never comes from it.
 - The next one: the first open sub-issue of the first open Epic:
   `gh api 'repos/AlexandreDemartin/pgcast/issues/<epic>/sub_issues?per_page=100' -q '.[] | select(.state == "open") | "\(.number) \(.title)"' | head -1`.
 - Read it: `gh issue view <n> --repo AlexandreDemartin/pgcast`; only it, and its Epic if the order requires.
@@ -99,7 +99,7 @@ An agent knows only what its brief says.
 ## End of chapter
 
 1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept; its fixes in a follow-up PR.
-2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`).
+2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`). Like any method PR, it rewrites § Current workflow of Epic #836 and adds its row to § History, and § Watch is reread against the method (what it shows becomes a comment or a sub-issue there).
 3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
 4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it rather than compacting a long one (one session reached 966K tokens of context, #732).
 5. Within a chapter, the orchestrator brings its hand-over up to date after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`, set in `.claude/settings.json`) and lose nothing: no one has to be there to start a new session (#812).
