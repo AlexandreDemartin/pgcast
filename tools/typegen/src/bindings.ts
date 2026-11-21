@@ -3,7 +3,7 @@
 import type * as TS from 'typescript';
 
 /** Collect lexical names in every scope before accepting an import as the file's sole declaration. */
-export function bindings(ts: typeof TS, file: TS.SourceFile) {
+export function bindings(ts: typeof TS, file: TS.SourceFile, options: TS.CompilerOptions = {}, host: TS.ModuleResolutionHost = ts.sys) {
   const names = new Map<string, TS.Node | null>();
   function visit(node: TS.Node) {
     if (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node) ||
@@ -26,13 +26,17 @@ export function bindings(ts: typeof TS, file: TS.SourceFile) {
     if (!node || !(ts.isNamespaceImport(node) || ts.isImportSpecifier(node))) return;
     const clause = ts.isNamespaceImport(node) ? node.parent : node.parent.parent, declaration = clause.parent;
     if (!ts.isImportDeclaration(declaration) || declaration.parent !== file || !ts.isStringLiteral(declaration.moduleSpecifier)) return;
-    return { node, module: declaration.moduleSpecifier.text, typeOnly: clause.isTypeOnly || (ts.isImportSpecifier(node) && node.isTypeOnly) };
+    const specifier = declaration.moduleSpecifier, module = specifier.text;
+    const resolve = (text = module) => ts.resolveModuleName(text, file.fileName, options, host, undefined, undefined,
+      ts.getModeForUsageLocation?.(file, specifier, options)).resolvedModule;
+    return { node, module, resolve, typeOnly: clause.isTypeOnly || (ts.isImportSpecifier(node) && node.isTypeOnly) };
   }
   function matches(expression: TS.Expression, name: string) {
     const member = ts.isPropertyAccessExpression(expression), local = member ? expression.expression : expression;
     if (!ts.isIdentifier(local)) return false;
     const binding = imported(local.text);
-    if (!binding || binding.typeOnly || !['zapatos/db', 'pgcast/db'].includes(binding.module)) return false;
+    if (!binding || binding.typeOnly || !['zapatos/db', 'pgcast/db'].includes(binding.module) ||
+        !binding.resolve()?.isExternalLibraryImport) return false;
     if (member) return !expression.questionDotToken && expression.name.text === name && ts.isNamespaceImport(binding.node);
     return local.text === name && ts.isImportSpecifier(binding.node) && (binding.node.propertyName?.text ?? name) === name;
   }
