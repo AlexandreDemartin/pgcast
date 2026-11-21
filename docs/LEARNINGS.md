@@ -249,6 +249,7 @@ Candidates for a check, a rule or a skill line.
 - #816 — Two copies of one pgcast version can compile a parameter differently, since the tag recognises it by class identity: every alias of the db module must resolve to one installation — codex
 - #807 — Postgres reports `42883` both for an incompatible operator and for a function the describing session cannot see; a SQLSTATE alone cannot prove a form impossible at run time, so only type-resolution codes drop a form and the same-session condition is documented — codex
 - #807 — An untyped `$n` fails Parse with `42P18` where the JSON-cast form of the same query succeeds; it belongs to the form, like `42725` — orchestrator
+- #818 — A count of matrix jobs written into a skill (`ci-gate`: "3 release-dry-run jobs") goes stale with each new package folder; name the job, not its count — orchestrator
 
 ## Minors kept
 
