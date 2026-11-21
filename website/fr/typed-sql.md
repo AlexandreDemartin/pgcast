@@ -5,13 +5,13 @@
 
 ## 1. Installer l’outil {#install}
 
-[Installez le paquet principal](/fr/install#add-the-package), puis ajoutez l’outil. Ses peer dependencies sont `@pgcast/pgcast`, `pg` et `typescript`. Le paquet principal de l’application, l’alias importé (`zapatos` ou `pgcast`) et la peer dependency `@pgcast/pgcast` que l’outil résout doivent avoir la même version.
+[Installez le paquet principal](/fr/install#add-the-package), puis ajoutez l’outil. Ses peer dependencies sont `@pgcast/pgcast`, `pg` et `typescript`. Le paquet principal de l’application, le paquet qu’elle importe sous l’alias `zapatos` ou `pgcast` et la peer dependency `@pgcast/pgcast` résolue par l’outil doivent être à la même version.
 
 ```sh
 npm install --save-dev @pgcast/typegen
 ```
 
-Pour générer ou vérifier les types, le projet passé à `--project` (`tsconfig.json` par défaut) doit pouvoir charger une [version prise en charge du parseur TypeScript](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking). Votre application peut compiler séparément les types commités.
+Pour générer ou vérifier les types, l’outil doit pouvoir trouver une [version prise en charge du parseur TypeScript](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking) à partir du fichier passé à `--project` (`tsconfig.json` par défaut). Votre application peut compiler séparément les types commités.
 
 ## 2. Nommer la requête {#name-the-query}
 
@@ -25,7 +25,7 @@ Importez `Row` depuis le fichier que l’outil va générer. Donnez un nom litt�
 
 ## 3. Générer les types de ligne {#generate-the-rows}
 
-Placez-vous dans le dossier de votre configuration pgcast. Pour vous connecter à la base où les migrations ont été appliquées, utilisez `db` (sans `query_timeout`) ou les variables d’environnement de `pg`. Reprenez le rôle et le `search_path` de l’application, sans objets temporaires, pour que les noms désignent les mêmes objets dans les deux sessions.
+Placez-vous dans le dossier de votre configuration pgcast. Pour vous connecter à la base où les migrations ont été appliquées, utilisez `db` (sans `query_timeout`) ou les variables d’environnement de `pg`. Utilisez le même rôle et le même `search_path` que l’application, sans objets temporaires, pour que les noms désignent les mêmes objets dans les deux sessions.
 
 ```sh
 npx --no-install pgcast-typegen
@@ -61,6 +61,6 @@ Le type généré de `total` est `string | null` car Postgres n’associe le ré
 - **Paramètres.** Vérifiez vous-même les valeurs d’entrée.
 - **Décodage.** Les types de ligne suivent les parseurs de texte par défaut de `pg`. Si `setTypeParser` change le type d’un champ, écrivez votre propre type de ligne. C’est aussi à vous de typer le contenu d’une valeur JSON.
 - **Interpolations.** Utilisez des identifiants littéraux ou `param()`. Pour les conditions, les variables interpolées directement, les appels de fonctions utilitaires, `raw()` ou les fragments imbriqués, écrivez vous-même le type de ligne.
-- **Formes des paramètres.** Jusqu’à quatre appels à `param()` sans cast ou avec `true` peuvent prendre deux formes, avec ou sans cast en JSON. Postgres doit pouvoir parser au moins une forme et toutes celles qu’il accepte doivent décrire la même ligne. Donnez au paramètre un cast littéral ou `false` pour fixer sa forme ([règles détaillées](https://github.com/AlexandreDemartin/pgcast/tree/master/tools/typegen#readme)).
-- **Nullabilité.** Un champ garde `| null` quand l’outil ne peut pas établir qu’il provient d’une colonne de table non nullable. Une jointure externe peut rendre tous les champs nullables dans le type. Gardez `| null` sauf si le champ décodé ne peut jamais valoir `null`.
+- **Formes des paramètres.** L’outil accepte au plus quatre appels à `param()` sans cast ou avec `true`. Pour chacun, le SQL peut prendre deux formes, avec ou sans cast en JSON. Postgres doit pouvoir parser au moins une variante de la requête, et toutes les variantes acceptées doivent décrire la même ligne. Pour fixer la forme d’un paramètre, passez un cast littéral ou `false` à `param()` ([règles détaillées](https://github.com/AlexandreDemartin/pgcast/tree/master/tools/typegen#readme)).
+- **Nullabilité.** Un champ garde `| null` quand l’outil ne peut pas établir qu’il provient d’une colonne non nullable d’une table. Une jointure externe peut rendre tous les champs nullables. Gardez `| null` sauf si la valeur décodée du champ ne peut jamais être `null`.
 - **Régénération.** Relancez la commande après chaque modification du SQL ou du schéma. L’outil ne propose pas encore `--watch`.
