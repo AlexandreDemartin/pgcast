@@ -23,14 +23,14 @@ interface StatementMessages {
  * A failure sending Parse, Describe or Sync ends the client. Transaction commands follow pg's client.query
  * error handling. After any rejection, the owner discards the client unless it chooses to reuse it.
  * Return parameter OIDs and ordered fields with their names, type OIDs, table OIDs and attribute numbers.
- * With schema rules, refine field types in the same catalogue snapshot before rollback.
+ * With schema rules, refine field types with a fresh snapshot while Parse holds its locks.
  * An expression can have zero for both origin fields.
  * NoData (e.g. DELETE without RETURNING) gives null fields. A zero-column row gives an empty array.
  */
 export async function describeQuery(client: Client, text: string, schemas?: CompleteConfig['schemas']): Promise<Description> {
   const { connectionParameters } = client as Client & { connectionParameters: { query_timeout: number | false } };
   if (connectionParameters.query_timeout) throw new Error('Disable query_timeout on the client used to describe statements');
-  await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+  await client.query('BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY');
   let succeeded = false;
   try {
     await client.query("SET LOCAL lock_timeout = '1s'");
