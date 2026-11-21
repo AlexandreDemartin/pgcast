@@ -3,12 +3,12 @@
 import { randomUUID } from 'node:crypto';
 import { open, rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { FieldDef } from 'pg';
+import type { ResultField } from './values';
 import { textTypes } from './values';
 
 interface Query {
   text: string;
-  fields: readonly Pick<FieldDef, 'name' | 'dataTypeID'>[] | null;
+  fields: readonly ResultField[] | null;
 }
 
 const literal = (value: string) => JSON.stringify(value).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
@@ -38,7 +38,8 @@ export async function writeQueries(path: string, dbModule: 'zapatos/db' | 'pgcas
         for (const imported of ['JSONValue', 'PostgresInterval']) {
           if (type.includes(imported)) imports.add(imported);
         }
-        lines.push(`      ${literal(field.name)}: ${type} | null;`);
+        const value = field.enumLabels?.map(literal).join(' | ') ?? type;
+        lines.push(`      ${literal(field.name)}: ${value}${field.notNull ? '' : ' | null'};`);
       }
       lines.push('    };');
     }

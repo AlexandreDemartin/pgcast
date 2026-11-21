@@ -1,5 +1,12 @@
 // Copyright (C) 2026 Alexandre Demartin
 
+import type { FieldDef } from 'pg';
+
+export interface ResultField extends Pick<FieldDef, 'name' | 'dataTypeID'> {
+  notNull?: boolean;
+  enumLabels?: string[];
+}
+
 const date = 'Date | number', point = '{ x: number; y: number }',
   strings = 'PgArray<string>', numbers = 'PgArray<number>', dates = 'PgArray<Date | number>';
 
