@@ -1,11 +1,12 @@
 // Copyright (C) 2026 Alexandre Demartin
 
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { Client } from 'pg';
-import { afterAll, beforeAll, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, expect, inject, it, vi } from 'vitest';
 import { createTemplateDatabase, dropDatabase, urlForDatabase, withAdminClient } from '../../../test/helpers/databases';
 import { describeQuery } from '../src/describe';
 
@@ -82,14 +83,13 @@ const replays: Replay[] = [
 let url: string, dir: string, client: Client, version: number, written: string;
 const supported = ([,,,, min = 14, max = Infinity]: Replay) => version >= min && version <= max;
 
-function generate(cases: Replay[], preload?: string) {
+async function generate(cases: Replay[], preload?: string) {
   const source = cases.map(([key, sql], i) => 'export const q' + i + '=db.sql<never, Row<' +
     JSON.stringify(key) + '>[]>`' + sql.replace(/\\/g, '\\\\') + '`;');
   writeFileSync(join(dir, 'app.ts'), ["import * as db from 'zapatos/db';", "import type { Row } from './zapatos/queries';", ...source].join('\n'));
   const args = preload ? ['--require', './preload.cjs', cli] : [cli];
   if (preload) writeFileSync(join(dir, 'preload.cjs'), preload);
-  const result = spawnSync(process.execPath, args, { cwd: dir, encoding: 'utf8', env: { ...process.env, ORIGINS_DB: url } });
-  expect(result.status, result.stderr).toBe(0);
+  await promisify(execFile)(process.execPath, args, { cwd: dir, env: { ...process.env, ORIGINS_DB: url } });
   return readFileSync(join(dir, 'zapatos/queries.ts'), 'utf8');
 }
 
@@ -133,7 +133,7 @@ beforeAll(async () => {
   writeFileSync(join(dir, 'pgcastconfig.json'), JSON.stringify({
     db: { connectionString: '{{ORIGINS_DB}}' }, schemas: { public: { include: '*', exclude: ['excluded'] } },
   }));
-  written = generate(replays.filter(supported));
+  written = await generate(replays.filter(supported));
 });
 afterAll(async () => {
   if (dir) rmSync(dir, { recursive: true, force: true });
@@ -159,7 +159,7 @@ it('proves the repaired rows after VALIDATE CONSTRAINT (Postgres 18+)', async ct
   ctx.skip(version < 18, 'server_version_num below 180000');
   await client.query('UPDATE unchecked SET x=2; ALTER TABLE unchecked VALIDATE CONSTRAINT required_x');
   const replay: Replay = ['validated', 'SELECT x FROM unchecked', [n], [[2]]];
-  await check(replay, generate([replay]));
+  await check(replay, await generate([replay]));
 });
 
 it('binds each statement\'s origin pairs in one proof query', async () => {
@@ -167,7 +167,7 @@ it('binds each statement\'s origin pairs in one proof query', async () => {
     ['ids', 'SELECT id, manager FROM users', [n,nn], [[1,null], [2,1]]],
     ['balances', 'SELECT balance FROM accounts', [s], [['10'], ['30']]],
   ];
-  const module = generate(cases, `
+  const module = await generate(cases, `
     const client = require(${JSON.stringify(require.resolve('pg'))}).Client.prototype, query = client.query;
     client.query = function (sql, ...args) {
       if (/\\bpg_inherits\\b/.test(sql?.text ?? sql)) {
@@ -189,7 +189,7 @@ it('holds the Parse lock until the origin has been checked', async () => {
   const replay: Replay = ['migration', 'SELECT id FROM cyclecol', [nn], [[null]]];
   await client.query('CREATE TABLE cyclecol (id int); INSERT INTO cyclecol VALUES (NULL)');
   expect((await client.query(replay[1])).rows).toEqual([{ id: null }]);
-  const module = generate([replay], `
+  const module = await generate([replay], `
     const { Client } = require(${JSON.stringify(require.resolve('pg'))}), query = Client.prototype.query;
     Client.prototype.query = async function (sql, ...args) {
       if (sql !== 'ROLLBACK') return query.call(this, sql, ...args);
@@ -220,10 +220,31 @@ it('holds the Parse lock until the origin has been checked', async () => {
   await check(replay, module);
 });
 
+it('reads the committed constraint after Parse waits for a migration', async () => {
+  const replay: Replay = ['migration first', 'SELECT id FROM waiting_column', [nn], [[null]]];
+  await client.query('CREATE TABLE waiting_column (id int NOT NULL); INSERT INTO waiting_column VALUES (1)');
+  await client.query('BEGIN');
+  try {
+    await client.query('ALTER TABLE waiting_column ALTER id DROP NOT NULL; UPDATE waiting_column SET id = NULL');
+    const [module] = await Promise.all([
+      generate([replay]),
+      vi.waitFor(async () => {
+        const { rows } = await client.query(`
+          SELECT FROM pg_locks WHERE relation = 'waiting_column'::regclass AND NOT granted
+            AND pg_backend_pid() = ANY(pg_blocking_pids(pid))`);
+        expect(rows).toHaveLength(1);
+      }, { timeout: 10000, interval: 10 }).then(() => client.query('COMMIT')),
+    ]);
+    await check(replay, module);
+  } finally {
+    await client.query('ROLLBACK');
+  }
+});
+
 it('keeps the wire type when a schema label differs from the catalogue', async () => {
   const replay: Replay = ['stale enum', 'SELECT mood FROM users', [sn], [['ok'], ['a"b']]],
     peer = JSON.stringify(require.resolve('@pgcast/pgcast/generate'));
-  await check(replay, generate([replay], `
+  await check(replay, await generate([replay], `
     const generator = require(${peer});
     require.cache[${peer}].exports = { ...generator, enumDataForSchema: async () => ({ mood: ['a"b', 'stale'] }) };
   `));
@@ -233,5 +254,5 @@ it('reads every current enum label on regeneration', async () => {
   await client.query(`ALTER TYPE extra.mood ADD VALUE 'later'`);
   await client.query("UPDATE users SET mood='later' WHERE id=1");
   const replay: Replay = ['changed enum', 'SELECT mood FROM users', ['"a\\"b" | "later" | "ok" | null'], [['later'],['a"b']]];
-  await check(replay, generate([replay]));
+  await check(replay, await generate([replay]));
 });
