@@ -1,6 +1,6 @@
 # AI tooling
 
-Each element exists once, where the tools read it natively. The method comes from an application project, cut down to what a library needs.
+Each element exists once, where the tools read it natively.
 
 | Element | Location | Read by |
 |---|---|---|
@@ -78,4 +78,5 @@ Ritual of a step: skill `run-step`; on one page for a human: [docs/WORKFLOW.md](
 - **Invariants**, never questioned alone: the 5 principles of `AGENTS.md` § Philosophy, 6.6.1 backward compatibility, the accepted decisions of `docs/decisions/`.
 - **Criterion**: a review remark enters a skill if it prevents a real bug that recurs or has cost dearly, and is general and verifiable. A preference of form does not.
 - **Preference**: an automatic check (ESLint, test, `check:agents`); otherwise an existing rule amended; last, a skill line.
-- **Batched**: the method is frozen during a chapter; agents return their "learnings" apart, the orchestrator writes them in [docs/LEARNINGS.md](../docs/LEARNINGS.md), judged at the end-of-chapter method PR (skill `run-step`).
+- **As soon as ready**: a method change goes out at once, whether the owner asks for it, the watch of Epic #836 shows it or a tool brings a new feature, so that pgcast uses it now.
+- **Batched**: only the agents' "learnings"; they return them apart, the orchestrator writes them in [docs/LEARNINGS.md](../docs/LEARNINGS.md), judged at the end-of-chapter method PR (skill `run-step`).

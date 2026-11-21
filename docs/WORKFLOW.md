@@ -2,7 +2,7 @@
 
 How a step of pgcast goes from its issue to `master`, on one page. Each box links to the skill that holds its rules; this page repeats none of them.
 
-An orchestrator (the main session) runs each step with three agents: `builder` writes the code, `branch-reviewer` reviews it read-only, `chores` does the mechanical work. The owner reads what each step leaves on GitHub and gives the OK where the risk is high.
+An orchestrator (the main session) runs each step with three agents: `builder` writes the code, `branch-reviewer` reviews it read-only, `chores` does the mechanical work. The owner reads what each step leaves on GitHub and decides the releases; the Ask of a `high` step is answered in advance by a standing delegation.
 
 ## The flow
 
@@ -27,7 +27,7 @@ flowchart TD
     ready["gh pr ready, green CI"] --> gate{"Merge gate"}
     gate -- "Ship: low" --> squash
     gate -- "Show: normal" --> squash
-    gate -- "Ask: high" --> owner["Label needs-owner, wait for the owner OK"] --> squash
+    gate -- "Ask: high" --> owner["Answered by the owner's standing delegation; a release waits for the owner"] --> squash
     owner -. "meanwhile" .-> next["Next step: independent, or stacked on this PR"]
     squash["Squash merge, the issue closes"] --> clean["Clean up: branch -D, fetch --prune"]
     clean --> epic{"Last step of the Epic?"}
@@ -53,7 +53,7 @@ The issue's **Risk** sets the plan, the review and the gate (detail: skill `run-
 |---|---|---|---|---|
 | `low` | docs, method, CI only | none | CI; the builder rereads its diff | **Ship**: merged on green CI |
 | `normal` | tests, an opt-in addition | posted, the builder goes on | `branch-reviewer`; fixes of blockers | **Show**: merged on green CI, read by the owner afterwards |
-| `high` | `core.ts`, `transaction.ts`, existing public types, default codegen output | posted, the builder waits for the check | `branch-reviewer` with a lens; fixes; verify | **Ask**: `needs-owner`, the owner's OK before merging |
+| `high` | `core.ts`, `transaction.ts`, existing public types, default codegen output | posted, the builder waits for the check | `branch-reviewer` with a lens; fixes; verify | **Ask**: answered in advance by the owner's standing delegation once review and verify are posted and CI is green; a release waits for the owner |
 
 ## A stack
 
@@ -69,6 +69,8 @@ flowchart LR
 ## End of chapter
 
 When the Epic's last step is merged: a review of the whole merged range, then a method PR that judges each line of [LEARNINGS.md](LEARNINGS.md) and closes the Epic (skill `run-step` § End of chapter).
+
+The method's current state and history live in Epic #836, rewritten by each method PR. A method change that is ready goes out at once; only the learnings wait for this PR (`.agents/README.md` § Self-improvement).
 
 ## Releases
 

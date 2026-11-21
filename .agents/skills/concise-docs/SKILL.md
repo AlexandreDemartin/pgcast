@@ -16,6 +16,7 @@ Complete in substance, concise in form.
 | A code rule | a single skill |
 | A decision and its why | `docs/decisions/NNN-*.md` |
 | Order of changes and their reason | the Epics, `type: epic` issues (skill `run-step`) |
+| The method, its current state and history | Epic #836 (rewritten by each method PR) |
 | A step, its state | its sub-issue, closed by its PR |
 | A change visible to the user | `CHANGELOG.md` |
 | Public usage | `README.md` |
