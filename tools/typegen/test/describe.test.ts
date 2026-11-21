@@ -91,7 +91,7 @@ it('rejects query_timeout before BEGIN and leaves the backend idle', async () =>
   }
 });
 
-it.each(['BEGIN READ ONLY', 'Describe', 'ROLLBACK'])('rejects socket loss during %s and releases the listeners', async stage => {
+it.each(['BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY', 'Describe', 'ROLLBACK'])('rejects socket loss during %s and releases the listeners', async stage => {
   const onError = vi.fn(), c = await connect({}, onError), initial = listenerCounts(c);
   const stream = c.connection.stream, write = stream.write.bind(stream);
   try {
@@ -156,7 +156,7 @@ it('sends Parse, statement Describe and Sync between the transaction commands', 
     // pg 8.6 sends a Flush inside sync(). Both drivers must reach Sync without Bind or Execute.
     const flush = messages[4]?.[0] === 'H' ? [['H', '']] : [];
     expect(messages).toEqual([
-      ['Q', 'BEGIN READ ONLY\0'], ['Q', "SET LOCAL lock_timeout = '1s'\0"],
+      ['Q', 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY\0'], ['Q', "SET LOCAL lock_timeout = '1s'\0"],
       ['P', '\0' + sql + '\0\0\0'], ['D', 'S\0'], ...flush, ['S', ''], ['Q', 'ROLLBACK\0'],
     ]);
   } finally {

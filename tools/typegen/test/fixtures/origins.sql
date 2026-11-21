@@ -14,6 +14,13 @@ CREATE VIEW user_ids AS SELECT id FROM users;
 CREATE TABLE versions (id integer NOT NULL);
 INSERT INTO versions VALUES (1);
 
+CREATE TABLE rule_parent (id int NOT NULL);
+INSERT INTO rule_parent VALUES (1);
+CREATE TABLE rule_target () INHERITS (rule_parent);
+CREATE TABLE rule_storage (id int);
+CREATE RULE route AS ON INSERT TO rule_target DO INSTEAD
+  INSERT INTO rule_storage VALUES (NULL) RETURNING rule_storage.id;
+
 CREATE TABLE parent_only (x int);
 CREATE TABLE other_child () INHERITS (parent_only);
 INSERT INTO other_child VALUES (NULL);

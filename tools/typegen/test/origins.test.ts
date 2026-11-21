@@ -53,6 +53,13 @@ const replays: Replay[] = [
     [nn,nn,sn], [[2,2,'0']], 17],
   ['returning old', 'INSERT INTO versions VALUES (2) RETURNING old.*', [nn], [[null]], 18],
   ['returning new', 'DELETE FROM versions RETURNING new.*', [nn], [[null]], 18],
+  ['escaped old', String.raw`INSERT INTO versions VALUES (2) RETURNING U&"\006fld".id`, [nn], [[null]], 18],
+  ['escaped new', String.raw`DELETE FROM versions RETURNING u&"n\0065w".id`, [nn], [[null]], 18],
+  ['custom escape', `INSERT INTO versions VALUES (2) RETURNING U&"!006fld" UESCAPE '!'.id`, [nn], [[null]], 18],
+  ['unicode guard in literal', "SELECT id FROM versions WHERE 'menu&more' <> ''", [nn], [[1]]],
+  ['unicode guard in comment', 'SELECT id FROM versions /* U& */', [nn], [[1]]],
+  ['rewrite rule', 'INSERT INTO rule_target VALUES (1) RETURNING id', [nn], [[null]]],
+  ['rule on descendant', 'SELECT id FROM rule_parent', [nn], [[1]]],
   ['returning alias', 'INSERT INTO versions VALUES (2) RETURNING WITH (OLD AS o) o.*', [nn], [[null]], 18],
   ['unvalidated child', 'SELECT x FROM checked_parent', [nn], [[null]], 18],
   ['not valid', 'SELECT x FROM unchecked', [nn], [[null]], 18],
@@ -155,9 +162,9 @@ it('proves the repaired rows after VALIDATE CONSTRAINT (Postgres 18+)', async ct
   await check(replay, generate([replay]));
 });
 
-it('looks up distinct queries in one parameterised origin query', async () => {
+it('binds each statement\'s origin pairs in one proof query', async () => {
   const cases: Replay[] = [
-    ['ids', 'SELECT id FROM users', [n], [[1], [2]]],
+    ['ids', 'SELECT id, manager FROM users', [n,nn], [[1,null], [2,1]]],
     ['balances', 'SELECT balance FROM accounts', [s], [['10'], ['30']]],
   ];
   const module = generate(cases, `
@@ -171,10 +178,46 @@ it('looks up distinct queries in one parameterised origin query', async () => {
   `);
   for (const replay of cases) await check(replay, module);
   const lookups = readFileSync(join(dir, 'lookups'), 'utf8').trim().split('\n');
-  expect(lookups).toHaveLength(1);
-  const [oids, numbers] = JSON.parse(lookups[0]) as number[][],
-    { fields } = await client.query('SELECT users.id, accounts.balance FROM users, accounts LIMIT 0');
-  expect(oids.map((oid, i) => [oid, numbers[i]]).sort()).toEqual(fields.map(f => [f.tableID, f.columnID]).sort());
+  expect(lookups).toHaveLength(cases.length);
+  for (const [i, [, text]] of cases.entries()) {
+    const { fields } = await client.query(text);
+    expect(JSON.parse(lookups[i])).toEqual([fields.map(f => f.tableID), fields.map(f => f.columnID)]);
+  }
+});
+
+it('holds the Parse lock until the origin has been checked', async () => {
+  const replay: Replay = ['migration', 'SELECT id FROM cyclecol', [nn], [[null]]];
+  await client.query('CREATE TABLE cyclecol (id int); INSERT INTO cyclecol VALUES (NULL)');
+  expect((await client.query(replay[1])).rows).toEqual([{ id: null }]);
+  const module = generate([replay], `
+    const { Client } = require(${JSON.stringify(require.resolve('pg'))}), query = Client.prototype.query;
+    Client.prototype.query = async function (sql, ...args) {
+      if (sql !== 'ROLLBACK') return query.call(this, sql, ...args);
+      Client.prototype.query = query;
+      const migration = new Client({ connectionString: process.env.ORIGINS_DB });
+      await migration.connect();
+      try {
+        const ddl = migration.query(\`
+          ALTER TABLE cyclecol RENAME id TO previous;
+          UPDATE cyclecol SET previous=1;
+          ALTER TABLE cyclecol ALTER previous SET NOT NULL;
+          ALTER TABLE cyclecol ADD id int;
+        \`);
+        let blocked = false;
+        for (let i = 0; i < 100 && !blocked; i++) {
+          const { rows } = await this.query('SELECT pg_backend_pid() = ANY(pg_blocking_pids($1)) AS blocked', [migration.processID]);
+          blocked = rows[0].blocked;
+          if (!blocked) await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        await this.query('ROLLBACK');
+        await ddl;
+        require('node:assert/strict').ok(blocked, 'migration waited for Describe');
+      } finally {
+        await migration.end();
+      }
+    };
+  `);
+  await check(replay, module);
 });
 
 it('keeps the wire type when a schema label differs from the catalogue', async () => {
