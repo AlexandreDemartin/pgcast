@@ -195,7 +195,7 @@ async function watchProject(ts: typeof TS, client: Client, project: string, path
   const watcher = watch(ts, project, path, {
     describe: async query => {
       context = site(query) + ' ';
-      try { return await describeCandidates(client, query, schemas); } catch (error) { throw new Error(context + message(error)); }
+      try { return await describeCandidates(client, query, schemas); } catch (error) { throw new Error(context + message(error)); } finally { context = `${path}:1:1 `; }
     },
     async write(rows) {
       const content = buildQueries(dbModule, typedQueries(rows)), stored = await readFile(path).catch(() => undefined);
