@@ -2299,7 +2299,7 @@ describe('a list that is not an array in isIn(), isNotIn(), eqAny(), likeAny() a
   };
   // one value in place of the list is wrapped, not spread: `[...'5']` would split a string again
   const message = (fn: string, kind: string) => ['string', 'null', 'undefined'].includes(kind) ?
-    `\`${fn}()\` takes an array, not \`${kind}\`: for one value, write \`${fn}([value])\`.` :
+    `\`${fn}()\` takes an array, not \`${kind}\`: for one ${/like/i.test(fn) ? 'pattern' : 'value'}, write \`${fn}([${/like/i.test(fn) ? 'pattern' : 'value'}])\`.` :
     `\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`;
 
   it('throws for each kind, in isIn(), isNotIn(), eqAny(), likeAny() and ilikeAny(), through deletes, select and update, nested in and(), or() and not(), and copied', () => {
