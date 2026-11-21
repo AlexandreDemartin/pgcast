@@ -68,7 +68,7 @@ flowchart LR
 
 ## End of chapter
 
-When the Epic's last step is merged: a review of the whole merged range, then a method PR that judges each line of [LEARNINGS.md](LEARNINGS.md) and closes the Epic (skill `run-step` § End of chapter).
+When the Epic's last step is merged: a review of the whole merged range, then a method PR that judges each line of [LEARNINGS.md](LEARNINGS.md) and closes the Epic (skill `run-step` § End of chapter), for every Epic that closes, a release chapter included. Past about 60 lines of § Learnings, a method PR judges them without waiting (skill `run-step` § Finding the step).
 
 The method's current state and history live in Epic #836, rewritten by each method PR. A method change that is ready goes out at once; only the learnings wait for this PR (`.agents/README.md` § Self-improvement).
 
