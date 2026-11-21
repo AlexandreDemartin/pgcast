@@ -11,13 +11,11 @@ export function readConfig(dir: string) {
   let config, problem: string | undefined;
   try {
     config = JSON.parse(json, (_, value: unknown) => typeof value !== 'string' ? value :
-      value.replace(/\{\{([\s\S]*?)\}\}/g, (_, contents: string) => {
-        const name = contents.trim();
-        if (!/^[A-Za-z_][A-Za-z_0-9]*$/.test(name)) {
-          problem ??= `${file}: a placeholder is not a variable name`;
-        } else if (process.env[name] === undefined) {
-          problem ??= `Environment variable '${name}' is not set in ${file}`;
-        } else return process.env[name]!;
+      value.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (_, name: string) => {
+        const replacement = process.env[name];
+        if (replacement !== undefined) return replacement;
+        const safeName = /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : '[redacted]';
+        problem ??= `If present, ${file} must be a valid JSON file, and all referenced environment variables must exist: Environment variable '${safeName}' is not set`;
         // Finish expanding db so the CLI can redact the diagnostic.
         return '';
       }));

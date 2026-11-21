@@ -87,7 +87,7 @@ export function neutralise(ts: typeof TS, source: TS.SourceFile, literal: TS.Tem
     start = tail.end - 2;
   }
   const variableSites = ambiguous.map(i => sites[i]);
-  if (ambiguous.length > 4) throw new Error(`More than four ambiguous parameters. Give each a cast or false: ${variableSites.join(', ')}.`);
+  if (ambiguous.length > 4) throw new Error(`Give slots a cast or false to leave at most four ambiguous parameters: ${variableSites.join(', ')}.`);
   const template = Object.assign(chunks, { raw });
   try {
     const text = db.sql(template, ...slots).compile().text;

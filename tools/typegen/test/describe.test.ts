@@ -154,9 +154,10 @@ it('sends Parse, statement Describe and Sync between the transaction commands', 
       return [packet.toString('ascii', 0, 1), packet.toString('utf8', 5)];
     });
     // pg 8.6 sends a Flush inside sync(). Both drivers must reach Sync without Bind or Execute.
-    const flush = messages[4]?.[0] === 'H' ? [['H', '']] : [];
+    const flush = messages.some(([tag]) => tag === 'H') ? [['H', '']] : [];
     expect(messages).toEqual([
       ['Q', 'BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY\0'], ['Q', "SET LOCAL lock_timeout = '1s'\0"],
+      ['Q', 'SHOW DateStyle\0'], ['Q', 'SHOW IntervalStyle\0'],
       ['P', '\0' + sql + '\0\0\0'], ['D', 'S\0'], ...flush, ['S', ''], ['Q', 'ROLLBACK\0'],
     ]);
   } finally {
@@ -197,5 +198,20 @@ it('times out behind a conflicting lock and rolls back before the next descripti
     expect((await describeQuery(client, 'SELECT FROM pg_catalog.pg_class')).fields).toEqual([]);
   } finally {
     await client.query('RESET statement_timeout');
+  }
+});
+
+it.each(['date', 'timestamp', 'timestamptz', 'interval'])('checks the leaf parser for %s arrays', async type => {
+  const c = await connect({ options: '-c DateStyle=SQL,DMY -c IntervalStyle=iso_8601' });
+  try {
+    const value = type === 'interval' ? '2 days' : '2024-03-20';
+    const sql = "SELECT ARRAY['" + value + "'::" + type + "] AS items";
+    const [item] = (await c.query(sql)).rows[0].items;
+    if (type === 'interval') expect(item.days).toBeUndefined();
+    else expect(item).toBeNull();
+    await expect(describeQuery(c, sql)).rejects.toThrow(type === 'interval' ? /IntervalStyle.*postgres/ : /DateStyle.*ISO/);
+    expect((await describeQuery(c, 'SELECT 1')).fields?.[0].dataTypeID).toBe(23);
+  } finally {
+    await c.end();
   }
 });
