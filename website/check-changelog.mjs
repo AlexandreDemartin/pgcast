@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Alexandre Demartin
-// Fails the docs build when a TypeScript snippet of the root CHANGELOG.md that is marked to compile does not
-// type-check (README.md § The changelog): a migration it gives a user is otherwise never compiled (#200). A snippet is
+// Fails the docs build when a TypeScript snippet of the root CHANGELOG.md, or of the pages that carry a mark (conditions,
+// select, testing, transaction, in English and French), that is marked to compile does not type-check (README.md § The
+// changelog): a migration it gives a user is otherwise never compiled (#200, #700, #715). A snippet is
 // a code span with a mark glued after it: `<!-- tsc -->` if it is a module's code, or `<!-- tsc: … -->` with the code
 // around it, `…` standing for the span (`db.upsert('films', [], 'id', { updateValues: … })`). Any other HTML comment
 // outside a code span fails, so that a near miss does not turn the check off. Each is checked in memory, as its own
@@ -45,8 +46,11 @@ function marksOf(line) {
   return marks;
 }
 
-/** The snippets of `source`, each `{ at, code }`; a comment that is not a mark glued after a span goes to `problems`. */
-function snippetsOf(name, source, problems) {
+/**
+ * The snippets of `source`, each `{ at, code }`; a comment that is not a mark glued after a span goes to `problems`.
+ * A page also holds the marks of check-reference.mjs, `<!-- probe: … -->` and `<!-- message -->`, which `ownMarks` skips.
+ */
+function snippetsOf(name, source, problems, ownMarks = false) {
   const snippets = [];
   source.split('\n').forEach((line, i) => {
     for (const { index, mark, span } of marksOf(line)) {
@@ -54,6 +58,7 @@ function snippetsOf(name, source, problems) {
         at = `${name}:${i + 1}:${index + 1}`,
         read = mark.match(/^<!-- tsc(?:: ((?:(?!--).)+?))? -->$/),
         around = read?.[1];
+      if (ownMarks && /^<!-- (?:probe|message|joined)\b/.test(mark)) continue;
       if (!read) problems.push(`${at}: an HTML comment here is a mark, \`<!-- tsc -->\` or \`<!-- tsc: … -->\`, ` +
         `on one line, with no \`--\` in it: ${mark}`);
       else if (span === undefined) problems.push(`${at}: ${mark} has no code span right before it`);
@@ -72,7 +77,8 @@ if (missed.length !== 1) throw new Error('check-changelog.mjs: the code spans ar
 
 // One file name, never written, for each snippet in turn: the other files are read once, for the programs to share.
 const
-  snippets = snippetsOf('CHANGELOG.md', readFileSync(`${root}../CHANGELOG.md`, 'utf8'), problems),
+  files = ['../CHANGELOG.md', ...['conditions', 'select', 'testing', 'transaction'].flatMap(page => [`${page}.md`, `fr/${page}.md`])],
+  snippets = files.flatMap(file => snippetsOf(file.replace('../', ''), readFileSync(`${root}${file}`, 'utf8'), problems, !file.startsWith('../'))),
   name = `${root}changelog-snippet.ts`,
   host = ts.createCompilerHost(options),
   { getSourceFile, fileExists } = host,
@@ -93,8 +99,8 @@ for (const { at, code } of snippets) {
 }
 
 if (problems.length > 0) {
-  console.error(`The changelog snippets check failed (README.md § The changelog):\n  ${problems.join('\n  ')}`);
+  console.error(`The snippets check failed (README.md § The changelog):\n  ${problems.join('\n  ')}`);
   process.exitCode = 1;
 } else {
-  console.log(`The changelog snippets type-check: ${snippets.length}.`);
+  console.log(`The snippets type-check: ${snippets.length}.`);
 }
