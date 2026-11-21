@@ -98,9 +98,9 @@ export const notReImatch = <T extends string>(a: T) => sql<SQL, boolean | null, 
 // 6.6.1 read `a.length`, which an iterable lacks, so `isNotIn(new Set([1]))` compiled to `true`, every row; the
 // refusal sits in the expressions, which copy() shares, so that a copied condition throws too; one value is wrapped,
 // not spread, which would split a string into its characters again
-const notAnArray = (fn: string, a: unknown) => sql`${refused(typeof a === 'object' && a !== null ?
+const notAnArray = (fn: string, a: unknown, one = 'value') => sql`${refused(typeof a === 'object' && a !== null ?
   `\`${fn}()\` takes an array, not \`${Object.prototype.toString.call(a).slice(8, -1)}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.` :
-  `\`${fn}()\` takes an array, not \`${a === null ? 'null' : typeof a}\`: for one value, write \`${fn}([value])\`.`)}`;
+  `\`${fn}()\` takes an array, not \`${a === null ? 'null' : typeof a}\`: for one ${one}, write \`${fn}([${one}])\`.`)}`;
 
 /**
  * `"col" IN ($1, $2)`, and `false` for an empty array. A list that is not an array (a `Set`, an
@@ -127,7 +127,7 @@ const notAValue = (x: unknown) =>
 // a list that is no array, for eqAny(), likeAny() and ilikeAny(); `noun`, one word, is what the array holds
 const notAList = (fn: string, noun: string, a: unknown) => {
   const name = notAValue(a);
-  return name === undefined ? notAnArray(fn, a) :
+  return name === undefined ? notAnArray(fn, a, noun.replace(/s$/, '')) :
     refused(`\`${fn}()\` takes an array of ${noun}, not ${name}: write \`${fn}(${noun})\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
 };
 
