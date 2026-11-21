@@ -34,6 +34,7 @@ const groups: Group[] = [
       { text: { en: 'Row security<small class="since">6.12</small>', fr: 'Sécurité niveau ligne<small class="since">6.12</small>' }, link: '/row-security' },
       { text: { en: 'Custom types', fr: 'Types personnalisés' }, link: '/custom-types' },
       { text: { en: 'Raw SQL', fr: 'SQL brut' }, link: '/raw-sql' },
+      { text: { en: 'Typed SQL', fr: 'SQL typé' }, link: '/typed-sql' },
       { text: { en: 'Errors', fr: 'Erreurs' }, link: '/handle-errors' },
       { text: { en: 'Drivers<small class="since">6.12</small>', fr: 'Drivers<small class="since">6.12</small>' }, link: '/drivers' },
       { text: { en: 'Testing', fr: 'Tests' }, link: '/testing' },
