@@ -62,7 +62,7 @@ One line each; the whole table is in [docs/WORKFLOW.md § Commands](docs/WORKFLO
 - `npm ci` (npm ≥ 10), `npm run build`, `npm run lint`, `npm run typecheck`, `npm test` (needs `TEST_DATABASE_URL`), `npm run test:watch`.
 - `npm run test:types`: the type tests on the fixture's schema. `npm run bench:types`: compile cost against `bench/baseline.json`, fails above +20 %.
 - `npm run check:floor` (after `build`): the declarations on TypeScript 4.1. `npm run check:agents`: skills, agents, § Architecture, changelog and report.
-- An extension runs its own checks from its folder (its README § Development).
+- An extension runs its own checks from its folder (its README § Development, and [docs/WORKFLOW.md § Commands](docs/WORKFLOW.md#commands)).
 
 A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass, and an extension's own when it changes.
 
@@ -70,6 +70,10 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass, an
 
 - Method on one page: [docs/WORKFLOW.md](docs/WORKFLOW.md); skill map: [.agents/README.md](.agents/README.md). Before a subject, read the skill it names.
 - A step is a sub-issue of an Epic (`gh issue view <n> --repo AlexandreDemartin/pgcast`, with **Files** and **Risk**), run by the skill `run-step`. Costs and levers: issue #812.
+
+### Compact instructions
+
+When the conversation is compacted, keep: the step and PR numbers in progress, the agents still running with their worktrees and scratch folders, the decisions taken with their reasons, and the next action. The rest is in the orchestrator's hand-over.
 
 ## Working rules
 
@@ -79,7 +83,7 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass, an
 - **No breaking change** to the public API: stop and ask (skill `backward-compat`).
 - **`core.ts`**: never touch it without saying so; each change adds SQL injection tests (skill `sql-safety`).
 - Subject skills: `zero-abstraction` (a helper), `type-tests` (a type), `codegen-output`, `consumer-usage` (a need), `code-style`, `concise-docs`.
-- `CHANGELOG.md` and the docs, in English and French, in the same PR as the feature (`website/README.md` § Languages).
+- `CHANGELOG.md` and the docs in the same PR as the feature; the docs site in English and French (`website/README.md` § Languages).
 - Keep the existing copyright headers (George MacKerron); a new file may carry `Copyright (C) 2026 Alexandre Demartin`.
 
 ## Stop points (mandatory: stop and ask)
