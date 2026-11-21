@@ -945,6 +945,14 @@ describe('cursor()', () => {
     expect(sent.slice(1)).toEqual([fetch(2), close()]);
   });
 
+  it('rejects a break with any other error of CLOSE when pg then reports the client outside a transaction block', async () => {
+    const failure = sqlError('57P01');
+    const options = { rows: rows(5), status: 'T', fail: (text: string): Error | undefined => text.startsWith('CLOSE') ? (options.status = 'I', failure) : undefined };
+    const { sent, client } = cursorClient(options);
+    await expect((async () => { for await (const _ of db.cursor(client, users, { batchSize: 2 })) break; })()).rejects.toBe(failure);
+    expect(sent.slice(1)).toEqual([fetch(2), close()]);
+  });
+
   // inside a transaction block, the 34000 aborts it: a generator read in one attempt and return()ed in the next
   it.each(['T', 'E', 'no status'])('rejects a break with a 34000 of CLOSE when the client then reports %s, and frees the number', async after => {
     const failure = sqlError('34000');
