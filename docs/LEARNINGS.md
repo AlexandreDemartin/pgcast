@@ -25,6 +25,7 @@ Candidates for a check, a rule or a skill line.
 - #847 — `require("<pkg>/package.json")` throws `ERR_PACKAGE_PATH_NOT_EXPORTED` on a package with `exports` (`@pgcast/pgcast`): a probe reads the file with `fs`, or a pinned install silently gets an empty version — builder
 - #847 — a replay of a CI step that reads its expected list from `ci.yml` itself gives a red/green proof for a workflow-only fix, where a test cannot — builder
 - #847 — an inherited `include` or `files` resolves from the base tsconfig's folder; only a key the extending file writes resolves from its own: check an expected tsconfig with `tsc -p <file> --listFilesOnly` before writing it in a review — branch-reviewer
+- #847 — a French page's code blocks are identical to the English page's (`website/check-translations.mjs`): a placeholder inside a command stays in English; a verify nit that translates one is wrong — orchestrator
 
 ## Minors kept
 
