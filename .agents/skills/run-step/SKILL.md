@@ -59,7 +59,7 @@ The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the ga
 ## Sequence
 
 1. **Issue**: **Files** and **Risk** present; stop points asked.
-2. **Plan** (`normal`, `high`): the `builder` posts it on the issue. At `high` it stops; the orchestrator checks the plan against the issue, then resumes it.
+2. **Plan** (`normal`, `high`): the `builder` posts it on the issue. At `high` it stops; the orchestrator checks the plan against the issue, then resumes it within 5 minutes, or else starts a fresh `builder` with "plan checked": after 5 minutes its cache is cold, and resuming rewrites its whole context (#812).
 3. **Build**: tests first, one-line commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with **Proofs** (skill `plan-and-proofs`).
 4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its comment (skill `review-comments`).
 5. **Fixes**: a fresh `builder`, blocking items only; the others go to `docs/LEARNINGS.md` § Minors kept.
@@ -77,12 +77,14 @@ An agent knows only what its brief says.
 
   | Role | Model | Effort |
   |---|---|---|
-  | `builder`, `low` or `normal` step | the session's | `medium` |
+  | `builder`, `low` or `normal` step | `sonnet` | `medium` |
   | `builder`, `high` step (plan and build), round of fixes | the session's | `high` |
   | `branch-reviewer`, review and `verify` | the session's | `high` |
   | `chores`, French proofreader, npm and site audits | `sonnet` | `medium` |
   | Orchestrator | the session's | the session's |
 
+  Each change of this table is a lever of #812, with its keep-or-revert test; its measurements go there.
+- **A `builder`'s hand-over**: one that stopped past about 80 calls (agent `builder` § Hand-over) is followed by a fresh `builder` with the issue, the branch and its hand-over note.
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
 - **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR, where the reviewer's harness stays for the fix round.
@@ -100,6 +102,7 @@ An agent knows only what its brief says.
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`).
 3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
 4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it rather than compacting a long one (one session reached 966K tokens of context, #732).
+5. Within a chapter, the orchestrator brings its hand-over up to date after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`) and lose nothing: no one has to be there to start a new session (#812).
 
 ## Checklist
 

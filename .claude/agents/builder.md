@@ -66,6 +66,13 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 - French pages hold U+00A0 (`website/README.md` § Typography): a scripted find-and-replace matches it, normalises first or anchors on the line's start; a conflict keeps its own text, never retyped (checked by byte); `docs:translated` runs once the page is checked, never chained after the edit (#262, #484, #575, #632, #667).
 - The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier), `'==='`, a heredoc (`<<'EOF'`, or its backticks run) and a glob (`--include='*.ts'`, or "no matches found" zeroes a count); `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`, and BSD `sed` no `\|` (`sed -E`): check that a scripted edit changed its file (#516, #521, #680).
 
+## Hand-over
+
+Each call rereads the whole context, so a long run costs more with each call (#812).
+
+- Past about 80 calls, with more than one point of the step left: at the next green commit, push, write `<scratch>/handoff.md` (points done, points left, the next command, the decisions taken and why), then stop and report it.
+- A `builder` started with a hand-over note reads it, then `git log origin/master..HEAD`, and goes on from the next point; it does not redo the plan.
+
 ## Report
 
 - PR (number, link), SHAs; at `high` after the plan, the plan comment's link.
