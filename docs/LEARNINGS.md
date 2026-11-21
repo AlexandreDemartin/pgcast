@@ -3,7 +3,7 @@
 What the agents returned during the chapter and what waits for its end. Written by the orchestrator, judged and emptied by the method PR (skill `run-step` § End of chapter).
 
 - One line per remark: `<step> — <remark> — <source>` (agent, `file:line`, standard).
-- Nothing applies before the end of the chapter: the method is frozen until then (`.agents/README.md` § Self-improvement).
+- A learning applies only once judged, at the end of the chapter; a method change that is ready does not wait (`.agents/README.md` § Self-improvement).
 
 ## Learnings
 
@@ -264,6 +264,8 @@ Candidates for a check, a rule or a skill line.
 - #835 — a wording a review proposes still needs every probe case: the proposed advisory-lock sentence was false for a 40001 thrown in JavaScript after a lock taken in the savepoint — builder
 - #834 — a check built on a regex is only as good as the forms it parses: probe it with the forms it should refuse, not only the one form the tree uses — branch-reviewer
 - #834 — a mutant `isDate` that reads `getTime` is killed only by a class instance: a plain object fails the prototype test before `getTime` is read — builder
+- #841 — The workflow Epic's body was ahead of the skills (its "As soon as possible" bullet existed before the PR); a method PR diffs Epic #836 against the skills it changes — builder
+- #841 — `docs/WORKFLOW.md` and the `merge-gate` checklist both still said "the owner's OK" for `high`; when a gate changes, grep `needs-owner` and "OK" across the docs — builder
 
 ## Minors kept
 
