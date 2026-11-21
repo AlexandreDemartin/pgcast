@@ -275,6 +275,17 @@ it('redacts a parsed password that also occurs in a config diagnostic', () => {
   expect(result.stderr.trim()).toContain("Environment variable '[redacted]' is not set");
 });
 
+it('redacts a JWT in a missing placeholder', ({ onTestFinished }) => {
+  const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.c2FtcGxl';
+  vi.stubEnv(token, undefined);
+  onTestFinished(() => { vi.unstubAllEnvs(); });
+  put('zapatosconfig.json', { db: { password: '{{' + token + '}}' } });
+  const result = run('--project', project);
+  expect(result.status).toBe(1);
+  expect(result.stderr).not.toContain(token);
+  expect(result.stderr).toContain("Environment variable '[redacted]' is not set");
+});
+
 it('redacts the password as written in a socket URI and as pg decodes it', () => {
   const raw = 'sample%2f804', parsed = 'sample/804';
   put('zapatosconfig.json', { db: { password: 'sample', connectionString: 'postgres://reader:' + raw + '@/db?host=/unused' }, outDir: 'generated' });
