@@ -190,7 +190,7 @@ it('prints no password from a rejected query in a watch round', { timeout: 20_00
   const { child, seen } = start();
   await until(() => rows().includes('"id": number;'), 'the first write');
   await settle();
-  put('app/app.ts', source('SELECT 1 AS id FROM public."' + secret.replace('"', '""') + '"'));
+  put('app/app.ts', source('SELECT 1 AS id FROM public."' + secret.replace(/"/g, '""') + '"'));
   await until(() => seen.stderr.includes('[redacted]'), 'the error');
   expect(seen.stderr).toMatch(/app\.ts:3:\d+ Query "people": 42P01: relation "public\.\[redacted\]" does not exist/);
   expect(seen.stdout + seen.stderr).not.toContain(secret);
@@ -198,7 +198,7 @@ it('prints no password from a rejected query in a watch round', { timeout: 20_00
 });
 
 it('prints no password when the watch cannot connect', async () => {
-  put('zapatosconfig.json', { db: { connectionString: 'postgres://reader:' + secret.replace('"', '%22') + '@127.0.0.1:1/db' }, outDir: 'generated' });
+  put('zapatosconfig.json', { db: { connectionString: 'postgres://reader:' + encodeURIComponent(secret) + '@127.0.0.1:1/db' }, outDir: 'generated' });
   const { seen } = start();
   await until(() => seen.code !== undefined, 'the exit');
   expect(seen.code).toBe(1);
