@@ -9,7 +9,6 @@ import { Client } from 'pg';
 import type * as TS from 'typescript';
 import { readConfig } from './config';
 import { describeQuery } from './describe';
-import { refineOrigins } from './origins';
 import { scan } from './scan';
 import { writeQueries } from './write';
 
@@ -88,7 +87,7 @@ async function run(args: string[]) {
       context = site(query) + ' ';
       if (connectionError) throw connectionError;
       try {
-        const { fields } = await describeQuery(client, query.text);
+        const { fields } = await describeQuery(client, query.text, config.schemas);
         rows.set(query.name, { text: query.text, fields });
       } catch (error) {
         console.error(redact(context + message(connectionError ?? error)));
@@ -96,7 +95,6 @@ async function run(args: string[]) {
         if (connectionError) return;
       }
     }
-    if (!process.exitCode && !connectionError) await refineOrigins(client, rows.values(), config.schemas);
   } finally {
     await client.end();
   }
