@@ -105,6 +105,33 @@ it('writes the first kept text when the all-plain form cannot infer a type', asy
   expect((await pg.query(query({}))).rows).toEqual([{ missing: false }]);
 });
 
+it('writes the first kept text when the all-plain operator is ambiguous', async () => {
+  expect(generate('SELECT ' + forced + ' -> 0 AS item').stderr).toBe('');
+  const query = (v: unknown) => db.sql`SELECT ${db.param(v, true)} -> 0 AS item`.compile();
+  await expect(pg.query(query('x'))).rejects.toMatchObject({ code: '42725' });
+  expect(written()).toContain(JSON.stringify(query([1]).text));
+  expect(written()).toContain('"item": JSONValue | null;');
+  expect((await pg.query(query([1]))).rows).toEqual([{ item: 1 }]);
+});
+
+it('keeps the previous file when only the JSON form needs a schema privilege', async () => {
+  await pg.query(`
+    CREATE SCHEMA variant_private;
+    CREATE TABLE variant_private.films (id int);
+    CREATE FUNCTION variant_name(text, text) RETURNS int LANGUAGE sql AS 'SELECT 1';
+    CREATE FUNCTION variant_name(regclass, json) RETURNS int LANGUAGE sql AS 'SELECT 2';
+  `);
+  expect(generate('SELECT 1 AS previous').status).toBe(0);
+  const path = join(dir, 'zapatos/queries.ts'), previous = readFileSync(path);
+  const result = generate("SELECT variant_name('variant_private.films', " + forced + ') AS n',
+    "process.env.PGOPTIONS = '-c role=pg_read_all_stats';");
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('Query "variant"');
+  expect(result.stderr).toContain('CAST($1 AS "json")');
+  expect(result.stderr).toMatch(/42501.*permission denied for schema variant_private/);
+  expect(readFileSync(path)).toEqual(previous);
+});
+
 it('refuses text and JSON results for the same field', async () => {
   const result = generate('SELECT ' + forced + ' AS n');
   expect(result.status).toBe(1);
