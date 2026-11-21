@@ -28,7 +28,7 @@ A typed placeholder for run-time content (an interpolation, a condition) proves 
 
 - The files a tsconfig selects are the compiler's, not a scan of its roots: build the program (no checker) to follow import-only files, skip composite sources replaced by declarations, and take each TypeScript version's extension rules (#811).
 - Project references are also tried in reverse order: a file two projects share keeps each project's verdict, and a disagreement drops the template either way (#811).
-- An inherited `include` or `files` resolves from the base tsconfig's folder, and only a key the extending file writes from its own; with neither in the base (what `tsc --init` writes), the default `**/*` resolves from the extending file's folder, and `extends` alone selects nothing of the project above it. A tsconfig that docs or a review prescribe is first run with `tsc -p <file> --listFilesOnly` (#847).
+- An inherited `include` or `files` resolves from the base tsconfig's folder, and only a key the extending file writes from its own; with neither in the base (what `tsc --init` writes), the default `**/*` resolves from the extending file's folder, and `extends` alone selects nothing of the project above it. A tsconfig that docs or a review prescribe is first run with `tsc -p <file> --listFilesOnly` on a base with neither key (what `tsc --init` writes) and on one with `include` (#847).
 
 ## Nullability
 
