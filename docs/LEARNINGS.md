@@ -239,6 +239,9 @@ Candidates for a check, a rule or a skill line.
 - #811 — A scanner that reads a tsconfig's roots is not the compiler's selection: build the program (no checker) to follow import-only files, skip composite sources replaced by declarations and inherit the extension rules of each TypeScript version — branch-reviewer
 - #811 — Reversing project references makes order-dependent binding decisions visible: a file two projects share keeps each project's verdict, and a disagreement drops the template in either order — codex
 - #811 — Accept a `zapatos/db` / `pgcast/db` import by resolving it under the project's options to an external library, not by its specifier: a `paths` entry can map the name to a local file — branch-reviewer
+- #814 — On pg 8.6.0 and 8.23.1, awaiting `end()` after a rejected `connect()` can never settle (invalid port): a CLI that awaits it exits 0 in silence; end the client only after a connection succeeded — codex
+- #814 — Check a client option as the driver parses it, not on the URL: pg reads `query_timeout` from a Unix-socket URI (`postgres://user@/db?host=/tmp&...`) that `URL.searchParams` on the configured string misses — branch-reviewer
+- #814 — A CLI's credential guard is one redactor on every printed line plus `uncaughtException` / `unhandledRejection` handlers installed before connecting: pg throws some errors from socket callbacks, outside any `try` — branch-reviewer
 
 ## Minors kept
 
@@ -264,3 +267,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #748 — `website/transaction.md:466` (FR `:470`) "a `break` after an error the loop caught ends the loop": add that the transaction stays aborted, so `COMMIT` gets `ROLLBACK` (`PGCAST_DEP003`, or a rejection under `transactionRequiresCommit`), link to `:62` — branch-reviewer
 - #750 — website/select.md:265 (and FR :269): the cast shown, `l as db.SQLFragmentMap`, fits the map forwarder only; for a `db.SQLFragment<R>` forwarder the cast is `l as db.SQLFragment<any>` (TS2352 otherwise) — branch-reviewer
 - #811 — `tools/typegen/test/scan.test.ts:217`: in a cyclic composite reference graph, TypeScript 5.9 and 6.0 select neither project's source and 4.1.6 both; the test pins the compiler's choice without asserting the cycle's diagnostic — orchestrator
+- #814 — `tools/typegen/src/cli.ts:63`: when `new Client(db)` throws (an invalid `db.sslnegotiation`), the missing-variable diagnostic is printed before the redactor knows the parsed password; only a variable whose name equals the password shows it — orchestrator
