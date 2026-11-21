@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Copyright (C) 2026 Alexandre Demartin
 
+import './peers';
 import { writeSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -20,7 +21,13 @@ import { aliases, buildQueries, header, literal, typedQueries, writeQueries } fr
 const usage = 'Usage: pgcast-typegen [--check | --watch] [--project <tsconfig>]';
 
 function projectCompiler(project: string): typeof TS {
-  try { return createRequire(project)('typescript'); } catch { throw new Error('Cannot load typescript from the project'); }
+  let ts: typeof TS;
+  try { ts = createRequire(project)('typescript'); } catch { throw new Error('Cannot load typescript from the project'); }
+  // TypeScript 7 is a native compiler: its package has no createSourceFile, so say which one the tsconfig resolved.
+  if (typeof ts.createSourceFile !== 'function') {
+    throw new Error(`typescript ${ts.version} from ${project} has no JavaScript API; point --project at a tsconfig that resolves typescript 4.1 to 6`);
+  }
+  return ts;
 }
 
 type Query = ReturnType<typeof scan>['queries'][number];
@@ -247,8 +254,8 @@ async function run(args: string[]) {
   context = `${project}:1:1 `;
   if (watching) return watchProject(projectCompiler(project), client!, project, path, `${moduleNames}/db`, config.schemas);
   const ts = projectCompiler(project), result = scan(ts, project, path), queries = result.queries;
-  // checkQueries reports invalid output with the regeneration advice, even when the project imports it.
-  const diagnostics = result.diagnostics.filter(d => !check || resolve(d.file) !== path);
+  // The output file is ours to rewrite: a conflict or a syntax error in it is not a reason to stop, and --check reports it with the advice.
+  const diagnostics = result.diagnostics.filter(d => resolve(d.file) !== path);
   if (diagnostics.length) {
     for (const d of diagnostics) console.error(redact(`${d.file}:${d.line}:${d.column} ${d.message}`));
     process.exitCode = 1;
