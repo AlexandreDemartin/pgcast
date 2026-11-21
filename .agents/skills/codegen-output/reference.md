@@ -4,6 +4,7 @@ The cases of skill `codegen-output` for the typed SQL tool, `tools/typegen` (dec
 
 ## Describing
 
+- A new module's `dist/` file joins the exact list of `ci.yml`'s package-contents step in the same commit (skill `ci-gate` § Pitfalls).
 - The user's text goes through Parse only, or not at all: `PREPARE` and `pg_prepared_statements` over the simple protocol run any statement that follows it in the text (#746).
 - `pg`'s documented Submittable (as pg-cursor uses it) gives Parse and Describe with `pg`'s own login and TLS; an ErrorResponse clears the active query, so a describer resolves and removes its listeners in `handleError`, where `handleReadyForQuery` never fires (#746).
 - Parse takes the statement's locks: a describe on a shared database sets `lock_timeout`; a probe script that talks the protocol sets a timeout per message and drops its leftover database on start (#746).
@@ -28,6 +29,7 @@ A typed placeholder for run-time content (an interpolation, a condition) proves 
 
 - The files a tsconfig selects are the compiler's, not a scan of its roots: build the program (no checker) to follow import-only files, skip composite sources replaced by declarations, and take each TypeScript version's extension rules (#811).
 - Project references are also tried in reverse order: a file two projects share keeps each project's verdict, and a disagreement drops the template either way (#811).
+- An inherited `include` or `files` resolves from the base tsconfig's folder, and only a key the extending file writes from its own; with neither in the base (what `tsc --init` writes), the default `**/*` resolves from the extending file's folder, and `extends` alone selects nothing of the project above it. A tsconfig that docs or a review prescribe is first run with `tsc -p <file> --listFilesOnly` on a base with neither key (what `tsc --init` writes) and on one with `include` (#847).
 
 ## Nullability
 
@@ -52,3 +54,4 @@ A `NOT NULL` proof from the catalog:
 - A `{{…}}` placeholder is printed only when it is a POSIX name: a credential pasted there reaches the diagnostic (#826). A test never expects a word the redactor can hide (CI's password is `postgres`), and an `it.each` title takes `%#`, never an argument holding a URL (#722, #826).
 - A client option is read as the driver parses it: `pg` reads `query_timeout` from a Unix-socket URI that `URL.searchParams` misses (#814).
 - The client is ended only after a connection succeeded: on `pg` 8.6.0 and 8.23.1, awaiting `end()` after a rejected `connect()` never settles, and the CLI exits 0 in silence (#814).
+- A missing peer is checked by a small module that the CLI imports first (`tools/typegen/src/peers.ts`): TypeScript's CommonJS output keeps the import order, and no `try` wraps an import (#847).
