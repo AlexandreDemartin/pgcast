@@ -20,7 +20,7 @@ In this order, stopping as soon as the answer is written:
 
 - **Found**: apply it without reopening the debate; a better idea is proposed, not imposed.
 - **Shaky need** (workaround, contorted case, magic): do not code around it; raise it.
-- **A note's claims are runs** (skill `code-style` § Claims): each signature compiled before the note is accepted (TS2536), each SQL string grepped in the output of one harness that replays them all, every round; a quote of Zapatos or of a maintainer runs to its conclusion and to the linked issue's closing comment; a Zapatos change is dated by its commit against the version commits; how the existing keys treat the same case is the precedent (#567, #635, #646, #680).
+- **A note's claims are runs** (skill `code-style` § Claims): each signature compiled before the note is accepted (TS2536), each SQL string grepped in the output of one harness that replays them all, every round; a quote of Zapatos or of a maintainer runs to its conclusion and to the linked issue's closing comment, and any source cited by its exact wording is fetched and the quote checked (#747); a Zapatos change is dated by its commit against the version commits; how the existing keys treat the same case is the precedent (#567, #635, #646, #680).
 
 ## 2. The limits, in this order
 
