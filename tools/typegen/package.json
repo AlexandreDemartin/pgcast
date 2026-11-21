@@ -11,6 +11,7 @@
   },
   "type": "commonjs",
   "exports": {},
+  "bin": { "pgcast-typegen": "dist/cli.js" },
   "files": ["dist", "README.md", "CHANGELOG.md", "LICENCE"],
   "scripts": {
     "build": "tsc",
