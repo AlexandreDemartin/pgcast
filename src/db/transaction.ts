@@ -622,8 +622,7 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  * - A `break`, a `return` or a throw in the loop sends `CLOSE`. If the query's
  *   `runResultTransform` throws, or a result listener throws after a successful
  *   `DECLARE` or `FETCH`, the generator sends `CLOSE` and rethrows the original
- *   error unless `CLOSE` fails with an error other than the 25P02 and the
- *   34000 dropped below.
+ *   error unless `CLOSE` fails with an error other than 25P02.
  *   A query listener that throws before a `FETCH` or `CLOSE` reaches the driver
  *   can leave the cursor open until the transaction ends. Reusing the leaked cursor's
  *   name in the same transaction fails with 42P03.
