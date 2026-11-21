@@ -260,6 +260,8 @@ Candidates for a check, a rule or a skill line.
 - #825 — A guide on generated types must separate one row's fields from the result shape (`Row` or `Row[]`) and the caller's decoders, which the tool cannot see — branch-reviewer
 - #834 — a check built on a regex is only as good as the forms it parses: probe it with the forms it should refuse, not only the one form the tree uses — branch-reviewer
 - #834 — a mutant `isDate` that reads `getTime` is killed only by a class instance: a plain object fails the prototype test before `getTime` is read — builder
+- #841 — The workflow Epic's body was ahead of the skills (its "As soon as possible" bullet existed before the PR); a method PR diffs Epic #836 against the skills it changes — builder
+- #841 — `docs/WORKFLOW.md` and the `merge-gate` checklist both still said "the owner's OK" for `high`; when a gate changes, grep `needs-owner` and "OK" across the docs — builder
 
 ## Minors kept
 
