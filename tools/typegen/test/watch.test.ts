@@ -108,8 +108,10 @@ it('rewrites the file on an edit and writes nothing when its bytes stay the same
   const { child, seen } = start();
   await until(() => rows().includes('"id": number;'), 'the first write');
   await settle();
+  const first = seen.stdout.split('\n').length;
   put('app/app.ts', source('SELECT id, email FROM public.users'));
-  await until(() => rows().includes('"email"'), 'the rewrite');
+  // The file changes before the tool prints its line: count lines only once that one has arrived.
+  await until(() => rows().includes('"email"') && seen.stdout.split('\n').length > first, 'the rewrite and its line');
   const before = statSync(out()).mtimeMs, lines = seen.stdout.split('\n').length;
   put('app/app.ts', source('SELECT id, email FROM public.users') + '\n// a comment');
   await new Promise(done => setTimeout(done, 1500));
