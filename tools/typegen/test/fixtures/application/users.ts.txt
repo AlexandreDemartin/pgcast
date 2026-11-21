@@ -1,7 +1,15 @@
 import * as db from 'zapatos/db';
 import type { Row } from './generated/zapatos/queries';
 
-export const users = db.sql<never, Row<'users'>[]>`SELECT id, settings FROM public.users`;
-const row: Row<'users'> = { id: 1, settings: { enabled: true } };
+export const users = db.sql<never, Row<'users'>[]>`SELECT u.id, settings, mood, scores FROM public.users u JOIN public.accounts a ON a.owner_id=u.id`;
+const row: Row<'users'> = { id: 1, settings: { enabled: true }, mood: null, scores: [[1, null]] };
+row.id.toFixed();
+row.mood = 'happy';
 // @ts-expect-error pg decodes an int4 as a number
 row.id = 'one';
+// @ts-expect-error the primary key cannot be null
+row.id = null;
+// @ts-expect-error the array column cannot be null
+row.scores = null;
+// @ts-expect-error the enum admits only its labels and null
+row.mood = 'absent';

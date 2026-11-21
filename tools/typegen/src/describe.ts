@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 
+import type { CompleteConfig } from '@pgcast/pgcast/generate';
 import type { Client, Connection, FieldDef, MessageConfig, QueryParse } from 'pg';
+import { refineOrigins } from './origins';
 
 type Field = Pick<FieldDef, 'name' | 'dataTypeID' | 'tableID' | 'columnID'>;
 interface Description {
@@ -21,17 +23,18 @@ interface StatementMessages {
  * A failure sending Parse, Describe or Sync ends the client. Transaction commands follow pg's client.query
  * error handling. After any rejection, the owner discards the client unless it chooses to reuse it.
  * Return parameter OIDs and ordered fields with their names, type OIDs, table OIDs and attribute numbers.
+ * With schema rules, refine field types with a fresh snapshot while Parse holds its locks.
  * An expression can have zero for both origin fields.
  * NoData (e.g. DELETE without RETURNING) gives null fields. A zero-column row gives an empty array.
  */
-export async function describeQuery(client: Client, text: string): Promise<Description> {
+export async function describeQuery(client: Client, text: string, schemas?: CompleteConfig['schemas']): Promise<Description> {
   const { connectionParameters } = client as Client & { connectionParameters: { query_timeout: number | false } };
   if (connectionParameters.query_timeout) throw new Error('Disable query_timeout on the client used to describe statements');
-  await client.query('BEGIN READ ONLY');
-  let description: Description | undefined;
+  await client.query('BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY');
+  let succeeded = false;
   try {
     await client.query("SET LOCAL lock_timeout = '1s'");
-    description = await new Promise<Description>((resolve, reject) => {
+    const description = await new Promise<Description>((resolve, reject) => {
       let fields: Field[] | null | undefined, parameterOIDs: number[] | undefined;
       const parameters = (message: { dataTypeIDs: number[] }) => { parameterOIDs = message.dataTypeIDs; },
         noData = () => { fields = null; };
@@ -68,10 +71,12 @@ export async function describeQuery(client: Client, text: string): Promise<Descr
         },
       });
     });
+    if (schemas && description.fields) await refineOrigins(client, text, description.fields, schemas);
+    succeeded = true;
+    return description;
   } finally {
     await client.query('ROLLBACK').catch(error => {
-      if (description) throw error;
+      if (succeeded) throw error;
     });
   }
-  return description;
 }

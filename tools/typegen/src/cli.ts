@@ -87,7 +87,7 @@ async function run(args: string[]) {
       context = site(query) + ' ';
       if (connectionError) throw connectionError;
       try {
-        const { fields } = await describeQuery(client, query.text);
+        const { fields } = await describeQuery(client, query.text, config.schemas);
         rows.set(query.name, { text: query.text, fields });
       } catch (error) {
         console.error(redact(context + message(connectionError ?? error)));

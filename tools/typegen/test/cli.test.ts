@@ -71,7 +71,7 @@ it.each(['environment', 'db'])('connects with discrete settings from %s', mode =
   put('app/app.ts', source('SELECT id FROM public.users').replace('../generated/zapatos', '../zapatos'));
   const result = spawnSync(process.execPath, [cli, '--project', project], { cwd: dir, env, encoding: 'utf8' });
   expect(result.status).toBe(0);
-  expect(readFileSync(join(dir, 'zapatos/queries.ts'), 'utf8')).toContain('"id": number | null');
+  expect(readFileSync(join(dir, 'zapatos/queries.ts'), 'utf8')).toContain('"id": number;');
 });
 it('names the file and missing variable even in an array of nested options', () => {
   put('zapatosconfig.json', { schemas: { public: { include: ['{{TYPEGEN_MISSING_804}}'] } } });
@@ -102,7 +102,7 @@ it('keeps the good file across scanner and Postgres failures and replaces it on 
   const generate = () => run('--project', project), read = () => readFileSync(join(dir, output));
   expect(generate().status).toBe(0);
   const first = read();
-  expect(first.toString()).toContain('"id": number | null');
+  expect(first.toString()).toContain('"id": number;');
   for (const [sql, message] of [['SELECT ${1}', 'static'], ['SELECT absent FROM public.users', '42703']]) {
     put('app/app.ts', source(sql));
     const result = generate();
@@ -115,7 +115,7 @@ it('keeps the good file across scanner and Postgres failures and replaces it on 
   const result = generate();
   expect(result.status).toBe(0);
   expect(result.stdout.trim()).toMatch(/generated\/zapatos\/queries\.ts.*1 query$/);
-  expect(read().toString()).toContain('"display_name": string | null');
+  expect(read().toString()).toContain('"display_name": string;');
 }, 30_000);
 it('writes an empty module using the default project', () => {
   put('tsconfig.json', { files: ['app/app.ts'] });
