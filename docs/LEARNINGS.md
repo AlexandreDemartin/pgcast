@@ -254,6 +254,8 @@ Candidates for a check, a rule or a skill line.
 - #823 — `after-fix.sh` copied the raw reviewer report over the triaged review it hands to the verify; a triaged file is never overwritten — orchestrator
 - #824 — A type that removes `null` is safe only on the decoded field: pg decodes JSON `null` to `null`, so a SQL guarantee (`COALESCE(x, 'null'::jsonb)`) is not enough — branch-reviewer
 - #824 — A micro-measure of an opt-in type (50 calls all using it) is its cost where written, not the compile benchmark; a builder that reads it as the +20 % stop point must give one verdict — orchestrator
+- #825 — A docs example can compile and run with a stale row type: only regenerating it against Postgres in the docs job shows the changed field — codex
+- #825 — A guide on generated types must separate one row's fields from the result shape (`Row` or `Row[]`) and the caller's decoders, which the tool cannot see — branch-reviewer
 
 ## Minors kept
 
