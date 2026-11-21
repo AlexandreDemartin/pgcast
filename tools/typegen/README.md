@@ -9,6 +9,22 @@ npm install pgcast@npm:@pgcast/pgcast pg
 npm install --save-dev @pgcast/typegen
 ```
 
+The tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the `--project` tsconfig resolves. TypeScript 7 has none, and the tool then stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`. On TypeScript 7, install the tool in a folder of its own with `typescript@6` and the same `@pgcast/pgcast` version as your application's:
+
+```sh
+npm install --save-dev --prefix typegen @pgcast/typegen @pgcast/pgcast pg typescript@6
+```
+
+Give that folder a `tsconfig.json`, `typegen/tsconfig.json`, that extends the project's, then run the tool from the project root with it as `--project`. TypeScript 7 still compiles the application.
+
+```json
+{ "extends": "../tsconfig.json" }
+```
+
+```sh
+typegen/node_modules/.bin/pgcast-typegen --project typegen/tsconfig.json
+```
+
 Set `"moduleNames": "pgcast"` in `pgcastconfig.json`. When switching from Zapatos, install `zapatos@npm:@pgcast/pgcast` instead, keep the default module names and use `zapatos` in the import paths below.
 
 For a worked example, see [Typed SQL](https://pgcast.dev/typed-sql).

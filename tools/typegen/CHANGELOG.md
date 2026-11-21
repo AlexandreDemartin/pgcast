@@ -8,6 +8,16 @@ All notable changes to `@pgcast/typegen` are documented here. Format: [Keep a Ch
 
 - `pgcast-typegen --watch` regenerates the row types each time a source file changes, describing only the queries whose text changed. [#829](https://github.com/AlexandreDemartin/pgcast/issues/829)
 
+### Changed
+
+- The `pg` peer range is `>=8.6.0 <9`: the tool's value decoding hard-codes the parser table of `pg-types` 2.x, which pg 9 may change.
+
+### Fixed
+
+- A project whose tsconfig resolves a `typescript` without the JavaScript API (TypeScript 7) gets `typescript <version> from <tsconfig> has no JavaScript API; point --project at a tsconfig that resolves typescript 4.1 to 6`, not a stack of `useCaseSensitiveFileNames`.
+- A `queries.ts` that the project imports and that holds conflict markers or a syntax error is regenerated, as `--check` advises, instead of stopping the run.
+- A missing peer (`@pgcast/pgcast` or `pg`, when the package manager skipped peers) is named in one line, with exit 1, instead of a stack.
+
 ## [0.1.0] - 2026-11-21
 
 ### Added

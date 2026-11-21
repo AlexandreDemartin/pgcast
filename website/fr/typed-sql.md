@@ -1,5 +1,5 @@
 ---
-english: abecaa955f0b
+english: 97085c507f0d
 ---
 
 # SQL typé
@@ -15,7 +15,25 @@ english: abecaa955f0b
 npm install --save-dev @pgcast/typegen
 ```
 
-Pour générer ou vérifier les types, l’outil doit pouvoir trouver une [version prise en charge du parseur TypeScript](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking) à partir du fichier passé à `--project` (`tsconfig.json` par défaut). Votre application peut compiler séparément les types commités.
+Pour générer ou vérifier les types, l’outil lit vos sources avec l’API JavaScript de TypeScript 4.1 à 6, celle du `typescript` que résout le tsconfig passé à `--project` (`tsconfig.json` par défaut). TypeScript 7 n’en a pas, et l’outil s’arrête alors avec `typescript 7.0.2 from <tsconfig> has no JavaScript API`. Votre application peut compiler séparément les types commités. Voir la [version prise en charge du parseur](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking).
+
+Avec TypeScript 7, installez l’outil dans un dossier à part, avec `typescript@6` et la même version de `@pgcast/pgcast` que votre application :
+
+```sh
+npm install --save-dev --prefix typegen @pgcast/typegen @pgcast/pgcast pg typescript@6
+```
+
+Donnez à ce dossier un `tsconfig.json` qui étend celui du projet, `typegen/tsconfig.json` :
+
+```json
+{ "extends": "../tsconfig.json" }
+```
+
+Lancez l’outil depuis la racine du projet, avec ce fichier pour `--project`. Il parcourt les mêmes fichiers, et TypeScript 7 compile toujours l’application.
+
+```sh
+typegen/node_modules/.bin/pgcast-typegen --project typegen/tsconfig.json
+```
 
 ## 2. Nommer la requête {#name-the-query}
 

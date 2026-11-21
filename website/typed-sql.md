@@ -11,7 +11,25 @@ From `@pgcast/typegen` 0.1.0. Ask Postgres for the row type of a [raw SQL query]
 npm install --save-dev @pgcast/typegen
 ```
 
-For generation and checking, the tsconfig passed to `--project` (default `tsconfig.json`) must resolve a [supported TypeScript parser](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking). Your application can compile the committed types separately.
+For generation and checking, the tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the tsconfig passed to `--project` (default `tsconfig.json`) resolves. TypeScript 7 has no such API, and the tool then stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`. Your application can compile the committed types separately. See the [supported parser](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking).
+
+On TypeScript 7, install the tool in a folder of its own, with `typescript@6` and the same `@pgcast/pgcast` version as your application's:
+
+```sh
+npm install --save-dev --prefix typegen @pgcast/typegen @pgcast/pgcast pg typescript@6
+```
+
+Give that folder a `tsconfig.json` that extends the project's, `typegen/tsconfig.json`:
+
+```json
+{ "extends": "../tsconfig.json" }
+```
+
+Run the tool from the project root, with that file as `--project`. It scans the same files, and TypeScript 7 still compiles the application.
+
+```sh
+typegen/node_modules/.bin/pgcast-typegen --project typegen/tsconfig.json
+```
 
 ## 2. Name the query {#name-the-query}
 

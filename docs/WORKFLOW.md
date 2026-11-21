@@ -99,7 +99,7 @@ A release tag queues a deployment to the GitHub environment `npm`. After the own
 
 ### An extension
 
-Each extension under `@pgcast/*` (`adapters/<driver>/`, later `tools/<name>/`) is released apart from the core, under its own version (decision [013](decisions/013-package-model.md)).
+Each extension under `@pgcast/*` (`adapters/<driver>/`, `tools/<name>/`) is released apart from the core, under its own version (decision [013](decisions/013-package-model.md)).
 
 - **Its tag**: `@pgcast/<name>@<version>`, on its version commit, `@pgcast/adapter-postgres-js@0.1.0`; the core keeps `v<version>`.
 - **Before it**: the pre-release pass of step 1, on its range and its `npm pack`.
