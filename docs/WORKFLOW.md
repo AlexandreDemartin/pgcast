@@ -104,6 +104,25 @@ Each extension under `@pgcast/*` (`adapters/<driver>/`, later `tools/<name>/`) i
 - **The core's `CHANGELOG.md`**: one line, at its first publication, linking to its changelog.
 - **After the first publication**, the owner pushes the extension tag and approves its `npm` deployment. The workflow publishes from the extension folder. Check the version, `latest` and provenance on npm.
 
+## Commands
+
+The short list is in `AGENTS.md` § Commands; each command in full. CI uses npm 10 (Node 20 and 22) and npm 11 (`lts/*`). Day-to-day development is on Node 22; in CI the test database is a GitHub Actions service container.
+
+| Command | Role |
+|---|---|
+| `npm ci` | install (npm ≥ 10) |
+| `npm run build` | `tsc` (CJS, ES2019) + ESM wrappers |
+| `npm run lint` | ESLint 9 (flat config) on `src/`, `scripts/` and the docs site's own code (`website/*.mjs`, `website/*.ts`, `website/.vitepress/**/*.ts`) |
+| `npm run typecheck` | `tsc` on the lib (its declarations go to `node_modules/.cache/pgcast`), on `test/`, and on the fixture's generated output (`test/generated/`) against those declarations |
+| `npm test` | Vitest: unit and integration (`TEST_DATABASE_URL` required, `useTestDatabase()` in `test/helpers/db.ts`) |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run test:types` | emits the declarations of `src/db`, then the Vitest type tests (`test/types/*.test-d.ts`, `expectTypeOf`) on the fixture's generated schema; then `test/types-opt-in` emits a library's declarations, each `import("…")` naming a public module (`scripts/check-declarations.mjs`), and `test/types-order` compiles, in a program of its own, types that depend on the order `tsc` checks them in. Finally `test/types-opt-in/legacy` checks the literal `false` aggregate declaration in isolation |
+| `npm run bench:types` | compile cost of `bench/` (typed queries on the fixture's schema): `Instantiations` and `Types`, minus a floor without pgcast, compared with `bench/baseline.json`; fails above +20 %, below −5 % or if the TypeScript version differs; `-- --update` rewrites the baseline |
+| `npm run check:floor` | after `build`: every `.d.ts` that `npm pack` lists parses with TypeScript 4.1.6, the `typescript` peer's floor, a consumer on 4.1 compiles against them with `skipLibCheck`, and their lib check finds no error but `Buffer<ArrayBuffer>`; fetches 4.1.6 and its `@types` once into `node_modules/.cache`; a directory argument checks an unpacked package instead |
+| `npm run check:agents` | consistency of skills and agents, § Architecture against `src/`, a `CHANGELOG.md` § Deprecated line (any release) per deprecation message, no `CHANGELOG.md` entry written twice in a release, the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections, tests of the `guard` hook, of the release-folder resolver and of these checks |
+
+An extension's checks run from its folder, after the root's `npm ci && npm run build`, whose install, helpers and `db.d.ts` its tests use: `npm ci`, `npm test`, `npm run test:types` (its README § Development), and `npm pack --dry-run` when its `files` or its build change.
+
 ## Later
 
 - release-please for pgcast's version PRs.
