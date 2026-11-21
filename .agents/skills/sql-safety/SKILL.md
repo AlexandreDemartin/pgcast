@@ -43,9 +43,3 @@ Each change adds, in `test/unit/injection.test.ts`:
 - each shape `compileExpression` takes in an identifier slot (string, fragment, array, Whereable), each character a check's class excludes (`[^"\0]`), and payloads that close every parenthesis they open. A second statement runs only with no parameter, which a `lateral` map and `extras` add and a single `lateral` does not: check `compile().values.length` per shape (#607, #610).
 
 "Nothing ran" is proved by the error naming the whole payload as one identifier, a read before the rollback, or `pool.connect` mocked to reject. Not by a read through another connection, a test placed last, a thrown error (`pg` answers a multi-statement query with an array, after the second statement ran), nor by SQLSTATE codes without the compiled text.
-
-## Checklist
-
-- [ ] User warned before writing, SQL before/after in the PR
-- [ ] Hostile inputs tested in compilation and in execution
-- [ ] No concatenated value; `raw` only on constants of the code

@@ -27,12 +27,11 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 - The next one: the first open sub-issue of the first open Epic:
   `gh api 'repos/AlexandreDemartin/pgcast/issues/<epic>/sub_issues?per_page=100' -q '.[] | select(.state == "open") | "\(.number) \(.title)"' | head -1`.
 - Read it: `gh issue view <n> --repo AlexandreDemartin/pgcast`; only it, and its Epic if the order requires.
-- A `type: feature` that starts: first create its `type: task` issues from **Planned PRs**, in order, each under the feature:
-  `gh api repos/AlexandreDemartin/pgcast/issues/<feature>/sub_issues -F sub_issue_id=<id>`, where `<id>` is the task's `id`, not its number (`gh api repos/AlexandreDemartin/pgcast/issues/<n> -q .id`).
+- A `type: feature` that starts: first create its `type: task` issues from **Planned PRs**, in order, each under the feature ([reference.md](reference.md) § Issue order).
 - A step too wide for one PR (skill `pr-shape` § Size and scope, § Splitting like Zapatos): split it into sub-issues before starting the `builder`.
 - `needs decision`, or a stop point of `AGENTS.md` (`core.ts`, codegen output, publication): ask the user **before** the `builder`.
-- A new idea: a `type: feature` issue under its Epic, at its place in the order (`PATCH …/issues/<epic>/sub_issues/priority`, with `sub_issue_id` and `after_id`).
-- Unstable network: each `gh` call can be retried; before recreating, list what exists (no duplicates).
+- A new idea: a `type: feature` issue under its Epic, at its place in the order ([reference.md](reference.md) § Issue order).
+- Unstable network: retry a `gh` call; before recreating, list what exists.
 
 ## Issue body
 
@@ -53,7 +52,7 @@ The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in Englis
 | `normal` | tests, opt-in addition (condition, option, codegen emitter) | posted, the builder goes on | `branch-reviewer`; a fresh `builder` only for blockers; no verify | Show |
 | `high` | `core.ts` (compilation, escaping), `transaction.ts`, driver interface, existing public types, default codegen output | posted, the builder stops until checked | `branch-reviewer` with the subject's lens; fresh `builder`; verify | Ask |
 
-- The level follows the file the change lands in, found by `git grep`, not the issue's title: `{ col: self }` never passes through `conditions.ts`, so #106 was `high` from the start. A refusal added inside `compileExpression` is `high` even when no SQL changes (#677).
+- The level follows the file the change lands in, found by `git grep`, not the issue's title; a refusal added inside `compileExpression` is `high` even when no SQL changes (#677).
 
 The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the gate: skill `merge-gate`.
 
@@ -64,7 +63,7 @@ The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the ga
 3. **Build**: tests first, one-line commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with **Proofs** (skill `plan-and-proofs`).
 4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its comment (skill `review-comments`).
 5. **Fixes**: a fresh `builder`, blocking items only; the others go to `docs/LEARNINGS.md` § Minors kept.
-6. **Verify** (`high`): `branch-reviewer` in `verify` mode on the fix commits, posted as a second comment; `not fixed` or `regressed` goes back to 5. A third round finding a deeper hole in one part cuts it to a Deferred section, its blockers checked against what stays (#746); a design on several conditional types writes its hunt grid before the first review (#751).
+6. **Verify** (`high`): `branch-reviewer` in `verify` mode on the fix commits, posted as a second comment; `not fixed` or `regressed` goes back to 5. A third round that finds a deeper hole: [reference.md](reference.md) § Rounds.
 7. **Learnings**: the agents' "learning" remarks, one line each in `docs/LEARNINGS.md`, last commit of the branch ("Record what #22 taught").
 8. **Gate**: `gh pr ready`, green CI (skill `ci-gate`), then the gate of the **Risk**, squash and clean-up (skill `merge-gate`). The merge closes the issue; no "Tick step" commit.
 
@@ -83,7 +82,7 @@ An agent knows only what its brief says. It follows the skills, names an excepti
 
 ## Ritual rules
 
-- One agent at a time works in the main checkout. Agents in parallel each get a worktree: `git worktree add --no-track -b <branch> <path> origin/master` (with tracking, a bare `git push` aims at `master`), `src/.env` linked, `npm ci` (agent `builder` § Where to work); removed after the merge. A checkout whose `node_modules` is a link shares `node_modules/.cache/pgcast`: its `typecheck`, `test:types` and `bench:types` overwrite the other's declarations, so at another commit it runs its own `npm ci` (#41, #50, #96).
+- One agent at a time works in the main checkout. Agents in parallel each get a worktree: `git worktree add --no-track -b <branch> <path> origin/master` (with tracking, a bare `git push` aims at `master`), `src/.env` linked, `npm ci` (agent `builder` § Where to work); removed after the merge. A checkout whose `node_modules` is a link shares `node_modules/.cache/pgcast`, which its `typecheck`, `test:types` and `bench:types` overwrite: at another commit it runs its own `npm ci` (#41, #50, #96).
 - A pushed branch is never rebased nor forced; a fix from below goes up by merge (`guard.mjs`).
 - Stacking dependent steps: skill `pr-shape` § Stacking.
 
@@ -94,13 +93,4 @@ Applies to every Epic that closes, a release chapter included; an Epic never clo
 1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept, each "still holds" a run on master (#690); its fixes in a follow-up PR.
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped, with its proof ([reference.md](reference.md) § Method PRs); the file is emptied in the same PR, which closes the Epic (`Closes #epic`). Like any method PR, it rewrites § Current workflow of Epic #836 and adds its row to § History, and § Watch is reread against the method (what it shows becomes a comment or a sub-issue there).
 3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
-4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it rather than compacting a long one (one session reached 966K tokens of context, #732).
-5. Within a chapter, the orchestrator brings its hand-over up to date after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`, set in `.claude/settings.json`) and lose nothing: no one has to be there to start a new session (#812).
-
-## Checklist
-
-- [ ] Only the step's issue read, with **Files** and **Risk**; stop points asked before the `builder`
-- [ ] Plan posted at `normal` and `high`, checked at `high`
-- [ ] Review of the **Risk**, brief without a fed conclusion, comment posted
-- [ ] Blockers fixed by a fresh `builder`; minors and learnings in `docs/LEARNINGS.md`
-- [ ] Gate passed, PR squashed with `Closes #n`, issue closed, local clean
+4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it (one session reached 966K tokens, #732). Within a chapter it updates the hand-over after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`, `.claude/settings.json`) and lose nothing (#812).
