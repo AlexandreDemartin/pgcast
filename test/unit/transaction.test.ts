@@ -934,6 +934,35 @@ describe('cursor()', () => {
     expect(sent.map(q => q.text.split(' ').slice(0, 2).join(' '))).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', close().text, 'DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
   });
 
+  // pg rejects a COMMIT of yours at its ErrorResponse, while the status still reads T: CLOSE goes out after the COMMIT's
+  // ReadyForQuery, so when CLOSE rejects pg reports I, and Postgres's 34000 for it is dropped
+  it('drops a 34000 of CLOSE when pg then reports the client outside a transaction block, so a break ends the loop', async () => {
+    const options = { rows: rows(5), status: 'T', fail: (text: string): Error | undefined => text.startsWith('CLOSE') ? (options.status = 'I', sqlError('34000')) : undefined };
+    const { sent, client } = cursorClient(options);
+    const batches: Row[][] = [];
+    for await (const batch of db.cursor(client, users, { batchSize: 2 })) { batches.push(batch); break; }
+    expect(batches).toEqual([rows(2)]);
+    expect(sent.slice(1)).toEqual([fetch(2), close()]);
+  });
+
+  // inside a transaction block, the 34000 aborts it: a generator read in one attempt and return()ed in the next
+  it.each(['T', 'E', 'no status'])('rejects a break with a 34000 of CLOSE when the client then reports %s, and frees the number', async after => {
+    const failure = sqlError('34000');
+    const options = {
+      rows: rows(5),
+      ...(after === 'no status' ? {} : { status: 'T' }),
+      fail: (text: string): Error | undefined => {
+        if (!text.startsWith('CLOSE')) return undefined;
+        if ('status' in options) options.status = after;
+        return failure;
+      },
+    };
+    const { sent, client } = cursorClient(options);
+    await expect((async () => { for await (const _ of db.cursor(client, users, { batchSize: 2 })) break; })()).rejects.toBe(failure);
+    await db.cursor(client, users, { batchSize: 2 }).next();
+    expect(sent.map(q => q.text.split(' ').slice(0, 2).join(' '))).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', close().text, 'DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
   it('sends no CLOSE when pg reports the client outside a transaction block, as after a COMMIT of yours', async () => {
     const { sent, client } = cursorClient({ rows: rows(5), status: 'T' });
     const batches = db.cursor(client, users, { batchSize: 2 });
