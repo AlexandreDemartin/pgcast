@@ -186,7 +186,18 @@ it('closes on SIGINT and SIGTERM with exit 0', async () => {
   }
 });
 
-it('prints no password from a failing watch round', async () => {
+it('prints no password from a rejected query in a watch round', { timeout: 20_000 }, async () => {
+  const { child, seen } = start();
+  await until(() => rows().includes('"id": number;'), 'the first write');
+  await settle();
+  put('app/app.ts', source('SELECT 1 AS id FROM public."' + secret.replace('"', '""') + '"'));
+  await until(() => seen.stderr.includes('[redacted]'), 'the error');
+  expect(seen.stderr).toMatch(/app\.ts:3:\d+ Query "people": 42P01: relation "public\.\[redacted\]" does not exist/);
+  expect(seen.stdout + seen.stderr).not.toContain(secret);
+  expect(child.exitCode).toBe(null);
+});
+
+it('prints no password when the watch cannot connect', async () => {
   put('zapatosconfig.json', { db: { connectionString: 'postgres://reader:' + secret.replace('"', '%22') + '@127.0.0.1:1/db' }, outDir: 'generated' });
   const { seen } = start();
   await until(() => seen.code !== undefined, 'the exit');
