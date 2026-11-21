@@ -325,7 +325,8 @@ it.each(['date', 'timestamp', 'timestamptz', 'interval'])('checks the session st
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('people');
     expect(result.stderr).toContain(setting);
-    expect(result.stderr).toContain(interval ? 'postgres' : 'ISO');
+    // The CLI redacts the database credentials, and CI's are 'postgres'.
+    expect(result.stderr).toMatch(interval ? /to (postgres|\[redacted\]) for interval fields/ : /to ISO for date and timestamp fields/);
     expect(readFileSync(join(dir, output), 'utf8')).toBe(previous);
   }
 }, 30_000);
