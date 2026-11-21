@@ -46,8 +46,10 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+// A change right after the watchers start can go unseen (file system events replay), so edits follow a pause.
+const settle = () => new Promise(done => setTimeout(done, 1000));
 const field = { name: 'id', dataTypeID: 23, notNull: true };
-it('describes again only the queries whose text changed', async () => {
+it('describes again only the queries whose text changed', { timeout: 20_000 }, async () => {
   put('app/other.ts', source('SELECT 2 AS id', 'films'));
   put('app/project.json', { files: ['app.ts', 'other.ts'], compilerOptions: { types: [] } });
   const described: string[] = [], lines: string[] = [];
@@ -60,6 +62,7 @@ it('describes again only the queries whose text changed', async () => {
   });
   try {
     await until(() => writes === 1, 'the first round');
+    await settle();
     expect(described.sort()).toEqual(['films:SELECT 2 AS id', 'people:SELECT id FROM public.users']);
     put('app/app.ts', source('SELECT id FROM public.users WHERE id > 0'));
     await until(() => writes === 2, 'the second round');
@@ -68,6 +71,23 @@ it('describes again only the queries whose text changed', async () => {
     await until(() => writes === 3, 'the third round');
     expect(described).toHaveLength(3);
     expect(lines).toEqual([out() + ': 2 queries', out() + ': 2 queries', out() + ': 2 queries']);
+  } finally { await watcher.close(); }
+});
+
+it('follows an edit in a referenced project', { timeout: 20_000 }, async () => {
+  put('tsconfig.json', { files: [], references: [{ path: './app/project.json' }] });
+  put('app/project.json', { files: ['app.ts'], compilerOptions: { composite: true, types: [] } });
+  const described: string[] = [];
+  const watcher = watch(compiler, join(dir, 'tsconfig.json'), out(), {
+    describe: async query => { described.push(query.text); return { text: query.text, fields: [field] }; },
+    write: async () => true, log: () => undefined, error: line => described.push('error ' + line),
+  });
+  try {
+    await until(() => described.length === 1, 'the first round');
+    await settle();
+    put('app/app.ts', source('SELECT 5 AS id'));
+    await until(() => described.length === 2, 'the second round');
+    expect(described).toEqual(['SELECT id FROM public.users', 'SELECT 5 AS id']);
   } finally { await watcher.close(); }
 });
 
@@ -86,6 +106,7 @@ const rows = () => { try { return readFileSync(out(), 'utf8'); } catch { return 
 it('rewrites the file on an edit and writes nothing when its bytes stay the same', async () => {
   const { child, seen } = start();
   await until(() => rows().includes('"id": number;'), 'the first write');
+  await settle();
   put('app/app.ts', source('SELECT id, email FROM public.users'));
   await until(() => rows().includes('"email"'), 'the rewrite');
   const before = statSync(out()).mtimeMs, lines = seen.stdout.split('\n').length;
@@ -100,6 +121,7 @@ it('rewrites the file on an edit and writes nothing when its bytes stay the same
 it('prints a rejected query, keeps watching, and recovers once it is fixed', async () => {
   const { child, seen } = start();
   await until(() => rows().includes('"id": number;'), 'the first write');
+  await settle();
   put('app/app.ts', source('SELECT id FROM public.nowhere'));
   await until(() => seen.stderr.includes('nowhere'), 'the error');
   expect(seen.stderr).toMatch(/app\.ts:3:\d+ Query "people": 42P01/);
@@ -111,6 +133,7 @@ it('prints a rejected query, keeps watching, and recovers once it is fixed', asy
 
 it('closes on SIGINT and SIGTERM with exit 0', async () => {
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    rmSync(out(), { force: true });
     const { child, seen } = start();
     await until(() => rows().includes('"id": number;'), 'the first write');
     child.kill(signal);

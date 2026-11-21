@@ -450,7 +450,7 @@ jobs:
           cache="$GITHUB_WORKSPACE/node_modules/.cache"
           npm install --prefix "$cache/pgcast-ts60" --no-save --package-lock=false typescript@6.0.3
           for version in 41 60; do
-            PGCAST_TEST_TYPESCRIPT="$cache/pgcast-ts$version/node_modules/typescript" npm test -- test/scan.test.ts test/neutralise.test.ts
+            PGCAST_TEST_TYPESCRIPT="$cache/pgcast-ts$version/node_modules/typescript" npm test -- test/scan.test.ts test/neutralise.test.ts test/watch.test.ts
           done
       - name: Check the exact package contents
         run: |

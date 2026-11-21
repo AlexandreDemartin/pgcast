@@ -1,0 +1,117 @@
+// Copyright (C) 2026 Alexandre Demartin
+
+import { resolve, sep } from 'node:path';
+import type * as TS from 'typescript';
+import { scan } from './scan';
+import type { ResultField } from './values';
+
+type Query = ReturnType<typeof scan>['queries'][number];
+export interface Described { text: string; fields: readonly ResultField[] | null }
+
+export interface Hooks {
+  /** Describe one query. A rejection is printed through error and fails the round. */
+  describe(query: Query): Promise<Described>;
+  /** Write the module if its bytes differ. Return whether it did. */
+  write(rows: ReadonlyMap<string, Described>): Promise<boolean>;
+  log(line: string): void;
+  error(line: string): void;
+}
+
+/**
+ * Scan the project now and after each change of its sources, then describe the queries whose text changed
+ * and write their module. A program per tsconfig, the root and each project reference, is kept between rounds.
+ * Rounds run one at a time. A failing round prints its errors and keeps watching.
+ */
+export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks) {
+  const key = (file: string) => ts.sys.useCaseSensitiveFileNames ? resolve(file) : resolve(file).toLowerCase();
+  const rows = key(path), watches = new Map<string, TS.WatchOfConfigFile<TS.BuilderProgram>>();
+  const cache = new Map<string, { signature: string; described: Described }>();
+  let closed = false, queued = false, settled = false, running = Promise.resolve();
+  const parented = new WeakSet<TS.SourceFile>();
+
+  function trigger() {
+    if (closed || queued) return;
+    queued = true;
+    running = running.then(round);
+  }
+
+  function programOf(file: string) {
+    let existing = watches.get(key(file));
+    if (!existing) {
+      let created = false;
+      const host = ts.createWatchCompilerHost(file, {}, ts.sys, undefined, () => undefined, () => undefined);
+      // The generated module may not exist yet, and the scan reads imports by their parent pointers.
+      Object.assign(host, {
+        fileExists: (name: string) => key(name) === rows || ts.sys.fileExists(name),
+        directoryExists: (name: string) => rows.startsWith(key(name) + sep) || !!ts.sys.directoryExists(name),
+        readFile: (name: string) => ts.sys.readFile(name) ?? (key(name) === rows ? '' : undefined),
+        createProgram: (...args: Parameters<typeof ts.createEmitAndSemanticDiagnosticsBuilderProgram>) => {
+          const compilerHost = args[2] as TS.CompilerHost, getSourceFile = compilerHost.getSourceFile;
+          compilerHost.getSourceFile = (...parameters) => {
+            const source = getSourceFile.apply(compilerHost, parameters);
+            if (source && !source.isDeclarationFile && !parented.has(source)) {
+              parented.add(source);
+              const link = (node: TS.Node) => ts.forEachChild(node, child => { (child as { parent: TS.Node }).parent = node; link(child); });
+              link(source);
+            }
+            return source;
+          };
+          return ts.createEmitAndSemanticDiagnosticsBuilderProgram(...args);
+        },
+        // The scan reports a tsconfig that cannot be read. The default handler would exit the process.
+        onUnRecoverableConfigFileDiagnostic: () => undefined,
+        afterProgramCreate: () => { if (created) trigger(); },
+      });
+      existing = ts.createWatchProgram(host);
+      created = true;
+      watches.set(key(file), existing);
+    }
+    return existing.getProgram().getProgram();
+  }
+
+  async function round() {
+    queued = false;
+    if (closed) return;
+    try {
+      const { queries, diagnostics } = scan(ts, project, path, programOf);
+      if (diagnostics.length) {
+        for (const d of diagnostics) hooks.error(`${d.file}:${d.line}:${d.column} ${d.message}`);
+        settled = false;
+        return;
+      }
+      const described = new Map<string, Described>();
+      let failed = false;
+      for (const query of queries) {
+        const signature = JSON.stringify([query.text, query.variants?.texts]), hit = cache.get(query.name);
+        if (hit?.signature === signature) { described.set(query.name, hit.described); continue; }
+        try {
+          const row = await hooks.describe(query);
+          cache.set(query.name, { signature, described: row });
+          described.set(query.name, row);
+        } catch (error) {
+          cache.delete(query.name);
+          hooks.error((error as Error).message);
+          failed = true;
+        }
+      }
+      for (const name of cache.keys()) if (!queries.some(query => query.name === name)) cache.delete(name);
+      if (failed || closed) { settled = false; return; }
+      const written = await hooks.write(described);
+      if (written || !settled) hooks.log(`${path}: ${described.size} ${described.size === 1 ? 'query' : 'queries'}`);
+      settled = true;
+    } catch (error) {
+      hooks.error((error as Error).message);
+      settled = false;
+    }
+  }
+
+  trigger();
+  return {
+    /** Stop watching and wait for the round in progress. */
+    async close() {
+      closed = true;
+      for (const watched of watches.values()) watched.close();
+      await running;
+    },
+  };
+}

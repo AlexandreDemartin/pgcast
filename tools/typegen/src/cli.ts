@@ -14,9 +14,10 @@ import { describeQuery, RejectedParse } from './describe';
 import { scan } from './scan';
 import { textTypes } from './values';
 import type { StoredQuery } from './write';
+import { watch } from './watch';
 import { aliases, buildQueries, header, literal, typedQueries, writeQueries } from './write';
 
-const usage = 'Usage: pgcast-typegen [--check] [--project <tsconfig>]';
+const usage = 'Usage: pgcast-typegen [--check | --watch] [--project <tsconfig>]';
 
 function projectCompiler(project: string): typeof TS {
   try { return createRequire(project)('typescript'); } catch { throw new Error('Cannot load typescript from the project'); }
@@ -177,10 +178,44 @@ async function checkQueries(ts: typeof TS, path: string, dbModule: 'zapatos/db' 
   }
 }
 
+/** Describe and write rows as edits arrive, over one connection, until a signal ends the session. */
+async function watchProject(ts: typeof TS, client: Client, project: string, path: string, dbModule: 'zapatos/db' | 'pgcast/db', schemas: CompleteConfig['schemas']) {
+  let stopping = false;
+  context = `${path}:1:1 `;
+  client.on('error', fail);
+  client.on('end', () => { if (!stopping) fail(new Error('Connection closed')); });
+  await client.connect();
+  const watcher = watch(ts, project, path, {
+    describe: async query => {
+      context = site(query) + ' ';
+      try { return await describeCandidates(client, query, schemas); } catch (error) { throw new Error(context + message(error)); }
+    },
+    async write(rows) {
+      const content = buildQueries(dbModule, typedQueries(rows)), stored = await readFile(path).catch(() => undefined);
+      if (stored?.equals(Buffer.from(content))) return false;
+      await mkdir(dirname(path), { recursive: true });
+      await writeQueries(path, dbModule, rows);
+      return true;
+    },
+    log: line => console.log(redact(line)),
+    error: line => console.error(redact(line)),
+  });
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    void watcher.close().then(() => client.end());
+  };
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
+}
+
 async function run(args: string[]) {
   if (args.length === 1 && args[0] === '--help') return console.log(redact(usage));
   const check = args[0] === '--check' || args[args.length - 1] === '--check';
   if (check) args = args[0] === '--check' ? args.slice(1) : args.slice(0, -1);
+  const watching = args[0] === '--watch' || args[args.length - 1] === '--watch';
+  if (watching) args = args[0] === '--watch' ? args.slice(1) : args.slice(0, -1);
+  if (check && watching) throw new Error(usage);
   if (args.length && !(args.length === 2 && args[0] === '--project' && args[1] && !args[1].startsWith('-'))) {
     throw new Error(usage);
   }
@@ -210,6 +245,7 @@ async function run(args: string[]) {
   }
 
   context = `${project}:1:1 `;
+  if (watching) return watchProject(projectCompiler(project), client!, project, path, `${moduleNames}/db`, config.schemas);
   const ts = projectCompiler(project), result = scan(ts, project, path), queries = result.queries;
   // checkQueries reports invalid output with the regeneration advice, even when the project imports it.
   const diagnostics = result.diagnostics.filter(d => !check || resolve(d.file) !== path);
