@@ -7,20 +7,21 @@ import { dirname, join, resolve } from 'node:path';
 import { afterEach, beforeEach, expect, inject, it } from 'vitest';
 import { urlForDatabase } from '../../../test/helpers/databases';
 import { useTestDatabase } from '../../../test/helpers/db';
+import { textTypes } from '../src/values';
 import { writeQueries } from '../src/write';
 
 const fixture = useTestDatabase(), cli = resolve(__dirname, '../dist/cli.js');
 const sql = 'SELECT id FROM users', closing = 'Run the generator without --check to write it.';
-const secret = 'sentinel-819', live = { connectionString: '{{CHECK_DB}}' };
+const secret = 'sentinel"819', live = { connectionString: '{{CHECK_DB}}' };
 let dir: string, path: string;
-function source(entries: readonly (readonly string[])[], outDir = '.') {
+function source(entries: readonly (readonly string[])[], outDir = '.', moduleNames = 'zapatos') {
   writeFileSync(join(dir, 'app.ts'), [
-    "import { sql, param } from 'zapatos/db';", `import type { Row } from '${outDir}/zapatos/queries';`,
+    "import { sql, param } from 'zapatos/db';", `import type { Row } from ${JSON.stringify(outDir + '/' + moduleNames + '/queries')};`,
     ...entries.map(([name, text]) => 'sql<unknown, Row<' + JSON.stringify(name).replace(/\u2028/g, '\\u2028') + '>[]>`' + text + '`;'),
   ].join('\n'));
 }
-function config(db?: object, outDir = '.') {
-  writeFileSync(join(dir, 'pgcastconfig.json'), JSON.stringify({ db, outDir }));
+function config(db?: object, outDir = '.', moduleNames = 'zapatos') {
+  writeFileSync(join(dir, 'pgcastconfig.json'), JSON.stringify({ db, outDir, moduleNames }));
 }
 function run(...args: string[]) {
   return spawnSync(process.execPath, [cli, ...args], { cwd: dir, encoding: 'utf8', timeout: 15_000,
@@ -34,7 +35,7 @@ function check(lines: string[], ...args: string[]) {
   const before = existsSync(path) ? snapshot() : undefined;
   const result = run(...(args.length ? args : ['--check']));
   expect(result.stderr).toBe('');
-  expect(result.stdout.trimEnd().split('\n')).toEqual(lines);
+  expect(result.stdout).toBe(lines.join('\n') + '\n');
   expect(result.status).toBe(lines.includes(closing) ? 1 : 0);
   if (before) expect(snapshot()).toEqual(before);
 }
@@ -136,19 +137,70 @@ it('checks changed module bytes online', () => {
   check(['Out of date: ' + path + ' - changed module bytes ("people")', closing]);
 });
 
-it('redacts check output and fails for an unreachable configured db', () => {
+it.each(['drift', 'missing file', 'refused connection'])('redacts quoted credentials on %s', async kind => {
   const outDir = './' + secret;
   path = join(dir, outDir, 'zapatos', 'queries.ts');
+  mkdirSync(dirname(path), { recursive: true });
+  await writeQueries(path, 'zapatos/db', new Map([[secret, { text: sql, fields: null }]]));
   source([[secret, sql]], outDir);
-  config(live, outDir);
-  expect(run().status).toBe(0);
   config(undefined, outDir);
+  const masked = path.replace(secret, '[redacted]');
   check([current().replace(secret, '[redacted]')]);
-  source([[secret, sql + ' LIMIT 1']], outDir);
-  check([stale(secret, 'changed text').split(secret).join('[redacted]'), closing]);
-  config({ host: '127.0.0.1', port: 1, password: secret }, outDir);
-  const result = run('--check');
-  expect(result.status).toBe(1);
-  expect(result.stderr).toMatch(/Query "\[redacted\]".*ECONNREFUSED/);
-  expect((result.stdout + result.stderr).includes(secret)).toBe(false);
+  if (kind === 'drift') {
+    source([[secret, sql + ' LIMIT 1']], outDir);
+    check([`Out of date: ${masked} - Query "[redacted]": changed text`, closing]);
+  } else if (kind === 'missing file') {
+    rmSync(path);
+    check([`Missing: ${masked} - "[redacted]"`, closing]);
+  } else {
+    config({ host: '127.0.0.1', port: 1, password: secret }, outDir);
+    const result = run('--check');
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toMatch(/Query "\[redacted\]".*ECONNREFUSED/);
+    expect(result.stderr).not.toContain(secret);
+    expect(result.stderr).not.toContain(JSON.stringify(secret).slice(1, -1));
+  }
+});
+
+it.each(['deleted import', 'undeclared field type', 'CRLF', 'trailing whitespace'])('rejects %s offline', async kind => {
+  await writeQueries(path, 'zapatos/db', new Map([['people', { text: sql, fields: [{ name: 'id', dataTypeID: 114 }] }]]));
+  const file = readFileSync(path, 'utf8');
+  writeFileSync(path, kind === 'deleted import' ? file.replace(/^import .*\n/m, '') :
+    kind === 'undeclared field type' ? file.replace(': JSONValue | null;', ': UnknownType | null;') :
+    kind === 'CRLF' ? file.replace(/\n/g, '\r\n') : file + ' ');
+  const reason = kind === 'undeclared field type' ? 'Query "people": invalid generated module' : 'changed module bytes ("people")';
+  check(['Out of date: ' + path + ' - ' + reason, closing]);
+});
+
+it.each(['zapatos', 'pgcast'] as const)('accepts every generated field type offline for %s', async moduleNames => {
+  path = join(dir, moduleNames, 'queries.ts');
+  mkdirSync(dirname(path), { recursive: true });
+  source([['people', sql], ['empty', sql], ['noData', sql]], '.', moduleNames);
+  config(undefined, '.', moduleNames);
+  const fields = [true, false].flatMap(notNull => [
+    ...Object.keys(textTypes).map(oid => ({ name: oid + notNull, dataTypeID: Number(oid), notNull })),
+    { name: 'enum' + notNull, dataTypeID: 0, enumLabels: ['JSONValue', 'Buffer | null', 'PostgresInterval"'], notNull },
+  ]);
+  await writeQueries(path, `${moduleNames}/db`, new Map([
+    ['people', { text: sql, fields }], ['empty', { text: sql, fields: [] }], ['noData', { text: sql, fields: null }],
+  ]));
+  check([current()]);
+});
+
+it('accepts a different generated field type offline and reports it online', () => {
+  writeFileSync(path, readFileSync(path, 'utf8').replace(': number;', ': string;'));
+  check([current()]);
+  config(live);
+  check([stale('people', 'changed row'), closing]);
+});
+
+it('prints one difference and the advice for a path containing CR and LF', async () => {
+  const outDir = './first\r\nsecond';
+  path = join(dir, outDir, 'zapatos', 'queries.ts');
+  mkdirSync(dirname(path), { recursive: true });
+  await writeQueries(path, 'zapatos/db', new Map([['people', { text: sql, fields: null }]]));
+  source([['people', sql + ' LIMIT 1']], outDir);
+  config(undefined, outDir);
+  check([stale('people', 'changed text').replace('\r\n', '\\r\\n'), closing]);
 });
