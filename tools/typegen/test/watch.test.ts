@@ -121,6 +121,15 @@ it('rewrites the file on an edit and writes nothing when its bytes stay the same
   expect(child.exitCode).toBe(null);
 });
 
+it('regenerates a queries.ts with conflict markers', { timeout: 20_000 }, async () => {
+  put('generated/zapatos/queries.ts', '<<<<<<< HEAD\nexport {};\n=======\nexport {};\n>>>>>>> feature\n');
+  const { child, seen } = start();
+  await until(() => rows().includes('"id": number;'), 'the rewrite');
+  expect(rows()).not.toContain('<<<<<<<');
+  expect(seen.stderr).toBe('');
+  expect(child.exitCode).toBe(null);
+});
+
 it('prints a rejected query, keeps watching, and recovers once it is fixed', async () => {
   const { child, seen } = start();
   await until(() => rows().includes('"id": number;'), 'the first write');
