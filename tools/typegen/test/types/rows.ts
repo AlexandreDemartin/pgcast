@@ -2,7 +2,7 @@
 
 import { expectTypeOf } from 'expect-type';
 import type { JSONValue } from 'zapatos/db';
-import type { PgArray, Queries, Row } from './queries';
+import type { NotNull, PgArray, Queries, Row } from './queries';
 
 declare const row: Row<'values'>;
 expectTypeOf(row).not.toBeAny();
@@ -38,3 +38,33 @@ if (row.items !== null) {
 }
 // @ts-expect-error the stored text is literal
 export const other: Queries['empty']['text'] = 'SELECT 2';
+
+declare const withId: NotNull<Row<'values'>, 'id'>;
+expectTypeOf(withId).toEqualTypeOf<{ items: typeof row.items; id: number; settings: typeof row.settings }>();
+// @ts-expect-error TS2322: id was narrowed
+withId.id = null;
+// @ts-expect-error TS2322: items can still be null
+export const uncheckedItems: PgArray<number> = withId.items;
+// @ts-expect-error TS2344: ids is not a column
+export declare const misspelt: NotNull<Row<'values'>, 'ids'>;
+
+declare const withItems: NotNull<Row<'values'>, 'items'>;
+expectTypeOf(withItems.items).toEqualTypeOf<PgArray<number>>();
+withItems.items = [1, null];
+withItems.items = [[1, null], [null, 2]];
+// @ts-expect-error TS2322: the whole array was narrowed
+withItems.items = null;
+// @ts-expect-error TS2322: nested leaves must be numbers or null
+withItems.items = [[1, 'two']];
+
+expectTypeOf<NotNull<Row<'values'>, 'id' | 'items'>>()
+  .toEqualTypeOf<{ items: PgArray<number>; id: number; settings: typeof row.settings }>();
+expectTypeOf<NotNull<Row<'values'>, never>>().toEqualTypeOf<typeof row>();
+expectTypeOf<NotNull<typeof withId, 'id'>>().toEqualTypeOf<typeof withId>();
+
+type Details = { readonly title?: string | null; year: number | null | undefined };
+declare const details: NotNull<Details, 'title' | 'year'>;
+expectTypeOf(details).toEqualTypeOf<{ readonly title?: string; year: number | undefined }>();
+export const untitled: typeof details = { year: undefined };
+// @ts-expect-error TS2540: title stays readonly
+details.title = 'Arrival';
