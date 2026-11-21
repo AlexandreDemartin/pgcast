@@ -38,7 +38,7 @@ beforeEach(() => {
   const core = dirname(require.resolve('@pgcast/pgcast/db'));
   mkdirSync(join(dir, 'app/node_modules/@pgcast'), { recursive: true });
   for (const name of ['zapatos', '@pgcast/pgcast']) symlinkSync(core, join(dir, 'app/node_modules', name), 'dir');
-  symlinkSync(dirname(require.resolve('typescript/package.json')), join(dir, 'app/node_modules/typescript'), 'dir');
+  symlinkSync(process.env.PGCAST_TEST_TYPESCRIPT || dirname(require.resolve('typescript/package.json')), join(dir, 'app/node_modules/typescript'), 'dir');
   put('zapatosconfig.json', { db: { connectionString: '{{WATCH_DB}}' }, outDir: 'generated' });
 });
 afterEach(() => {
