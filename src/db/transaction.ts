@@ -488,9 +488,10 @@ export async function savepoint<T, C extends TxnClient<IsolationLevel> | TxnClie
 /**
  * Take a transaction-level advisory lock on `key`, waiting while another
  * transaction holds it, and resolve once it is held. Postgres releases it as
- * the transaction ends, at `COMMIT` or `ROLLBACK`, or at a `ROLLBACK TO` a
- * savepoint taken before it: so an attempt that `transaction()` retries never
- * holds the lock of the one before. The SQL:
+ * the transaction ends, at `COMMIT` or `ROLLBACK`, at a `ROLLBACK TO` a
+ * savepoint taken before it, and as soon as a query fails, unless that query
+ * runs in a savepoint taken after the lock: so an attempt that `transaction()`
+ * retries never holds the lock of the one before. The SQL:
  *
  * - a `bigint`, `BigInt(42)`: `SELECT pg_advisory_xact_lock($1)`, with
  *   `['42']`, its decimal string, as `pg` would send it;
@@ -633,7 +634,10 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  *   status, or on a driver that reports none, gets 25P02, which is dropped:
  *   no 25P02 of `CLOSE`'s replaces the loop's error. A client that `pg`
  *   reports outside a transaction block, after a `COMMIT` of yours, sends no
- *   `CLOSE` either: its cursor went with the transaction.
+ *   `CLOSE` either: its cursor went with the transaction. A `COMMIT` of yours
+ *   that fails can still read as inside a block: `CLOSE` then gets 34000,
+ *   dropped when `pg` reports the client outside a block. Elsewhere, and on a
+ *   driver that reports no status, a 34000 of `CLOSE`'s rejects.
  *   A generator left unfinished leaves its cursor to `COMMIT` or `ROLLBACK`,
  *   and its number taken on this client.
  * - The `DECLARE` runs unnamed even with nested prepared fragments. Its text changes with
@@ -725,7 +729,11 @@ async function* cursorBatches<RunResult>(
       // out after a query of the loop failed: Postgres's 25P02 for it is dropped, or it would replace that query's error
       if (response && !ended() && status !== 'E' && status !== 'I') {
         await sql`CLOSE ${name}`.run(txnClient).catch((err: unknown) => {
-          if (!isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')) throw err;
+          if (isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')) return;
+          // a COMMIT of yours that failed is rejected while the status still reads T; pg sends CLOSE after its
+          // ReadyForQuery, so I here means the cursor went with that transaction. Inside a block, the 34000 aborts it
+          if (isDatabaseError(err, 'InvalidCursorName_InvalidCursorName') && transactionStatus(txnClient as pg.ClientBase) === 'I') return;
+          throw err;
         });
       }
     } finally {

@@ -258,6 +258,10 @@ Candidates for a check, a rule or a skill line.
 - #826 — A test that expects a word in a message breaks where that word is the database password and the CLI redacts it; CI's credentials are `postgres` — orchestrator
 - #825 — A docs example can compile and run with a stale row type: only regenerating it against Postgres in the docs job shows the changed field — codex
 - #825 — A guide on generated types must separate one row's fields from the result shape (`Row` or `Row[]`) and the caller's decoders, which the tool cannot see — branch-reviewer
+- #835 — Postgres releases an advisory xact lock at the failing query, when the transaction or savepoint aborts, not at the later ROLLBACK or ROLLBACK TO — builder
+- #835 — a CLOSE that gets 34000 inside a live block aborts that block: dropping an error by its code alone hides why the COMMIT comes back as ROLLBACK; gate it on the status that makes it harmless — builder
+- #835 — a lock claim needs a probe per place the lock is taken (before the savepoint, inside it) and per error (a query error, 40001, a JS throw): the builder probed the lock taken before only with 23505 — branch-reviewer
+- #835 — a wording a review proposes still needs every probe case: the proposed advisory-lock sentence was false for a 40001 thrown in JavaScript after a lock taken in the savepoint — builder
 - #834 — a check built on a regex is only as good as the forms it parses: probe it with the forms it should refuse, not only the one form the tree uses — branch-reviewer
 - #834 — a mutant `isDate` that reads `getTime` is killed only by a class instance: a plain object fails the prototype test before `getTime` is read — builder
 - #841 — The workflow Epic's body was ahead of the skills (its "As soon as possible" bullet existed before the PR); a method PR diffs Epic #836 against the skills it changes — builder
@@ -288,5 +292,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #750 — website/select.md:265 (and FR :269): the cast shown, `l as db.SQLFragmentMap`, fits the map forwarder only; for a `db.SQLFragment<R>` forwarder the cast is `l as db.SQLFragment<any>` (TS2352 otherwise) — branch-reviewer
 - #811 — `tools/typegen/test/scan.test.ts:217`: in a cyclic composite reference graph, TypeScript 5.9 and 6.0 select neither project's source and 4.1.6 both; the test pins the compiler's choice without asserting the cycle's diagnostic — orchestrator
 - #814 — `tools/typegen/src/cli.ts:63`: when `new Client(db)` throws (an invalid `db.sslnegotiation`), the missing-variable diagnostic is printed before the redactor knows the parsed password; only a variable whose name equals the password shows it — orchestrator
+- #835 — form: `test/integration/transaction.test.ts:2257`: the message-splitting proxy pool keeps any `sslmode` of `TEST_DATABASE_URL`, so on a TLS server the test hangs to the Vitest timeout instead of failing clearly (not run: no TLS locally or in CI) — branch-reviewer
 - #834 — defect: `scripts/check-skills.mjs:38` `sectionErrors` reads only a capitalised section after a `](reference.md)` link: `` § `toPostgres` ``, `§ iterables`, `` `reference.md` § X `` or another link text pass unchecked, and `§ Step 2` is read as 'Step'; the reviewer's regex `/(?:\]\(reference\.md\)|`?reference\.md`?) § ([^.;:\n]+)/g` passes the tree and every probe — branch-reviewer
 - #834 — form: `scripts/check-skills.mjs:70`: the "links" and "cited" checks match any mention of `reference.md`, not a link to the skill's own file (`/\]\(reference\.md\)/`) — branch-reviewer
