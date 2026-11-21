@@ -40,7 +40,7 @@ const
   withoutComments = (code: string) => code.replace(/\s*\/\/.*$/gm, '').trim();
 
 export default defineLoader({
-  watch: ['../examples/first-query.ts', '../zapatos/**/*.d.ts'],
+  watch: ['../examples/first-query.ts', '../zapatos/**/*.d.ts', '../zapatos/queries.ts'],
   load() {
     const [above, query] = readFileSync(example, 'utf8').split('// ---cut---\n');
     // the reader edits the example as the tutorial shows it, with nothing hidden: what is above its cut is the header's
@@ -56,7 +56,7 @@ export default defineLoader({
 
     add(zapatos, ['db.d.ts'], 'node_modules/zapatos');
     add(join(zapatos, 'dist/db'), dts(join(zapatos, 'dist/db')), 'node_modules/zapatos/dist/db');
-    add(join(website, 'zapatos'), ['schema.d.ts'], 'zapatos');
+    add(join(website, 'zapatos'), ['schema.d.ts', 'queries.ts'], 'zapatos');
     // custom/ exists only once the schema has a type the generator leaves to the user, as in twoslash.ts
     add(join(website, 'zapatos/custom'), dts(join(website, 'zapatos/custom')), 'zapatos/custom');
     // `pg`'s types, without @types/node's 2 MB: what they take from Node (`EventEmitter`, `tls`) is left unresolved

@@ -1,0 +1,4 @@
+{
+  "db": { "connectionString": "{{PGCAST_DOCS_DATABASE}}" },
+  "outDir": ".."
+}

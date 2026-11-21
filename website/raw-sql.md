@@ -26,7 +26,7 @@ Write the SQL as you would in `psql`, but put each table and column name between
 </CastPanel>
 
 - An interpolated name is quoted, `"films"`<!-- probe: examples/raw_sql_join.ts -->, and checked against the first type argument: here `Tables`, the `SQL` type of each table the query names. Qualify a column as `${'films'}.${'title'}`: the type knows each table's columns, not `'films.title'`, unless you name the pair ([Qualify a column by its alias](#qualify-a-column-by-its-alias)).
-- The second type argument is your word for what comes back: nothing checks it against the SQL. The rows come as `pg` parses them, as a `Selectable` describes them (a `Date` for a `timestamptz`), not as the JSON of the shortcuts' `JSONSelectable`. A `count(*)` is a `bigint`, which `pg` gives as a string: `'4'`.
+- The second type argument is unchecked. Even with [field types from Postgres for one row](/typed-sql), you supply the result shape (`[]`) and any narrowing. The rows come as `pg` parses them, as a `Selectable` describes them (a `Date` for a `timestamptz`), not as the JSON of the shortcuts' `JSONSelectable`. A `count(*)` is a `bigint`, which `pg` gives as a string: `'4'`.
 - Keywords stay in the text. SQL you write yourself is safe there; only what comes from outside needs the steps below.
 
 A name the type doesn't know fails to compile: a query that names `screenings` needs `s.screenings.SQL` in its first type argument.

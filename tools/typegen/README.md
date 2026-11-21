@@ -11,6 +11,8 @@ npm install --save-dev @pgcast/typegen
 
 Set `"moduleNames": "pgcast"` in `pgcastconfig.json`. When switching from Zapatos, install `zapatos@npm:@pgcast/pgcast` instead, keep the default module names and use `zapatos` in the import paths below.
 
+For a worked example, see [Typed SQL](https://pgcast.dev/typed-sql).
+
 Import `Row` from the file the command will write and give the query a name.
 
 ```ts

@@ -256,6 +256,8 @@ Candidates for a check, a rule or a skill line.
 - #824 — A micro-measure of an opt-in type (50 calls all using it) is its cost where written, not the compile benchmark; a builder that reads it as the +20 % stop point must give one verdict — orchestrator
 - #826 — A placeholder in `{{…}}` is a variable name only by convention: a credential pasted there reaches the diagnostic unless only POSIX names are printed — codex
 - #826 — A test that expects a word in a message breaks where that word is the database password and the CLI redacts it; CI's credentials are `postgres` — orchestrator
+- #825 — A docs example can compile and run with a stale row type: only regenerating it against Postgres in the docs job shows the changed field — codex
+- #825 — A guide on generated types must separate one row's fields from the result shape (`Row` or `Row[]`) and the caller's decoders, which the tool cannot see — branch-reviewer
 
 ## Minors kept
 
