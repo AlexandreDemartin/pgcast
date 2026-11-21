@@ -1,13 +1,14 @@
 // Copyright (C) 2026 Alexandre Demartin
-// Fails the docs build when a TypeScript snippet of the root CHANGELOG.md that is marked to compile does not
-// type-check (README.md § The changelog): a migration it gives a user is otherwise never compiled (#200). A snippet is
+// Fails the docs build when a TypeScript snippet of the root CHANGELOG.md, or of a page in English or French, that is
+// marked to compile does not type-check (README.md § The changelog): a migration it gives a user is otherwise never
+// compiled (#200, #700, #715). A snippet is
 // a code span with a mark glued after it: `<!-- tsc -->` if it is a module's code, or `<!-- tsc: … -->` with the code
 // around it, `…` standing for the span (`db.upsert('films', [], 'id', { updateValues: … })`). Any other HTML comment
 // outside a code span fails, so that a near miss does not turn the check off. Each is checked in memory, as its own
 // file, `db` (`zapatos/db`) and a `pool` in scope, with the options of tsconfig.json but `skipLibCheck`, against the
 // built `zapatos/db` and the docs schema, as check-joined.mjs checks a page. Types only: a value Postgres refuses at
 // run time passes. Run by `npm run docs:build`.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
@@ -45,8 +46,13 @@ function marksOf(line) {
   return marks;
 }
 
-/** The snippets of `source`, each `{ at, code }`; a comment that is not a mark glued after a span goes to `problems`. */
-function snippetsOf(name, source, problems) {
+/**
+ * The snippets of `source`, each `{ at, code }`; a comment that is not a mark glued after a span goes to `problems`.
+ * A page also holds the marks of other checks, which `ownMarks` skips: `<!-- probe: … -->` and `<!-- message -->`
+ * (check-prose.mjs), `<!-- joined: … -->` (check-joined.mjs), `<!-- @changelog -->` (.vitepress/changelog.ts) and
+ * `<!-- @content -->` (VitePress's dynamic route, `[page].md`).
+ */
+function snippetsOf(name, source, problems, ownMarks = false) {
   const snippets = [];
   source.split('\n').forEach((line, i) => {
     for (const { index, mark, span } of marksOf(line)) {
@@ -54,6 +60,7 @@ function snippetsOf(name, source, problems) {
         at = `${name}:${i + 1}:${index + 1}`,
         read = mark.match(/^<!-- tsc(?:: ((?:(?!--).)+?))? -->$/),
         around = read?.[1];
+      if (ownMarks && /^<!-- (?:probe|message|joined|@changelog|@content)\b/.test(mark)) continue;
       if (!read) problems.push(`${at}: an HTML comment here is a mark, \`<!-- tsc -->\` or \`<!-- tsc: … -->\`, ` +
         `on one line, with no \`--\` in it: ${mark}`);
       else if (span === undefined) problems.push(`${at}: ${mark} has no code span right before it`);
@@ -72,7 +79,12 @@ if (missed.length !== 1) throw new Error('check-changelog.mjs: the code spans ar
 
 // One file name, never written, for each snippet in turn: the other files are read once, for the programs to share.
 const
-  snippets = snippetsOf('CHANGELOG.md', readFileSync(`${root}../CHANGELOG.md`, 'utf8'), problems),
+  pages = ['', 'fr/'].flatMap(dir => readdirSync(`${root}${dir}`)
+    .filter(file => file.endsWith('.md') && file !== 'README.md').map(file => dir + file)),
+  snippets = [
+    ...snippetsOf('CHANGELOG.md', readFileSync(`${root}../CHANGELOG.md`, 'utf8'), problems),
+    ...pages.flatMap(page => snippetsOf(page, readFileSync(`${root}${page}`, 'utf8'), problems, true)),
+  ],
   name = `${root}changelog-snippet.ts`,
   host = ts.createCompilerHost(options),
   { getSourceFile, fileExists } = host,
@@ -93,8 +105,8 @@ for (const { at, code } of snippets) {
 }
 
 if (problems.length > 0) {
-  console.error(`The changelog snippets check failed (README.md § The changelog):\n  ${problems.join('\n  ')}`);
+  console.error(`The snippets check failed (README.md § The changelog):\n  ${problems.join('\n  ')}`);
   process.exitCode = 1;
 } else {
-  console.log(`The changelog snippets type-check: ${snippets.length}.`);
+  console.log(`The snippets type-check: ${snippets.length}.`);
 }

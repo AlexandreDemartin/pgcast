@@ -208,6 +208,26 @@ it('prints no password from a rejected query in a watch round', { timeout: 20_00
   expect(child.exitCode).toBe(null);
 });
 
+it('names the output file, not the last described query, when an idle connection is lost', { timeout: 20_000 }, async () => {
+  const admin = new Client({ connectionString: env().WATCH_DB });
+  await admin.connect();
+  try {
+    const pids = async () => (await admin.query("SELECT pid FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend'")).rows.map(row => row.pid as number);
+    const before = await pids();
+    const { seen } = start();
+    await until(() => rows().includes('"id": number;'), 'the first write');
+    await settle();
+    // The only connection the watch added is its own.
+    const added = (await pids()).filter(pid => !before.includes(pid));
+    expect(added).toHaveLength(1);
+    await admin.query('SELECT pg_terminate_backend($1)', [added[0]]);
+    await until(() => seen.code !== undefined, 'the exit');
+    expect(seen.code).toBe(1);
+    expect(seen.stderr).toMatch(/generated\/zapatos\/queries\.ts:1:1 .*57P01/);
+    expect(seen.stderr).not.toContain('app.ts');
+  } finally { await admin.end(); }
+});
+
 it('prints no password when the watch cannot connect', async () => {
   put('zapatosconfig.json', { db: { connectionString: 'postgres://reader:' + encodeURIComponent(secret) + '@127.0.0.1:1/db' }, outDir: 'generated' });
   const { seen } = start();

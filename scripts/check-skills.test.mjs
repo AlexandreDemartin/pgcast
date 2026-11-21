@@ -89,6 +89,57 @@ test('fails on a cited section that is no heading of reference.md', () => {
   }), ["alpha/SKILL.md: cites section 'Lookup' that reference.md has no heading for"]);
 });
 
+// Each near miss cites a section of 'Lookups', 'Step 2', 'toPostgres' or 'Method PRs' that the reference lacks or has.
+const sectionsOf = (cite, headings = ['Lookups', 'Step 2', '`toPostgres`', 'iterables', 'Method PRs', 'Watch mode']) => errorsOf({
+  'alpha/SKILL.md': head + cite + '\n',
+  'alpha/reference.md': '# Alpha\n\n' + headings.map(heading => `## ${heading}\n`).join('\n'),
+});
+const link = '[reference.md](reference.md)';
+const missing = section => [`alpha/SKILL.md: cites section '${section}' that reference.md has no heading for`];
+
+test('passes on citations of every shape, each a heading', () => {
+  for (const cite of [
+    `Read ${link} § Step 2.`,
+    `Read ${link} § \`toPostgres\`.`,
+    `Read ${link} § iterables; then more.`,
+    `Read \`reference.md\` § Lookups: when, why.`,
+    `Read reference.md § Lookups, ${link} § Method PRs, ${link} § Watch mode.`,
+    `Read ${link} § Lookups, then § Step 2 and § iterables.`,
+    `Read ${link} § Lookups (and more)`,
+    `Read ${link} § Lookups — when keyed.`,
+    `Is it in ${link} § Lookups?`,
+    `**Read ${link} § Lookups**, always.`,
+    `"Read ${link} § Lookups", always.`,
+    'Run `reference.md § Lookups` there.',
+  ]) assert.deepEqual(sectionsOf(cite), [], cite);
+});
+
+test('fails on a section the old reading let through', () => {
+  assert.deepEqual(sectionsOf(`Read ${link} § \`toPostgress\`.`), missing('`toPostgress`'));
+  assert.deepEqual(sectionsOf(`Read ${link} § iterable.`), missing('iterable'));
+  assert.deepEqual(sectionsOf('Read `reference.md` § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('Read reference.md § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('Read [the reference](reference.md) § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('Read [`reference.md`](reference.md) § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Step 3.`), missing('Step 3'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Step 2b.`), missing('Step 2b'));
+});
+
+test('fails on each section of a list, and on one joined by "and" or ", then"', () => {
+  assert.deepEqual(sectionsOf(`Read ${link} § Lookups, then § Lookup.`), missing('Lookup'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Lookups and § Step.`), missing('Step'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Lookups, ${link} § Watch.`), missing('Watch'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Watch mode and ${link} § Watched.`), missing('Watched'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Lookups and ${link} § Lookup, ${link} § Watch.`), [...missing('Lookup'), ...missing('Watch')]);
+});
+
+test('fails on a heading that ends in a capital, cited shortened or extended', () => {
+  assert.deepEqual(sectionsOf(`Read ${link} § The method PR).`), missing('The method PR'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Method PR).`), missing('Method PR'));
+  assert.deepEqual(sectionsOf(`Read ${link} § Method PRs).`), []);
+  assert.deepEqual(sectionsOf(`Read ${link} § Method.`, ['Method PRs']), missing('Method'));
+});
+
 test('fails on a link to a reference.md that does not exist', () => {
   assert.deepEqual(errorsOf({'alpha/SKILL.md': head + 'Read [reference.md](reference.md).\n'}),
     ['alpha/SKILL.md: links reference.md, which does not exist']);
