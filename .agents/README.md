@@ -62,7 +62,7 @@ description: 'What the skill does. USE FOR: … DO NOT USE FOR: …'
 
 | Agent | Mission |
 |---|---|
-| `builder` | Builds a step (an issue): plan comment, code, draft PR that closes it; or fixes the blocking items of a review, started afresh; at `medium` effort, `high` for a `high` step and a round of fixes; only the tools it uses |
+| `builder` | Builds a step (an issue): plan comment, code, draft PR that closes it; or fixes the blocking items of a review, started afresh; on sonnet at `medium` effort, on the session's model at `high` for a `high` step and a round of fixes; hands over past about 80 calls; only the tools it uses |
 | `branch-reviewer` | Senior read-only review at `high` effort with the pgcast lenses, returned in Conventional Comments; `verify` mode |
 | `chores` | Mechanical work on sonnet, with only the tools it uses: merge from below, CI rerun, regeneration; stops at the first choice |
 

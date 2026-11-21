@@ -92,6 +92,11 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass, an
 - Plan comment and PR proofs: skill `plan-and-proofs`; review comments: skill `review-comments`.
 - CI: skill `ci-gate`; merge by risk (Ship / Show / Ask), squashed, closing its issue: skill `merge-gate`.
 - Deciding alone or asking: skill `decision-philosophy`. Size, splitting, titles, branches and commits: skill `pr-shape`; code, JSDoc, errors and the docs voice: skill `code-style`.
+- What the workflow costs and what each lever buys: issue #812.
+
+### Compact instructions
+
+When the conversation is compacted, keep: the step and PR numbers in progress, the agents still running with their worktrees and scratch folders, the decisions taken with their reasons, and the next action. The rest is in the orchestrator's hand-over.
 
 ## Working rules
 
