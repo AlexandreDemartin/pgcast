@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 
-import { resolve, sep } from 'node:path';
+import { sep } from 'node:path';
 import type * as TS from 'typescript';
-import { scan } from './scan';
+import { fileKey, scan } from './scan';
 import type { ResultField } from './values';
 
 type Query = ReturnType<typeof scan>['queries'][number];
@@ -25,7 +25,7 @@ export interface Hooks {
  * Rounds run one at a time. A failing round prints its errors and keeps watching, except a first one that could not read the root tsconfig.
  */
 export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks) {
-  const key = (file: string) => ts.sys.useCaseSensitiveFileNames ? resolve(file) : resolve(file).toLowerCase();
+  const key = fileKey(ts);
   const rows = key(path), watches = new Map<string, TS.WatchOfConfigFile<TS.BuilderProgram>>();
   const cache = new Map<string, { signature: string; described: Described }>(), timers = new Set<ReturnType<typeof setTimeout>>();
   let closed = false, queued = false, settled = false, running = Promise.resolve(), left: string | undefined;

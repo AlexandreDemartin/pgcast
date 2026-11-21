@@ -12,7 +12,7 @@ import { Client } from 'pg';
 import type * as TS from 'typescript';
 import { readConfig } from './config';
 import { describeQuery, RejectedParse } from './describe';
-import { scan } from './scan';
+import { fileKey, scan } from './scan';
 import { textTypes } from './values';
 import type { StoredQuery } from './write';
 import { watch } from './watch';
@@ -256,7 +256,7 @@ async function run(args: string[]) {
   if (watching) return watchProject(projectCompiler(project), client!, project, path, `${moduleNames}/db`, config.schemas);
   const ts = projectCompiler(project), result = scan(ts, project, path), queries = result.queries;
   // The output file is ours to rewrite: a conflict or a syntax error in it is not a reason to stop, and --check reports it with the advice.
-  const diagnostics = result.diagnostics.filter(d => resolve(d.file) !== path);
+  const key = fileKey(ts), diagnostics = result.diagnostics.filter(d => key(d.file) !== key(path));
   if (diagnostics.length) {
     for (const d of diagnostics) console.error(redact(`${d.file}:${d.line}:${d.column} ${d.message}`));
     process.exitCode = 1;
