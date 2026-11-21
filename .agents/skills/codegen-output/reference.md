@@ -51,4 +51,4 @@ A `NOT NULL` proof from the catalog:
 - One redactor on every printed line, with `uncaughtException` and `unhandledRejection` handlers installed before connecting: `pg` throws some errors from socket callbacks, outside any `try` (#814).
 - A `{{…}}` placeholder is printed only when it is a POSIX name: a credential pasted there reaches the diagnostic (#826). A test never expects a word the redactor can hide (CI's password is `postgres`), and an `it.each` title takes `%#`, never an argument holding a URL (#722, #826).
 - A client option is read as the driver parses it: `pg` reads `query_timeout` from a Unix-socket URI that `URL.searchParams` misses (#814).
-- The client is ended only after a connection succeeded: on `pg` 8.6.0 to 8.23.1, awaiting `end()` after a rejected `connect()` never settles, and the CLI exits 0 in silence (#814).
+- The client is ended only after a connection succeeded: on `pg` 8.6.0 and 8.23.1, awaiting `end()` after a rejected `connect()` never settles, and the CLI exits 0 in silence (#814).
