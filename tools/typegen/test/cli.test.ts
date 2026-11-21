@@ -78,9 +78,9 @@ it('prints help without reading the project or database config', () => {
   put('pgcastconfig.json', 'invalid');
   const result = run('--help');
   expect(result.status).toBe(0);
-  expect(result.stdout).toContain('pgcast-typegen [--project <tsconfig>]');
+  expect(result.stdout).toContain('pgcast-typegen [--check] [--project <tsconfig>]');
 });
-it.each([['--check'], ['stray'], ['--project'], ['--project', '--help'], ['--help', 'stray']])(
+it.each([['--check', '--check'], ['--project', '--check'], ['--check', '--help'], ['stray'], ['--project'], ['--project', '--help'], ['--help', 'stray']])(
   'rejects invalid arguments %s with usage', (...args) => {
     const result = run(...args);
     expect(result.status).toBe(1);

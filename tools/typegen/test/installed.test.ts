@@ -38,6 +38,7 @@ it('generates importable rows with the installed bin for both module names', () 
       run('npx', ['--no-install', 'pgcast']);
       const result = run('npx', ['--no-install', 'pgcast-typegen']);
       expect(result).toContain('generated/' + name + '/queries.ts: 1 query');
+      expect(run('npx', ['--no-install', 'pgcast-typegen', '--check'])).toContain('generated/' + name + ' are up to date.');
       const rows = readFileSync(join(app, 'generated', name, 'queries.ts'), 'utf8');
       expect(rows).toContain(`import type { JSONValue } from "${name}/db"`);
       run('npx', ['--no-install', 'tsc', '--noEmit']);
