@@ -14,7 +14,7 @@ export function readConfig(dir: string) {
       value.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (_, name: string) => {
         const replacement = process.env[name];
         if (replacement !== undefined) return replacement;
-        const safeName = /^[\w.-]+$/.test(name) ? name : '[redacted]';
+        const safeName = /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : '[redacted]';
         problem ??= `If present, ${file} must be a valid JSON file, and all referenced environment variables must exist: Environment variable '${safeName}' is not set`;
         // Finish expanding db so the CLI can redact the diagnostic.
         return '';
