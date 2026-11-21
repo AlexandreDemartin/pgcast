@@ -458,7 +458,7 @@ jobs:
             const paths = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map(f => f.path).sort();
             require('assert/strict').deepEqual(paths, [
               'CHANGELOG.md', 'LICENCE', 'README.md', 'dist/bindings.js', 'dist/cli.js', 'dist/config.js',
-              'dist/describe.js', 'dist/neutralise.js', 'dist/origins.js', 'dist/scan.js',
+              'dist/describe.js', 'dist/neutralise.js', 'dist/origins.js', 'dist/peers.js', 'dist/scan.js',
               'dist/values.js', 'dist/watch.js', 'dist/write.js', 'package.json',
             ]);"
 
