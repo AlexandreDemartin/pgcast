@@ -7,7 +7,7 @@ description: 'Changing the codegen output (src/generate): fixture snapshots, opt
 
 The generated file (`zapatos/schema.d.ts`) is compiled by every user project: its content is part of the API (skill `backward-compat`).
 
-Before changing the typed SQL tool, `tools/typegen` (decision 012): [reference.md](reference.md) § Describing; then, for what the change touches, § Neutralising, § Name binding, § Program selection, § Nullability, § Watch mode and § A CLI and its credentials.
+Before changing the typed SQL tool, `tools/typegen` (decision 012): [reference.md](reference.md) § Describing; then, for what the change touches, [reference.md](reference.md) § Neutralising, [reference.md](reference.md) § Name binding, [reference.md](reference.md) § Program selection, [reference.md](reference.md) § Nullability, [reference.md](reference.md) § Watch mode, [reference.md](reference.md) § A CLI and its credentials.
 
 ## Rules
 
