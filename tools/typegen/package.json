@@ -4,6 +4,8 @@
   "description": "Describe SQL query fields using Postgres.",
   "license": "MIT",
   "author": "Alexandre Demartin (https://github.com/AlexandreDemartin)",
+  "homepage": "https://pgcast.dev/typed-sql",
+  "keywords": ["pgcast", "zapatos", "postgres", "postgresql", "typescript"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AlexandreDemartin/pgcast.git",
