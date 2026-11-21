@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Alexandre Demartin
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Client } from 'pg';
@@ -38,6 +38,41 @@ beforeEach(() => {
   put('zapatosconfig.json', { db: { connectionString: '{{ TYPEGEN_DB }}' }, outDir: '{{TYPEGEN_OUT}}' });
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+it.each(['static', 'app compiler', 'two compilers'])('generates from a referenced project with %s', layout => {
+  mkdirSync(join(dir, 'node_modules'));
+  renameSync(join(dir, 'app/node_modules/typescript'), join(dir, 'node_modules/typescript'));
+  put('tsconfig.json', { files: [], references: [{ path: './' + project }] });
+  const shared = layout === 'two compilers', file = shared ? 'shared/query.ts' : 'app/app.ts';
+  put(project, { files: [shared ? '../' + file : 'app.ts'], compilerOptions: { composite: true, rootDir: '..', types: [] } });
+  const peer = 'node_modules/@pgcast/pgcast', appPeer = 'app/' + peer, core = dirname(require.resolve('@pgcast/pgcast/db'));
+  if (shared) {
+    mkdirSync(join(dir, 'node_modules/@pgcast'));
+    symlinkSync(core, join(dir, peer), 'dir');
+    symlinkSync('@pgcast/pgcast', join(dir, 'node_modules/zapatos'), 'dir');
+  }
+  rmSync(join(dir, appPeer));
+  put(appPeer + '/package.json', readFileSync(join(core, 'package.json'), 'utf8'));
+  const marker = join(dir, 'compiled');
+  if (layout !== 'static') put(appPeer + '/db.js', `
+    const db = require('zapatos/db');
+    exports.param = db.param;
+    exports.sql = (...args) => {
+      require('node:fs').appendFileSync(${JSON.stringify(marker)}, 'app');
+      return db.sql(...args);
+    };
+  `);
+  put(file, source(layout === 'static' ? 'SELECT\\n7 AS id' : "SELECT ${db.param(7, 'int4')} AS id"));
+  const result = run('--project', 'tsconfig.json');
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(0);
+  const rows = readFileSync(join(dir, output), 'utf8');
+  if (layout === 'static') expect(rows).toContain(JSON.stringify('SELECT\n7 AS id'));
+  else {
+    expect(rows).toContain('SELECT CAST($1 AS \\"int4\\") AS id');
+    expect(existsSync(marker) && readFileSync(marker, 'utf8')).toBe('app');
+  }
+});
 
 it('prints help without reading the project or database config', () => {
   put('pgcastconfig.json', 'invalid');
