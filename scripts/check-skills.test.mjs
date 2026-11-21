@@ -106,6 +106,11 @@ test('passes on citations of every shape, each a heading', () => {
     `Read reference.md § Lookups, ${link} § Method PRs, ${link} § Watch mode.`,
     `Read ${link} § Lookups, then § Step 2 and § iterables.`,
     `Read ${link} § Lookups (and more)`,
+    `Read ${link} § Lookups — when keyed.`,
+    `Is it in ${link} § Lookups?`,
+    `**Read ${link} § Lookups**, always.`,
+    `"Read ${link} § Lookups", always.`,
+    'Run `reference.md § Lookups` there.',
   ]) assert.deepEqual(sectionsOf(cite), [], cite);
 });
 
