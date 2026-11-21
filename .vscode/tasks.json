@@ -8,7 +8,7 @@
         "$eslint-stylish"
       ],
       "label": "npm: lint",
-      "detail": "eslint --ext .ts ."
+      "detail": "eslint (flat config)"
     }
   ]
 }
