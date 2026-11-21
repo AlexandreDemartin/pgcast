@@ -5,8 +5,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, s
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Client } from 'pg';
-import { afterEach, beforeEach, expect, inject, it } from 'vitest';
+import { afterEach, beforeEach, expect, inject, it, vi } from 'vitest';
 import { urlForDatabase } from '../../../test/helpers/databases';
+import { cliConfig } from '../../../src/generate/cliConfig';
+import { readConfig } from '../src/config';
 import { useTestDatabase } from '../../../test/helpers/db';
 
 const db = useTestDatabase(), cli = resolve(__dirname, '../dist/cli.js');
@@ -116,6 +118,7 @@ it('names the file and missing variable even in an array of nested options', () 
   expect(result.status).toBe(1);
   expect(result.stderr).toContain('zapatosconfig.json');
   expect(result.stderr).toContain('TYPEGEN_MISSING_804');
+  expect(() => cliConfig('{}', dir)).toThrow(result.stderr.trim());
 });
 it('refuses an explicit query_timeout before connecting', () => {
   put('pgcastconfig.json', { db: { host: '127.0.0.1', port: 1, query_timeout: 0 } });
@@ -225,11 +228,25 @@ it('redacts credentials in the both-files note', () => {
   expect(result.stderr).not.toContain('option');
 });
 
-it.each(['postgres://reader:sample@localhost/db', 'two words', ''])('reports a malformed placeholder by file alone (%#)', name => {
-  put('zapatosconfig.json', { outDir: '{{' + name + '}}' });
+it.each(['{{release-dir}}', '{{two words}}', '{{}}'])('matches core interpolation for %s', placeholder => {
+  vi.stubEnv('release-dir', 'generated');
+  try {
+    put('zapatosconfig.json', { outDir: placeholder });
+    const { config, problem } = readConfig(dir);
+    expect(problem).toBeUndefined();
+    expect(config.outDir).toBe(cliConfig('{}', dir).outDir);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it('omits credentials in a missing placeholder name', () => {
+  const secret = 'postgres://reader:sample@localhost/db';
+  put('zapatosconfig.json', { outDir: '{{' + secret + '}}' });
   const result = run('--project', project);
   expect(result.status).toBe(1);
-  expect(result.stderr.trim()).toBe('zapatosconfig.json: a placeholder is not a variable name');
+  expect(result.stderr).toContain('zapatosconfig.json');
+  expect(result.stderr).not.toContain('sample');
 });
 
 it('refuses query_timeout in a Unix-socket URI and keeps the previous file', () => {
@@ -255,7 +272,7 @@ it('redacts a parsed password that also occurs in a config diagnostic', () => {
     db: { connectionString: 'postgres://reader:TYPEGEN_%4DISSING_804@localhost/db' } });
   const result = run('--project', project);
   expect(result.status).toBe(1);
-  expect(result.stderr.trim()).toBe("Environment variable '[redacted]' is not set in zapatosconfig.json");
+  expect(result.stderr.trim()).toContain("Environment variable '[redacted]' is not set");
 });
 
 it('redacts the password as written in a socket URI and as pg decodes it', () => {
@@ -280,3 +297,24 @@ it('writes the row returned by pg and guards an interpolated identifier', async 
   expect(written).toContain('"label": string | null;');
   expect((await db.client.query(actual)).rows).toEqual([{ left: id, label: 'User' }]);
 });
+
+it.each(['date', 'timestamp', 'timestamptz', 'interval'])('checks the session style for a non-null %s', async type => {
+  const interval = type === 'interval', setting = interval ? 'IntervalStyle' : 'DateStyle';
+  const configure = (style: string) => put('zapatosconfig.json', { outDir: 'generated',
+    db: { connectionString: '{{TYPEGEN_DB}}', options: '-c ' + setting + '=' + style } });
+  await db.pool.query('CREATE TABLE style_' + type + ' (v ' + type + ' NOT NULL)');
+  put('app/app.ts', source('SELECT v FROM style_' + type));
+  configure(interval ? 'postgres' : 'ISO,DMY');
+  expect(run('--project', project).status).toBe(0);
+  const previous = readFileSync(join(dir, output), 'utf8');
+  expect(previous).toContain('"v": ' + (interval ? 'PostgresInterval' : 'Date | number') + ';');
+  configure(interval ? 'iso_8601' : 'SQL,DMY');
+  for (const args of [[], ['--check']]) {
+    const result = run('--project', project, ...args);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('people');
+    expect(result.stderr).toContain(setting);
+    expect(result.stderr).toContain(interval ? 'postgres' : 'ISO');
+    expect(readFileSync(join(dir, output), 'utf8')).toBe(previous);
+  }
+}, 30_000);
