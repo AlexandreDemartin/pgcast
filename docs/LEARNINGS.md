@@ -25,9 +25,12 @@ Candidates for a check, a rule or a skill line.
 - #848 — an issue carried over from an Epic that closes ("Minors kept from Epic #n") is attached to an open Epic, or its place said, before `Closes #n` merges, or `run-step` § Finding the step never reaches it — branch-reviewer
 - #848 — merging two learnings into one rule can drop the condition of one (here the base tsconfig with no `include`): reread each merged rule against each source line — orchestrator
 - #848 — when a fix moves a rule or a pointer, grep the PR body, the verdict comment and the Epic comments for its old location (three places named it) — builder
+- #855 — Vite 8 is rolldown-based (no esbuild in `node_modules`): a build whose entry is a virtual module names it without a null byte and maps it to the `\0` id in `resolveId` — builder
+- #855 — `adapters/pglite`'s `check:browser` reads `dist`: `npm run build` in the adapter first — builder
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 - #853 — six skills keep a `## Checklist` (`backward-compat`, `code-style`, `consumer-usage`, `merge-gate`, `review-comments`, `zero-abstraction`) after #853 cut the six others as duplicates: one rule for all, at the next method PR
 - #854 — `sectionErrors` still leaves unchecked `[reference.md](reference.md#x) § X` and `[reference.md](./reference.md) § X`, and checks a bare `skills/code-style/reference.md § Claims` against the citing skill's own reference; no such citation in the tree
+

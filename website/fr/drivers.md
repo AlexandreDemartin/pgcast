@@ -1,5 +1,5 @@
 ---
-english: a6c6ad16cf5f
+english: 728026d8b3f2
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -96,7 +96,7 @@ Le code du panneau est typé sur un `pg.Pool` ; sur `asPool(pglite)`, le SQL et
 - Une erreur est une `DatabaseError` de PGlite, pas celle de `pg` : elle a les champs de `pg` (`code`, `constraint`…), donc `isDatabaseError()` et les retries fonctionnent.
 - PGlite a une seule connexion, que le pool prête à une transaction à la fois : [Transactions](#transactions).
 
-Dans une page web, chargez une implémentation de `Buffer` avant l’adaptateur. Si vous incluez le cœur de pgcast et le vrai `pg` dans le même bundle, l’absence de l’objet `global` de Node peut aussi provoquer une erreur. Le [worker du playground](https://github.com/AlexandreDemartin/pgcast/tree/master/website/.vitepress/playground) remplace `pg` par deux classes vides, `Pool` et `Client`. Il fournit `process.emitWarning` et une implémentation limitée de `Buffer` avant de charger `zapatos/db`. Dans cette implémentation, `Buffer.from()` lève une erreur.
+Dans une page web, `zapatos/db` demande deux choses à votre bundler : `pg` remplacé par deux classes vides (`Pool` et `Client`, que le cœur teste avec `instanceof`), et un `Buffer` complet placé sur `globalThis` avant le chargement du cœur. Le README de l’adaptateur donne une [recette testée](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#in-a-page). Deno, Bun et les runtimes edge ne sont pas testés.
 
 Ce que l’adaptateur lit et écrit, type par type, et en quoi il diffère de `pg` : [son README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).
 

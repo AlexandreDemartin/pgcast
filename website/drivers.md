@@ -95,7 +95,7 @@ The panel's code is typed on a `pg.Pool`; on `asPool(pglite)`, the SQL and the t
 - An error is PGlite's `DatabaseError`, not `pg`'s: it has `pg`'s fields (`code`, `constraint`…), so `isDatabaseError()` and the retries work.
 - PGlite has one connection, which the pool lends to one transaction at a time: [Transactions](#transactions).
 
-In a page, load a `Buffer` implementation before the adapter. Bundling the core with the real `pg` can also fail on Node's `global`. The [playground worker](https://github.com/AlexandreDemartin/pgcast/tree/master/website/.vitepress/playground) replaces `pg` with stub `Pool` and `Client` classes. It supplies `process.emitWarning` and a limited `Buffer` before loading `zapatos/db`. Its `Buffer.from()` throws.
+In a page, `zapatos/db` needs two things from your bundler: `pg` aliased to two empty classes (`Pool` and `Client`, which the core tests with `instanceof`), and a complete `Buffer` set on `globalThis` before the core loads. The adapter's README gives a [tested recipe](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#in-a-page). Deno, Bun and edge runtimes are untested.
 
 What the adapter reads and writes, type by type, and how it differs from `pg`: [its README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).
 

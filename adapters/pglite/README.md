@@ -42,7 +42,44 @@ await db.serializable(pool, async txn => {
 - `run(pool)` sends each query as `pg` sends it, through `execProtocol()`: with no value and no name, a simple `Query`, which may hold several statements; otherwise `Parse`, `Bind`, `Describe`, `Execute` and `Sync`. `.prepared(name)` parses the query once on that PGlite, as `pg` does once on a connection, whichever `asPool()` gave the pool; an empty name is no name, as in `pg`.
 - `COPY … FROM STDIN` gets `pg`'s answer, a `CopyFail`, so it rejects with 57014 and the next query runs.
 - The pool has the PGlite's one connection. `transaction()` and its shortcuts (`serializable()`…) take it with `connect()`, in turn, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end. A query on the pool waits for that connection. [Native PGlite calls](#how-it-differs-from-pg) can run before the adapter releases it.
-- In a page, the adapter imports no Node built-in, but `pg`'s parser for a `bytea` reads a global `Buffer` as it loads: set `globalThis.Buffer` (the `buffer` package's) in a module imported before the adapter. For `zapatos/db`, follow the [core browser setup](https://pgcast.dev/drivers#pglite).
+- In a page, the adapter imports no Node built-in, but `pg`'s parser for a `bytea` reads a global `Buffer` as it loads. For `zapatos/db` too, follow [In a page](#in-a-page).
+
+## In a page
+
+`zapatos/db` is written for Node. Bundled for a browser as it is, it fails: it imports `pg` for `instanceof pg.Pool`, and `pg` needs `net`, `tls`, `dns` and `global`. It also reads `Buffer` at import (`toBuffer()`, `Buffer.isBuffer` and `Buffer.byteLength`), and PGlite's `bytea` needs a complete one. This recipe gives it both:
+
+```ts
+// buffer-global.ts
+import { Buffer } from 'buffer';  // the `buffer` package, not a Node built-in
+globalThis.Buffer = Buffer;
+```
+
+```ts
+// pg-stub.ts: the two classes zapatos/db tests with instanceof; the adapter's pool never is one
+export class Pool {}
+export class Client {}
+```
+
+```ts
+// main.ts: Buffer first, so that the modules after it find it
+import './buffer-global';
+import * as db from 'zapatos/db';
+import { PGlite } from '@electric-sql/pglite';
+import { asPool } from '@pgcast/adapter-pglite';
+
+const pool = asPool(new PGlite('idb://cinema'));
+```
+
+```sh
+npm install buffer
+esbuild main.ts --bundle --platform=browser --alias:pg=./pg-stub.ts --outfile=out.js
+```
+
+Any bundler that aliases `pg` does the same. Tested: a transaction with a parameter, an insert and a `bytea` read on a PGlite, from a bundle of `db.js` and of `db.mjs`, loaded in a bare context with no `process` and no `require`, with esbuild 0.28.2, `buffer` 6.0.3, PGlite 0.5.16 and pgcast 7.1.0. `npm run check:browser` repeats it for `db.mjs` on each change, bundled by Vite and given Node's `Buffer` in place of the package's.
+
+- With no alias, the bundle imports Node's `net`, `tls`, `dns`, `fs`, `crypto`… With the alias and no `Buffer`, loading throws `Buffer is not defined`.
+- A partial `Buffer` is not enough: one with no working `Buffer.from` fails on a `bytea` (the playground's stand-in throws there on purpose).
+- Untested: Deno, Bun and edge runtimes (Cloudflare Workers, Vercel Edge).
 
 ## What it reads
 
@@ -103,7 +140,7 @@ cd adapters/pglite
 npm ci
 npm test                  # the tables above, the shortcuts, prepared queries and transactions
 npm run test:types        # the tests, and asPool() against the root's db.d.ts
-npm run check:browser     # dist/ bundled for a page, with no Node built-in, and run given only TextEncoder and Buffer
+npm run check:browser     # dist/, then zapatos/db with it, bundled for a page with no Node built-in and run given only TextEncoder and Buffer
 ```
 
 CI runs them on PGlite 0.5.0, 0.5.13 and the lockfile's version, on Postgres 14, 18 and 19.
