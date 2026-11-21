@@ -75,6 +75,18 @@ To check row types too, point `db` at the migrated database. The tool describes 
 
 Both modes accept `--project <tsconfig>` and leave the file untouched. Exit 0 means the file passed the selected check. Exit 1 reports drift or an error. Regenerate after a reported difference.
 
+## Watch for edits
+
+From 0.2.0.
+
+```sh
+npx pgcast-typegen --watch [--project <tsconfig>]
+```
+
+The command generates once, then regenerates `queries.ts` each time a source file of the project changes, until `SIGINT` or `SIGTERM` closes it with exit 0. It follows the project and its references through the project's own TypeScript and keeps one connection to `db`. It describes only the queries whose text changed since the last round, and writes the file only when its bytes change. It prints a line when it writes, and the errors of a failing round, then keeps watching. A lost connection exits 1.
+
+The schema is not watched. After a migration, one run without `--watch` is enough: a running `--watch` sees the file change and describes every query again, so it keeps the new rows. The config file is read once: restart `--watch` after editing it. `--watch` cannot be combined with `--check`.
+
 ## Development
 
 Build the root package first, then run the tests against the repository's [test database](https://github.com/AlexandreDemartin/pgcast/blob/master/AGENTS.md#local-environment).

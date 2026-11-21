@@ -4,6 +4,10 @@ All notable changes to `@pgcast/typegen` are documented here. Format: [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- `pgcast-typegen --watch` regenerates the row types each time a source file changes, describing only the queries whose text changed. [#829](https://github.com/AlexandreDemartin/pgcast/issues/829)
+
 ## [0.1.0] - 2026-11-21
 
 ### Added

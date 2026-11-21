@@ -45,8 +45,11 @@ function sameTexts(a?: CandidateTexts, b?: CandidateTexts) {
   return a?.text === b?.text && isDeepStrictEqual(a?.variants?.texts, b?.variants?.texts);
 }
 
-/** Find named Row templates using the application's compiler and its project's source files. */
-export function scan(ts: typeof TS, project: string, rowsFile: string) {
+/**
+ * Find named Row templates using the application's compiler and its project's source files.
+ * With programOf, a project's program comes from the caller (a watch keeps them between scans) instead of a new one.
+ */
+export function scan(ts: typeof TS, project: string, rowsFile: string, programOf?: (file: string) => TS.Program) {
   const projects = new Set<string>(), diagnostics: Diagnostic[] = [], templates = new Map<string, Template>();
   const key = (path: string) => ts.sys.useCaseSensitiveFileNames ? resolve(path) : resolve(path).toLowerCase();
   const rows = key(rowsFile), root = resolve(project), host = {
@@ -65,18 +68,8 @@ export function scan(ts: typeof TS, project: string, rowsFile: string) {
       diagnostics.push({ ...location(file), message: error instanceof Error ? error.message : String(error) });
     }
   }
-  function readProject(file: string) {
-    const id = key(ts.sys.realpath?.(file) ?? file);
-    if (projects.has(id)) return;
-    projects.add(id);
-    const config = parse(file, () => ts.readConfigFile(file, ts.sys.readFile));
-    if (!config) return;
-    if (config.error) {
-      if (file === root && !config.error.file) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
-      report(config.error, file);
-      return;
-    }
-    const parsed = parse(file, () => ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(file), undefined, file));
+  function created(file: string, json: unknown) {
+    const parsed = parse(file, () => ts.parseJsonConfigFileContent(json, ts.sys, dirname(file), undefined, file));
     if (!parsed) return;
     for (const error of parsed.errors) report(error, error.file?.fileName ?? file);
     const options = parsed.options, compilerHost = ts.createCompilerHost(options, true), getSourceFile = compilerHost.getSourceFile;
@@ -88,9 +81,23 @@ export function scan(ts: typeof TS, project: string, rowsFile: string) {
         return ts.createSourceFile(path, '', target);
       }
     };
-    const program = parse(file, () => ts.createProgram({ rootNames: parsed.fileNames, options, host: compilerHost,
+    return parse(file, () => ts.createProgram({ rootNames: parsed.fileNames, options, host: compilerHost,
       projectReferences: parsed.projectReferences ?? [] }));
+  }
+  function readProject(file: string) {
+    const id = key(ts.sys.realpath?.(file) ?? file);
+    if (projects.has(id)) return;
+    projects.add(id);
+    const config = parse(file, () => ts.readConfigFile(file, ts.sys.readFile));
+    if (!config) return;
+    if (config.error) {
+      if (file === root && !config.error.file) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
+      report(config.error, file);
+      return;
+    }
+    const program = programOf ? parse(file, () => programOf(file)) : created(file, config.config);
     if (!program) return;
+    if (programOf) for (const error of program.getConfigFileParsingDiagnostics()) report(error, error.file?.fileName ?? file);
     for (const error of program.getOptionsDiagnostics()) report(error, file);
     for (const source of program.getSourceFiles()) {
       if (!source.isDeclarationFile && !program.isSourceFileFromExternalLibrary(source)) parse(source.fileName, () => readFile(source, program, file));

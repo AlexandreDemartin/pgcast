@@ -1,5 +1,5 @@
 ---
-english: 4cd58ebd6f45
+english: abecaa955f0b
 ---
 
 # SQL typé
@@ -67,4 +67,4 @@ Le type généré de `total` est `string | null` car Postgres n’associe le ré
 - **Interpolations.** Utilisez des identifiants littéraux ou `param()`. Pour les conditions, les variables interpolées directement, les appels de fonctions utilitaires, `raw()` ou les fragments imbriqués, écrivez vous-même le type de ligne.
 - **Formes des paramètres.** L’outil accepte au plus quatre appels à `param()` sans cast ou avec `true`. Pour chacun, le SQL peut prendre deux formes, avec ou sans cast en JSON. Postgres doit pouvoir parser au moins une variante de la requête, et toutes les variantes acceptées doivent décrire la même ligne. Pour fixer la forme d’un paramètre, passez un cast littéral ou `false` à `param()` ([règles détaillées](https://github.com/AlexandreDemartin/pgcast/tree/master/tools/typegen#readme)).
 - **Nullabilité.** Un champ garde `| null` quand l’outil ne peut pas établir qu’il provient d’une colonne non nullable d’une table. Une jointure externe peut rendre tous les champs nullables. Gardez `| null` sauf si la valeur décodée du champ ne peut jamais être `null`.
-- **Régénération.** Relancez la commande après chaque modification du SQL ou du schéma. L’outil ne propose pas encore `--watch`.
+- **Régénération.** Relancez la commande après chaque modification du SQL ou du schéma. À partir de la 0.2.0, `--watch` régénère les types de ligne à chaque modification d’un fichier source et ne décrit que les requêtes dont le texte a changé. Il ne surveille pas le schéma : après une migration, une exécution sans `--watch` suffit, et un `--watch` en cours décrit alors à nouveau toutes les requêtes.
