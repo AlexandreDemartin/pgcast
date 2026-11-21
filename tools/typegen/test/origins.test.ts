@@ -126,9 +126,9 @@ beforeAll(async () => {
     ALTER TABLE unchecked ADD CONSTRAINT required_x NOT NULL x NOT VALID;
   `);
   dir = mkdtempSync(join(tmpdir(), 'pgcast-origins-'));
-  mkdirSync(join(dir, 'node_modules/zapatos'), { recursive: true });
+  mkdirSync(join(dir, 'node_modules/@pgcast'), { recursive: true });
   symlinkSync(dirname(require.resolve('typescript/package.json')), join(dir, 'node_modules/typescript'), 'dir');
-  writeFileSync(join(dir, 'node_modules/zapatos/db.d.ts'), 'export declare const sql: any;');
+  for (const name of ['zapatos', '@pgcast/pgcast']) symlinkSync(dirname(require.resolve('@pgcast/pgcast/db')), join(dir, 'node_modules', name), 'dir');
   writeFileSync(join(dir, 'tsconfig.json'), '{"files":["app.ts"]}');
   writeFileSync(join(dir, 'pgcastconfig.json'), JSON.stringify({
     db: { connectionString: '{{ORIGINS_DB}}' }, schemas: { public: { include: '*', exclude: ['excluded'] } },

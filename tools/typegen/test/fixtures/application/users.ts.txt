@@ -1,7 +1,8 @@
+import type * as s from 'zapatos/schema';
 import * as db from 'zapatos/db';
 import type { Row } from './generated/zapatos/queries';
 
-export const users = db.sql<never, Row<'users'>[]>`SELECT u.id, settings, mood, scores FROM public.users u JOIN public.accounts a ON a.owner_id=u.id`;
+export const users = db.sql<s.users.SQL, Row<'users'>[]>`SELECT u.id, settings, mood, scores FROM public.${'users'} u JOIN public.accounts a ON a.owner_id=u.id WHERE u.${`id`} IN (${db.param(1, 'int4')}, ${db.param(2, `int4`)}, ${db.param(3, false)})`;
 const row: Row<'users'> = { id: 1, settings: { enabled: true }, mood: null, scores: [[1, null]] };
 row.id.toFixed();
 row.mood = 'happy';

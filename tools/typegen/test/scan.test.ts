@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Alexandre Demartin
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type ts from 'typescript';
@@ -24,7 +24,13 @@ function project(files: string[], compilerOptions = {}) {
 }
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'pgcast-scan-'));
-  for (const module of ['zapatos/db', 'pgcast/db']) put('node_modules/' + module + '.d.ts', 'export declare const sql: any, param: any;');
+  const entry = require.resolve('@pgcast/pgcast/db');
+  mkdirSync(join(dir, 'node_modules/@pgcast'), { recursive: true });
+  symlinkSync(dirname(entry), join(dir, 'node_modules/@pgcast/pgcast'), 'dir');
+  for (const module of ['zapatos/db', 'pgcast/db']) {
+    put('node_modules/' + module + '.d.ts', 'export declare const sql: any, param: any;');
+    symlinkSync(entry, join(dir, 'node_modules/' + module + '.js'));
+  }
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -34,7 +40,7 @@ describe.each(imports)('%s bindings from %s on TypeScript ' + compiler.version, 
     const ast = compiler.createSourceFile(join(dir, 'bindings.ts'), source.replace(/FN/g, name) + '\n' + expression.replace(/FN/g, name),
       compiler.ScriptTarget.Latest, true);
     const last = ast.statements[ast.statements.length - 1] as ts.ExpressionStatement;
-    return bindings(compiler, ast).matches(last.expression, name);
+    return !!bindings(compiler, ast).matches(last.expression, name);
   }
   it.each([['{ FN }', 'FN'], ['* as db', 'db.FN'], ['* as zdb', 'zdb.FN']])('accepts %s as %s', (clause, expression) => {
     expect(bound(`import ${clause} from '${module}';`, expression)).toBe(true);
@@ -130,7 +136,7 @@ it.each(['v', 'whereable', 'db.conditions.eq(v)', 'db.raw(v)', 'sql`nested`', 'd
       file = put('a.ts', [row, named, query('films', 'SELECT\n  ' + placeholder + ' AND ${later}')].join('\n'));
     const result = project(['a.ts']);
     expect(result.queries).toEqual([]);
-    expect(result.diagnostics).toEqual([{ file, line: 3, column: 1, message: expect.stringMatching(/only static templates/i) }]);
+    expect(result.diagnostics).toEqual([{ file, line: 3, column: 1, message: expect.stringContaining('placeholder') }]);
     for (const part of ['films', placeholder, '4:3']) expect(result.diagnostics[0].message).toContain(part);
     expect(result.diagnostics[0].message).not.toContain('later');
   });
@@ -189,7 +195,7 @@ it('opts in only through RunResult, including wrapped rows', () => {
 
 it.each(['local', 'unresolved'])('refuses a db import with a target that is %s', target => {
   const file = put('query.ts', [row, named, query('films')].join('\n'));
-  if (target === 'unresolved') rmSync(join(dir, 'node_modules/zapatos/db.d.ts'));
+  if (target === 'unresolved') rmSync(join(dir, 'node_modules/zapatos'), { recursive: true });
   put('foreign.ts', 'export const sql = String.raw;');
   const options = target === 'local' ? { paths: { 'zapatos/db': ['./foreign.ts'] } } : {};
   expect(project(['query.ts'], options)).toEqual({ queries: [], diagnostics: [
