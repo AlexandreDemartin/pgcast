@@ -1,5 +1,5 @@
 ---
-english: 6b63bd0bce90
+english: 5638bfc6b396
 description: "Réservez des places sous SERIALIZABLE, pour que deux requêtes HTTP simultanées n’enfreignent pas une règle, et laissez pgcast relancer la transaction refusée."
 ---
 
@@ -30,7 +30,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 COMMIT
 ```
 
-L’onglet dont la transaction est commitée la première obtient ses lignes, `seat_bookings.JSONSelectable[]` ; l’autre obtient `null`, ici `tabTwo`. Le SQL des requêtes du callback : [`count()`](/fr/select#count) et [`insert()`](/fr/insert#insert) ; ce que pgcast envoie autour, et quand il réessaie : [Retries](/fr/transaction#retries).
+L’onglet dont la transaction est commitée la première obtient ses lignes, `seat_bookings.JSONSelectable[]` ; l’autre obtient `null`, ici `tabTwo`. Le SQL des requêtes du callback : [`count()`](/fr/aggregates#count) et [`insert()`](/fr/insert#insert) ; ce que pgcast envoie autour, et quand il réessaie : [Retries](/fr/transaction#retries).
 
 - Exécutez chaque requête de la transaction sur `txnClient`. Une requête sur `pool` n’en fait pas partie : elle échappe au rollback, et la tentative suivante l’exécute de nouveau.
 - Deux requêtes HTTP peuvent aussi passer l’une après l’autre, et alors aucune n’est réessayée : la seconde compte simplement les places de la première.

@@ -73,7 +73,7 @@ For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability t
 - A column's `NOT NULL` applies to the array itself. Even with a `NOT NULL` domain as the element type, an assignment past the end, such as `a[3] = 3` on `{1}`, stores `{1,NULL,3}`. As in Zapatos 6.6.1, pgcast types `int4[] NOT NULL` as `number[]`, but `pg` reads `{1,NULL}` as `[1, null]`.
 - An enum array is text in `Selectable` and a label array in shortcut JSON. [`enumArraysTypedAsText: false`](/generator#generate.enumArraysTypedAsText) suits a parser that returns an array.
 - A domain over `text` whose `CHECK` lists its values, `CHECK (VALUE IN ('U', 'PG', '12'))`, is a `string`, its placeholder's type as generated, unless [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) is on.
-- An `interval` is a [`PostgresInterval`](/runtime-config#PostgresInterval) in a raw row and text in JSON. [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects) suits a parser that returns text.
+- An `interval` is a [`PostgresInterval`](/value-types#PostgresInterval) in a raw row and text in JSON. [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects) suits a parser that returns text.
 
 ::: info Coming
 Reading more of the catalog, as a separate tool: the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
@@ -129,7 +129,7 @@ The price is that every value travels as JSON, and JSON has no dates, no bytes a
 
 Zapatos returned JSON from every shortcut that returns rows, even those that could do without it, "in the interests of consistency", as its docs put it: one shortcut's row is the same type as another's.
 
-And it typed the strings rather than converting them behind your back: [`TimestampTzString`](/runtime-config#TimestampTzString) and its siblings check a string's shape, and [`toDate()`](/runtime-config#toDate) turns one into a `Date` when you choose to, saying in which time zone to read a string that carries none ([Dates and times](/runtime-config#dates-and-times)).
+And it typed the strings rather than converting them behind your back: [`TimestampTzString`](/value-types#TimestampTzString) and its siblings check a string's shape, and [`toDate()`](/value-types#toDate) turns one into a `Date` when you choose to, saying in which time zone to read a string that carries none ([Dates and times](/value-types#dates-and-times)).
 
 ## How a result type follows the query
 
@@ -160,7 +160,7 @@ All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extra
 
 ## What pgcast kept, and what it changes
 
-The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)). Its fixes change `schema.d.ts` where 6.6.1's was wrong: a table's `UniqueIndex` lists only its own unique indexes, each line of a multi-line column comment gets its `*`, and each column of an `Insertable` takes `db.SQLFragment<any>`, a `sql` fragment whose result is typed, where 6.6.1 wrote `db.SQLFragment` ([changelog](/changelog)).
+The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersionCanary`](/generated-files#SchemaVersionCanary)). Its fixes change `schema.d.ts` where 6.6.1's was wrong: a table's `UniqueIndex` lists only its own unique indexes, each line of a multi-line column comment gets its `*`, and each column of an `Insertable` takes `db.SQLFragment<any>`, a `sql` fragment whose result is typed, where 6.6.1 wrote `db.SQLFragment` ([changelog](/changelog)).
 
 What pgcast changes on the way in is in the run-time library, not in the generated types. [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`).
 
@@ -170,6 +170,6 @@ What pgcast refuses is a second source of truth: a model class, a schema written
 
 ## Further reading
 
-- The entries this page talks about: [`select()` options](/select#options), [`JSONOnlyColsForTable`](/select#JSONOnlyColsForTable), [`ExtrasResult`](/select#ExtrasResult), [`LateralResult`](/select#LateralResult), [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment), the [value types](/runtime-config#value-types).
+- The entries this page talks about: [`select()` options](/select#options), [`JSONOnlyColsForTable`](/select#JSONOnlyColsForTable), [`ExtrasResult`](/select#ExtrasResult), [`LateralResult`](/select#LateralResult), [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment), the [value types](/value-types).
 - The generator, its options and the files it writes: [Generator](/generator).
 - Filling in a placeholder: [Custom types](/custom-types).

@@ -16,7 +16,7 @@ The screenings of 1 March 2030, in UTC:
 
 - `"starts_at" >= $1`<!-- probe: db.sql`${{ starts_at: db.conditions.and(db.conditions.gte('2030-03-01T00:00:00Z'), db.conditions.lt('2030-03-02T00:00:00Z')) }}` --> and `"starts_at" < $2`<!-- probe: db.sql`${{ starts_at: db.conditions.and(db.conditions.gte('2030-03-01T00:00:00Z'), db.conditions.lt('2030-03-02T00:00:00Z')) }}` -->, joined by `AND`: a half-open period, its start in and its end out. A week or a month is the same pair, from its first midnight to the one after it.
 - The bounds are explicit dates, not `now()`, so the query gives the same rows whenever it runs. From the current time, use [`now`](/conditions#conditions.now) or [`fromNow()`](/conditions#conditions.fromNow).
-- A bound is a string with its offset or a `Date` ([Dates and times](/conditions#dates)). `starts_at` comes back as a string in the session's time zone ([Dates and times](/runtime-config#dates-and-times)).
+- A bound is a string with its offset or a `Date` ([Dates and times](/conditions#dates)). `starts_at` comes back as a string in the session's time zone ([Dates and times](/value-types#dates-and-times)).
 
 ## Why not `between()`
 
@@ -46,5 +46,5 @@ The screenings of 2 March 2030 for a reader in Tokyo, whose day starts nine hour
 ## See also
 
 - [Comparisons](/conditions#comparisons) and [Ranges](/conditions#ranges): each condition and the SQL it writes.
-- [Dates and times](/conditions#dates), and their [types](/runtime-config#dates-and-times): what a bound can be, and what comes back.
+- [Dates and times](/conditions#dates), and their [types](/value-types#dates-and-times): what a bound can be, and what comes back.
 - [Date/time functions](https://www.postgresql.org/docs/current/functions-datetime.html), in the Postgres docs.

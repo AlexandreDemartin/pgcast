@@ -136,7 +136,7 @@ The screenings, soonest first, on `starts_at` then `id`. Here `last` is page 1's
 <template #caption><span>Page 2: screenings 1002 and 1003, at 18:00 and 20:15 UTC on 2 March.</span></template>
 </CastPanel>
 
-- `last.starts_at` is a string, a [`TimestampTzString`](/runtime-config#TimestampTzString), with the microseconds Postgres keeps: `'2030-03-03T18:00:00.0001+00:00'`. Send it back as that string, in the comparison and in the cursor.
+- `last.starts_at` is a string, a [`TimestampTzString`](/value-types#TimestampTzString), with the microseconds Postgres keeps: `'2030-03-03T18:00:00.0001+00:00'`. Send it back as that string, in the comparison and in the cursor.
 - Not as a `Date`, which keeps milliseconds and drops the rest. Take two screenings in one millisecond, at 18:00:00.000100 and 18:00:00.000900: as a `Date`, both are 18:00:00.000. In this `ASC` order, the page after the first gives the first again; in a `DESC` order, the page after the second skips the first.
 - A query of your own in the [`sql`](/sql-template#sql) template gets `starts_at` from `pg` as a `Date`: take the cursor from a shortcut's row, which has the string.
 - Comparing on `date_trunc('milliseconds', starts_at)` also works with a `Date`, but needs the same expression in the `order`, and an index on it to start at the last row. That index needs the zone, `date_trunc('milliseconds', starts_at, 'UTC')`: on the two-argument form, Postgres refuses it (42P17). The string needs none of this: an index on `(starts_at, id)` serves the comparison as it is.
@@ -189,7 +189,7 @@ Start from the first row you showed, and read the other way: flip the comparison
 
 Two ways, by where you want the number:
 
-| | [`count()`](/select#count) | `count(*) OVER ()` in `extras` |
+| | [`count()`](/aggregates#count) | `count(*) OVER ()` in `extras` |
 |---|---|---|
 | Queries | one more | none, but it reads every row of the `where`, as `count()` does |
 | The total | a `number` | a key on each row |
@@ -251,6 +251,6 @@ On the docs schema, `GET /films` replies:
 
 ## See also
 
-- [`select()`](/select#select): every option and the SQL it writes; [`count()`](/select#count) and its options.
+- [`select()`](/select#select): every option and the SQL it writes; [`count()`](/aggregates#count) and its options.
 - [SQL template](/sql-template#sql), [`self`](/sql-template#self) and [`param()`](/sql-template#param), for the comparison.
 - [Why pgcast](/why): why a query stays the SQL you see.

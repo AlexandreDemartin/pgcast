@@ -1,5 +1,5 @@
 ---
-english: 821fa9d82fa3
+english: d555764daf57
 ---
 
 # Pagination
@@ -140,7 +140,7 @@ Les séances, les plus proches d’abord, sur `starts_at` puis `id`. Ici `last` 
 <template #caption><span>Page 2 : les séances 1002 et 1003, à 18:00 et 20:15 UTC le 2 mars.</span></template>
 </CastPanel>
 
-- `last.starts_at` est une chaîne, un [`TimestampTzString`](/fr/runtime-config#TimestampTzString), avec les microsecondes que garde Postgres : `'2030-03-03T18:00:00.0001+00:00'`. Renvoyez-la telle quelle, dans la comparaison et dans le curseur.
+- `last.starts_at` est une chaîne, un [`TimestampTzString`](/fr/value-types#TimestampTzString), avec les microsecondes que garde Postgres : `'2030-03-03T18:00:00.0001+00:00'`. Renvoyez-la telle quelle, dans la comparaison et dans le curseur.
 - Pas sous forme de `Date`, qui garde les millisecondes et perd le reste. Prenez deux séances dans la même milliseconde, à 18:00:00.000100 et 18:00:00.000900 : en `Date`, les deux valent 18:00:00.000. Dans cet ordre `ASC`, la page après la première redonne la première ; dans un ordre `DESC`, la page après la seconde saute la première.
 - Une requête à vous dans le template [`sql`](/fr/sql-template#sql) reçoit `starts_at` de `pg` sous forme de `Date` : prenez le curseur dans la ligne d’un raccourci, qui a la chaîne.
 - Comparer sur `date_trunc('milliseconds', starts_at)` fonctionne aussi avec un `Date`, mais demande la même expression dans l’`order`, et un index dessus pour commencer à la dernière ligne. Cet index demande le fuseau, `date_trunc('milliseconds', starts_at, 'UTC')` : sur la forme à deux arguments, Postgres le refuse (42P17). La chaîne n’a besoin de rien de tout cela : un index sur `(starts_at, id)` sert la comparaison telle quelle.
@@ -193,7 +193,7 @@ Partez de la première ligne affichée, et lisez dans l’autre sens : inversez
 
 Deux façons, selon l’endroit où vous voulez le nombre :
 
-| | [`count()`](/fr/select#count) | `count(*) OVER ()` dans `extras` |
+| | [`count()`](/fr/aggregates#count) | `count(*) OVER ()` dans `extras` |
 |---|---|---|
 | Requêtes | une de plus | aucune, mais elle lit chaque ligne du `where`, comme `count()` |
 | Le total | un `number` | une clé sur chaque ligne |
@@ -255,6 +255,6 @@ Sur le schéma de la doc, `GET /films` répond :
 
 ## Voir aussi {#see-also}
 
-- [`select()`](/fr/select#select) : chaque option et le SQL qu’elle écrit ; [`count()`](/fr/select#count) et ses options.
+- [`select()`](/fr/select#select) : chaque option et le SQL qu’elle écrit ; [`count()`](/fr/aggregates#count) et ses options.
 - [Template SQL](/fr/sql-template#sql), [`self`](/fr/sql-template#self) et [`param()`](/fr/sql-template#param), pour la comparaison.
 - [Pourquoi pgcast](/fr/why) : pourquoi une requête reste le SQL que vous voyez.

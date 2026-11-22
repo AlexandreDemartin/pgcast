@@ -1,5 +1,5 @@
 ---
-english: 76a6102bad55
+english: 50d94c69de35
 description: "Un type que le générateur ne sait pas traduire, comme point, et chaque domaine vous arrivent en placeholder dans zapatos/custom, que vous remplissez vous-même."
 ---
 
@@ -291,6 +291,6 @@ declare module 'zapatos/custom' {
 
 ## Voir aussi {#see-also}
 
-- [Les fichiers qu’il écrit](/fr/generator#the-files-it-writes) : chaque fichier que le générateur écrit, et quand.
+- [Les fichiers qu’il écrit](/fr/generated-files#the-files-it-writes) : chaque fichier que le générateur écrit, et quand.
 - [`customTypesTransform`](/fr/generator#generate.customTypesTransform) : les noms des placeholders.
 - [Le catalogue](/fr/catalog-types) : pourquoi un type diffère entre `Selectable` et `JSONSelectable`.

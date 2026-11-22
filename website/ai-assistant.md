@@ -19,7 +19,7 @@ Paste a URL into the chat, or let the rules file below name it.
 
 ## Give it your schema
 
-`npx pgcast` writes `zapatos/schema.d.ts` into your [`outDir`](/generator#generate.outDir): `src/zapatos/schema.d.ts` in the tutorial. It holds what an assistant would otherwise guess: each table's columns, the type of each in a row, a filter, an insert and an update ([The files it writes](/generator#the-files-it-writes)), and a comment on each column with its Postgres type, whether it is `NOT NULL`, and its default.
+`npx pgcast` writes `zapatos/schema.d.ts` into your [`outDir`](/generator#generate.outDir): `src/zapatos/schema.d.ts` in the tutorial. It holds what an assistant would otherwise guess: each table's columns, the type of each in a row, a filter, an insert and an update ([The files it writes](/generated-files#the-files-it-writes)), and a comment on each column with its Postgres type, whether it is `NOT NULL`, and its default.
 
 - Tell the assistant to read it before writing a query, and never to edit it: the next run writes it again. The rules file below does both; change its path if your `outDir` differs.
 - A `COMMENT ON COLUMN`, in a migration, reaches that comment too, on a table, a view, a materialised view, a foreign table or a partitioned table ([`schemaJSDoc`](/generator#generate.schemaJSDoc)): the place to tell the assistant what a column means. Each relation shows its own: a view shows none of its table's.
@@ -41,7 +41,7 @@ https://pgcast.dev/llms-full.txt
 - The database is the source of the types. Before writing a query on a table,
   read its columns and their types in `src/zapatos/schema.d.ts`; never guess a
   column. Never edit that file: it is generated.
-  https://pgcast.dev/generator#the-files-it-writes
+  https://pgcast.dev/generated-files#the-files-it-writes
 - After a migration, run `npx pgcast` to generate the types again, then fix
   what no longer compiles.
   https://pgcast.dev/first-query#when-the-schema-changes

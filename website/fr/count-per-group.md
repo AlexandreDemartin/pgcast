@@ -1,5 +1,5 @@
 ---
-english: 8e5a32ee077b
+english: 5e0ea97be728
 ---
 
 # Comptes par groupe
@@ -20,7 +20,7 @@ Le nombre de films de chaque studio :
 
 - `GROUP BY "studio_id"`<!-- probe: examples/count_per_group.ts --> donne une ligne par studio, `columns` contenant ce par quoi il groupe.
 - `count(*)` est un `bigint`, mais la ligne revient en JSON, donc `films` est un nombre, comme le dit son fragment.
-- Pas [`count()`](/fr/select#count) avec `groupBy` : il ne donne que le compte du premier groupe.
+- Pas [`count()`](/fr/aggregates#count) avec `groupBy` : il ne donne que le compte du premier groupe.
 - Avec le nom du studio : [Jointures § Filtrer, trier et grouper par un lateral](/fr/lateral#filter-sort-and-group-by-a-lateral). Pour ne garder que certains groupes, `having` ([`groupBy` et `having`](/fr/select#groupby-and-having)).
 
 ## Compter une partie de chaque groupe {#count-part-of-each-group}
@@ -56,5 +56,5 @@ Le nombre de films de chaque genre, parmi ceux sortis avant 2010. `genres` est u
 ## Voir aussi {#see-also}
 
 - [`groupBy` et `having`](/fr/select#groupby-and-having) : ce qu’un `select()` groupé peut renvoyer.
-- [`count()`](/fr/select#count) : un seul compte, ses options, et `count(DISTINCT …)`.
+- [`count()`](/fr/aggregates#count) : un seul compte, ses options, et `count(DISTINCT …)`.
 - [Fonctions d’agrégat](https://www.postgresql.org/docs/current/functions-aggregate.html) et [`FILTER`](https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-AGGREGATES), dans la doc de Postgres.

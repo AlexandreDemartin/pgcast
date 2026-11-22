@@ -29,7 +29,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 COMMIT
 ```
 
-The tab whose transaction commits first gets its rows, `seat_bookings.JSONSelectable[]`; the other gets `null`, here `tabTwo`. The SQL of the callback's queries: [`count()`](/select#count) and [`insert()`](/insert#insert); what pgcast sends around them, and when it retries: [Retries](/transaction#retries).
+The tab whose transaction commits first gets its rows, `seat_bookings.JSONSelectable[]`; the other gets `null`, here `tabTwo`. The SQL of the callback's queries: [`count()`](/aggregates#count) and [`insert()`](/insert#insert); what pgcast sends around them, and when it retries: [Retries](/transaction#retries).
 
 - Run every query of the transaction on `txnClient`. A query on `pool` is not in it: it isn't rolled back, and the next attempt runs it again.
 - Two requests may still run one after the other, and then neither is retried: the second simply counts the first one's seats.

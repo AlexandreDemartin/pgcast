@@ -33,7 +33,7 @@ Read the cursor inside the [`transaction()`](/transaction#transaction) that owns
 
 The example’s plain select reads the snapshot visible at declaration. Under repeatable read, an earlier query in the transaction may already have fixed that snapshot.
 
-Suppose another transaction commits a fifth film after the first batch. Under `READ COMMITTED`, a [`count()`](/select#count) in the loop sees five films while the cursor reads four. Under `REPEATABLE READ, READ ONLY`, both see four.
+Suppose another transaction commits a fifth film after the first batch. Under `READ COMMITTED`, a [`count()`](/aggregates#count) in the loop sees five films while the cursor reads four. Under `REPEATABLE READ, READ ONLY`, both see four.
 
 ## Handle an early exit or a retry
 

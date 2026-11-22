@@ -1,5 +1,5 @@
 ---
-english: 7b9e4cf16c41
+english: d0484ad6e894
 ---
 
 # Le catalogue
@@ -77,7 +77,7 @@ Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos :
 - La contrainte `NOT NULL` de la colonne s’applique au tableau lui-même. Même si les éléments ont pour type un domaine `NOT NULL`, une affectation au-delà de la fin, comme `a[3] = 3` sur `{1}`, enregistre `{1,NULL,3}`. Comme Zapatos 6.6.1, pgcast type `int4[] NOT NULL` en `number[]`, mais `pg` lit `{1,NULL}` comme `[1, null]`.
 - Un tableau d’enums est représenté par du texte dans `Selectable` et par un tableau de labels dans le JSON des raccourcis. [`enumArraysTypedAsText: false`](/fr/generator#generate.enumArraysTypedAsText) convient à un parser qui renvoie un tableau.
 - Un domaine sur `text` dont le `CHECK` liste les valeurs, `CHECK (VALUE IN ('U', 'PG', '12'))`, est une `string`, le type de son placeholder tel que généré, sauf si [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) est activé.
-- Un `interval` est représenté par un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) dans une ligne renvoyée par `pg` et par du texte en JSON. [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects) convient à un parser qui renvoie du texte.
+- Un `interval` est représenté par un [`PostgresInterval`](/fr/value-types#PostgresInterval) dans une ligne renvoyée par `pg` et par du texte en JSON. [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects) convient à un parser qui renvoie du texte.
 
 ::: info À venir
 Lire davantage du catalogue, comme outil à part : les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
@@ -133,7 +133,7 @@ Le prix, c’est que chaque valeur voyage en JSON, et que JSON n’a ni dates, n
 
 Zapatos renvoyait du JSON depuis chaque raccourci qui renvoie des lignes, même ceux qui auraient pu s’en passer, « <span lang="en">in the interests of consistency</span> », comme le dit sa doc : la ligne d’un raccourci est du même type que celle d’un autre.
 
-Et il typait les chaînes plutôt que de les convertir dans votre dos : [`TimestampTzString`](/fr/runtime-config#TimestampTzString) et ses semblables vérifient la forme d’une chaîne, et [`toDate()`](/fr/runtime-config#toDate) en fait un `Date` quand vous le décidez, en précisant dans quel fuseau horaire lire une chaîne qui n’en porte pas ([Dates et heures](/fr/runtime-config#dates-and-times)).
+Et il typait les chaînes plutôt que de les convertir dans votre dos : [`TimestampTzString`](/fr/value-types#TimestampTzString) et ses semblables vérifient la forme d’une chaîne, et [`toDate()`](/fr/value-types#toDate) en fait un `Date` quand vous le décidez, en précisant dans quel fuseau horaire lire une chaîne qui n’en porte pas ([Dates et heures](/fr/value-types#dates-and-times)).
 
 ## Comment le type du résultat suit la requête {#how-a-result-type-follows-the-query}
 
@@ -164,7 +164,7 @@ Tout cela demande `strictNullChecks`, ou `strict`. Sans cette option, `columns`,
 
 ## Ce que pgcast a gardé, et ce qu’il change {#what-pgcast-kept-and-what-it-changes}
 
-Le générateur est celui de Zapatos 6.6.1, son canary de version toujours à 104 ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)). Ses corrections changent `schema.d.ts` là où celui de 6.6.1 se trompait : l’`UniqueIndex` d’une table ne liste que ses propres index uniques, chaque ligne d’un commentaire de colonne sur plusieurs lignes reçoit son `*`, et chaque colonne d’un `Insertable` prend `db.SQLFragment<any>`, un fragment `sql` dont le résultat est typé, là où la 6.6.1 écrivait `db.SQLFragment` ([changelog](/fr/changelog)).
+Le générateur est celui de Zapatos 6.6.1, son canary de version toujours à 104 ([`SchemaVersionCanary`](/fr/generated-files#SchemaVersionCanary)). Ses corrections changent `schema.d.ts` là où celui de 6.6.1 se trompait : l’`UniqueIndex` d’une table ne liste que ses propres index uniques, chaque ligne d’un commentaire de colonne sur plusieurs lignes reçoit son `*`, et chaque colonne d’un `Insertable` prend `db.SQLFragment<any>`, un fragment `sql` dont le résultat est typé, là où la 6.6.1 écrivait `db.SQLFragment` ([changelog](/fr/changelog)).
 
 Les changements qu’apporte pgcast sont dans le runtime, pas dans les types générés. [`raw()`](/fr/sql-template#raw), [`cols()`](/fr/sql-template#cols) et [`vals()`](/fr/sql-template#vals) ne passent plus la vérification de types comme valeur d’un `Whereable`, d’un `Insertable` ou d’un `Updatable`, là où 6.6.1 les prenait pour un `Parameter`, un objet de même forme (`{ value }`).
 
@@ -174,6 +174,6 @@ Ce que pgcast refuse, c’est une seconde source de vérité : une classe modè
 
 ## Pour aller plus loin {#further-reading}
 
-- Les entrées dont parle cette page : [options de `select()`](/fr/select#options), [`JSONOnlyColsForTable`](/fr/select#JSONOnlyColsForTable), [`ExtrasResult`](/fr/select#ExtrasResult), [`LateralResult`](/fr/select#LateralResult), [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment), les [types de valeurs](/fr/runtime-config#value-types).
+- Les entrées dont parle cette page : [options de `select()`](/fr/select#options), [`JSONOnlyColsForTable`](/fr/select#JSONOnlyColsForTable), [`ExtrasResult`](/fr/select#ExtrasResult), [`LateralResult`](/fr/select#LateralResult), [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment), les [types de valeurs](/fr/value-types).
 - Le générateur, ses options et les fichiers qu’il écrit : [Générateur](/fr/generator).
 - Remplir un placeholder : [Types personnalisés](/fr/custom-types).

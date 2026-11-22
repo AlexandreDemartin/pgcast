@@ -81,7 +81,7 @@ A crew member's mentor is another row of `crew`. Give the subquery an `alias`, s
 </CastPanel>
 
 - `mentor` holds the row or `null`: Wilhelmina Strand has no mentor.
-- [`count()`](/select#count) gives a number, here each member's protégés.
+- [`count()`](/aggregates#count) gives a number, here each member's protégés.
 - Without the aliases, the subquery's `FROM "crew"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> hides the outer one, and `"crew"."mentor_id"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> is the subquery's own row. Postgres runs it with no error, and every `mentor` comes back `null`, every count `0`:
 
   ```sql

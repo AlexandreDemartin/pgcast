@@ -145,7 +145,7 @@ A driver that ignores `name`, as this one does, runs a [`prepared()`](/sql-templ
 
 ### Parse like pg {#parse-like-pg}
 
-The SQL is the same on any driver, and the types describe what `pg` gives ([Value types](/runtime-config#value-types)). A driver of your own reads each type as `pg` reads it, or its rows don't match their types, and nothing says so:
+The SQL is the same on any driver, and the types describe what `pg` gives ([Value types](/value-types)). A driver of your own reads each type as `pg` reads it, or its rows don't match their types, and nothing says so:
 
 | Type | `pg` gives |
 |---|---|
