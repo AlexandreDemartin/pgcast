@@ -1,6 +1,6 @@
 {
   "name": "@pgcast/adapter-pglite",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Run pgcast's queries on a PGlite, with values read and written as pg reads and writes them.",
   "license": "MIT",
   "author": "Alexandre Demartin (https://github.com/AlexandreDemartin)",
