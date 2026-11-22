@@ -31,7 +31,7 @@ The people whose name holds `or`. Each `SELECT` takes the filter, as a Whereable
 <template #caption><span>Ambrose Okafor, an actor, Corin Halloway, crew, and Teodor Vasko, an actor.</span></template>
 </CastPanel>
 
-- The condition is written once and sent twice, as `ILIKE $1` and `ILIKE $2`<!-- probe: examples/combine_tables_filter.ts -->, one value each.
+- The condition is written once and sent twice, as `ILIKE $1`<!-- probe: examples/combine_tables_filter.ts --> and `ILIKE $2`<!-- probe: examples/combine_tables_filter.ts -->, one value each.
 - A pattern from a user needs its `%`, `_` and `\` escaped first: [Text search](/text-search).
 
 ## See also

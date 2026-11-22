@@ -1,5 +1,5 @@
 ---
-english: 0a30b6307ad0
+english: 6426539bedfc
 ---
 
 # Unions
@@ -35,7 +35,7 @@ Les personnes dont le nom contient `or`. Chaque `SELECT` prend le filtre, comme 
 <template #caption><span>Ambrose Okafor, un acteur, Corin Halloway, de l’équipe, et Teodor Vasko, un acteur.</span></template>
 </CastPanel>
 
-- La condition est écrite une fois et envoyée deux fois, en `ILIKE $1` et `ILIKE $2`<!-- probe: examples/combine_tables_filter.ts -->, une valeur chacun.
+- La condition est écrite une fois et envoyée deux fois, en `ILIKE $1`<!-- probe: examples/combine_tables_filter.ts --> et `ILIKE $2`<!-- probe: examples/combine_tables_filter.ts -->, une valeur chacun.
 - Un motif venu d’un utilisateur doit d’abord avoir ses `%`, `_` et `\` échappés : [Recherche textuelle](/fr/text-search).
 
 ## Voir aussi {#see-also}
