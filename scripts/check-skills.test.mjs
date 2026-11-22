@@ -185,10 +185,10 @@ test('fails on the near misses of a ## Checklist: its case, level, suffix, or a 
 test('fails on a sentence of eight words or more that a skill holds twice, in one file or across both', () => {
   const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n', twice = 'A guard proves something only through a mutant.';
   assert.deepEqual(errorsOf({'alpha/SKILL.md': `${head}- ${twice} See reference.md.\n`, 'alpha/reference.md': `# R\n\n${twice}\n`}),
-    ["alpha/reference.md:3: repeats SKILL.md:5 ('a guard proves something only through …')"]);
+    ["alpha/reference.md:3: repeats SKILL.md:5 ('a guard proves something only through …'); keep it once, a summary and a link in its other place"]);
   assert.deepEqual(errorsOf({'alpha/SKILL.md': `${head}In a test, it is probed, not read from the declarations:\n\n`
     + '1. In a test, it is probed, not read from the declarations; then run.\n'}),
-  ["alpha/SKILL.md:7: repeats SKILL.md:5 ('in a test it is probed …')"]);
+  ["alpha/SKILL.md:7: repeats SKILL.md:5 ('in a test it is probed …'); keep it once, a summary and a link in its other place"]);
 });
 
 test('passes on a sentence under eight words twice, and on one sentence in two skills', () => {

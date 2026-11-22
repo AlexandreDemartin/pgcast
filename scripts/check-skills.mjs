@@ -86,7 +86,8 @@ export function duplicateErrors(texts) {
         const words = sentence.toLowerCase().replace(/[^\p{L}\p{N}_` ]/gu, '').split(/\s+/).filter(Boolean);
         if (words.length < 8) continue;
         const key = words.join(' ');
-        if (seen.has(key)) errors.push(`${path}:${index + 1}: repeats ${seen.get(key)} ('${words.slice(0, 6).join(' ')} …')`);
+        if (seen.has(key)) errors.push(`${path}:${index + 1}: repeats ${seen.get(key)} ('${words.slice(0, 6).join(' ')} …'); `
+          + 'keep it once, a summary and a link in its other place');
         else seen.set(key, `${basename(path)}:${index + 1}`);
       }
     });
