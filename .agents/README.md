@@ -52,7 +52,7 @@ description: 'What the skill does. USE FOR: … DO NOT USE FOR: …'
 
 - **One subject per skill**, read in full when it triggers: ~100 lines and ~1,200 words, 150 lines and 1,800 words at most (`check:agents`); an agent too.
 - **A core and a reference**: rare cases go in a `reference.md` beside `SKILL.md`; the core names each section with when to read it (`code-style`), each `§` after its own `[reference.md](reference.md)` link, the citations joined by commas. Same limits and citation check (`check:agents`), which reads each `§` after `reference.md` or `./reference.md` (a link, a code span or plain text) as the longest heading the text starts with, ending at a punctuation mark, a backtick, "and", "or" or "then", and checks each section of a list; any other path to a `reference.md`, such as another skill's, is left unchecked.
-- **Each rule once**: no `## Checklist`, and no sentence of eight words or more twice in a core and its reference, where the core gives a summary and a link (`check:agents`; a move left a lead-in twice, #853).
+- **Each rule once**: no `## Checklist`, and no sentence of eight words or more twice in a skill's core and reference, one file or both, where the core gives a summary and a link (`check:agents`; a move left a lead-in twice, #853).
 - **Only what the agent does not know**: pgcast's own choices, never a course on Postgres or TypeScript.
 - **One rule, one skill**: elsewhere, refer to it by name ("skill `sql-safety`").
 - **One default path**, the exception named; the why in one line.

@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The checks of `npm run check:agents` on .agents/skills (.agents/README.md § Writing a skill): each SKILL.md's
 // frontmatter, and the size and citations of each SKILL.md and of the reference.md beside it, read in full when its
-// core names a case, so under the same limits; neither holds a `## Checklist`, nor a sentence the other already holds.
+// core names a case, so under the same limits; neither holds a checklist, and the two hold no sentence of eight words
+// or more twice, in one file or both.
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {basename, join} from 'node:path';
 

@@ -22,7 +22,7 @@ const measured = path => {
   return text;
 };
 
-// Each skill's frontmatter, size and citations (scripts/check-skills.mjs).
+// Each skill's frontmatter, size, citations, checklist and repeated sentences (scripts/check-skills.mjs).
 const {skills, files: skillFiles, errors} = checkSkills(skillsDirectory);
 skillFiles.forEach(measured);
 
