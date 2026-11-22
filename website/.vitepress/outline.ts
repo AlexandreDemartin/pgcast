@@ -80,7 +80,7 @@ const groups: Group[] = [
       { text: { en: 'Trees', fr: 'Arbres' }, link: '/walk-a-tree' },
       { text: { en: 'Unions', fr: 'Unions' }, link: '/combine-tables' },
       { text: { en: 'Batch deletes', fr: 'Suppressions par batch' }, link: '/delete-in-batches' },
-      { text: { en: 'Job locks', fr: 'Verrous de job' }, link: '/one-worker' },
+      { text: { en: 'Job locks', fr: 'Locks de job' }, link: '/one-worker' },
     ],
   },
   {
