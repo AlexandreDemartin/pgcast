@@ -125,6 +125,23 @@ A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell 
 - Create the index in the `order`'s directions, `(release_year DESC, id ASC)`. Postgres starts reading at the last row's year: on 300,000 films, after the last row (1960, 150000), `EXPLAIN (ANALYZE)` shows `Index Cond: (release_year <= 1960)`, then a `Filter:` that removes the rest of that year, 1,167 rows.
 - Without the bound, the `OR` is only a `Filter:`: Postgres reads and throws away every row before the last one, 148,671 here, as for an `offset`.
 
+### On a `timestamptz` column
+
+The screenings, soonest first, on `starts_at` then `id`. Here `last` is page 1's last row, screening 1001 at 21:45 UTC on 1 March, kept as above:
+
+<CastPanel example="paginate_keyset_timestamp">
+
+<<< ./examples/paginate_keyset_timestamp.ts{ts twoslash}
+
+<template #caption><span>Page 2: screenings 1002 and 1003, at 18:00 and 20:15 UTC on 2 March.</span></template>
+</CastPanel>
+
+- `last.starts_at` is a string, a [`TimestampTzString`](/runtime-config#TimestampTzString), with the microseconds Postgres keeps: `'2030-03-03T18:00:00.0001+00:00'`. Send it back as that string, in the comparison and in the cursor.
+- Not as a `Date`, which keeps milliseconds and drops the rest. Take two screenings in one millisecond, at 18:00:00.000100 and 18:00:00.000900: as a `Date`, both are 18:00:00.000. In this `ASC` order, the page after the first gives the first again; in a `DESC` order, the page after the second skips the first.
+- A query of your own in the [`sql`](/sql-template#sql) template gets `starts_at` from `pg` as a `Date`: take the cursor from a shortcut's row, which has the string.
+- Comparing on `date_trunc('milliseconds', starts_at)` also works with a `Date`, but needs the same expression in the `order`, and an index on it to start at the last row. That index needs the zone, `date_trunc('milliseconds', starts_at, 'UTC')`: on the two-argument form, Postgres refuses it (42P17). The string needs none of this: an index on `(starts_at, id)` serves the comparison as it is.
+- Check a cursor's string before the query, as `decodeCursor()` checks the integers ([below](#send-the-cursor-to-the-client)): Postgres refuses one it can't read as a time (22007). The form `to_jsonb()` writes is `/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?[+-]\d\d:\d\d$/`.
+
 ### Send the cursor to the client
 
 A client that asks for the next page sends the last row's keys back. Give them to it as one string, a cursor, and check what comes back before it goes into a query:
