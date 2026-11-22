@@ -32,6 +32,7 @@ Candidates for a check, a rule or a skill line.
 - #863 — an early return on SIGINT turns a hang into a process only SIGKILL ends: test that the process exits, not only that it stops printing — reviewer
 - #863 — CI's TypeScript loop replays locally with `check:floor` and `npm install --prefix <scratch>/ts<version> typescript@<version>`, pointed to by `PGCAST_TEST_TYPESCRIPT` — builder
 - #863 — a fix round that runs the reviewer's harness needs its own probe database and its own scratch folder exported, since the harness reads them from there — builder
+- #865 — auto mode refuses a compound command that starts with `pkill`: a builder stops its own background process by its PID — builder
 
 ## Minors kept
 

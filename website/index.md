@@ -1,8 +1,7 @@
 ---
 layout: home
 markdownStyles: false
-title: pgcast
-titleTemplate: The Postgres you know, with the full power of TypeScript
+title: The Postgres you know, with the full power of TypeScript
 description: "The Postgres you know, with the full power of TypeScript. pgcast reads your schema and writes the types; each query is SQL you can read and predict."
 ---
 
