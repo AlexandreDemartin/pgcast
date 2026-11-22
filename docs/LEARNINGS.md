@@ -57,6 +57,10 @@ Candidates for a check, a rule or a skill line.
 - #899 — without `alias`, a self-join's `parent()` names the inner row and silently returns `[]`: a probe that runs the join without the alias catches a recipe that forgot it — builder
 - #899 — a ranked search writes its `tsquery` twice, in `websearchToTsquery()` and in the fragment for `ts_rank()`/`ts_headline()`: a need to watch for the chapter-10 list — builder
 - #899 — one long-lived probe process (create the database, load `schema.sql`, run a cases module, drop it) serves every docs step; a loop that fetches each built page's HTML and reads its playground links checks several pages with no navigation — builder
+- #906 — a builder in a worktree checks that each Edit path starts with the worktree: one edit of note 005 landed in the main checkout first (reverted at once) — builder
+- #906 — on the playground, chrome-devtools `wait_for` and `take_snapshot` dump the whole schema block (~1,100 nodes) per call: an inline `evaluate_script` that clicks Run and returns the live region's `innerText` costs one small call per panel — builder
+- #906 — two agents' `vitepress preview` share port 4173 by default: each builder serves its preview on its own port — builder
+- #906 — #907 closes the `isBuffer` gap that the #898 learning above names, with `check-buffer.mjs` in `docs:build` — orchestrator
 
 ## Minors kept
 
