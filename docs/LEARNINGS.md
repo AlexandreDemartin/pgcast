@@ -53,6 +53,10 @@ Candidates for a check, a rule or a skill line.
 - #898 — a cast panel shows the type of the first `const` below the cut: helper consts go inside functions — builder
 - #898 — `docs:examples` runs in Node with the real `Buffer`, so a gap in the playground's stand-in (`globals.ts`: `byteLength`, still `isBuffer`) shows only when a link runs in the browser: a check that the stand-in covers every `Buffer.` call of `dist/db` would catch it — builder
 - #898 — a same-origin iframe loop (open each playground link, press Run, read the live region) checks every panel of a page in one call — builder
+- #899 — `count(*)` in a `select()`'s `extras` comes back a JSON number (the row is `jsonb_build_object`), in a `sql` template a string: `::int` belongs only in the raw template — builder
+- #899 — without `alias`, a self-join's `parent()` names the inner row and silently returns `[]`: a probe that runs the join without the alias catches a recipe that forgot it — builder
+- #899 — a ranked search writes its `tsquery` twice, in `websearchToTsquery()` and in the fragment for `ts_rank()`/`ts_headline()`: a need to watch for the chapter-10 list — builder
+- #899 — one long-lived probe process (create the database, load `schema.sql`, run a cases module, drop it) serves every docs step; a loop that fetches each built page's HTML and reads its playground links checks several pages with no navigation — builder
 - #906 — a builder in a worktree checks that each Edit path starts with the worktree: one edit of note 005 landed in the main checkout first (reverted at once) — builder
 - #906 — on the playground, chrome-devtools `wait_for` and `take_snapshot` dump the whole schema block (~1,100 nodes) per call: an inline `evaluate_script` that clicks Run and returns the live region's `innerText` costs one small call per panel — builder
 - #906 — two agents' `vitepress preview` share port 4173 by default: each builder serves its preview on its own port — builder

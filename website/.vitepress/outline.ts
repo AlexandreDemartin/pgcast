@@ -67,6 +67,11 @@ const groups: Group[] = [
       { text: { en: 'Array columns', fr: 'Colonnes tableau' }, link: '/array-columns' },
       { text: { en: 'Text search', fr: 'Recherche textuelle' }, link: '/text-search' },
       { text: { en: 'In-place updates', fr: 'Mises à jour en place' }, link: '/update-in-place' },
+      { text: { en: 'JSON fields', fr: 'Champs JSON' }, link: '/json-fields' },
+      { text: { en: 'Group counts', fr: 'Comptes par groupe' }, link: '/count-per-group' },
+      { text: { en: 'Ranked search', fr: 'Recherche classée' }, link: '/rank-results' },
+      { text: { en: 'Prefix search', fr: 'Recherche par préfixe' }, link: '/prefix-search' },
+      { text: { en: 'Keyless joins', fr: 'Jointures sans clé' }, link: '/join-without-key' },
     ],
   },
   {
