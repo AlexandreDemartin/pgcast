@@ -91,6 +91,7 @@ The panel's code is typed on a `pg.Pool`; on `asPool(pglite)`, the SQL and the t
 
 - A `bigint` comes as a string, as with `pg`, where PGlite's own `query()` gives a `number`, or a `bigint` beyond 2^53.
 - `asPool()` never creates nor closes the PGlite: you do.
+- To check types, set `skipLibCheck: true` in your tsconfig: PGlite's own declarations fail without it (`Cannot find namespace 'Emscripten'`).
 - [`prepared()`](/sql-template#prepared) parses its query once on that PGlite, as `pg` does once on a connection.
 - An error is PGlite's `DatabaseError`, not `pg`'s: it has `pg`'s fields (`code`, `constraint`…), so `isDatabaseError()` and the retries work.
 - PGlite has one connection, which the pool lends to one transaction at a time: [Transactions](#transactions).

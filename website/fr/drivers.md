@@ -1,5 +1,5 @@
 ---
-english: 05bcab6c30c2
+english: 543a470839b9
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -92,6 +92,7 @@ Le code du panneau est typé sur un `pg.Pool` ; sur `asPool(pglite)`, le SQL et
 
 - Un `bigint` arrive en chaîne, comme avec `pg`, là où le `query()` de PGlite lui-même donne un `number`, ou un `bigint` au-delà de 2^53.
 - `asPool()` ne crée ni ne ferme jamais le PGlite : c’est à vous de le faire.
+- Pour vérifier les types, mettez `skipLibCheck: true` dans votre tsconfig : sans lui, les propres déclarations de PGlite échouent (`Cannot find namespace 'Emscripten'`).
 - [`prepared()`](/fr/sql-template#prepared) parse sa requête une fois sur ce PGlite, comme `pg` le fait une fois sur une connexion.
 - Une erreur est une `DatabaseError` de PGlite, pas celle de `pg` : elle a les champs de `pg` (`code`, `constraint`…), donc `isDatabaseError()` et les retries fonctionnent.
 - PGlite a une seule connexion, que le pool prête à une transaction à la fois : [Transactions](#transactions).

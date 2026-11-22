@@ -46,7 +46,7 @@ export const films = db.sql<never, Row<'films'>[]>`SELECT title FROM films`;
 npx pgcast-typegen
 ```
 
-The command scans `./tsconfig.json`, or the file given by `--project <tsconfig>`. From the working directory it reads `pgcastconfig.json`, falls back to `zapatosconfig.json`, then to the schema generator's defaults. String values expand `{{NAME}}` from the environment. Use `db` for pg connection settings or use pg's environment variables. Omit `query_timeout` so the describer can finish its rollback.
+The command scans `./tsconfig.json`, or the file given by `--project <tsconfig>`. From the working directory it reads `pgcastconfig.json`, falls back to `zapatosconfig.json`, then to the schema generator's defaults. String values expand `{{NAME}}` from the environment. Use `db` for pg connection settings or use pg's environment variables. Omit `query_timeout` so the describer can finish its rollback. `npx pgcast-typegen --help` prints the usage, `pgcast-typegen [--check | --watch] [--project <tsconfig>]`.
 
 The file is `<outDir>/zapatos/queries.ts` by default. With `moduleNames: "pgcast"`, use `pgcast/db` and `<outDir>/pgcast/queries.ts`. A failed run preserves the previous file.
 
@@ -105,7 +105,7 @@ npx pgcast-typegen --watch [--project <tsconfig>]
 
 The command generates once, then regenerates `queries.ts` each time a source file of the project changes, until `SIGINT` or `SIGTERM` closes it with exit 0. It follows the project and its references through the project's own TypeScript and keeps one connection to `db`. It describes only the queries whose text changed since the last round, and writes the file only when its bytes change. It prints a line when it writes or recovers, and the errors of a failing round, then keeps watching. When the `--project` tsconfig cannot be read or parsed at start, or the connection is lost, it exits 1.
 
-The schema is not watched. After a migration, one run without `--watch` is enough: a running `--watch` sees the file change and describes every query again, so it keeps the new rows. The config file is read once: restart `--watch` after editing it. `--watch` cannot be combined with `--check`.
+The schema is not watched. After a migration, one run without `--watch` is enough: a running `--watch` sees the file change and describes every query again, so it keeps the new rows. The config file is read once: restart `--watch` after editing it. `--watch` cannot be combined with `--check`: together they print the usage and exit 1.
 
 ## Development
 

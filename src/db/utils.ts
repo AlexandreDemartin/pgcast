@@ -48,19 +48,6 @@ export function callerValue<T extends object, K extends keyof T & string>(obj: T
   return undefined;
 }
 
-const warned = new Set<string>();
-
-/**
- * Emit a `DeprecationWarning` once per process for each code.
- * @param code The code identifying this deprecation
- * @param message What is deprecated, and the option that opts in to what replaces it
- */
-export const warnOnce = (code: string, message: string) => {
-  if (warned.has(code)) return;
-  warned.add(code);
-  process.emitWarning(message, { type: 'DeprecationWarning', code });
-};
-
 /**
  * Basic zero-padding for small, positive integers
  * @param n The integer to pad

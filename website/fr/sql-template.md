@@ -1,5 +1,5 @@
 ---
-english: f616d584ac29
+english: 2cbfea249589
 ---
 
 # Template SQL
@@ -372,6 +372,8 @@ La colonne courante, dans un fragment donné en valeur d’un Whereable : `` { 
 type SelfType = typeof self
 ```
 
+Le type de `db.self`, l’un des types de [`GenericSQLExpression`](#GenericSQLExpression).
+
 ## `parent()` {#parent}
 
 ```ts
@@ -426,6 +428,8 @@ Le mot-clé `DEFAULT` : la valeur par défaut d’une colonne, dans une valeur 
 ```ts
 type DefaultType = typeof Default
 ```
+
+Le type de `db.Default`, que les `Insertable` et `Updatable` générés acceptent pour une colonne nullable ou qui a une valeur par défaut.
 
 ## Fragments imbriqués {#nested-fragments}
 
@@ -485,6 +489,8 @@ Le `where` de `select()`, de `count()` et des autres lectures qui correspond à 
 ```ts
 type AllType = typeof all
 ```
+
+Le type de `db.all`, qu’acceptent le `where` de `select()`, de `count()` et des autres lectures, ainsi qu’`exists()` et `isInSelect()`.
 
 ## `SQLFragment` {#SQLFragment}
 

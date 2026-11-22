@@ -27,6 +27,12 @@ Candidates for a check, a rule or a skill line.
 - #885 — the test count rises by one per new module in `src/` (the per-module case of `runtimeImports.test.ts`): a refactor's proof explains the difference — builder
 - #885 — when a module moves, run `tsc --declaration` for a consumer against both tarballs before applying #581's "an export of `dist` stays": tsc names a symbol through the entry that re-exports it, so only a hand-written `dist` path changes — branch-reviewer
 - #885 — a file moved within `src/` can drop a name from `dist/<module>` with no suite noticing: a path-mapped type test, as `utils.test-d.ts` does, freezes an inner module's old exports — builder
+- #886 — an orchestrator brief asked for "the label the languages section names", but `website/README.md` § Languages names a script (`docs:translated`), not a label: a brief quotes the rule it relies on rather than paraphrasing it — builder
+- #886 — the home's install line (`website/index.md`) drops `pg` by #371's choice, so a `pg` sweep of install commands skips it rather than flagging it — builder
+- #886 — a find-and-replace anchored on a French line ending in "PGlite : c’est" missed (the space before the colon is U+00A0); anchoring on the line's start worked — builder
+- #886 — two fixes in separate hunks of one file were committed apart with `git apply --cached --unidiff-zero` on one hunk, as `git add -p` is interactive here — builder
+- #884 — with no `process.emitWarning` left in `zapatos/db`, the playground's shim in `website/.vitepress/playground/globals.ts` is likely dead: a small PR of its own, proved by `docs:build` and the playground — builder
+- #884 — skill `backward-compat`'s rule "an export of `dist` stays" under `node10` (#581) could say it covers the exports a consumer's declarations can name, so removing an uninferrable helper is not read as a stop point — builder
 
 ## Minors kept
 
