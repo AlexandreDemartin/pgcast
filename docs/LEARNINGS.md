@@ -23,6 +23,10 @@ Candidates for a check, a rule or a skill line.
 - #874 — word counts quoted in a GitHub comment drift between rounds: recount them against the named base when the comment is edited — builder
 - #878 — a docs recipe proved by a harness that passes in a dependency the recipe bundles (a PGlite built in Node) does not test the recipe's command: replay the copyable blocks exactly as written, with the versions the doc names — branch-reviewer
 - #878 — an adapter's install command names every required peer of the core (`pg`): a package manager that installs no peers fails at `import 'zapatos/db'`; the consumer probe runs each README's install with `--legacy-peer-deps`, not only `/install` — audit
+- #885 — `tools/typegen`'s `npm ci` installs the published `@pgcast/pgcast` (peer `>=7.1.0 <8`), so its checks do not test a root branch: unpack the branch's `npm pack` into its `node_modules`; a symlink to the root fails (Vitest inlines the root's `generate.mjs`) — builder
+- #885 — the test count rises by one per new module in `src/` (the per-module case of `runtimeImports.test.ts`): a refactor's proof explains the difference — builder
+- #885 — when a module moves, run `tsc --declaration` for a consumer against both tarballs before applying #581's "an export of `dist` stays": tsc names a symbol through the entry that re-exports it, so only a hand-written `dist` path changes — branch-reviewer
+- #885 — a file moved within `src/` can drop a name from `dist/<module>` with no suite noticing: a path-mapped type test, as `utils.test-d.ts` does, freezes an inner module's old exports — builder
 
 ## Minors kept
 
