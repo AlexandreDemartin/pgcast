@@ -37,7 +37,7 @@ onUnmounted(() => window.removeEventListener('change', rememberPicked));
     </template>
     <template #doc-before><PageActions place="title" /></template>
     <template #aside-outline-after><PageActions place="rail" /></template>
-    <template #doc-after><SiteFooter /><img src="/favicon.svg" width="24" height="24"></template>
+    <template #doc-after><SiteFooter /></template>
     <template #not-found><NotFound /></template>
   </DefaultTheme.Layout>
 </template>
