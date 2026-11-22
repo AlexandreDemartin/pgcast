@@ -26,6 +26,7 @@ The site is in the four groups of [Diátaxis](https://diataxis.fr/) (decision 00
 | Explanation | Do they want the why? | prose: the idea, its history, its trade-offs | steps to follow, lists of options |
 
 - What belongs to another job goes to its page, as a link.
+- A recipe is a how-to of one need met with one query, in the *Recipes* group after the guides: its list, format and title rule are [decision 015](../docs/decisions/015-recipes.md) § 2, from `templates/how-to.md`.
 - A new page: its entry in `outline.ts`, then `<link>.md`. Until the file exists, `[page].paths.ts` makes the entry a "Coming" page.
 - A page that documents a minor carries its version in its entry, glued to the text: `'Versions<small class="since">6.7</small>'`.
 

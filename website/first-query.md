@@ -374,4 +374,4 @@ After you upgrade pgcast, a type error on `schemaVersionCanary` in `schema.d.ts`
 - Read the SQL a query runs with `.compile()`, and its type under your cursor.
 - Regenerate after a migration, and let TypeScript find the queries that no longer fit.
 
-Next: every option in the [reference](/reference), a task of your own in the [how-to guides](/guides), and why it works this way in the [explanations](/explanation).
+Next: every option in the [reference](/reference), a task of your own in the [how-to guides](/guides), a common need in the [recipes](/recipes), and why it works this way in the [explanations](/explanation).
