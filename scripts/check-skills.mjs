@@ -70,8 +70,9 @@ export function checklistErrors(path, text) {
 
 /**
  * One error per sentence of eight words or more that a skill's files, `texts` (path, text), hold twice, naming the
- * first by its file and line: a copy, where a core gives a summary and a link. A sentence ends at `.`, `;` or `:` before a space, and is compared in lower case,
- * its bullet's marker and every character but letters, digits, `_`, backticks and spaces dropped.
+ * first by its file and line: a copy, where a core gives a summary and a link. A sentence ends at `.`, `;` or `:`
+ * before a space, and is compared in lower case, its bullet's marker and every character but letters, digits, `_`,
+ * backticks and spaces dropped.
  */
 export function duplicateErrors(texts) {
   const seen = new Map(), errors = [];
