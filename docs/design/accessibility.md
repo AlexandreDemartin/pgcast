@@ -2,6 +2,8 @@
 
 WCAG 2.2 AA on the theme, the cast panel and the nav, checked by hand on `npm run docs:preview` with the chrome-devtools tools (a snapshot, Tab through the page, computed sizes and styles), in the light and the dark theme. The automated check is `website/check-lighthouse.mjs`, run by the `docs` job of `ci.yml`: four pages (`/`, `/select`, `/first-query`, `/why`), desktop preset, at least 95 in each of the four categories. Part of #195, issue #861.
 
+A fix recorded here also updates the rule of `art-direction.md` it overrides, in the same PR: Lighthouse does not audit focus contrast, so a theme PR that follows the old rule drops the fix with CI green (#868, #873).
+
 ## Manual checks, 2026-11-22
 
 | Criterion | Result |

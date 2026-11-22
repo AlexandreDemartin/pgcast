@@ -79,7 +79,7 @@ The core's release, `@pgcast/pgcast`, goes in this order; an extension's, below.
 1. **The pre-release pass**, before every publication:
    - a range review of every PR merged since the last pass;
    - an audit of `npm pack` (files, README, `package.json` fields) and of the docs site: each feature's "From x.y.z." in EN and FR, no current-version number in the README or the docs;
-   - a consumer probe that installs as the docs say: `typescript` as `/install` gives it, `latest` (pinning 6 hid an `ERESOLVE` on 7), and a package manager that installs no peers (`--legacy-peer-deps`) before the docs name the alias alone (chapter #62's review);
+   - a consumer probe that installs as the docs say: `typescript` as `/install` gives it, `latest` (pinning 6 hid an `ERESOLVE` on 7), and a package manager that installs no peers (`--legacy-peer-deps`) before the docs name the alias alone (chapter #62's review); its package is built as `release.yml` builds it, from a `git archive` of the commit with `npm ci --ignore-scripts` at the root and in the package (its pack then matched the checkout's byte for byte, #867);
    - a fix for each finding, merged before the version PR.
 2. **The version PR**, by hand, reviewed like any PR and merged by the session (models: #624, and #568 for one that also carries an advisory):
    - `version` in `package.json`, in both root entries of `package-lock.json` and in the `..` entry of `website/package-lock.json`;
