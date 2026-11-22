@@ -44,7 +44,7 @@ Explore, plan, code, commit.
 
 - Branch `<type>/<issue>-<slug>` (skill `pr-shape` § Branch) from an up-to-date `master`: `git fetch && git switch -c <branch> origin/master`.
 - Layer of a stack, only if the orchestrator asks (skill `pr-shape` § Stacking): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
-- Small, atomic commits (skill `pr-shape` § Commits), staged by path, never `git commit -am` with two changes in progress (#709); two changes in one file go apart by `git apply --cached` of one hunk's diff, as `git add -p` is interactive here and a pushed mixed commit cannot be amended (#874, #886); each ends with the requested `Co-Authored-By` line.
+- Small, atomic commits (skill `pr-shape` § Commits), staged by path, never `git commit -am` with two changes in progress (#709); two changes in one file go apart by `git apply --cached --unidiff-zero` of one hunk of `git diff -U0` (at the default context, two changes within six lines share a hunk), as `git add -p` is interactive here and a pushed mixed commit cannot be amended (#874, #886); each ends with the requested `Co-Authored-By` line.
 - Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`). To retry, run `git push` alone again, then compare `git rev-parse HEAD` with `git ls-remote origin <branch>`: a loop or a pipe hides the exit code, and in a worktree the sandbox refuses compound `git` commands.
 - Another revision is read with `git show "<ref>:<path>"` or a detached worktree; never `git checkout <ref>`, `git stash` or `git checkout -- <file>` in your checkout, which move `HEAD` or drop uncommitted edits.
 
