@@ -58,6 +58,18 @@ const groups: Group[] = [
     ],
   },
   {
+    text: { en: 'Recipes', fr: 'Recettes' },
+    link: '/recipes',
+    collapsed: true,  // folded: a reader comes for one need, from the search or a link (decision 015)
+    items: [
+      { text: { en: 'Optional filters', fr: 'Filtres optionnels' }, link: '/optional-filters' },
+      { text: { en: 'Related rows', fr: 'Lignes liées' }, link: '/related-rows' },
+      { text: { en: 'Array columns', fr: 'Colonnes tableau' }, link: '/array-columns' },
+      { text: { en: 'Text search', fr: 'Recherche textuelle' }, link: '/text-search' },
+      { text: { en: 'In-place updates', fr: 'Mises à jour en place' }, link: '/update-in-place' },
+    ],
+  },
+  {
     text: { en: 'Explanation', fr: 'Explication' },
     link: '/explanation',
     collapsed: true,  // folded: read once, for the why

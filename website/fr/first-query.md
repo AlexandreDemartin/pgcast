@@ -1,5 +1,5 @@
 ---
-english: 798949a9b34b
+english: 9015c0ec1937
 description: "À la fin de cette page, vous aurez généré les types d’une base, demandé des films et ajouté un film, avec sous les yeux le SQL et le type de chaque requête."
 ---
 
@@ -375,4 +375,4 @@ Après une mise à jour de pgcast, une erreur de type sur `schemaVersionCanary` 
 - Lire le SQL qu’exécute une requête avec `.compile()`, et son type sous votre curseur.
 - Régénérer après une migration, et laisser TypeScript trouver les requêtes qui ne correspondent plus.
 
-Ensuite : chaque option dans la [référence](/fr/reference), une tâche à vous dans les [guides pratiques](/fr/guides), et le pourquoi de son fonctionnement dans les [explications](/fr/explanation).
+Ensuite : chaque option dans la [référence](/fr/reference), une tâche à vous dans les [guides pratiques](/fr/guides), un besoin courant dans les [recettes](/fr/recipes), et le pourquoi de son fonctionnement dans les [explications](/fr/explanation).

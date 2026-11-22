@@ -28,4 +28,4 @@ Each step builds on the one before. Only what this path needs: no options to cho
 
 - One line per thing the reader can now do on their own.
 
-Next: every option in the [reference](/reference), a task of your own in the [how-to guides](/guides), and why it works this way in the [explanations](/explanation).
+Next: every option in the [reference](/reference), a task of your own in the [how-to guides](/guides), a common need in the [recipes](/recipes), and why it works this way in the [explanations](/explanation).

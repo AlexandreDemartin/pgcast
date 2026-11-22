@@ -48,6 +48,11 @@ Candidates for a check, a rule or a skill line.
 - #892 — an "every `### Added` placed or left out" proof is mechanical with a script over the changelogs and a placement file checked for equal counts — builder
 - #893 — in a fresh worktree `docs:build` fails with TS2694 on `zapatos/schema.d.ts` until the root's `npm run build` has run: a builder brief's worktree setup names it after `npm ci` — builder
 - #893 — `vitepress preview` on `/` redirects a French-language browser to `/fr/`: read the English home with `fetch('/index.html')` — builder
+- #898 — a condition is probed on its own (`db.sql\`${{ col: cond }}\``): `columns` shifts the parameter numbers, so a `$n` quoted in prose drifts — builder
+- #898 — an `and()` or `or()` saved with no annotation infers `T = unknown` and a shortcut's `where` refuses it (TS2345): annotate it `SQLFragment<boolean | null>` or build it in the call — a need for the chapter-10 list — builder
+- #898 — a cast panel shows the type of the first `const` below the cut: helper consts go inside functions — builder
+- #898 — `docs:examples` runs in Node with the real `Buffer`, so a gap in the playground's stand-in (`globals.ts`: `byteLength`, still `isBuffer`) shows only when a link runs in the browser: a check that the stand-in covers every `Buffer.` call of `dist/db` would catch it — builder
+- #898 — a same-origin iframe loop (open each playground link, press Run, read the live region) checks every panel of a page in one call — builder
 
 ## Minors kept
 
