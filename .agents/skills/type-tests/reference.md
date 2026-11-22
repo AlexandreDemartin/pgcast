@@ -50,8 +50,6 @@ A refusal by `SQLFragment`'s type arguments (a brand, `options & X<L>`):
 
 In a test, the docs or the CHANGELOG, a claim is probed, not read from the declarations:
 
-In a test, the docs or the CHANGELOG, it is probed, not read from the declarations:
-
 - on the result type, not only the parameter: a `readonly` `returning` is accepted and gives `never`;
 - with `strict: false`: `undefined extends X` is then always true, so narrowing by `columns`, `returning` or `reportAction` is lost, and a `lateral` key gives TS2339;
 - on a value built at run time and on wider types (`Record<string, string>`, `object`): excess keys are checked only in a fresh literal, and a built-in that shares a member with a column (`name`, `size`) passes the weak-type check;
