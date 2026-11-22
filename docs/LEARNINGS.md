@@ -46,6 +46,8 @@ Candidates for a check, a rule or a skill line.
 - #892 — `check-translations` fails a new French page with no `english:` front matter; `docs:translated -- <page>` writes it, so a new page needs no hand-written hash — builder
 - #892 — the French prose mixes « batches » (14) and « batchs » (8): a site-wide choice for the glossary, left alone — builder
 - #892 — an "every `### Added` placed or left out" proof is mechanical with a script over the changelogs and a placement file checked for equal counts — builder
+- #893 — in a fresh worktree `docs:build` fails with TS2694 on `zapatos/schema.d.ts` until the root's `npm run build` has run: a builder brief's worktree setup names it after `npm ci` — builder
+- #893 — `vitepress preview` on `/` redirects a French-language browser to `/fr/`: read the English home with `fetch('/index.html')` — builder
 
 ## Minors kept
 
