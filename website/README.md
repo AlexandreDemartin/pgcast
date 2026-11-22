@@ -151,7 +151,12 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 - `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes. A panel not written `<CastPanel example="<name>">` fails the build. Its fenced blocks open and close as in the other checks (`.vitepress/fences.ts`), and `llms.ts` checks itself before the pages: a note after a ```` ```md ```` block that shows a ```` ```ts ```` line, a block of four backticks that holds a ```` ``` ```` line, and a block meant to fail, nested in a list.
 - `/<page>.md` (`/index.md` for the home): each page's part of `llms-full.txt`, in a file of its own, listed nowhere. On each written page of the outline, under "On this page" from 1280px, else beside the title, its page actions (`.vitepress/theme/PageActions.vue`) copy it, link it, and open ChatGPT or Claude on a prompt that names its URL; nothing outside the site is fetched until one of those links is followed. In `docs:dev` the file does not exist: `docs:build` writes it.
 
-A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. The changelog is in `llms.txt` only.
+Each page with a copy names it in its `<head>`: `<link rel="alternate" type="text/markdown" href="https://pgcast.dev/select.md">` (`/index.md` and `/fr/index.md` for the homes), by `pageHead()` in `.vitepress/meta.ts`. After the pages are built, `.vitepress/alternates.ts` reads those links back from `dist` and fails the build on a link to a copy the site does not serve, or a served copy no page links.
+
+A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. Four routes have a page and no copy, in each language, on purpose:
+
+- The playground is interactive: its page holds a tool, and no prose to copy.
+- The changelog is in `llms.txt` only, under "Optional", and `/changelog.xml` is its machine-readable form; a copy would repeat the root's `CHANGELOG.md`, and add a language rule for a page that stays English.
 
 ### The changelog
 

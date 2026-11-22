@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createTwoslasher } from 'twoslash';
 import type { SiteConfig } from 'vitepress';
+import { checkAlternates, fileOf } from './alternates.ts';
 import { castOf } from './cast.data.ts';
 import { earlyCloser, fenceClosed, fenceOpened } from './fences.ts';
 import { outlineIn } from './outline.ts';
@@ -23,6 +24,7 @@ export async function writeLlmsFiles(config: SiteConfig) {
   const twoslasher = createTwoslasher(twoslashOptions);
   checkFences(twoslasher);
   for (const lang of langs) await writeLlmsFilesIn(lang, config, twoslasher);
+  checkAlternates(config.outDir, host + config.site.base);
 }
 
 /**
@@ -40,9 +42,6 @@ function checkFences(twoslasher: Twoslasher) {
   if (got !== expected)
     throw new Error(`llms.ts: the self-check's page came out as\n${got}\n\nnot\n${expected}\n\ncheck fences.ts and shown()`);
 }
-
-/** A page's file in the site's source, by its link: `/select` is `select.md`, `/fr/` is `fr/index.md`. */
-const fileOf = (link: string) => link.endsWith('/') ? `${link.slice(1)}index.md` : `${link.slice(1)}.md`;
 
 async function writeLlmsFilesIn(lang: Lang, config: SiteConfig, twoslasher: Twoslasher) {
   const

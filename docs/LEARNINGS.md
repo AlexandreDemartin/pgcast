@@ -33,10 +33,12 @@ Candidates for a check, a rule or a skill line.
 - #863 — CI's TypeScript loop replays locally with `check:floor` and `npm install --prefix <scratch>/ts<version> typescript@<version>`, pointed to by `PGCAST_TEST_TYPESCRIPT` — builder
 - #863 — a fix round that runs the reviewer's harness needs its own probe database and its own scratch folder exported, since the harness reads them from there — builder
 - #865 — auto mode refuses a compound command that starts with `pkill`: a builder stops its own background process by its PID — builder
+- #866 — a check meant to be proved red on its own lives in a module that plain Node loads: `llms.ts` imports `cast.data.ts`, which only VitePress loads — builder
+- #866 — an issue's counts go stale between filing and building (68 pages then, 70 now): the builder recounts from `dist` and says so — orchestrator
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 - #853 — six skills keep a `## Checklist` (`backward-compat`, `code-style`, `consumer-usage`, `merge-gate`, `review-comments`, `zero-abstraction`) after #853 cut the six others as duplicates: one rule for all, at the next method PR
 - #854 — `sectionErrors` still leaves unchecked `[reference.md](reference.md#x) § X` and `[reference.md](./reference.md) § X`, and checks a bare `skills/code-style/reference.md § Claims` against the citing skill's own reference; no such citation in the tree
-
+- #866 — `website/.vitepress/meta.ts:4` and `:54`: two comment lines lengthened past the file's wrap width, not re-wrapped — orchestrator
