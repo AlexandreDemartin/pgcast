@@ -549,11 +549,15 @@ A value JSON can hold: the type of a `json` or `jsonb` column. `undefined`, a `D
 type JSONObject = { [k: string]: JSONValue }
 ```
 
+A JSON object, each value a `JSONValue`: the `vars` of [`jsonbPathExists()`](/conditions#conditions.jsonbPathExists).
+
 ### `JSONArray` {#JSONArray}
 
 ```ts
 type JSONArray = JSONValue[]
 ```
+
+A JSON array, each item a `JSONValue`.
 
 ## Large numbers {#large-numbers}
 

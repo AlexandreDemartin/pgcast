@@ -1,5 +1,5 @@
 ---
-english: 5d7e968ac634
+english: 8b4d4d1257e0
 ---
 
 # SQL typé
@@ -59,6 +59,8 @@ npx --no-install pgcast-typegen
 
 L’outil parcourt le projet et demande à Postgres de décrire les requêtes nommées sans les exécuter. Commitez `<outDir>/zapatos/queries.ts` à côté du schéma. Avec `moduleNames: "pgcast"`, importez les types depuis le fichier généré `pgcast/queries.ts` et utilisez `pgcast/db`.
 
+`npx --no-install pgcast-typegen --help` affiche l’usage, `pgcast-typegen [--check | --watch] [--project <tsconfig>]`.
+
 ## 4. Vérifier en CI {#check-in-ci}
 
 ```sh
@@ -70,7 +72,7 @@ npx --no-install pgcast-typegen --check
 | Omettre `db` | La vérification s’effectue hors ligne, même si les variables d’environnement de `pg` sont définies. L’outil compare les noms des requêtes et leur SQL (avec les paramètres `$1`, `$2`, etc.) au contenu du fichier commité. Il en vérifie le format. Les types de ligne ne sont pas vérifiés. |
 | Faire pointer `db` vers la base où les migrations ont été appliquées | Demande à Postgres de décrire à nouveau chaque requête et compare le résultat au fichier commité octet par octet, types de ligne compris. |
 
-Dans les deux cas, le fichier reste intact. L’outil se termine avec le code `1` s’il trouve une différence ou rencontre une erreur. Après une modification de la requête ou du schéma, régénérez le fichier et commitez les changements.
+Dans les deux cas, le fichier reste intact. L’outil se termine avec le code `1` s’il trouve une différence ou rencontre une erreur. `--check` ne se combine pas avec `--watch` : ensemble, ils affichent l’usage et l’outil se termine avec le code `1`. Après une modification de la requête ou du schéma, régénérez le fichier et commitez les changements.
 
 ## 5. Affiner le type d’une colonne {#narrow-a-column}
 

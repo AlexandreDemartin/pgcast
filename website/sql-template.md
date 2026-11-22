@@ -368,6 +368,8 @@ The current column, in a Whereable's fragment value: `` { runtime_minutes: db.sq
 type SelfType = typeof self
 ```
 
+The type of `db.self`, one of the [`GenericSQLExpression`](#GenericSQLExpression) types.
+
 ## `parent()` {#parent}
 
 ```ts
@@ -422,6 +424,8 @@ The keyword `DEFAULT`: a column's default, in an `INSERT` or `UPDATE` value, alo
 ```ts
 type DefaultType = typeof Default
 ```
+
+The type of `db.Default`, which the generated `Insertable` and `Updatable` accept for a column that is nullable or has a default.
 
 ## Nested fragments {#nested-fragments}
 
@@ -481,6 +485,8 @@ The `where` of `select()`, `count()` and the other selects that matches every ro
 ```ts
 type AllType = typeof all
 ```
+
+The type of `db.all`, which the `where` of `select()`, `count()` and the other selects accepts, as do `exists()` and `isInSelect()`.
 
 ## `SQLFragment` {#SQLFragment}
 

@@ -1,5 +1,5 @@
 ---
-english: f9075780579f
+english: 1a73a3b211a4
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -554,11 +554,15 @@ Une valeur que JSON peut contenir : le type d’une colonne `json` ou `jsonb`. 
 type JSONObject = { [k: string]: JSONValue }
 ```
 
+Un objet JSON, chaque valeur un `JSONValue` : les `vars` de [`jsonbPathExists()`](/fr/conditions#conditions.jsonbPathExists).
+
 ### `JSONArray` {#JSONArray}
 
 ```ts
 type JSONArray = JSONValue[]
 ```
+
+Un tableau JSON, chaque élément un `JSONValue`.
 
 ## Grands nombres {#large-numbers}
 
