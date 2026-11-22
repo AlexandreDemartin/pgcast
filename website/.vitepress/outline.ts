@@ -27,11 +27,14 @@ const groups: Group[] = [
     items: [
       { text: { en: 'SQL template', fr: 'Template SQL' }, link: '/sql-template' },
       { text: { en: 'Select', fr: 'Lectures' }, link: '/select' },
+      { text: { en: 'Aggregates', fr: 'Agrégats' }, link: '/aggregates' },
       { text: { en: 'Writes', fr: 'Écritures' }, link: '/insert' },
       { text: { en: 'Conditions', fr: 'Conditions' }, link: '/conditions' },
       { text: { en: 'Transactions', fr: 'Transactions' }, link: '/transaction' },
       { text: { en: 'Configuration', fr: 'Configuration' }, link: '/runtime-config' },
+      { text: { en: 'Value types', fr: 'Types de valeurs' }, link: '/value-types' },
       { text: { en: 'Generator', fr: 'Générateur' }, link: '/generator' },
+      { text: { en: 'Generated files', fr: 'Fichiers générés' }, link: '/generated-files' },
     ],
   },
   {

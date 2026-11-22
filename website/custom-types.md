@@ -286,6 +286,6 @@ declare module 'zapatos/custom' {
 
 ## See also
 
-- [The files it writes](/generator#the-files-it-writes): each file the generator writes, and when.
+- [The files it writes](/generated-files#the-files-it-writes): each file the generator writes, and when.
 - [`customTypesTransform`](/generator#generate.customTypesTransform): the names of the placeholders.
 - [The catalog](/catalog-types): why a type differs between `Selectable` and `JSONSelectable`.

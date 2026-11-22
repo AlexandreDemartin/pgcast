@@ -1,5 +1,5 @@
 ---
-english: cee1ec62dc62
+english: 69c42480d33b
 ---
 
 # Transactions
@@ -119,7 +119,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 COMMIT
 ```
 
-Le SQL de la requête du callback : [`count()`](/fr/select#count).
+Le SQL de la requête du callback : [`count()`](/fr/aggregates#count).
 
 - Le callback reçoit le client du pool, marqué au niveau d’isolation demandé. Quand TypeScript connaît le type du client du pool, il infère un [`TxnClientLike`](#TxnClientLike), sauf si ce type étend `pg.PoolClient`. Dans ce cas, il infère le type du client de transaction de `pg`. `taken` est un `number`, comme sur un `pg.Pool`.
   Avec un pool, si vous indiquez explicitement le type du résultat à l’appel sans préciser celui du client du pool, TypeScript donne au paramètre du callback le type du client de transaction de `pg`. Pour conserver le type `ShowClient` dans l’exemple ci-dessous, laissez TypeScript inférer les arguments de type (vous pouvez annoter le type de retour du callback) ou indiquez aussi le type du client. Dans `transaction()`, le type du client vient en troisième, après le type du résultat et celui du niveau d’isolation.
@@ -287,7 +287,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE
 COMMIT
 ```
 
-Le SQL de chaque requête : [`count()`](/fr/select#count). Les autres raccourcis en lecture seule envoient la même chose, avec leur niveau ; dans [`readCommittedRO()`](#readCommittedRO), chaque requête lit son propre instantané, donc une réservation commitée entre les deux comptages figure dans le second.
+Le SQL de chaque requête : [`count()`](/fr/aggregates#count). Les autres raccourcis en lecture seule envoient la même chose, avec leur niveau ; dans [`readCommittedRO()`](#readCommittedRO), chaque requête lit son propre instantané, donc une réservation commitée entre les deux comptages figure dans le second.
 
 ## `savepoint()` {#savepoint}
 
@@ -364,7 +364,7 @@ SELECT pg_advisory_xact_lock($1, $2)
 COMMIT
 ```
 
-Le SQL des requêtes du callback : [`count()`](/fr/select#count) et [`insert()`](/fr/insert#insert).
+Le SQL des requêtes du callback : [`count()`](/fr/aggregates#count) et [`insert()`](/fr/insert#insert).
 
 | Clé | SQL | Valeurs |
 |---|---|---|
@@ -722,7 +722,7 @@ Les gérer dans une application : [Erreurs](/fr/handle-errors).
 
 ## Erreurs que pgcast lève avant toute requête {#errors-pgcast-throws-before-any-query}
 
-Une simple `Error`, sans `code`, avant que rien ne soit envoyé. Un raccourci lève les siennes de façon synchrone, dès l’appel, sauf pour les options de `truncate()` dans un autre ordre et les `columns` ou le `lateral` d’un agrégat ([`count()`](/fr/select#count)) : `.run()` n’est jamais atteint, donc un `.catch()` chaîné dessus ne les reçoit pas.
+Une simple `Error`, sans `code`, avant que rien ne soit envoyé. Un raccourci lève les siennes de façon synchrone, dès l’appel, sauf pour les options de `truncate()` dans un autre ordre et les `columns` ou le `lateral` d’un agrégat ([`count()`](/fr/aggregates#count)) : `.run()` n’est jamais atteint, donc un `.catch()` chaîné dessus ne les reçoit pas.
 
 Les autres sont levées quand `.compile()` compile la requête, donc `.run()` est rejetée avec elles ; `transaction()`, `advisoryXactLock()` et `setLocal()` sont rejetées avec les leurs, et le `next()` de `cursor()` avec les siennes. Chacune est listée avec ce qui la lève :
 
@@ -736,7 +736,7 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 | `truncate()` avec une autre option | l’appel lève | [`truncate()`](/fr/insert#truncate) |
 | une interpolation qui n’a pas de sens en SQL : un nombre, `null`, `db.all`, l’objet global ; `db.all` comme filtre de `deletes()` ou d’`update()` | `.run()` est rejetée | [Interpolations](/fr/sql-template#interpolations), [`all`](/fr/sql-template#all) |
 | `db.self` sans colonne ; `db.parent()` sans table parente, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()` | `.run()` est rejetée | [`self`](/fr/sql-template#self), [`parent()`](/fr/sql-template#parent) |
-| `count()` et les autres agrégats avec des `columns` sans colonne ou à plusieurs colonnes, ou sans `columns` du tout pour `sum()`, `avg()`, `min()` et `max()` ; ou une seule sous-requête comme `lateral` ; et donc une requête qui en imbrique un | `.run()` est rejetée | [`count()`](/fr/select#count) |
+| `count()` et les autres agrégats avec des `columns` sans colonne ou à plusieurs colonnes, ou sans `columns` du tout pour `sum()`, `avg()`, `min()` et `max()` ; ou une seule sous-requête comme `lateral` ; et donc une requête qui en imbrique un | `.run()` est rejetée | [`count()`](/fr/aggregates#count) |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` ou `db.vals()` comme valeur de filtre ; `db.all` comme valeur de filtre, valeur d’une condition ou élément d’`isIn()` ou d’`isNotIn()` ; l’un d’eux, `db.param()`, un fragment ou `db.parent()` comme élément d’`arrayContains()`, d’`arrayContainedIn()` ou d’`arrayOverlaps()` ; `db.raw()`, `db.cols()` ou `db.vals()` comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, ou dans tout `vals({…})` | `.run()` est rejetée | [Objets Whereable](/fr/sql-template#whereable), [Conditions](/fr/conditions#refused-values), [`insert()`](/fr/insert#insert), [`vals()`](/fr/sql-template#vals) |
 | `truncate()` avec ses options dans un autre ordre | `.run()` est rejetée | [`truncate()`](/fr/insert#truncate) |
 | `transaction()` avec un autre niveau d’isolation | sa promesse est rejetée | [`transaction()`, Erreurs](#errors) |

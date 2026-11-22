@@ -1,5 +1,5 @@
 ---
-english: 56a290a58837
+english: 8a6b94d3f929
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -86,7 +86,7 @@ Le mentor d’un membre de l’équipe est une autre ligne de `crew`. Donnez un 
 </CastPanel>
 
 - `mentor` contient la ligne ou `null` : Wilhelmina Strand n’a pas de mentor.
-- [`count()`](/fr/select#count) donne un nombre, ici les protégés de chaque membre.
+- [`count()`](/fr/aggregates#count) donne un nombre, ici les protégés de chaque membre.
 - Sans les alias, le `FROM "crew"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> de la sous-requête masque celui de la requête extérieure, et `"crew"."mentor_id"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> est la ligne même de la sous-requête. Postgres l’exécute sans erreur, et chaque `mentor` revient `null`, chaque compte `0` :
 
   ```sql

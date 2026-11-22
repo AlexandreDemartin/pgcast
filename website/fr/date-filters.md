@@ -1,5 +1,5 @@
 ---
-english: 465979252e30
+english: 2508e016c8fc
 ---
 
 # Filtres de date
@@ -20,7 +20,7 @@ Les séances du 1er mars 2030, en UTC :
 
 - `"starts_at" >= $1`<!-- probe: db.sql`${{ starts_at: db.conditions.and(db.conditions.gte('2030-03-01T00:00:00Z'), db.conditions.lt('2030-03-02T00:00:00Z')) }}` --> et `"starts_at" < $2`<!-- probe: db.sql`${{ starts_at: db.conditions.and(db.conditions.gte('2030-03-01T00:00:00Z'), db.conditions.lt('2030-03-02T00:00:00Z')) }}` -->, joints par `AND` : une période semi-ouverte, son début inclus et sa fin exclue. Une semaine ou un mois est la même paire, de son premier minuit au minuit qui la suit.
 - Les bornes sont des dates explicites, pas `now()`, pour que la requête donne les mêmes lignes à chaque exécution. À partir de l’heure courante, utilisez [`now`](/fr/conditions#conditions.now) ou [`fromNow()`](/fr/conditions#conditions.fromNow).
-- Une borne est une chaîne avec son décalage ou un `Date` ([Dates et heures](/fr/conditions#dates)). `starts_at` revient sous forme de chaîne dans le fuseau horaire de la session ([Dates et heures](/fr/runtime-config#dates-and-times)).
+- Une borne est une chaîne avec son décalage ou un `Date` ([Dates et heures](/fr/conditions#dates)). `starts_at` revient sous forme de chaîne dans le fuseau horaire de la session ([Dates et heures](/fr/value-types#dates-and-times)).
 
 ## Pourquoi pas `between()` {#why-not-between}
 
@@ -50,5 +50,5 @@ Les séances du 2 mars 2030 pour un lecteur à Tokyo, dont le jour commence neuf
 ## Voir aussi {#see-also}
 
 - [Les comparaisons](/fr/conditions#comparisons) et [Les intervalles](/fr/conditions#ranges) : chaque condition et le SQL qu’elle écrit.
-- [Dates et heures](/fr/conditions#dates), et leurs [types](/fr/runtime-config#dates-and-times) : ce qu’une borne peut être, et ce qui revient.
+- [Dates et heures](/fr/conditions#dates), et leurs [types](/fr/value-types#dates-and-times) : ce qu’une borne peut être, et ce qui revient.
 - [Fonctions de date et d’heure](https://www.postgresql.org/docs/current/functions-datetime.html), dans la doc de Postgres.

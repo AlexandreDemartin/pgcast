@@ -1,10 +1,10 @@
 ---
-english: 44923cee1197
+english: ec190dda3274
 ---
 
 # Comptes imbriqués
 
-Compter à travers des jointures : les rôles de chaque studio, en passant par ses films. Imbriquez [`count()`](/fr/select#count) dans un [`lateral`](/fr/select#lateral), et atteignez la table intermédiaire avec [`isInSelect()`](/fr/conditions#conditions.isInSelect) ou [`exists()`](/fr/conditions#conditions.exists), dont l’option `parent` nomme la ligne extérieure.
+Compter à travers des jointures : les rôles de chaque studio, en passant par ses films. Imbriquez [`count()`](/fr/aggregates#count) dans un [`lateral`](/fr/select#lateral), et atteignez la table intermédiaire avec [`isInSelect()`](/fr/conditions#conditions.isInSelect) ou [`exists()`](/fr/conditions#conditions.exists), dont l’option `parent` nomme la ligne extérieure.
 {.lede}
 
 ## Compter à travers une table intermédiaire {#count-through-a-table-in-between}
@@ -20,7 +20,7 @@ Un rôle pointe vers un film, et un film vers un studio. Chaque studio avec le n
 
 - `"film_id" IN (SELECT "id" FROM "films" WHERE ("studio_id" = "studios"."id"))`<!-- probe: examples/count_across_joins.ts --> : les rôles des films du studio, comptés en une seule requête.
 - `parent: 'studios'` fait de `db.parent('id')` l’`id` du studio, deux niveaux plus haut. Sans lui, la requête lève l’erreur "The 'parent' table alias has no meaning here"<!-- message --> avant d’être envoyée.
-- `roles` est un `number`, et `0` pour un studio sans rôle ([`count()`](/fr/select#count)).
+- `roles` est un `number`, et `0` pour un studio sans rôle ([`count()`](/fr/aggregates#count)).
 
 ## Compter les lignes qui ont une ligne liée {#count-the-rows-that-have-a-related-row}
 
@@ -40,5 +40,5 @@ Chaque studio avec le nombre de ses films où joue Teodor Vasko (l’acteur 1003
 ## Voir aussi {#see-also}
 
 - [Sous-requêtes](/fr/conditions#subqueries) : `exists()`, `isInSelect()` et leur option `parent`.
-- [`lateral`](/fr/select#lateral) et [`count()`](/fr/select#count) : ce que renvoie un compte imbriqué.
+- [`lateral`](/fr/select#lateral) et [`count()`](/fr/aggregates#count) : ce que renvoie un compte imbriqué.
 - [Décision 006](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/006-subquery-conditions.md) : pourquoi les conditions de sous-requête prennent `parent`.

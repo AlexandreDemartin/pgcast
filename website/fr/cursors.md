@@ -1,5 +1,5 @@
 ---
-english: 095223a1c88c
+english: e76d485c11c1
 ---
 
 # Curseurs
@@ -37,7 +37,7 @@ Lisez le curseur dans l’appel à [`transaction()`](/fr/transaction#transaction
 
 Dans l’exemple, la requête de sélection simple utilise l’instantané visible à la déclaration du curseur. En lecture répétable, une requête exécutée plus tôt dans la transaction peut avoir déjà fixé cet instantané.
 
-Supposons qu’une autre transaction commite l’insertion d’un cinquième film après le premier batch. En `READ COMMITTED`, un appel à [`count()`](/fr/select#count) dans la boucle renvoie cinq, alors que le curseur lit quatre films. En `REPEATABLE READ, READ ONLY`, les deux en voient quatre.
+Supposons qu’une autre transaction commite l’insertion d’un cinquième film après le premier batch. En `READ COMMITTED`, un appel à [`count()`](/fr/aggregates#count) dans la boucle renvoie cinq, alors que le curseur lit quatre films. En `REPEATABLE READ, READ ONLY`, les deux en voient quatre.
 
 ## Gérer une sortie anticipée de la boucle ou un retry {#handle-an-early-exit-or-a-retry}
 

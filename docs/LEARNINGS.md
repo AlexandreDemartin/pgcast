@@ -71,6 +71,11 @@ Candidates for a check, a rule or a skill line.
 - #911 — the brief said `@pgcast/typegen` "checks" a query's row type with a Whereable, but it refuses a Whereable (`neutralise.ts`): a brief reads a tool's accepted inputs before stating its limits — builder
 - #911 — Python's `re.escape` escapes spaces, so a pattern over the French pages splits on spaces and joins with `[  ]` (U+00A0) — builder
 - #911 — in the playground, each example link takes its own navigate before `evaluate_script`, the list of links kept in localStorage — builder
+- #904 — a mutant of a `.vitepress` check runs without a rebuild: load the module with vite's `ssrLoadModule` (`ssr.external: true`, `resolve.preserveSymlinks: true`), change its table or a copy of the dist, then call `checkLinks` with `outDir` on the copy; plain `node` fails on `cast.data.ts` — builder
+- #904 — a French page whose English page changes only in a link still needs `docs:translated`, so its `english:` line changes too; a conflict limited to those lines resolves by dropping the markers by script, then `docs:translated` — builder
+- #904 — a moved-anchor check accepts a line whose old page is gone, as the 404 page runs the same head script — builder
+- #904 — an inline head script kept in a TS template literal is changed twice before it ships (escapes, then the minifier): test the built one, taken from the built HTML and run in `node:vm` with a mock `location` — branch-reviewer
+- #904 — the brief asked the reviewer to post its comment, against `review-comments` (the orchestrator posts it): a review brief asks for the text — orchestrator
 
 ## Minors kept
 

@@ -16,7 +16,7 @@ The number of films of each studio:
 
 - `GROUP BY "studio_id"`<!-- probe: examples/count_per_group.ts --> gives one row per studio, with `columns` holding what it groups by.
 - `count(*)` is a `bigint`, but the row comes back as JSON, so `films` is a number, as its fragment says.
-- Not [`count()`](/select#count) with `groupBy`: it gives the first group's count only.
+- Not [`count()`](/aggregates#count) with `groupBy`: it gives the first group's count only.
 - With the studio's name: [Joins § Filter, sort and group by a lateral](/lateral#filter-sort-and-group-by-a-lateral). To keep only some groups, `having` ([`groupBy` and `having`](/select#groupby-and-having)).
 
 ## Count part of each group
@@ -52,5 +52,5 @@ The number of films in each genre, among those released before 2010. `genres` is
 ## See also
 
 - [`groupBy` and `having`](/select#groupby-and-having): what a grouped `select()` can return.
-- [`count()`](/select#count): one count, its options, and `count(DISTINCT …)`.
+- [`count()`](/aggregates#count): one count, its options, and `count(DISTINCT …)`.
 - [Aggregate functions](https://www.postgresql.org/docs/current/functions-aggregate.html) and [`FILTER`](https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-AGGREGATES), in the Postgres docs.

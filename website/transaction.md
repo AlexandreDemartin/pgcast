@@ -115,7 +115,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 COMMIT
 ```
 
-The SQL of the callback's query: [`count()`](/select#count).
+The SQL of the callback's query: [`count()`](/aggregates#count).
 
 - The callback gets the pool's client, marked for that isolation level. When the pool's client type is known, TypeScript infers a [`TxnClientLike`](#TxnClientLike) unless the client extends `pg.PoolClient`, in which case it infers `pg`'s transaction client type. `taken` is a `number`, as on a `pg.Pool`.
   With a pool, supplying a result type argument on the call and omitting the pool-client type argument gives the callback `pg`'s transaction client type. For the `ShowClient` below, leave the type arguments off (you can annotate the callback's return type) or supply the client type too. For `transaction()`, the client type comes third, after the result and isolation level.
@@ -283,7 +283,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE
 COMMIT
 ```
 
-The SQL of each query: [`count()`](/select#count). The other read-only shortcuts send the same, with their level; in [`readCommittedRO()`](#readCommittedRO), each query reads its own snapshot, so a booking committed between the two counts is in the second.
+The SQL of each query: [`count()`](/aggregates#count). The other read-only shortcuts send the same, with their level; in [`readCommittedRO()`](#readCommittedRO), each query reads its own snapshot, so a booking committed between the two counts is in the second.
 
 ## `savepoint()` {#savepoint}
 
@@ -360,7 +360,7 @@ SELECT pg_advisory_xact_lock($1, $2)
 COMMIT
 ```
 
-The SQL of the callback's queries: [`count()`](/select#count) and [`insert()`](/insert#insert).
+The SQL of the callback's queries: [`count()`](/aggregates#count) and [`insert()`](/insert#insert).
 
 | Key | SQL | Values |
 |---|---|---|
@@ -718,7 +718,7 @@ Handling them in an app: [Errors](/handle-errors).
 
 ## Errors pgcast throws before any query
 
-A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself, but for `truncate()`'s options in another order and an aggregate's `columns` or `lateral` ([`count()`](/select#count)): `.run()` is never reached, so a `.catch()` chained on it does not get them.
+A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself, but for `truncate()`'s options in another order and an aggregate's `columns` or `lateral` ([`count()`](/aggregates#count)): `.run()` is never reached, so a `.catch()` chained on it does not get them.
 
 The others are thrown as `.compile()` compiles the query, so `.run()` rejects with them; `transaction()`, `advisoryXactLock()` and `setLocal()` reject with their own, and `cursor()`'s `next()` with its own. Each is listed with what throws it:
 
@@ -732,7 +732,7 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 | `truncate()` with another option | the call throws | [`truncate()`](/insert#truncate) |
 | an interpolation that has no meaning in SQL: a number, `null`, `db.all`, the global object; `db.all` as the filter of `deletes()` or `update()` | `.run()` rejects | [Interpolations](/sql-template#interpolations), [`all`](/sql-template#all) |
 | `db.self` with no column; `db.parent()` with no parent table, so as an `insert()`, `upsert()` or `update()` value | `.run()` rejects | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
-| `count()` and the other aggregates given a `columns` of no column or several, or none at all for `sum()`, `avg()`, `min()` and `max()`; or a single subquery as `lateral`; so a query that nests one | `.run()` rejects | [`count()`](/select#count) |
+| `count()` and the other aggregates given a `columns` of no column or several, or none at all for `sum()`, `avg()`, `min()` and `max()`; or a single subquery as `lateral`; so a query that nests one | `.run()` rejects | [`count()`](/aggregates#count) |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value; `db.all` as a filter value, a condition's value or an item of `isIn()` or `isNotIn()`; any of these, `db.param()`, a fragment or `db.parent()` as an item of `arrayContains()`, `arrayContainedIn()` or `arrayOverlaps()`; `db.raw()`, `db.cols()` or `db.vals()` as an `insert()`, `upsert()` or `update()` value, or in any `vals({…})` | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions#refused-values), [`insert()`](/insert#insert), [`vals()`](/sql-template#vals) |
 | `truncate()` with its options in another order | `.run()` rejects | [`truncate()`](/insert#truncate) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |

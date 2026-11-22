@@ -1,5 +1,5 @@
 ---
-english: a11404b4ea40
+english: 4e1d7fad2186
 description: "Donnez à un assistant qui écrit vos requêtes cette doc, votre schéma généré et un court fichier de règles, pour qu’il les écrive à la manière de pgcast."
 ---
 
@@ -24,7 +24,7 @@ Collez une URL dans la conversation, ou laissez le fichier de règles ci-dessous
 
 ## Lui donner votre schéma {#give-it-your-schema}
 
-`npx pgcast` écrit `zapatos/schema.d.ts` dans votre [`outDir`](/fr/generator#generate.outDir) : `src/zapatos/schema.d.ts` dans le tutoriel. Il contient ce qu’un assistant devinerait sinon : les colonnes de chaque table, le type de chacune dans une ligne, un filtre, une insertion et une mise à jour ([Les fichiers qu’il écrit](/fr/generator#the-files-it-writes)), et sur chaque colonne un commentaire avec son type Postgres, si elle est `NOT NULL`, et sa valeur par défaut.
+`npx pgcast` écrit `zapatos/schema.d.ts` dans votre [`outDir`](/fr/generator#generate.outDir) : `src/zapatos/schema.d.ts` dans le tutoriel. Il contient ce qu’un assistant devinerait sinon : les colonnes de chaque table, le type de chacune dans une ligne, un filtre, une insertion et une mise à jour ([Les fichiers qu’il écrit](/fr/generated-files#the-files-it-writes)), et sur chaque colonne un commentaire avec son type Postgres, si elle est `NOT NULL`, et sa valeur par défaut.
 
 - Dites à l’assistant de le lire avant d’écrire une requête, et de ne jamais le modifier : la prochaine exécution le réécrit. Le fichier de règles ci-dessous fait les deux ; changez son chemin si votre `outDir` diffère.
 - Un `COMMENT ON COLUMN`, dans une migration, arrive aussi dans ce commentaire, sur une table, une vue, une vue matérialisée, une table distante ou une table partitionnée ([`schemaJSDoc`](/fr/generator#generate.schemaJSDoc)) : c’est là qu’il faut dire à l’assistant ce que signifie une colonne. Chaque relation montre les siens : une vue ne montre aucun de ceux de sa table.
@@ -46,7 +46,7 @@ https://pgcast.dev/llms-full.txt
 - The database is the source of the types. Before writing a query on a table,
   read its columns and their types in `src/zapatos/schema.d.ts`; never guess a
   column. Never edit that file: it is generated.
-  https://pgcast.dev/generator#the-files-it-writes
+  https://pgcast.dev/generated-files#the-files-it-writes
 - After a migration, run `npx pgcast` to generate the types again, then fix
   what no longer compiles.
   https://pgcast.dev/first-query#when-the-schema-changes

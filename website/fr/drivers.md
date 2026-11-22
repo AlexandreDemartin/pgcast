@@ -1,5 +1,5 @@
 ---
-english: 543a470839b9
+english: 99d077f7cac6
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -146,7 +146,7 @@ Un driver qui ignore `name`, comme celui-ci, lance une requête [`prepared()`](/
 
 ### Parser comme pg {#parse-like-pg}
 
-Le SQL est le même sur tout driver, et les types décrivent ce que donne `pg` ([Types de valeurs](/fr/runtime-config#value-types)). Un driver à vous lit chaque type comme `pg` le lit, sinon ses lignes ne correspondent pas à leurs types, sans que rien ne le signale :
+Le SQL est le même sur tout driver, et les types décrivent ce que donne `pg` ([Types de valeurs](/fr/value-types)). Un driver à vous lit chaque type comme `pg` le lit, sinon ses lignes ne correspondent pas à leurs types, sans que rien ne le signale :
 
 | Type | `pg` donne |
 |---|---|
