@@ -1,5 +1,5 @@
 ---
-english: 728026d8b3f2
+english: 05bcab6c30c2
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -31,7 +31,7 @@ Les paquets [`@pgcast/adapter-postgres-js`](https://www.npmjs.com/package/@pgcas
 ## postgres.js {#postgres-js}
 
 ```sh
-npm install zapatos@npm:@pgcast/pgcast@^7 @pgcast/adapter-postgres-js postgres
+npm install zapatos@npm:@pgcast/pgcast@^7 pg @pgcast/adapter-postgres-js postgres
 ```
 
 Passez à `asPool()` le `sql` que renvoie `postgres()`, importé comme d’habitude (`import postgres from 'postgres'`) :
@@ -66,7 +66,7 @@ Ce qu’il lit et écrit, type par type, et en quoi il diffère de `pg` : [son 
 ## PGlite {#pglite}
 
 ```sh
-npm install zapatos@npm:@pgcast/pgcast@^7 @pgcast/adapter-pglite @electric-sql/pglite
+npm install zapatos@npm:@pgcast/pgcast@^7 pg @pgcast/adapter-pglite @electric-sql/pglite
 ```
 
 Passez à `asPool()` un PGlite où votre schéma est chargé, celui d’après lequel pgcast a généré ses types :
