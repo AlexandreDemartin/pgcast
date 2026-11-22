@@ -25,7 +25,7 @@ Lighthouse 13.6.0, desktop preset, local `docs:preview`, 2026-11-22.
 | `/first-query` | 100 | 100 | 100 | 100 | 0.2 s | 0 ms | 0.002 |
 | `/why` | 100 | 100 | 100 | 100 | 0.2 s | 0 ms | 0.001 |
 
-On the CI runner (run 44969323753, same preset) `/select` scores 93 in Performance (TBT 220 ms; LCP 0.3 s, CLS 0.002), the other three 100. A 4x CPU slowdown on a laptop reproduces it (82, TBT 420 ms). Cause: hydrating the page, a 439 kB document with 278 Twoslash popovers (`v-popper`) and 54 cast panels, in `theme.js` and `framework.js` long tasks. Not fixed here (no small, clear fix in the theme): it is the subject of #869; with the median of three runs, `/select` scores 95 on the runner (94, 95, 95), no margin.
+On the CI runner (run 44969323753, same preset) `/select` scores 93 in Performance (TBT 220 ms; LCP 0.3 s, CLS 0.002), the other three 100. A 4x CPU slowdown on a laptop reproduces it (82, TBT 420 ms). Cause: hydrating the page, a 439 kB document with 278 Twoslash popovers (`v-popper`) and 54 cast panels, in `theme.js` and `framework.js` long tasks. #869 hydrates each code block with hover types on its first pointer, focus or touch instead of at load: on the runner (run 44978414582, median of three) `/select` then scores 99 in Performance (96, 100, 99; TBT 83 ms), the other three 100.
 
 The mobile preset gives 96 in Performance on `/select` (LCP 1.8 s, TBT 190 ms): too close to the threshold on a shared runner, hence desktop in CI.
 
