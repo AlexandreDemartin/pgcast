@@ -1,6 +1,6 @@
 # Codegen output: reference
 
-The cases of skill `codegen-output` for the typed SQL tool, `tools/typegen` (decision 012); [SKILL.md](SKILL.md) names each section with when to read it.
+The cases of skill `codegen-output`, the typed SQL tool's (`tools/typegen`, decision 012) first; [SKILL.md](SKILL.md) names each section with when to read it.
 
 ## Describing
 
