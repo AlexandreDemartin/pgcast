@@ -18,9 +18,8 @@ import { moduleNamesOf } from './moduleNames';
 import { jsdocText, tsIdentifier } from './quote';
 import type { CompleteConfig } from './config';
 import type { SchemaVersionCanary } from "../db/canary";
+import { Relation, relationsInSchema } from './relations';
 import {
-  Relation,
-  relationsInSchema,
   definitionForRelationInSchema,
   crossTableTypesForTables,
   crossSchemaTypesForAllTables,
