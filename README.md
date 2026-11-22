@@ -113,7 +113,7 @@ Everything else: the [changelog](https://pgcast.dev/changelog); what the charact
 
 ## Documentation
 
-pgcast's documentation, in English and French: <https://pgcast.dev/>, built from `master`. A tutorial, how-to guides, explanations, and a reference with an entry for every export of `zapatos/db` and every option; a project on Zapatos starts at [Switch from Zapatos](https://pgcast.dev/switching).
+pgcast's documentation, in English and French: <https://pgcast.dev/>, built from `master`. A tutorial, a reference with an entry for every export of `zapatos/db` and every option, how-to guides, recipes and explanations; a project on Zapatos starts at [Switch from Zapatos](https://pgcast.dev/switching).
 
 ## Roadmap
 

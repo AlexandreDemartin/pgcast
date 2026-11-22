@@ -1,5 +1,5 @@
 ---
-english: cb0145d9f9c2
+english: 96aac2d28bb8
 layout: home
 markdownStyles: false
 title: Le Postgres que vous connaissez, avec toute la puissance de TypeScript
@@ -77,6 +77,7 @@ Les valeurs voyagent en `$1`, `$2`. Les noms sont mis entre guillemets comme le 
 [**Tutoriel**<small>Installez pgcast et lancez votre première requête typée.</small>](/fr/tutorial)
 [**Référence**<small>Chaque export et chaque option, et le SQL qu’ils écrivent.</small>](/fr/reference)
 [**Guides pratiques**<small>Laterals, pages, batches, retries : une tâche chacun.</small>](/fr/guides)
+[**Recettes**<small>Filtres, dernières lignes, upserts, arbres : une requête chacun.</small>](/fr/recipes)
 [**Explication**<small>Pourquoi pgcast fonctionne comme il le fait.</small>](/fr/explanation)
 
 </div>

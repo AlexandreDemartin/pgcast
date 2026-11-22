@@ -29,7 +29,7 @@ Each cinema's latest screening, from `screenings` alone:
 <template #caption><span>Cinema 1000 at 21:45 UTC on 1 March, its later screening of the two; cinemas 1001 and 1002 with their one screening each, on 2 March.</span></template>
 </CastPanel>
 
-- `SELECT DISTINCT ON ("cinema_id")`<!-- probe: examples/latest_row_distinct.ts --> keeps the first row of each `cinema_id` in the order: `"starts_at" DESC` makes it the latest.
+- `SELECT DISTINCT ON ("cinema_id")`<!-- probe: examples/latest_row_distinct.ts --> keeps the first row of each `cinema_id` in the order: `"starts_at" DESC`<!-- probe: examples/latest_row_distinct.ts --> makes it the latest.
 - The `order` starts on `cinema_id`, or Postgres refuses the query (42P10).
 - A cinema with no screening is not in the result, and the rows are screenings, with no column of `cinemas`. For each cinema with its row or `null`, start from `cinemas` with the lateral above.
 

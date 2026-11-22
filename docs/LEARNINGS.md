@@ -76,6 +76,12 @@ Candidates for a check, a rule or a skill line.
 - #904 — a moved-anchor check accepts a line whose old page is gone, as the 404 page runs the same head script — builder
 - #904 — an inline head script kept in a TS template literal is changed twice before it ships (escapes, then the minifier): test the built one, taken from the built HTML and run in `node:vm` with a mock `location` — branch-reviewer
 - #904 — the brief asked the reviewer to post its comment, against `review-comments` (the orchestrator posts it): a review brief asks for the text — orchestrator
+- ch9 range — no check compares a panel's caption with what the panel returns: a caption check in `docs:examples` would freeze them, as the range review's `captions.mjs` did by hand — branch-reviewer
+- ch9 range — a new outline group touches every list of the groups (`outline.ts`, `llms.txt`, the home's read-next cards, `README.md`'s docs line): #903 and #905 each updated part of it — branch-reviewer
+- ch9 range — a page split is proved to lose no anchor by taking the old tag's anchors minus the new pages' anchors and `moved.ts` — branch-reviewer
+- #914 — `{{ … }}` in an inline code span breaks a VitePress page (Vue interpolation): a Whereable in prose or a table is written `<code v-pre>` with `&#96;`; only fenced blocks are safe — builder
+- #914 — a full-page DevTools screenshot lays the page out again: crop a viewport screenshot taken after scrolling the element into view, at the device pixel ratio — builder
+- #914 — the docs world seeds no `ratings` row and `security_empty_filter` deletes them all: a `ratings` example on the seed alone returns nothing — builder
 
 ## Minors kept
 

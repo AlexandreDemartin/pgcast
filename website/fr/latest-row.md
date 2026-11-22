@@ -1,5 +1,5 @@
 ---
-english: f2a45691a28b
+english: 0378229fc723
 ---
 
 # Dernières lignes
@@ -33,7 +33,7 @@ La dernière séance de chaque cinéma, depuis `screenings` seule :
 <template #caption><span>Le cinéma 1000 à 21:45 UTC le 1er mars, la plus tardive de ses deux séances ; les cinémas 1001 et 1002 avec leur unique séance, le 2 mars.</span></template>
 </CastPanel>
 
-- `SELECT DISTINCT ON ("cinema_id")`<!-- probe: examples/latest_row_distinct.ts --> garde la première ligne de chaque `cinema_id` dans l’ordre : `"starts_at" DESC` en fait la dernière.
+- `SELECT DISTINCT ON ("cinema_id")`<!-- probe: examples/latest_row_distinct.ts --> garde la première ligne de chaque `cinema_id` dans l’ordre : `"starts_at" DESC`<!-- probe: examples/latest_row_distinct.ts --> en fait la dernière.
 - L’`order` commence par `cinema_id`, sinon Postgres refuse la requête (42P10).
 - Un cinéma sans séance n’est pas dans le résultat, et les lignes sont des séances, sans colonne de `cinemas`. Pour chaque cinéma avec sa ligne ou `null`, partez de `cinemas` avec le lateral ci-dessus.
 
