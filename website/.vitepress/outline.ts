@@ -77,6 +77,10 @@ const groups: Group[] = [
       { text: { en: 'Upserts', fr: 'Upserts' }, link: '/insert-or-update' },
       { text: { en: 'Nested counts', fr: 'Comptes imbriqués' }, link: '/count-across-joins' },
       { text: { en: 'Date filters', fr: 'Filtres de date' }, link: '/date-filters' },
+      { text: { en: 'Trees', fr: 'Arbres' }, link: '/walk-a-tree' },
+      { text: { en: 'Unions', fr: 'Unions' }, link: '/combine-tables' },
+      { text: { en: 'Batch deletes', fr: 'Suppressions par batch' }, link: '/delete-in-batches' },
+      { text: { en: 'Job locks', fr: 'Locks de job' }, link: '/one-worker' },
     ],
   },
   {
