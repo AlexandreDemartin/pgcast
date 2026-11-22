@@ -70,8 +70,8 @@ const
  * Fail the build on a link outside the site's base, to a page or a file that the build did not write, or to an anchor
  * that its page does not define, a link written with the site's host included; a URL of the site in a fenced block
  * too (the rules file of `ai-assistant.md`, copied into projects), with its line. A name still in `reference-pending.json` counts as an anchor of its page: a link to it
- * lands once its entry is written, and writing it removes the name. Each line of `moved.ts` too, its new place and its
- * old page. Run once every file is written (`llms.txt` too).
+ * lands once its entry is written, and writing it removes the name. Each line of `moved.ts` too: its new place exists, and its
+ * old anchor is gone. Run once every file is written (`llms.txt` too).
  */
 export function checkLinks(config: SiteConfig) {
   // A self-check: a block after a ```md block that shows a ```ts line is a block.
@@ -129,18 +129,17 @@ export function checkLinks(config: SiteConfig) {
       if (problem) problems.add(`${page}:${line}: ${written}, ${problem}`);
     }
   }
-  // each moved anchor, in each language: its new place exists, not moved in turn, and its old page still does, without
-  // it, so that the redirect hides no anchor of its page
+  // each moved anchor, in each language: its new place exists, not moved in turn, and it is no longer an anchor of its old
+  // page, so that the redirect hides none; a page gone since keeps its line, as the 404 page runs the redirect too
   for (const [from, to] of Object.entries(moved)) {
     if (Object.hasOwn(moved, to)) problems.add(`moved.ts: ${from} → ${to}, moved again: give ${from} its last place`);
     for (const prefix of langs.map(prefixOf)) {
       const
         site = `http://site${base}`,
-        problem = problemOf(new URL(prefix + to, site)),
-        before = problemOf(new URL(prefix + from, site));
+        problem = problemOf(new URL(prefix + to, site));
       if (problem) problems.add(`moved.ts: ${prefix}${from} → ${prefix}${to}, ${problem}`);
-      if (before !== 'no such anchor on that page') {
-        problems.add(`moved.ts: ${prefix}${from}, ${before ?? 'still an anchor of its page'}: drop its line`);
+      if (!problemOf(new URL(prefix + from, site))) {
+        problems.add(`moved.ts: ${prefix}${from}, still an anchor of its page: drop its line`);
       }
     }
   }
