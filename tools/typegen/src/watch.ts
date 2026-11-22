@@ -42,6 +42,8 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
     if (!existing) {
       let created = false;
       const host = ts.createWatchCompilerHost(file, {}, ts.sys, undefined, () => undefined, () => undefined);
+      // A watch that throws while it builds its first program is never returned, so its close() cannot end the watchers it opened.
+      const opened: TS.FileWatcher[] = [], { watchFile, watchDirectory } = host;
       // The generated module may not exist yet, and the scan reads imports by their parent pointers.
       Object.assign(host, {
         fileExists: (name: string) => key(name) === rows || ts.sys.fileExists(name),
@@ -75,8 +77,14 @@ export function watch(ts: typeof TS, project: string, path: string, hooks: Hooks
           return timer;
         },
         clearTimeout: (timer: ReturnType<typeof setTimeout>) => { timers.delete(timer); clearTimeout(timer); },
+        watchFile: (...args: Parameters<typeof watchFile>) => record(watchFile.apply(host, args)),
+        watchDirectory: (...args: Parameters<typeof watchDirectory>) => record(watchDirectory.apply(host, args)),
       });
-      existing = ts.createWatchProgram(host);
+      const record = (watcher: TS.FileWatcher) => { if (!created) opened.push(watcher); return watcher; };
+      try { existing = ts.createWatchProgram(host); } catch (error) {
+        for (const watcher of opened) watcher.close();
+        throw error;
+      }
       created = true;
       watches.set(key(file), existing);
     }
