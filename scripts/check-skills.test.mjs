@@ -155,3 +155,8 @@ test('fails on a section cited through ./reference.md or reference.md#anchor', (
   assert.deepEqual(sectionsOf('Read [reference.md](reference.md#lookups) § Lookup.'), missing('Lookup'));
   assert.deepEqual(sectionsOf('See skills/code-style/reference.md § Claims.'), []);
 });
+
+test('fails on a section cited after a bare ./reference.md; leaves ../x/reference.md unchecked', () => {
+  assert.deepEqual(sectionsOf('Read ./reference.md § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('See ../code-style/reference.md § Claims.'), []);
+});
