@@ -54,7 +54,7 @@ Each value between `${…}` compiles by what it is. The SQL is the built library
 | `raw(s)` | `s`, as it is | [`raw()`](#raw) |
 | `cols(o)` / `cols(a)` | the object's keys, sorted, or the array's items, quoted: `"film_id", "tag"`<!-- probe: db.sql`${db.cols({ tag: 'x', film_id: 1 })}` --> | [`cols()`](#cols) |
 | `vals(o)` / `vals(a)` | the values, in the order of `cols(o)`, or the array's: `$1, $2`<!-- probe: db.sql`${db.vals({ tag: 'x', film_id: 1 })}` --> | [`vals()`](#vals) |
-| any other object | a Whereable of its own enumerable keys, plain or not: `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` -->; `{}` → `TRUE`<!-- probe: db.sql`${{}}` -->; a built-in object, such as a `Date`, throws | [Whereable objects](#whereable) |
+| any other object | a Whereable, the way to write a condition, typed by column: `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` -->, from its own enumerable keys, plain or not; `{}` → `TRUE`<!-- probe: db.sql`${{}}` -->; a built-in object, such as a `Date`, throws | [Whereable objects](#whereable) |
 | `self` | the current column, in a Whereable's fragment value | [`self`](#self) |
 | `parent(c?)` | the column of the parent query: `"studios"."id"`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) --> | [`parent()`](#parent) |
 | `Default` | `DEFAULT`<!-- probe: db.sql`${db.Default}` --> | [`Default`](#Default) |
@@ -92,7 +92,7 @@ Interpolate names rather than writing them in the literal: they are type-checked
 db.param<T>(value: T, cast?: boolean | string): Parameter<T>
 ```
 
-A numbered parameter: `$1`, `$2`…, numbered across the whole query, and `value` at that place in the values. The value never enters the SQL text.
+A numbered parameter: `$1`, `$2`…, numbered across the whole query, and `value` at that place in the values. The value never enters the SQL text. It takes any value: for a condition on a column, a [Whereable](#whereable) is the typed form, `{ release_year: db.conditions.lt(2000) }`<!-- tsc: db.sql`${…}` -->.
 
 <CastPanel example="sql_param">
 
@@ -300,6 +300,8 @@ What `vals()` returns. A type-only member keeps it from passing as a `Parameter`
 ## Whereable objects {#whereable}
 
 An object is a Whereable of the table: each own enumerable key a column, each value what it must match. The keys are sorted, each pair compiled as below, joined by `AND`, the whole in parentheses; there is no `WHERE`, which you write. An empty object is `TRUE`.
+
+It is how to write a condition in `sql`: each value must be of its column's type, and in an object literal each key a column of the type argument, where a `param()` takes any value ([Raw SQL](/raw-sql#pass-each-value-as-a-parameter)).
 
 <CastPanel example="sql_whereable">
 
@@ -595,7 +597,7 @@ A copy compiles as a nested fragment. Without `withTies`, a copy of `selectExact
 withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q
 ```
 
-From 6.11.0. Puts CTEs before a query and keeps its result: with `recent` a `sql` fragment that selects films after 1990, `db.withCTEs({ recent }, db.count('films', …))` gives `WITH "recent" AS (SELECT "id" FROM "films" WHERE "release_year" > $1) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${'release_year'} > ${db.param(1990)}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> and resolves to a number.
+From 6.11.0. Puts CTEs before a query and keeps its result: with `recent` a `sql` fragment that selects films after 1990, `db.withCTEs({ recent }, db.count('films', …))` gives `WITH "recent" AS (SELECT "id" FROM "films" WHERE (("release_year" > $1))) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${{ release_year: db.conditions.gt(1990) }}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> and resolves to a number.
 
 - **Order**: the object's, so a CTE reads those before it; an integer key comes first, as `Object.keys` gives it.
 - **Names**: each key is one name, never split on `.`, quoted as an [identifier](#identifiers) is: `'a.b'` gives `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, a `"` is doubled, and a key escaped by hand is kept, so `'a""b'` and `'a"b'` both name the CTE `a"b`: in one call, Postgres refuses the pair (42712).
