@@ -72,6 +72,11 @@ const groups: Group[] = [
       { text: { en: 'Ranked search', fr: 'Recherche classée' }, link: '/rank-results' },
       { text: { en: 'Prefix search', fr: 'Recherche par préfixe' }, link: '/prefix-search' },
       { text: { en: 'Keyless joins', fr: 'Jointures sans clé' }, link: '/join-without-key' },
+      { text: { en: 'User sorting', fr: 'Tri utilisateur' }, link: '/user-sort' },
+      { text: { en: 'Latest rows', fr: 'Dernières lignes' }, link: '/latest-row' },
+      { text: { en: 'Upserts', fr: 'Upserts' }, link: '/insert-or-update' },
+      { text: { en: 'Nested counts', fr: 'Comptes imbriqués' }, link: '/count-across-joins' },
+      { text: { en: 'Date filters', fr: 'Filtres de date' }, link: '/date-filters' },
     ],
   },
   {
