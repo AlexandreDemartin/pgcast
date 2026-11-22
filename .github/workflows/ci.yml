@@ -264,6 +264,18 @@ jobs:
       - name: Every example runs against Postgres
         run: npm run docs:examples
       - run: npm run docs:build
+      - name: Lighthouse scores 95 or more on four pages of the built site
+        # The home, /select, /first-query and /why, served as built (docs:preview); performance, accessibility, best
+        # practices and SEO, desktop preset. lighthouse comes through npx at an exact version, never a dependency
+        # (check-lighthouse.mjs). The runner's Chrome needs --no-sandbox.
+        env:
+          CHROME_FLAGS: --no-sandbox
+        run: |
+          npm run docs:preview -- --port 4173 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          curl --silent --fail --retry 30 --retry-delay 1 --retry-connrefused --output /dev/null http://localhost:4173/
+          node check-lighthouse.mjs http://localhost:4173
 
   adapter-postgres-js:
     # The postgres.js adapter, a package of its own (adapters/postgres-js/): its tests read and write each type through pg
