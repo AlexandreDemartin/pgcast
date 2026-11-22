@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
 import { earlyCloser, fenceClosed, fenceOpened } from './fences.ts';
 import { host } from './llms.ts';
-import { langOf, words } from './words.ts';
+import { moved } from './moved.ts';
+import { langOf, langs, prefixOf, words } from './words.ts';
 
 /**
  * Keep each link's hash as written. VitePress slugifies it (`#Config.upsertRequiresSameKeys` becomes
@@ -69,7 +70,8 @@ const
  * Fail the build on a link outside the site's base, to a page or a file that the build did not write, or to an anchor
  * that its page does not define, a link written with the site's host included; a URL of the site in a fenced block
  * too (the rules file of `ai-assistant.md`, copied into projects), with its line. A name still in `reference-pending.json` counts as an anchor of its page: a link to it
- * lands once its entry is written, and writing it removes the name. Run once every file is written (`llms.txt` too).
+ * lands once its entry is written, and writing it removes the name. Each line of `moved.ts` too, its new place and its
+ * old page. Run once every file is written (`llms.txt` too).
  */
 export function checkLinks(config: SiteConfig) {
   // A self-check: a block after a ```md block that shows a ```ts line is a block.
@@ -125,6 +127,21 @@ export function checkLinks(config: SiteConfig) {
     for (const [line, written] of fencedSiteUrls(readFileSync(markdown, 'utf8'))) {
       const problem = problemOf(atHome(new URL(written)));
       if (problem) problems.add(`${page}:${line}: ${written}, ${problem}`);
+    }
+  }
+  // each moved anchor, in each language: its new place exists, not moved in turn, and its old page still does, without
+  // it, so that the redirect hides no anchor of its page
+  for (const [from, to] of Object.entries(moved)) {
+    if (Object.hasOwn(moved, to)) problems.add(`moved.ts: ${from} → ${to}, moved again: give ${from} its last place`);
+    for (const prefix of langs.map(prefixOf)) {
+      const
+        site = `http://site${base}`,
+        problem = problemOf(new URL(prefix + to, site)),
+        before = problemOf(new URL(prefix + from, site));
+      if (problem) problems.add(`moved.ts: ${prefix}${from} → ${prefix}${to}, ${problem}`);
+      if (before !== 'no such anchor on that page') {
+        problems.add(`moved.ts: ${prefix}${from}, ${before ?? 'still an anchor of its page'}: drop its line`);
+      }
     }
   }
   if (problems.size > 0) {

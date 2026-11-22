@@ -10,6 +10,7 @@ import { codeGroupLogos } from './codeGroups.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
 import { checkStructuredData, describePage, pageHead, repo, sitemapAlternates } from './meta.ts';
+import { movedAnchors } from './moved.ts';
 import { outlineIn } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
@@ -134,6 +135,7 @@ export default defineConfig({
     // (400ms on a throttled 1.6 Mb/s, 150ms link, against 1.2s unpreloaded and 1.5s preloaded behind the three faces)
     font('saira-wordmark'), font('schibsted-grotesk-latin'), font('inter-latin'), font('jetbrains-mono-latin'),
     ['script', {}, languageHome],  // first: on its way to /fr/, the page sets nothing
+    ['script', {}, movedAnchors],  // a bookmark of a moved anchor, on its way to the new page (moved.ts)
     ['script', {}, wordmarkEntrance],
     // public/: favicon.svg follows the system's theme; favicon.ico, apple-touch-icon.png and the manifest's icons are
     // rendered by render-images.mjs
