@@ -6,7 +6,7 @@ All notable changes to `@pgcast/typegen` are documented here. Format: [Keep a Ch
 
 ### Added
 
-- `pgcast-typegen --watch` regenerates the row types each time a source file changes, describing only the queries whose text changed. [#829](https://github.com/AlexandreDemartin/pgcast/issues/829)
+- `pgcast-typegen --watch` regenerates the row types each time a source file changes, describing only the queries whose text changed. Like a plain run, it exits 1 when the `--project` tsconfig cannot be read or parsed at start. [#829](https://github.com/AlexandreDemartin/pgcast/issues/829)
 
 ### Changed
 

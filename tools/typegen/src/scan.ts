@@ -45,13 +45,16 @@ function sameTexts(a?: CandidateTexts, b?: CandidateTexts) {
   return a?.text === b?.text && isDeepStrictEqual(a?.variants?.texts, b?.variants?.texts);
 }
 
+/** Key a path as the compiler compares it: case-folded on a case-insensitive file system. */
+export const fileKey = (ts: typeof TS) => (path: string) => ts.sys.useCaseSensitiveFileNames ? resolve(path) : resolve(path).toLowerCase();
+
 /**
  * Find named Row templates using the application's compiler and its project's source files.
  * With programOf, a project's program comes from the caller (a watch keeps them between scans) instead of a new one.
  */
 export function scan(ts: typeof TS, project: string, rowsFile: string, programOf?: (file: string) => TS.Program) {
   const projects = new Set<string>(), diagnostics: Diagnostic[] = [], templates = new Map<string, Template>();
-  const key = (path: string) => ts.sys.useCaseSensitiveFileNames ? resolve(path) : resolve(path).toLowerCase();
+  const key = fileKey(ts);
   const rows = key(rowsFile), root = resolve(project), host = {
     ...ts.sys,
     fileExists: (path: string) => key(path) === rows || ts.sys.fileExists(path),
