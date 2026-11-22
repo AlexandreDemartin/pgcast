@@ -175,7 +175,7 @@ A "Coming" page has no `.md` file, so it is in neither; nor are the templates an
 - A canonical URL on `https://pgcast.dev/`, Open Graph (`og:locale` and `og:locale:alternate`) and a Twitter card, with its language's social image, `public/social-card.png` or `social-card-fr.png`; on each home, a JSON-LD `SoftwareSourceCode` with its `inLanguage`.
 - Its page in each language, `hreflang` `en`, `fr` and `x-default` (the English page), the same codes as `sitemap.xml`'s.
 
-`sitemap.xml` gives each page's `lastmod`, and the page its "Last updated", from git: CI checks out the whole history. The favicons, the Apple touch icon and the social cards are drawn in SVG in `public/` (`social-card-fr.svg` is `social-card.svg` with its French text); after changing one, `npm run docs:images` renders the PNG and ICO with headless Chrome (`CHROME=<path>` off macOS), to commit with it.
+`sitemap.xml` gives each page's `lastmod`, and the page its "Last updated", from git: CI checks out the whole history. The favicons, the Apple touch icon, the manifest's icons (`site.webmanifest`; `icon-maskable.svg` is the maskable one, its artwork inside the central circle of radius 40 %) and the social cards are drawn in SVG in `public/` (`social-card-fr.svg` is `social-card.svg` with its French text); after changing one, `npm run docs:images` renders the PNG and ICO with headless Chrome (`CHROME=<path>` off macOS), to commit with it.
 
 ### Screenshots for a PR
 

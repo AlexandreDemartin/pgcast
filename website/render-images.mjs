@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The site's raster images, rendered from their SVG sources in public/ by headless Chrome (`CHROME`, or its macOS
 // path), which loads the social cards' fonts: social-card.png and social-card-fr.png, its French text, 1200×630;
-// apple-touch-icon.png, 180×180; favicon.ico, favicon.svg in its light theme at 16, 32 and 48px. Not part of the build:
+// apple-touch-icon.png, 180×180; favicon.ico, favicon.svg in its light theme at 16, 32 and 48px; icon-192.png and
+// icon-512.png, favicon.svg at those sizes, and icon-maskable-512.png, icon-maskable.svg, for site.webmanifest. Not part of the build:
 // run `npm run docs:images` after changing a source, and commit what it writes.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -57,6 +58,8 @@ function ico(images) {
 try {
   for (const card of ['social-card', 'social-card-fr']) writeFileSync(join(pub, `${card}.png`), render(`${card}.svg`, 1200, 630));
   writeFileSync(join(pub, 'apple-touch-icon.png'), render('apple-touch-icon.svg', 180, 180));
+  for (const size of [192, 512]) writeFileSync(join(pub, `icon-${size}.png`), render('favicon.svg', size, size));
+  writeFileSync(join(pub, 'icon-maskable-512.png'), render('icon-maskable.svg', 512, 512));
   writeFileSync(join(pub, 'favicon.ico'), ico([16, 32, 48].map(size => ({ size, data: render('favicon.svg', size, size) }))));
 } finally {
   rmSync(tmp, { recursive: true, force: true });

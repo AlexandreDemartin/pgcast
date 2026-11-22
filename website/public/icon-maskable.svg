@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- apple-touch-icon.svg's artwork, opaque and full-bleed, as Android masks it, scaled to 0.8 so that it sits inside the
+       central circle of radius 40% of the icon (its farthest point is at 37.8%). Rendered to icon-maskable-512.png by
+       render-images.mjs. -->
+  <title>pgcast</title>
+  <rect width="256" height="256" fill="#0a6b63"/>
+  <path fill="#ffffff" transform="translate(128 128) scale(0.8) translate(-128 -128)" d="M48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
+</svg>

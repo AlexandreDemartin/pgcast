@@ -134,11 +134,12 @@ export default defineConfig({
     font('saira-wordmark'), font('schibsted-grotesk-latin'), font('inter-latin'), font('jetbrains-mono-latin'),
     ['script', {}, languageHome],  // first: on its way to /fr/, the page sets nothing
     ['script', {}, wordmarkEntrance],
-    // public/: favicon.svg follows the system's theme; favicon.ico and apple-touch-icon.png are rendered by
-    // render-images.mjs
+    // public/: favicon.svg follows the system's theme; favicon.ico, apple-touch-icon.png and the manifest's icons are
+    // rendered by render-images.mjs
     ['link', { rel: 'icon', href: '/favicon.ico', sizes: '32x32' }],
     ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
     ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
+    ['link', { rel: 'manifest', href: '/site.webmanifest' }],
     ['link', { rel: 'alternate', type: 'application/atom+xml', href: '/changelog.xml', title: 'pgcast changelog' }],
     // the top bar's `--surface`; `media` first, as VitePress keeps one `<meta>` per first attribute other than `content`
     ['meta', { media: '(prefers-color-scheme: light)', name: 'theme-color', content: '#ffffff' }],
