@@ -9,7 +9,7 @@ npm install pgcast@npm:@pgcast/pgcast pg
 npm install --save-dev @pgcast/typegen
 ```
 
-The tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the `--project` tsconfig resolves. TypeScript 7 has none, and the tool then stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`. On TypeScript 7, install the tool in a folder of its own with `typescript@6` and the same `@pgcast/pgcast` version as your application's:
+The tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the `--project` tsconfig resolves. TypeScript 7 has none: npm refuses the install with `ERESOLVE`, and from 0.2.0 a tool installed anyway stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`. On TypeScript 7, install the tool in a folder of its own with `typescript@6` and the same `@pgcast/pgcast` version as your application's:
 
 ```sh
 npm install --save-dev --prefix typegen @pgcast/typegen @pgcast/pgcast@<your version> pg typescript@6
@@ -103,7 +103,7 @@ From 0.2.0.
 npx pgcast-typegen --watch [--project <tsconfig>]
 ```
 
-The command generates once, then regenerates `queries.ts` each time a source file of the project changes, until `SIGINT` or `SIGTERM` closes it with exit 0. It follows the project and its references through the project's own TypeScript and keeps one connection to `db`. It describes only the queries whose text changed since the last round, and writes the file only when its bytes change. It prints a line when it writes, and the errors of a failing round, then keeps watching. A lost connection exits 1.
+The command generates once, then regenerates `queries.ts` each time a source file of the project changes, until `SIGINT` or `SIGTERM` closes it with exit 0. It follows the project and its references through the project's own TypeScript and keeps one connection to `db`. It describes only the queries whose text changed since the last round, and writes the file only when its bytes change. It prints a line when it writes or recovers, and the errors of a failing round, then keeps watching. A tsconfig it cannot read at start, like a lost connection, exits 1.
 
 The schema is not watched. After a migration, one run without `--watch` is enough: a running `--watch` sees the file change and describes every query again, so it keeps the new rows. The config file is read once: restart `--watch` after editing it. `--watch` cannot be combined with `--check`.
 
