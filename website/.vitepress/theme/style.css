@@ -788,7 +788,9 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 @media (hover: hover) and (pointer: fine) {
   .twoslash .twoslash-hover:hover { background: var(--accent-soft); border-radius: 2px; }
 }
-.twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as on hover */
+.twoslash .twoslash-hover > span:focus-visible { outline: none; }
+/* the background alone (--accent-soft on --code-bg, about 1.1:1) is no focus indicator (WCAG 1.4.11, 3:1): a ring on the term */
+.twoslash .twoslash-hover:has(> span:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
 .v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 /* in dark, a shadow strong enough to lift a popover off the page */
 .dark :is(.PageActions .menu, .v-popper--theme-twoslash .v-popper__inner) { box-shadow: 0 8px 28px rgb(0 0 0 / .5); }
