@@ -9,7 +9,7 @@ import { calloutIcons } from './callouts.ts';
 import { codeGroupLogos } from './codeGroups.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
-import { describePage, pageHead, repo, sitemapAlternates } from './meta.ts';
+import { checkStructuredData, describePage, pageHead, repo, sitemapAlternates } from './meta.ts';
 import { outlineIn } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
@@ -124,6 +124,7 @@ export default defineConfig({
   buildEnd: async config => {
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
     await writeChangelogFeed(config);  // changelog.xml
+    checkStructuredData(config.outDir, host + config.site.base);  // meta.ts
     checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
     await checkPlaygroundLinks(config);  // so does a cast panel that does not open its example in the playground
   },
