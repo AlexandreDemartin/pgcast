@@ -55,6 +55,8 @@ npx --no-install pgcast-typegen
 
 The tool scans the project and asks Postgres to describe the named queries without running them. Commit `<outDir>/zapatos/queries.ts` beside your schema. With `moduleNames: "pgcast"`, import from the generated `pgcast/queries.ts` and use `pgcast/db`.
 
+`npx --no-install pgcast-typegen --help` prints the usage, `pgcast-typegen [--check | --watch] [--project <tsconfig>]`.
+
 ## 4. Check in CI {#check-in-ci}
 
 ```sh
@@ -66,7 +68,7 @@ npx --no-install pgcast-typegen --check
 | Omit `db` | Offline, even with pg environment variables set. Compares query names and SQL with placeholders against the committed file and checks its format. Row types stay unchecked. |
 | Set `db` to the migrated database | Describes each query again and compares the generated file byte for byte, including its row types. |
 
-Either check leaves the file untouched. A difference or an error exits with code 1. After a query or schema change, regenerate and commit the diff.
+Either check leaves the file untouched. A difference or an error exits with code 1. `--check` cannot be combined with `--watch`: together they print the usage and exit with code 1. After a query or schema change, regenerate and commit the diff.
 
 ## 5. Narrow a column {#narrow-a-column}
 
