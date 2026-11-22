@@ -18,3 +18,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [012](./012-raw-sql-types.md) | Raw SQL types: how a hand-written `sql` query gets its types from Postgres | accepted (2026-11-18), by delegation: a separate tool, `@pgcast/typegen`; Parse / Describe over `pg`, nullable unless proven, a committed file under `--check` |
 | [013](./013-package-model.md) | The package model: one core, extensions under `@pgcast` | accepted (2026-11-18), by delegation |
 | [014](./014-constraint-violations.md) | Tell which constraint Postgres refused a write for | accepted (2026-11-19), under the owner's delegation |
+| [015](./015-recipes.md) | Recipes: the list, the format, the place and the schema | accepted (2026-11-22), by delegation: 19 recipes in four batches, a group of their own, the film schema unchanged |
