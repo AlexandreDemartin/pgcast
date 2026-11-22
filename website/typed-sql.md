@@ -5,13 +5,13 @@ From `@pgcast/typegen` 0.1.0. Ask Postgres for the row type of a [raw SQL query]
 
 ## 1. Install {#install}
 
-[Install the core](/install#add-the-package), then add the tool. Its peers are `@pgcast/pgcast`, `pg` and `typescript`. Your application's core, its imported alias (`zapatos` or `pgcast`) and the `@pgcast/pgcast` peer resolved by the tool must have the same version.
+[Install the core](/install#add-the-package), then add the tool. Its peers are `@pgcast/pgcast`, `pg` and `typescript`. From 0.2.0, the `pg` peer is `>=8.6.0 <9`. Your application's core, its imported alias (`zapatos` or `pgcast`) and the `@pgcast/pgcast` peer resolved by the tool must have the same version.
 
 ```sh
 npm install --save-dev @pgcast/typegen
 ```
 
-For generation and checking, the tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the tsconfig passed to `--project` (default `tsconfig.json`) resolves. TypeScript 7 has no such API, and the tool then stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`. Your application can compile the committed types separately. See the [supported parser](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking).
+For generation and checking, the tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the tsconfig passed to `--project` (default `tsconfig.json`) resolves. TypeScript 7 has no such API: npm refuses the install with `ERESOLVE`, and from 0.2.0 a tool installed anyway stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`. Your application can compile the committed types separately. See the [supported parser](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking).
 
 On TypeScript 7, install the tool in a folder of its own, with `typescript@6` and the same `@pgcast/pgcast` version as your application's:
 

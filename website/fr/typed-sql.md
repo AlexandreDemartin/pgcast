@@ -1,5 +1,5 @@
 ---
-english: a90a1b848f1e
+english: 420b8f83caf4
 ---
 
 # SQL typé
@@ -9,13 +9,13 @@ english: a90a1b848f1e
 
 ## 1. Installer l’outil {#install}
 
-[Installez le paquet principal](/fr/install#add-the-package), puis ajoutez l’outil. Ses peer dependencies sont `@pgcast/pgcast`, `pg` et `typescript`. Le paquet principal de l’application, le paquet qu’elle importe sous l’alias `zapatos` ou `pgcast` et la peer dependency `@pgcast/pgcast` résolue par l’outil doivent être à la même version.
+[Installez le paquet principal](/fr/install#add-the-package), puis ajoutez l’outil. Ses peer dependencies sont `@pgcast/pgcast`, `pg` et `typescript`. À partir de la 0.2.0, la peer dependency `pg` est `>=8.6.0 <9`. Le paquet principal de l’application, le paquet qu’elle importe sous l’alias `zapatos` ou `pgcast` et la peer dependency `@pgcast/pgcast` résolue par l’outil doivent être à la même version.
 
 ```sh
 npm install --save-dev @pgcast/typegen
 ```
 
-Pour générer ou vérifier les types, l’outil lit vos sources avec l’API JavaScript de TypeScript 4.1 à 6, celle du `typescript` que résout le tsconfig passé à `--project` (`tsconfig.json` par défaut). TypeScript 7 n’en a pas, et l’outil s’arrête alors avec `typescript 7.0.2 from <tsconfig> has no JavaScript API`. Votre application peut compiler séparément les types commités. Voir la [version prise en charge du parseur](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking).
+Pour générer ou vérifier les types, l’outil lit vos sources avec l’API JavaScript de TypeScript 4.1 à 6, celle du `typescript` que résout le tsconfig passé à `--project` (`tsconfig.json` par défaut). TypeScript 7 n’en a pas : npm refuse l’installation avec `ERESOLVE`, et à partir de la 0.2.0, un outil installé malgré tout s’arrête avec `typescript 7.0.2 from <tsconfig> has no JavaScript API`. Votre application peut compiler séparément les types commités. Voir la [version prise en charge du parseur](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/012-raw-sql-types.md#3-naming-finding-writing-checking).
 
 Avec TypeScript 7, installez l’outil dans un dossier à part, avec `typescript@6` et la même version de `@pgcast/pgcast` que votre application :
 

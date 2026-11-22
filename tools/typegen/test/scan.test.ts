@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import type ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { bindings } from '../src/bindings';
-import { scan } from '../src/scan';
+import { fileKey, scan } from '../src/scan';
 
 const compiler: typeof ts = require(process.env.PGCAST_TEST_TYPESCRIPT || 'typescript');
 const row = "import type { Row } from './generated/queries';";
@@ -183,6 +183,13 @@ it('reports malformed project references and deeply nested source', () => {
 
 it('throws for an unreadable project', () => {
   expect(() => scan(compiler, join(dir, 'missing.json'), join(dir, 'rows.ts'))).toThrow(/missing\.json/);
+});
+
+// A stub file system, so that both cases run on every runner.
+it.each([false, true])('keys a resolved path, case-folded only when file names are case-insensitive (case-sensitive: %s)', sensitive => {
+  const key = fileKey({ sys: { useCaseSensitiveFileNames: sensitive } } as unknown as typeof ts);
+  expect(key('app/../ZAPATOS/queries.ts')).toBe(key('ZAPATOS/queries.ts'));
+  expect(key('ZAPATOS/queries.ts') === key('zapatos/queries.ts')).toBe(!sensitive);
 });
 
 it('opts in only through RunResult, including wrapped rows', () => {

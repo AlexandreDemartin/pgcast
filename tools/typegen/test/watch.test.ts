@@ -38,7 +38,7 @@ beforeEach(() => {
   const core = dirname(require.resolve('@pgcast/pgcast/db'));
   mkdirSync(join(dir, 'app/node_modules/@pgcast'), { recursive: true });
   for (const name of ['zapatos', '@pgcast/pgcast']) symlinkSync(core, join(dir, 'app/node_modules', name), 'dir');
-  symlinkSync(dirname(require.resolve('typescript/package.json')), join(dir, 'app/node_modules/typescript'), 'dir');
+  symlinkSync(process.env.PGCAST_TEST_TYPESCRIPT || dirname(require.resolve('typescript/package.json')), join(dir, 'app/node_modules/typescript'), 'dir');
   put('zapatosconfig.json', { db: { connectionString: '{{WATCH_DB}}' }, outDir: 'generated' });
 });
 afterEach(() => {
@@ -60,6 +60,7 @@ it('describes again only the queries whose text changed', { timeout: 20_000 }, a
     write: async () => ++writes > 0,
     log: line => lines.push(line),
     error: line => lines.push('error ' + line),
+    end: () => lines.push('end'),
   });
   try {
     await until(() => writes === 1, 'the first round');
@@ -82,6 +83,7 @@ it('follows an edit in a referenced project', { timeout: 20_000 }, async () => {
   const watcher = watch(compiler, join(dir, 'tsconfig.json'), out(), {
     describe: async query => { described.push(query.text); return { text: query.text, fields: [field] }; },
     write: async () => true, log: () => undefined, error: line => described.push('error ' + line),
+    end: () => described.push('end'),
   });
   try {
     await until(() => described.length === 1, 'the first round');
@@ -103,6 +105,10 @@ function start(project = 'app/project.json') {
   return { child, seen };
 }
 const rows = () => { try { return readFileSync(out(), 'utf8'); } catch { return ''; } };
+
+it('gives the spawned CLI the compiler the suite loads', () => {
+  expect(require(join(dir, 'app/node_modules/typescript')).version).toBe(compiler.version);
+});
 
 it('rewrites the file on an edit and writes nothing when its bytes stay the same', { timeout: 20_000 }, async () => {
   const { child, seen } = start();
@@ -184,6 +190,24 @@ it.each(['tsconfig.json', 'app/project.json'])('reports a removed %s, keeps watc
   put('app/app.ts', source('SELECT id, email FROM public.users'));
   await until(() => rows().includes('"email"'), 'the rewrite');
   expect(seen.code).toBeUndefined();
+});
+
+it.each([['missing', undefined], ['malformed', '{ "include": [ }']])('exits 1 on a %s tsconfig at start, as a plain run does', { timeout: 20_000 }, async (_, contents) => {
+  if (contents) put('app/watch.json', contents);
+  const plain = spawnSync(process.execPath, [cli, '--project', 'app/watch.json'], { cwd: dir, env: env(), encoding: 'utf8' });
+  expect(plain.status).toBe(1);
+  expect(plain.stderr).toContain(join(dir, 'app/watch.json') + ':1:');
+  const { seen } = start('app/watch.json');
+  await until(() => seen.code !== undefined, 'the exit');
+  expect(seen).toMatchObject({ code: 1, stdout: '', stderr: plain.stderr });
+});
+
+it('exits 1 on a source the parser overflows on at start', { timeout: 20_000 }, async () => {
+  put('app/app.ts', 'export const x = ' + '('.repeat(200_000) + '1' + ')'.repeat(200_000) + ';\n');
+  const { seen } = start();
+  await until(() => seen.code !== undefined, 'the exit');
+  expect(seen).toMatchObject({ code: 1, stdout: '' });
+  expect(seen.stderr).toContain('Maximum call stack size exceeded');
 });
 
 it('closes on SIGINT and SIGTERM with exit 0', { timeout: 20_000 }, async () => {
