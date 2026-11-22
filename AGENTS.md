@@ -43,7 +43,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
   - `cli.ts` runs it, `cliConfig.ts` reads its arguments and config files, `config.ts` holds the config, `schemaRules.ts` checks its `schemas` rules.
   - `write.ts` writes the files and their `check()`, `outputFiles.ts` builds them in memory, `header.ts` is their header.
   - `tsOutput.ts` assembles the `zapatos/schema` module, `moduleNames.ts` picks `zapatos/*` or `pgcast/*`.
-  - `tables.ts` introspects relations and produces their types, `quote.ts` writes a name or a text into the output.
+  - `relations.ts` reads relations and their columns from the catalog, `tables.ts` produces their types, `quote.ts` writes a name or a text into the output.
   - `enums.ts` and `pgTypes.ts` map Postgres types to TS, `enumOrder.ts`, `domainRoots.ts` and `domainUnions.ts` read enums and domains; `legacy.ts` prints the "srcMode" migration warning.
 - `src/db/`: the runtime (import `zapatos/db`).
   - `core.ts`: ⚠️ **sensitive zone**: `sql`, `SQLFragment`, compilation and escaping.

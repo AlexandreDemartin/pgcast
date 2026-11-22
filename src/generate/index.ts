@@ -7,6 +7,7 @@ Released under the MIT licence: see LICENCE file
 export * from './config';
 export * from './enums';
 export * from './pgTypes';
+export { Relation, relationsInSchema } from './relations';
 export * from './tables';
 export * from './tsOutput';
 export * from './write';
