@@ -4,6 +4,8 @@ All notable changes to `@pgcast/adapter-pglite` are documented here. Format: [Ke
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-22
+
 ### Changed
 - Point out where native PGlite calls share an adapter transaction in the README.
 - The README's [In a page](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#in-a-page) gives the setup to load `zapatos/db` with the adapter in a browser (a `pg` alias and a full `Buffer`), and `npm run check:browser` checks its `zapatos/db` part, bundled with `pg` aliased, on a PGlite made in Node.
