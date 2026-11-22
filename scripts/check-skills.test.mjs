@@ -149,3 +149,9 @@ test('fails on a reference.md that its SKILL.md does not cite', () => {
   assert.deepEqual(errorsOf({'alpha/reference.md': '# Alpha\n'}),
     ['alpha/reference.md: not cited by its SKILL.md']);
 });
+
+test('fails on a section cited through ./reference.md or reference.md#anchor', () => {
+  assert.deepEqual(sectionsOf('Read [reference.md](./reference.md) § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('Read [reference.md](reference.md#lookups) § Lookup.'), missing('Lookup'));
+  assert.deepEqual(sectionsOf('See skills/code-style/reference.md § Claims.'), []);
+});
