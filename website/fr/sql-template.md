@@ -1,5 +1,5 @@
 ---
-english: 2cbfea249589
+english: 76a20f69b5d0
 ---
 
 # Template SQL
@@ -58,7 +58,7 @@ Chaque valeur entre `${…}` se compile selon ce qu’elle est. Le SQL est celui
 | `raw(s)` | `s`, tel quel | [`raw()`](#raw) |
 | `cols(o)` / `cols(a)` | les clés de l’objet, triées, ou les éléments du tableau, entre guillemets : `"film_id", "tag"`<!-- probe: db.sql`${db.cols({ tag: 'x', film_id: 1 })}` --> | [`cols()`](#cols) |
 | `vals(o)` / `vals(a)` | les valeurs, dans l’ordre de `cols(o)`, ou dans celui du tableau : `$1, $2`<!-- probe: db.sql`${db.vals({ tag: 'x', film_id: 1 })}` --> | [`vals()`](#vals) |
-| tout autre objet | un Whereable de ses propres clés énumérables, objet simple ou non : `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` --> ; `{}` → `TRUE`<!-- probe: db.sql`${{}}` --> ; un objet natif, comme un `Date`, lève une erreur | [Objets Whereable](#whereable) |
+| tout autre objet | un Whereable, la façon d’écrire une condition, typé par colonne : `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` -->, d’après ses propres clés énumérables, objet simple ou non ; `{}` → `TRUE`<!-- probe: db.sql`${{}}` --> ; un objet natif, comme un `Date`, lève une erreur | [Objets Whereable](#whereable) |
 | `self` | la colonne courante, dans un fragment donné en valeur d’un Whereable | [`self`](#self) |
 | `parent(c?)` | la colonne de la requête parente : `"studios"."id"`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) --> | [`parent()`](#parent) |
 | `Default` | `DEFAULT`<!-- probe: db.sql`${db.Default}` --> | [`Default`](#Default) |
@@ -96,7 +96,7 @@ Interpolez les noms plutôt que de les écrire dans le littéral : ils passent 
 db.param<T>(value: T, cast?: boolean | string): Parameter<T>
 ```
 
-Un paramètre numéroté : `$1`, `$2`…, numérotés sur toute la requête, et `value` à cette place dans les valeurs. La valeur n’entre jamais dans le texte SQL.
+Un paramètre numéroté : `$1`, `$2`…, numérotés sur toute la requête, et `value` à cette place dans les valeurs. La valeur n’entre jamais dans le texte SQL. Il accepte n’importe quelle valeur : pour une condition sur une colonne, un [Whereable](#whereable) est la forme typée, `{ release_year: db.conditions.lt(2000) }`<!-- tsc: db.sql`${…}` -->.
 
 <CastPanel example="sql_param">
 
@@ -304,6 +304,8 @@ Ce que renvoie `vals()`. Un membre qui n’existe que dans le type l’empêche 
 ## Objets Whereable {#whereable}
 
 Un objet est un Whereable de la table : chacune de ses propres clés énumérables est une colonne, chaque valeur ce à quoi elle doit correspondre. Les clés sont triées, chaque paire compilée comme ci-dessous, les paires jointes par `AND`, le tout entre parenthèses ; le `WHERE` n’en fait pas partie, à vous de l’écrire. Un objet vide est `TRUE`.
+
+C’est ainsi qu’on écrit une condition dans `sql` : chaque valeur doit être du type de sa colonne, et dans un objet littéral chaque clé une colonne de l’argument de type, là où un `param()` accepte n’importe quelle valeur ([SQL brut](/fr/raw-sql#pass-each-value-as-a-parameter)).
 
 <CastPanel example="sql_whereable">
 
@@ -599,7 +601,7 @@ Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de 
 withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q
 ```
 
-À partir de la 6.11.0. Place des CTE avant une requête et garde son résultat : avec `recent` un fragment `sql` qui sélectionne les films d’après 1990, `db.withCTEs({ recent }, db.count('films', …))` donne `WITH "recent" AS (SELECT "id" FROM "films" WHERE "release_year" > $1) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${'release_year'} > ${db.param(1990)}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> et se résout en un nombre.
+À partir de la 6.11.0. Place des CTE avant une requête et garde son résultat : avec `recent` un fragment `sql` qui sélectionne les films d’après 1990, `db.withCTEs({ recent }, db.count('films', …))` donne `WITH "recent" AS (SELECT "id" FROM "films" WHERE (("release_year" > $1))) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${{ release_year: db.conditions.gt(1990) }}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> et se résout en un nombre.
 
 - **Ordre** : celui de l’objet, si bien qu’une CTE lit celles qui la précèdent ; une clé entière vient en premier, comme `Object.keys` la donne.
 - **Noms** : chaque clé est un seul nom, jamais coupé sur `.`, écrit entre guillemets comme un [identifiant](#identifiers) : `'a.b'` donne `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, un `"` est doublé, et une clé déjà échappée à la main est gardée telle quelle, si bien que `'a""b'` et `'a"b'` nomment toutes deux la CTE `a"b` : dans un même appel, Postgres refuse la paire (42712).

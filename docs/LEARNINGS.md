@@ -68,6 +68,9 @@ Candidates for a check, a rule or a skill line.
 - #901 — the French site says « lock » for an advisory lock and « verrou » only for a row lock: a brief for a lock page says so — builder
 - #901 — `cmd; echo exit $?` in the background showed 0 for a failed `docs:build`: append the exit code to the log and read it there — builder
 - #901 — `docs:translated` runs again after any later edit of the English page, or the build fails on the French page's stale `english:` mark — builder
+- #911 — the brief said `@pgcast/typegen` "checks" a query's row type with a Whereable, but it refuses a Whereable (`neutralise.ts`): a brief reads a tool's accepted inputs before stating its limits — builder
+- #911 — Python's `re.escape` escapes spaces, so a pattern over the French pages splits on spaces and joins with `[  ]` (U+00A0) — builder
+- #911 — in the playground, each example link takes its own navigate before `evaluate_script`, the list of links kept in localStorage — builder
 
 ## Minors kept
 

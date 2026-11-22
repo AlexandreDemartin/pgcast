@@ -1,16 +1,16 @@
 ---
-english: 8031fc770e6e
+english: 8ee4b16e8d34
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
 # SQL brut
 
-Quand aucun raccourci n’écrit la requête dont vous avez besoin (une jointure, une fonction de fenêtrage, un `INSERT … SELECT`), écrivez-la dans le template `sql`, et gardez hors de son texte toute valeur venue de l’extérieur. Vous connaissez déjà les raccourcis grâce au [tutoriel](/fr/tutorial) ; chaque interpolation est dans [Template SQL](/fr/sql-template).
+Quand aucun raccourci n’écrit la requête dont vous avez besoin (une jointure, une fonction de fenêtrage, un `INSERT … SELECT`), écrivez-la dans le template `sql`, et gardez hors de son texte toute valeur venue de l’extérieur. Une condition sur une colonne entre comme Whereable, dont la valeur est vérifiée d’après le type de la colonne, là où `db.param()` accepte n’importe quelle valeur. Vous connaissez déjà les raccourcis grâce au [tutoriel](/fr/tutorial) ; chaque interpolation est dans [Template SQL](/fr/sql-template).
 {.lede}
 
 <AtAGlance>
 
-- Les noms vont entre `${…}`, vérifiés d’après les tables que vous donnez à `sql` ; une valeur venue de l’extérieur entre comme `db.param()` ou dans un Whereable.
+- Les noms vont entre `${…}`, vérifiés d’après les tables que vous donnez à `sql` ; une condition sur une colonne est un Whereable, sa valeur vérifiée par type, et toute autre valeur venue de l’extérieur un `db.param()`.
 - La syntaxe que choisit un appelant, comme un sens de tri, est l’une de vos propres constantes : ne donnez jamais à `raw()` le texte d’un appelant.
 - `.compile()` montre le `text` et les `values` qu’enverrait une requête : un test qui fige `text` garde dans `values` chaque valeur venue de l’extérieur.
 
@@ -53,7 +53,7 @@ Une requête d’écriture s’écrit de la même façon. Cet `INSERT … SELECT
 
 ## Passer chaque valeur comme paramètre {#pass-each-value-as-a-parameter}
 
-Une valeur venue d’un appelant (un formulaire, une URL, une ligne lue ailleurs) entre comme [`db.param()`](/fr/sql-template#param), ou dans un [objet Whereable](/fr/sql-template#whereable), qui fait un paramètre de chaque valeur :
+Une valeur venue d’un appelant (un formulaire, une URL, une ligne lue ailleurs) entre comme paramètre. Comparée à une colonne, elle va dans un [objet Whereable](/fr/sql-template#whereable), qui fait un paramètre de chaque valeur et la vérifie d’après le type de la colonne ; partout ailleurs, dans [`db.param()`](/fr/sql-template#param), qui accepte n’importe quelle valeur :
 
 <CastPanel example="raw_sql_values">
 
@@ -63,8 +63,26 @@ Une valeur venue d’un appelant (un formulaire, une URL, une ligne lue ailleurs
 
 - <code v-pre>${{ studio_id: studioId }}</code> donne `("studio_id" = $1)`<!-- probe: examples/raw_sql_values.ts --> : un filtre de `films`, tel que le prend le `where` de [`select()`](/fr/select#select), donc les [conditions](/fr/conditions) y fonctionnent aussi : [`gte()`](/fr/conditions#conditions.gte) dans `{ release_year: db.conditions.gte(1990) }`.
 - `${db.param(genre)}` donne `$2`, dans `$2 = ANY("genres")`<!-- probe: examples/raw_sql_values.ts --> : un paramètre va partout où le SQL accepte une valeur.
-- Un tableau est un seul paramètre : `` ${'id'} = ANY(${db.param(ids)}) `` envoie `ids` comme un tableau Postgres par défaut ; avec `castArrayParamsToJson` activé, non ([plus bas](#cast-a-parameter-postgres-can-t-type)).
+- Un tableau est un seul paramètre : `db.param(ids)` envoie `ids` comme un tableau Postgres par défaut ; avec `castArrayParamsToJson` activé, non ([plus bas](#cast-a-parameter-postgres-can-t-type)). Sur une colonne, `{ id: db.conditions.eqAny(ids) }` écrit `"id" = ANY($1)`<!-- probe: db.sql`${{ id: db.conditions.eqAny([1000]) }}` --> et vérifie le type des éléments.
 - Une partie de la requête dont seuls certains appels ont besoin est un fragment imbriqué, ou `[]` pour rien ([Fragments imbriqués](/fr/sql-template#nested-fragments)).
+
+Le type refuse une chaîne pour `release_year`, qui est un entier, et une clé qualifiée par sa table :
+
+```ts twoslash
+// @errors: 2345 2353
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+type Tables = s.films.SQL | s.screenings.SQL | s.cinemas.SQL;
+// ---cut---
+db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ release_year: db.conditions.lt('2000') }}`;
+db.sql<Tables>`SELECT * FROM ${'cinemas'} WHERE ${{ 'cinemas.name': 'The Lantern' }}`;
+```
+
+`` ${'release_year'} < ${db.param('2000')} ``<!-- tsc: db.sql<import('zapatos/schema').films.SQL>`…` --> compile : `param()` accepte n’importe quelle valeur, et seul Postgres la vérifie. Là où un Whereable ne suffit pas :
+
+- Dans une jointure, ses clés ne sont pas qualifiées par table : comparez un nom qualifié avec `param()`, comme le fait `listings()` [plus haut](#write-the-query-its-names-interpolated).
+- Une comparaison qui n’oppose pas une colonne à une valeur (deux colonnes, une expression, une ligne de colonnes) reste dans `sql`, avec `param()`.
+- Le type des lignes donné à `sql` reste le vôtre : [`@pgcast/typegen`](/fr/typed-sql) ne le lit depuis Postgres que pour une requête de noms et de `param()`, et refuse celle qui contient un Whereable.
 
 Une chaîne seule entre `${…}` est un nom, pas une valeur, donc le type la refuse :
 
@@ -230,7 +248,7 @@ db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.raw(`'${title}'
 SELECT "title" FROM "films" WHERE "title" = 'x' OR TRUE --'
 ```
 
-Cela renvoie tous les films. Une valeur est un `param()`, toujours : `${db.param(title)}` donne `"title" = $1`<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.param('x')}` -->, et aucun film.
+Cela renvoie tous les films. Une valeur est un paramètre, toujours : <code v-pre>${{ title }}</code> donne `("title" = $1)`<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${{ title: 'x' }}` -->, comme `${db.param(title)}` donne `"title" = $1`<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.param('x')}` -->, et aucun film.
 :::
 
 ## Comparer une colonne à du SQL, avec `self` {#compare-a-column-with-sql-through-self}
