@@ -33,6 +33,9 @@ Candidates for a check, a rule or a skill line.
 - #886 — two fixes in separate hunks of one file were committed apart with `git apply --cached --unidiff-zero` on one hunk, as `git add -p` is interactive here — builder
 - #884 — with no `process.emitWarning` left in `zapatos/db`, the playground's shim in `website/.vitepress/playground/globals.ts` is likely dead: a small PR of its own, proved by `docs:build` and the playground — builder
 - #884 — skill `backward-compat`'s rule "an export of `dist` stays" under `node10` (#581) could say it covers the exports a consumer's declarations can name, so removing an uninferrable helper is not read as a stop point — builder
+- 7.1.2 range — `npm pack --dry-run` shows no CHANGELOG gap in the extensions: a docs PR that changes an extension's README after it shipped (#889, after adapters 0.1.2 and typegen 0.2.0) leaves its `[Unreleased]` empty, so the range review checks the `[Unreleased]` of each package whose files the range touches — branch-reviewer
+- 7.1.2 range — consumer declarations compiled against a published and a branch tarball through a symlinked package need `preserveSymlinks: true`, or `pg` resolves from the real path and fails with TS2307 — branch-reviewer
+- 7.1.2 range — #887 updated decision 003 but left `docs/decisions/005-playground.md:51` and `website/.vitepress/playground/globals.ts:3` saying `zapatos/db` calls `process.emitWarning`: they go with the shim's removal (#884's learning) — branch-reviewer
 
 ## Minors kept
 
