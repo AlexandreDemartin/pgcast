@@ -38,6 +38,7 @@ await db.serializable(pool, async txn => {
 });
 ```
 
+- To check its types, set `skipLibCheck: true` in your tsconfig: PGlite's own declarations fail without it (`Cannot find namespace 'Emscripten'`).
 - `asPool(pglite)` never creates, configures nor closes the PGlite: you do, as with a `pg.Pool`, which Zapatos "doesn't manage" for you either. It takes the PGlite that `PGlite.create()` or `new PGlite()` returns, and throws on the `tx` of `pglite.transaction()`, which has no `execProtocol()`.
 - `run(pool)` sends each query as `pg` sends it, through `execProtocol()`: with no value and no name, a simple `Query`, which may hold several statements; otherwise `Parse`, `Bind`, `Describe`, `Execute` and `Sync`. `.prepared(name)` parses the query once on that PGlite, as `pg` does once on a connection, whichever `asPool()` gave the pool; an empty name is no name, as in `pg`.
 - `COPY … FROM STDIN` gets `pg`'s answer, a `CopyFail`, so it rejects with 57014 and the next query runs.
