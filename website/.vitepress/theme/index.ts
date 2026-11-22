@@ -31,8 +31,8 @@ export default {
     app.component('CastPanel', CastPanel);
     app.component('CatalogFlow', CatalogFlow);
     app.component('GroupPages', GroupPages);
-    app.component('LazyPre', LazyPre);
     app.component('InstallLine', InstallLine);
+    app.component('LazyPre', LazyPre);
     app.component('RetryFlow', RetryFlow);
     app.component('SiteFooter', SiteFooter);
     app.component('ValuesFlow', ValuesFlow);
