@@ -160,3 +160,7 @@ test('fails on a section cited after a bare ./reference.md; leaves ../x/referenc
   assert.deepEqual(sectionsOf('Read ./reference.md § Lookup.'), missing('Lookup'));
   assert.deepEqual(sectionsOf('See ../code-style/reference.md § Claims.'), []);
 });
+
+test('fails on a section cited after a `./reference.md` span', () => {
+  assert.deepEqual(sectionsOf('Read `./reference.md` § Lookup.'), missing('Lookup'));
+});
