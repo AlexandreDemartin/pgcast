@@ -9,6 +9,9 @@ What the agents returned during the chapter and what waits for its end. Written 
 ## Learnings
 
 Candidates for a check, a rule or a skill line.
+- #916 — a method PR's proof checks a merged row only against its kept term, so a merge that drops a source line's qualifier passes (twice here: `--unidiff-zero`, "an adapter's"): grep each source line's actor, flag and exception in the merged rule before the first push — branch-reviewer
+- #916 — a verdict "the check catches it" is a claim about a check's limit: rerun the check on the learning's exact case (row 51: a fragment probed alone numbers from `$1`) — branch-reviewer
+- #916 — in a worktree's zsh, a shell function named `g` or `gg` collides with the profile's aliases (`gg` ran `git gui`): proof greps go in a bash script in scratch — builder
 
 ## Minors kept
 
