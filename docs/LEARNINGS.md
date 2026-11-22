@@ -61,6 +61,9 @@ Candidates for a check, a rule or a skill line.
 - #906 — on the playground, chrome-devtools `wait_for` and `take_snapshot` dump the whole schema block (~1,100 nodes) per call: an inline `evaluate_script` that clicks Run and returns the live region's `innerText` costs one small call per panel — builder
 - #906 — two agents' `vitepress preview` share port 4173 by default: each builder serves its preview on its own port — builder
 - #906 — #907 closes the `isBuffer` gap that the #898 learning above names, with `check-buffer.mjs` in `docs:build` — orchestrator
+- #900 — a probe span that starts with `(` carries every pair of parentheses around it: an `and()` of comparisons is quoted as one span per comparison, each probed — builder
+- #900 — the local probe server's session TimeZone is not UTC: a probe sets UTC before reading offsets for captions — builder
+- #900 — the French proofreader moves a marked pgcast message into « »: a brief says that `<!-- message -->` keeps straight quotes — builder
 
 ## Minors kept
 
