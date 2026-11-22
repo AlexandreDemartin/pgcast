@@ -28,6 +28,7 @@ Candidates for a check, a rule or a skill line.
 - #855 — Vite 8 is rolldown-based (no esbuild in `node_modules`): a build whose entry is a virtual module names it without a null byte and maps it to the `\0` id in `resolveId` — builder
 - #855 — `adapters/pglite`'s `check:browser` reads `dist`: `npm run build` in the adapter first — builder
 - #864 — the chrome-devtools tools cannot open DevTools › Application › Manifest: a Done-when that needs that panel says the owner checks it, or proves the manifest by fetching it and loading each icon — builder
+- #865 — auto mode refuses a compound command that starts with `pkill`: a builder stops its own background process by its PID — builder
 
 ## Minors kept
 
