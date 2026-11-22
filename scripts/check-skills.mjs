@@ -63,9 +63,13 @@ export function sectionErrors(path, text, reference) {
   return errors;
 }
 
-/** One error if `text` has a `## Checklist`, which repeats rules its sections state; empty if none. */
+/**
+ * One error if `text` has a checklist, which repeats rules its sections state: a heading of level 2 or more that starts
+ * with the word "checklist" in any case, or a task item (`- [ ]`, `* [x]`) under any heading; empty if none.
+ */
 export function checklistErrors(path, text) {
-  return /^## Checklist\s*$/m.test(text) ? [`${path}: has a ## Checklist; each rule goes in its section, once`] : [];
+  const checklist = /^#{2,}\s*checklist\b|^\s*[-*] \[[ x]\] /im;
+  return checklist.test(text) ? [`${path}: has a ## Checklist; each rule goes in its section, once`] : [];
 }
 
 /**
