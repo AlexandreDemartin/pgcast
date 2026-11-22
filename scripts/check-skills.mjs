@@ -41,7 +41,7 @@ export function citationErrors(path, text, skills) {
  */
 export function sectionErrors(path, text, reference) {
   const headings = [...reference.matchAll(/^#+ (.+?)\s*$/gm)].map(([, heading]) => heading).sort((a, b) => b.length - a.length);
-  const errors = [], citation = /(?:\]\((?:\.\/)?reference\.md(?:#[^)]*)?\)|`reference\.md`|(?<![\w/])reference\.md) § /g;
+  const errors = [], citation = /(?:\]\((?:\.\/)?reference\.md(?:#[^)]*)?\)|`reference\.md`|(?<![\w/.])(?:\.\/)?reference\.md) § /g;
   const end = /^(?:$|\s*[\p{P}`]|\s+(?:and|or|then)\b)/u, join = /^(?:[,;])? ?(?:(?:then|and|or) )?§ /;
   for (const line of text.split('\n')) {
     for (const {index, 0: cited} of line.matchAll(citation)) {
