@@ -174,6 +174,14 @@ test('fails on a ## Checklist in a SKILL.md or a reference.md', () => {
   assert.deepEqual(errorsOf({'alpha/SKILL.md': head + '## Checklists of a PR\n\nA PR body is no checklist.\n'}), []);
 });
 
+test('fails on the near misses of a ## Checklist: its case, level, suffix, or a task item under another heading', () => {
+  const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n';
+  for (const body of ['## checklist\n', '##  Checklist\n', '### Checklist\n', '## Checklist:\n', '## Checklist before the PR\n',
+    '## Before the PR\n\n- [ ] A rule\n', '## Before the PR\n\n* [x] A rule\n', '## Before the PR\n\n  - [X] A rule\n'])
+    assert.deepEqual(errorsOf({'alpha/SKILL.md': head + body}), ['alpha/SKILL.md: has a ## Checklist; each rule goes in its section, once'],
+      JSON.stringify(body));
+});
+
 test('fails on a sentence of eight words or more that a skill holds twice, in one file or across both', () => {
   const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n', twice = 'A guard proves something only through a mutant.';
   assert.deepEqual(errorsOf({'alpha/SKILL.md': `${head}- ${twice} See reference.md.\n`, 'alpha/reference.md': `# R\n\n${twice}\n`}),
