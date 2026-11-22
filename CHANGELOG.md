@@ -8,7 +8,6 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Added
 
-- Each page of the docs site now carries structured data that search engines read: a `BreadcrumbList` (its group, then the page, in its language) on each page of the outline, and a `WebSite` on the English home, for Google's site name. The build fails on JSON-LD that does not parse or repeats a type on a page.
 - First release of [`@pgcast/typegen`](https://github.com/AlexandreDemartin/pgcast/blob/master/tools/typegen/CHANGELOG.md), at 0.1.0: row types for named `sql` queries, described by Postgres ([Typed SQL](https://pgcast.dev/typed-sql)).
 
 ### Fixed
