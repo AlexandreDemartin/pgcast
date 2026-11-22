@@ -1,5 +1,5 @@
 ---
-english: 27e100eb6957
+english: 821fa9d82fa3
 ---
 
 # Pagination
@@ -128,6 +128,23 @@ Une comparaison de lignes va dans un seul sens. Avec `release_year` en `DESC` et
 
 - Créez l’index dans les sens de l’`order`, `(release_year DESC, id ASC)`. Postgres commence à lire à l’année de la dernière ligne : sur 300 000 films, après la dernière ligne (1960, 150000), `EXPLAIN (ANALYZE)` montre `Index Cond: (release_year <= 1960)`, puis un `Filter:` qui retire le reste de cette année, 1 167 lignes.
 - Sans la borne, le `OR` n’est qu’un `Filter:` : Postgres lit et jette chaque ligne avant la dernière, 148 671 ici, comme pour un `offset`.
+
+### Sur une colonne `timestamptz` {#on-a-timestamptz-column}
+
+Les séances, les plus proches d’abord, sur `starts_at` puis `id`. Ici `last` est la dernière ligne de la page 1, la séance 1001 à 21:45 UTC le 1er mars, gardée comme ci-dessus :
+
+<CastPanel example="paginate_keyset_timestamp">
+
+<<< ../examples/paginate_keyset_timestamp.ts{ts twoslash}
+
+<template #caption><span>Page 2 : les séances 1002 et 1003, à 18:00 et 20:15 UTC le 2 mars.</span></template>
+</CastPanel>
+
+- `last.starts_at` est une chaîne, un [`TimestampTzString`](/fr/runtime-config#TimestampTzString), avec les microsecondes que garde Postgres : `'2030-03-03T18:00:00.0001+00:00'`. Renvoyez-la telle quelle, dans la comparaison et dans le curseur.
+- Pas sous forme de `Date`, qui garde les millisecondes et perd le reste. Prenez deux séances dans la même milliseconde, à 18:00:00.000100 et 18:00:00.000900 : en `Date`, les deux valent 18:00:00.000. Dans cet ordre `ASC`, la page après la première redonne la première ; dans un ordre `DESC`, la page après la seconde saute la première.
+- Une requête à vous dans le template [`sql`](/fr/sql-template#sql) reçoit `starts_at` de `pg` sous forme de `Date` : prenez le curseur dans la ligne d’un raccourci, qui a la chaîne.
+- Comparer sur `date_trunc('milliseconds', starts_at)` fonctionne aussi avec un `Date`, mais demande la même expression dans l’`order`, et un index dessus pour commencer à la dernière ligne. Cet index demande le fuseau, `date_trunc('milliseconds', starts_at, 'UTC')` : sur la forme à deux arguments, Postgres le refuse (42P17). La chaîne n’a besoin de rien de tout cela : un index sur `(starts_at, id)` sert la comparaison telle quelle.
+- Vérifiez la chaîne d’un curseur avant la requête, comme `decodeCursor()` vérifie les entiers ([ci-dessous](#send-the-cursor-to-the-client)) : Postgres refuse une chaîne qu’il ne peut pas lire comme une heure (22007). La forme qu’écrit `to_jsonb()` est `/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?[+-]\d\d:\d\d$/`.
 
 ### Envoyer le curseur au client {#send-the-cursor-to-the-client}
 
