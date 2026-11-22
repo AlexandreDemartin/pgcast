@@ -16,7 +16,7 @@ Every worker runs the job that settles a cinema's subtitles: a screening before 
 
 - `SELECT pg_try_advisory_xact_lock($1, $2)`<!-- probe: examples/one_worker.ts --> answers at once: `true` if the transaction now holds the lock, `false` if another one does. A second worker gets its `false` within milliseconds, where `advisoryXactLock()` would wait.
 - The key is a pair of 32-bit integers, or one `bigint`: [`advisoryXactLock()`](/transaction#advisoryXactLock) has the rules, and a key made from a text.
-- A `SELECT` with no `FROM` gives one row, so the type is a tuple, `[{ locked: boolean }]`, written by hand.
+- The row's type is written by hand, `{ locked: boolean }[]`. A `SELECT` with no `FROM` gives one row, which the job reads as `const [{ locked }]`.
 - On the pool, the lock would go with the query's own transaction, at once: run it on the client of the job's transaction, as below.
 
 ## Run the job under the lock

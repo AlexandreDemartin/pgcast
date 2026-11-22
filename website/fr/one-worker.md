@@ -1,5 +1,5 @@
 ---
-english: dfb9b441a5b4
+english: 24141a4f5f40
 ---
 
 # Locks de job
@@ -20,7 +20,7 @@ Chaque worker lance le job qui règle les sous-titres d’un cinéma : une séa
 
 - `SELECT pg_try_advisory_xact_lock($1, $2)`<!-- probe: examples/one_worker.ts --> répond tout de suite : `true` si la transaction détient maintenant le lock, `false` si une autre le détient. Un second worker reçoit son `false` en quelques millisecondes, là où `advisoryXactLock()` attendrait.
 - La clé est une paire d’entiers 32 bits, ou un seul `bigint` : [`advisoryXactLock()`](/fr/transaction#advisoryXactLock) en donne les règles, et une clé tirée d’un texte.
-- Un `SELECT` sans `FROM` donne une ligne, donc le type est un tuple, `[{ locked: boolean }]`, écrit à la main.
+- Le type de la ligne est écrit à la main, `{ locked: boolean }[]`. Un `SELECT` sans `FROM` donne une ligne, que le job lit avec `const [{ locked }]`.
 - Sur le pool, le lock partirait avec la transaction propre à la requête, aussitôt : lancez-la sur le client de la transaction du job, comme ci-dessous.
 
 ## Lancer le job sous le lock {#run-the-job-under-the-lock}
