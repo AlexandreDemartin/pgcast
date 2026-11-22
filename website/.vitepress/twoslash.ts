@@ -81,6 +81,23 @@ export const moduleNames = (type: string) => type.replace(
   (_, types, name) => `import("${types ? name.replace(/^([^/]+?)__/, '@$1/') : name}")`);  // @types/a__b is @a/b
 
 /**
+ * A code block with hover types is a `<pre is="vue:lazy-pre">` (theme/LazyPre.ts): its HTML still starts with `<pre`, which
+ * VitePress keeps as it is (it wraps anything else in a `<pre><code>`), and the `vue:` prefix makes Vue render the component,
+ * which renders that same `<pre>` and hydrates the block when it is first pointed at, focused or touched, not at load.
+ */
+export const lazyHydratedCode: NonNullable<MarkdownOptions['codeTransformers']>[number] = {
+  name: 'pgcast:lazy-hydrated-code',
+  root(hast) {
+    const hasMenu = (node: Node): boolean => node.tagName === 'v-menu' || (node.children?.some(hasMenu) ?? false);
+    const visit = (node: Node) => {
+      if (node.tagName === 'pre' && hasMenu(node)) node.properties = { ...node.properties, is: 'vue:lazy-pre' };
+      else node.children?.forEach(visit);
+    };
+    visit(hast as Node);
+  },
+};
+
+/**
  * Each hover type takes the keyboard's focus (docs/design/art-direction.md § Hover types): the menu's trigger, the
  * `<span>` that floating-vue listens on, gets a `tabindex`; the menu opens on focus (theme/index.ts).
  */

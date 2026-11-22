@@ -33,12 +33,23 @@ Candidates for a check, a rule or a skill line.
 - #863 — CI's TypeScript loop replays locally with `check:floor` and `npm install --prefix <scratch>/ts<version> typescript@<version>`, pointed to by `PGCAST_TEST_TYPESCRIPT` — builder
 - #863 — a fix round that runs the reviewer's harness needs its own probe database and its own scratch folder exported, since the harness reads them from there — builder
 - #865 — auto mode refuses a compound command that starts with `pkill`: a builder stops its own background process by its PID — builder
+- #867 — a consumer probe replays `release.yml`'s build from a `git archive` with both `npm ci --ignore-scripts`: the pack matched the checkout's byte for byte (shasum 0c9d396b) — orchestrator
 - #866 — a check meant to be proved red on its own lives in a module that plain Node loads: `llms.ts` imports `cast.data.ts`, which only VitePress loads — builder
 - #866 — an issue's counts go stale between filing and building (68 pages then, 70 now): the builder recounts from `dist` and says so — orchestrator
+- #870 — Google's Rich Results Test now asks for a sign-in: an agent validates with validator.schema.org, and the live test goes to the owner after deploy — builder
+- #870 — the root `CHANGELOG.md` is the npm package's: a docs-site change goes in `website/README.md`, not there — orchestrator
+#869 — VitePress keeps a fence's highlighted HTML as it is only when it starts with `<pre`: to swap a block for a component, set `is="vue:<name>"` on the `<pre>`, never rename the tag — branch-reviewer
+#869 — a Vue functional component without props passes only `class`, `style` and listeners to its root: set `inheritAttrs: false` and pass `attrs` by hand — branch-reviewer
+#869 — a PR that claims "the built HTML does not change" proves it in its first round with a tag-level diff of the built pages against master — branch-reviewer
+#869 — `el.__vnode` is not set in a production build: test hydration by reading the element's event listeners — builder
+#869 — `vitepress preview` can serve the assets of the previous build: rebuild and restart it, then check the asset hashes, before measuring — builder
+#869 — runner Lighthouse scores swing several points run to run (`/select` 93 to 99 on the same commit): measure a performance change locally under CPU slowdown, the runner median only gates — orchestrator
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 - #853 — six skills keep a `## Checklist` (`backward-compat`, `code-style`, `consumer-usage`, `merge-gate`, `review-comments`, `zero-abstraction`) after #853 cut the six others as duplicates: one rule for all, at the next method PR
 - #854 — `sectionErrors` still leaves unchecked `[reference.md](reference.md#x) § X` and `[reference.md](./reference.md) § X`, and checks a bare `skills/code-style/reference.md § Claims` against the citing skill's own reference; no such citation in the tree
+- #867 — `website/typed-sql.md` § Install and `tools/typegen/README.md`: `--legacy-peer-deps`, which npm's ERESOLVE hint suggests on TypeScript 7, skips the peers, so the missing-peer line comes before the TypeScript 7 one; neither says so — orchestrator
 - #866 — `website/.vitepress/meta.ts:4` and `:54`: two comment lines lengthened past the file's wrap width, not re-wrapped — orchestrator
+

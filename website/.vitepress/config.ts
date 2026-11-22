@@ -9,7 +9,7 @@ import { calloutIcons } from './callouts.ts';
 import { codeGroupLogos } from './codeGroups.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
-import { describePage, pageHead, repo, sitemapAlternates } from './meta.ts';
+import { checkStructuredData, describePage, pageHead, repo, sitemapAlternates } from './meta.ts';
 import { outlineIn } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
@@ -17,7 +17,7 @@ import { markSteps } from './steps.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { svg } from './theme/icons.ts';
-import { createCheckedTwoslasher, focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
+import { createCheckedTwoslasher, focusableHovers, lazyHydratedCode, moduleNames, twoslashOptions } from './twoslash.ts';
 import { languageKey, langs, prefixOf, words, type Lang } from './words.ts';
 
 const
@@ -124,6 +124,7 @@ export default defineConfig({
   buildEnd: async config => {
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
     await writeChangelogFeed(config);  // changelog.xml
+    checkStructuredData(config.outDir, host + config.site.base);  // meta.ts
     checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
     await checkPlaygroundLinks(config);  // so does a cast panel that does not open its example in the playground
   },
@@ -156,7 +157,7 @@ export default defineConfig({
         twoslashOptions, twoslasher: createCheckedTwoslasher(),
         processHoverInfo: type => defaultHoverInfoProcessor(moduleNames(type)),
       }),
-      focusableHovers, sqlParameters, lineIndents,
+      focusableHovers, lazyHydratedCode, sqlParameters, lineIndents,
     ],
     config: md => {
       keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
