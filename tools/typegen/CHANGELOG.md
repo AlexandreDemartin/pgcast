@@ -7,6 +7,7 @@ All notable changes to `@pgcast/typegen` are documented here. Format: [Keep a Ch
 ### Changed
 
 - The README says `--help` prints the usage, and that `--check` with `--watch` prints it and exits 1.
+- The README's Development section says how to test a change to the root package.
 
 ## [0.2.0] - 2026-11-22
 

@@ -15,7 +15,7 @@ Cases that serve a minority of steps are in [reference.md](reference.md), read w
 - The generated types and their shape (`Selectable`, `Insertable`, `Whereable`, `Updatable`, `*ForTable<T>`).
 - The SQL produced by each shortcut: a user may log, test or depend on it.
 - The config (`zapatosconfig.json`, `setConfig`) and the CLI (`npx zapatos`).
-- No export removed nor added by accident: `git diff $(git merge-base origin/master HEAD) -- db.mjs generate.mjs` after `npm run build`. Each export of a module in `src/generate/index.ts`'s `export *` is public, so a helper goes in its own module; under `node10` a consumer's `.d.ts` names `zapatos/dist/db/*` paths, so an export of `dist` stays (#581).
+- No export removed nor added by accident: `git diff $(git merge-base origin/master HEAD) -- db.mjs generate.mjs` after `npm run build`. Each export of a module in `src/generate/index.ts`'s `export *` is public, so a helper goes in its own module; under `node10` a consumer's `.d.ts` names `zapatos/dist/db/*` paths, so an export of `dist` stays (#581). tsc names a type through the entry that re-exports it, so a dist path is written for one no entry re-exports, or by hand: a module moved within `src/` re-exports its old names from its old file, frozen by a path-mapped type test (`generateTables.test-d.ts`, as `utils.test-d.ts` does, #885), and a helper absent from 6.6.1 that no entry exports and no entry's type names may go (`warnOnce`, #887). Which paths a consumer's declarations write: `tsc --declaration` against both tarballs, with `preserveSymlinks: true` through a linked package, or `pg` fails with TS2307 (#885, 7.1.2's range review).
 
 ## Breaking, hence a stop point
 
