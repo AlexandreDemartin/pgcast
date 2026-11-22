@@ -33,6 +33,9 @@ Candidates for a check, a rule or a skill line.
 - #886 — two fixes in separate hunks of one file were committed apart with `git apply --cached --unidiff-zero` on one hunk, as `git add -p` is interactive here — builder
 - #884 — with no `process.emitWarning` left in `zapatos/db`, the playground's shim in `website/.vitepress/playground/globals.ts` is likely dead: a small PR of its own, proved by `docs:build` and the playground — builder
 - #884 — skill `backward-compat`'s rule "an export of `dist` stays" under `node10` (#581) could say it covers the exports a consumer's declarations can name, so removing an uninferrable helper is not read as a stop point — builder
+- #895 — before deleting a browser stand-in for a Node global, grep the built bundle for unguarded reads of the global itself, not only of the method it provided: the shim also defined `process` — builder
+- #895 — a brief's scratch folder is created by the orchestrator before the spawn: `npm ci > <missing dir>/x.log` in the background failed silently — builder
+- #895 — chrome-devtools `take_screenshot` cannot write into the session scratchpad (outside its workspace roots): screenshot proof needs another allowed folder — builder
 
 ## Minors kept
 
