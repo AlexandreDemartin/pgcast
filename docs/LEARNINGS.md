@@ -33,10 +33,11 @@ Candidates for a check, a rule or a skill line.
 - #863 — CI's TypeScript loop replays locally with `check:floor` and `npm install --prefix <scratch>/ts<version> typescript@<version>`, pointed to by `PGCAST_TEST_TYPESCRIPT` — builder
 - #863 — a fix round that runs the reviewer's harness needs its own probe database and its own scratch folder exported, since the harness reads them from there — builder
 - #865 — auto mode refuses a compound command that starts with `pkill`: a builder stops its own background process by its PID — builder
+- #867 — a consumer probe replays `release.yml`'s build from a `git archive` with both `npm ci --ignore-scripts`: the pack matched the checkout's byte for byte (shasum 0c9d396b) — orchestrator
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 - #853 — six skills keep a `## Checklist` (`backward-compat`, `code-style`, `consumer-usage`, `merge-gate`, `review-comments`, `zero-abstraction`) after #853 cut the six others as duplicates: one rule for all, at the next method PR
 - #854 — `sectionErrors` still leaves unchecked `[reference.md](reference.md#x) § X` and `[reference.md](./reference.md) § X`, and checks a bare `skills/code-style/reference.md § Claims` against the citing skill's own reference; no such citation in the tree
-
+- #867 — `website/typed-sql.md` § Install and `tools/typegen/README.md`: `--legacy-peer-deps`, which npm's ERESOLVE hint suggests on TypeScript 7, skips the peers, so the missing-peer line comes before the TypeScript 7 one; neither says so — orchestrator
