@@ -52,7 +52,7 @@ The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in Englis
 | `normal` | tests, opt-in addition (condition, option, codegen emitter) | posted, the builder goes on | `branch-reviewer`; a fresh `builder` only for blockers; no verify | Show |
 | `high` | `core.ts` (compilation, escaping), `transaction.ts`, driver interface, existing public types, default codegen output | posted, the builder stops until checked | `branch-reviewer` with the subject's lens; fresh `builder`; verify | Ask |
 
-- The level follows the file the change lands in, found by `git grep`, not the issue's title; a refusal added inside `compileExpression` is `high` even when no SQL changes (#677).
+- The level follows the file the change lands in, found by `git grep`, not the issue's title; a refusal added inside `compileExpression` is `high` even when no SQL changes (#677); a case that never reaches the file can be `high` too ([reference.md](reference.md) § Risk).
 
 The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the gate: skill `merge-gate`.
 

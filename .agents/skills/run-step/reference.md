@@ -22,6 +22,9 @@ Each change of this table is a lever of #812, with its keep-or-revert test and i
 ## Rounds
 
 - A third round finding a deeper hole in one part cuts it to a Deferred section, its blockers checked against what stays (#746); a design on several conditional types writes its hunt grid before the first review (#751).
+
+## Risk
+
 - `{ col: self }` never passes through `conditions.ts`, so #106 was `high` from the start.
 
 ## Method PRs
