@@ -15,6 +15,10 @@ import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 
+// still exported here, where 6.6.1 declared them: a declaration may name them as zapatos/dist/generate/tables
+export { relationsInSchema } from './relations';
+export type { Relation } from './relations';
+
 // DomainRoots of ./domainRoots, declared here and not exported: a library's declarations that write the type of
 // definitionForRelationInSchema() out cannot name ./domainRoots, which zapatos/generate does not export (TS2742), and
 // they write this alias out in full
