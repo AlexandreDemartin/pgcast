@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Runs Lighthouse on four pages of the built site served by `npm run docs:preview` (the home, a reference page, a guide
-// and an explanation), runs each three times, prints the four scores of each run and their median, and fails the median under 95 in any of them. Lighthouse comes through `npx` at an
-// exact version, never as a dependency. Run by the `docs` job of ci.yml, after `docs:build`:
+// and an explanation), runs each three times, prints the four scores of each run and their median, and fails the median
+// under 95 in any of them. Lighthouse comes through `npx` at an exact version, never as a dependency. Run by the `docs`
+// job of ci.yml, after `docs:build`:
 //   npm run docs:preview -- --port 4173 &  node check-lighthouse.mjs http://localhost:4173
 // Chrome comes from CHROME_PATH, or is found by Lighthouse; a runner needs --no-sandbox, `CHROME_FLAGS` adds it.
 import { execFileSync } from 'node:child_process';
@@ -15,8 +16,9 @@ const
   pages = ['/', '/select', '/first-query', '/why'],
   categories = ['performance', 'accessibility', 'best-practices', 'seo'],
   base = (process.argv[2] ?? 'http://localhost:4173').replace(/\/$/, ''),
-  // the desktop preset: it is how the pages are read (the docs are written at a desk); the mobile one throttles the CPU by 4
-  // and the network to slow 4G, which on a shared runner moves the performance score by more than the threshold's margin
+  // the desktop preset: it is how the pages are read (the docs are written at a desk); the mobile one throttles the CPU
+  // by 4 and the network to slow 4G, which on a shared runner moves the performance score by more than the threshold's
+  // margin
   flags = ['--preset=desktop', '--quiet', '--output=json', ...categories.map(category => `--only-categories=${category}`),
     `--chrome-flags=--headless=new ${process.env.CHROME_FLAGS ?? ''}`],
   folder = mkdtempSync(join(tmpdir(), 'pgcast-lighthouse-')),

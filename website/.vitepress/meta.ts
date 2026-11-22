@@ -1,8 +1,9 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Each page's metadata, for search engines and link previews: its description, cut from its `{.lede}` unless its front
 // matter sets one; its canonical URL, its page in the other language (`hreflang`, sitemap.xml's too), Open Graph and
-// Twitter card, with its language's social image; its Markdown copy (llms.ts), when it has one; as JSON-LD, on each home the project, on the English home the site, on each outline page its breadcrumb. The favicons and
-// `theme-color`, the same on every page, are in config.ts.
+// Twitter card, with its language's social image; its Markdown copy (llms.ts), when it has one; as JSON-LD, on each
+// home the project, on the English home the site, on each outline page its breadcrumb. The favicons and `theme-color`,
+// the same on every page, are in config.ts.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { HeadConfig, PageData, TransformContext, TransformPageContext, UserConfig } from 'vitepress';
@@ -53,10 +54,10 @@ export function fromLede(lede: string) {
 }
 
 /**
- * A page's canonical URL, the same page in each language, its Markdown copy if it has one (`hasCopy()`), Open Graph and Twitter card (`transformHead`), with the
- * `<title>` and description VitePress gives it; as schema.org JSON-LD (`structuredData()`). Every
- * page has its translation (check-translations.mjs), so each names both, by the codes sitemap.xml gives
- * (`sitemapAlternates()`). The 404 page gets none.
+ * A page's canonical URL, the same page in each language, its Markdown copy if it has one (`hasCopy()`), Open Graph and
+ * Twitter card (`transformHead`), with the `<title>` and description VitePress gives it; as schema.org JSON-LD
+ * (`structuredData()`). Every page has its translation (check-translations.mjs), so each names both, by the codes
+ * sitemap.xml gives (`sitemapAlternates()`). The 404 page gets none.
  */
 export function pageHead({ page, pageData, siteConfig, title, description }: TransformContext): HeadConfig[] {
   if (pageData.isNotFound) return [];
@@ -95,12 +96,12 @@ type Data = Record<string, unknown>;
 /**
  * A page's JSON-LD (schema.org), one object per type, each at most once per page:
  * - each home, the project as a `SoftwareSourceCode`;
- * - the English home only, the site as a `WebSite` for Google's site names, which read the domain's home (the French home,
- *   under `/fr/`, is not the domain's);
- * - each outline page, its `BreadcrumbList`: its group, then the page, absolute URLs and the names in the page's language.
- *   Google wants two items, the last without `item` at most: the group's landing page is its URL. A group's landing
- *   page has one item, so none; neither do the homes, the 404, the changelog and the playground, which the outline
- *   does not list.
+ * - the English home only, the site as a `WebSite` for Google's site names, which read the domain's home (the French
+ *   home, under `/fr/`, is not the domain's);
+ * - each outline page, its `BreadcrumbList`: its group, then the page, absolute URLs and the names in the page's
+ *   language. Google wants two items, the last without `item` at most: the group's landing page is its URL. A group's
+ *   landing page has one item, so none; neither do the homes, the 404, the changelog and the playground, which the
+ *   outline does not list.
  */
 export function structuredData(page: string, url: string, root: string, title: string): Data[] {
   const
