@@ -202,6 +202,14 @@ it.each([['missing', undefined], ['malformed', '{ "include": [ }']])('exits 1 on
   expect(seen).toMatchObject({ code: 1, stdout: '', stderr: plain.stderr });
 });
 
+it('exits 1 on a source the parser overflows on at start', { timeout: 20_000 }, async () => {
+  put('app/app.ts', 'export const x = ' + '('.repeat(200_000) + '1' + ')'.repeat(200_000) + ';\n');
+  const { seen } = start();
+  await until(() => seen.code !== undefined, 'the exit');
+  expect(seen).toMatchObject({ code: 1, stdout: '' });
+  expect(seen.stderr).toContain('Maximum call stack size exceeded');
+});
+
 it('closes on SIGINT and SIGTERM with exit 0', { timeout: 20_000 }, async () => {
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     rmSync(out(), { force: true });
