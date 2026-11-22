@@ -7,7 +7,7 @@ Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [PGlite](https
 ## Install
 
 ```sh
-npm install zapatos@npm:@pgcast/pgcast@^7 @pgcast/adapter-pglite @electric-sql/pglite
+npm install zapatos@npm:@pgcast/pgcast@^7 pg @pgcast/adapter-pglite @electric-sql/pglite
 ```
 
 For `pgcast/db`, install `pgcast@npm:@pgcast/pgcast@^7` in place of the `zapatos` alias. Set [`moduleNames`](https://pgcast.dev/generator#generate.moduleNames) to `"pgcast"`. Generate the types from a Postgres database with your schema. The adapter imports neither pgcast nor PGlite. Its types fit either alias.
@@ -72,10 +72,13 @@ const pool = asPool(new PGlite('idb://cinema'));
 
 ```sh
 npm install buffer
-esbuild main.ts --bundle --platform=browser --alias:pg=./pg-stub.ts --outfile=out.js
+esbuild main.ts --bundle --platform=browser --format=esm --external:node:module --alias:pg=./pg-stub.ts --outfile=out.js
+cp node_modules/@electric-sql/pglite/dist/{pglite.wasm,initdb.wasm,pglite.data} .
 ```
 
-Any bundler that aliases `pg` does the same. Tested: a transaction with a parameter, an insert and a `bytea` read on a PGlite, from a bundle of `db.js` and of `db.mjs`, loaded in a bare context with no `process` and no `require`, with esbuild 0.28.2, `buffer` 6.0.3, PGlite 0.5.16 and pgcast 7.1.0. `npm run check:browser` repeats it for `db.mjs` on each change, bundled by Vite and given Node's `Buffer` in place of the package's.
+Load `out.js` with `<script type="module">` from the folder of PGlite's three files, where PGlite finds them; to serve them elsewhere, pass them to `PGlite.create()` ([PGlite's esbuild notes](https://pglite.dev/docs/bundler-support#esbuild)). `--external:node:module` keeps PGlite's import of it, which runs only in Node. Any bundler that aliases `pg` does the same for `zapatos/db`.
+
+Tested: these blocks as written, the page served over http to Chrome 157, then a transaction with a parameter, an insert and a `bytea` read on `idb://cinema`, with esbuild 0.28.2, `buffer` 6.0.3, PGlite 0.5.16 and pgcast 7.1.1. `npm run check:browser` checks the `zapatos/db` part on each change: `db.mjs` and the adapter bundled by Vite with `pg` aliased, then the same transaction on a PGlite made in Node, given Node's `Buffer` and no `process` nor `require`.
 
 - With no alias, the bundle imports Node's `net`, `tls`, `dns`, `fs`, `crypto`… With the alias and no `Buffer`, loading throws `Buffer is not defined`.
 - A partial `Buffer` is not enough: one with no working `Buffer.from` fails on a `bytea` (the playground's stand-in throws there on purpose).
