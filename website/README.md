@@ -1,6 +1,6 @@
 # The docs site
 
-pgcast's documentation ([decision 004](../docs/decisions/004-documentation-site.md)), on VitePress, with the look of [art-direction.md](../docs/design/art-direction.md). A package of its own: nothing here reaches the library.
+pgcast's documentation ([decision 004](../docs/decisions/004-documentation-site.md)), on VitePress, with the look of [art-direction.md](../docs/design/art-direction.md) and the checks of [accessibility.md](../docs/design/accessibility.md). A package of its own: nothing here reaches the library.
 
 ## Build
 
@@ -153,7 +153,7 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 
 Each page with a copy names it in its `<head>`: `<link rel="alternate" type="text/markdown" href="https://pgcast.dev/select.md">` (`/index.md` and `/fr/index.md` for the homes), by `pageHead()` in `.vitepress/meta.ts`. After the pages are built, `.vitepress/alternates.ts` reads those links back from `dist` and fails the build on a link to a copy the site does not serve, or a served copy no page links.
 
-A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. Four routes have a page and no copy, in each language, on purpose:
+A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. Two routes, in each language, have a page and no copy, on purpose:
 
 - The playground is interactive: its page holds a tool, and no prose to copy.
 - The changelog is in `llms.txt` only, under "Optional", and `/changelog.xml` is its machine-readable form; a copy would repeat the root's `CHANGELOG.md`, and add a language rule for a page that stays English.
@@ -203,6 +203,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - [ ] Links to the other groups; British spelling
 - [ ] Its French page, `fr/<page>.md`, says the same, marked with `npm run docs:translated -- <page>` (§ Languages)
 - [ ] `npm run docs:build` passes, and `npm run docs:examples` if an example changed
+- [ ] If the theme changed, Lighthouse locally: after `docs:build`, `npm run docs:preview -- --port 4173 &` then `node check-lighthouse.mjs http://localhost:4173` (the median of three runs on four pages, at least 95 in each category; [accessibility.md](../docs/design/accessibility.md))
 - [ ] Screenshots of a new page, or of one that looks different
 
 ## Languages
