@@ -1,10 +1,11 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Each page's metadata, for search engines and link previews: its description, cut from its `{.lede}` unless its front
 // matter sets one; its canonical URL, its page in the other language (`hreflang`, sitemap.xml's too), Open Graph and
-// Twitter card, with its language's social image; on each home, the project as JSON-LD. The favicons and
+// Twitter card, with its language's social image; its Markdown copy (llms.ts), when it has one; on each home, the project as JSON-LD. The favicons and
 // `theme-color`, the same on every page, are in config.ts.
 import { join } from 'node:path';
 import type { HeadConfig, PageData, TransformContext, TransformPageContext, UserConfig } from 'vitepress';
+import { hasCopy } from './alternates.ts';
 import { host, plainText, readPage } from './llms.ts';
 import { langOf, langs, words } from './words.ts';
 
@@ -50,7 +51,7 @@ export function fromLede(lede: string) {
 }
 
 /**
- * A page's canonical URL, the same page in each language, Open Graph and Twitter card (`transformHead`), with the
+ * A page's canonical URL, the same page in each language, its Markdown copy if it has one (`hasCopy()`), Open Graph and Twitter card (`transformHead`), with the
  * `<title>` and description VitePress gives it; on each home, the project as a schema.org `SoftwareSourceCode`. Every
  * page has its translation (check-translations.mjs), so each names both, by the codes sitemap.xml gives
  * (`sitemapAlternates()`). The 404 page gets none.
@@ -70,6 +71,7 @@ export function pageHead({ page, pageData, siteConfig, title, description }: Tra
     ['link', { rel: 'canonical', href: url }],
     ...langs.map(other => alternate(other, other === 'en' ? path : `${other}/${path}`)),
     alternate('x-default', path),
+    ...hasCopy(page, siteConfig.srcDir) ? [['link', { rel: 'alternate', type: 'text/markdown', href: root + page }] satisfies HeadConfig] : [],
     og('og:type', 'website'),
     og('og:site_name', siteConfig.site.title),
     og('og:title', title),
