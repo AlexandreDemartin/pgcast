@@ -33,7 +33,7 @@ We validate locally while iterating; CI runs **once ready**.
 
 ## Pitfalls
 
-- **Proofs on a draft**: **CI passed** is green with every job skipped; they are local only.
+- **Proofs on a draft**: **CI passed** is green with every job skipped; they are local only. A check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready (#861, #869). CodeQL does run on a draft: read its alerts before the review, as it caught what lint and the tests did not (#854).
 - **A conflicting PR**: GitHub runs no CI on it (CodeQL only). Before review, `gh pr ready` and merge, `gh pr view <n> --json mergeable` says `MERGEABLE` and **CI passed** is in `statusCheckRollup`; a French page's `english:` hash conflicts each time master edits its English page.
 - **A job added to `ci.yml`**: add it to the `needs` of **CI passed** and its result to `RESULTS`, otherwise its failure does not block the merge. `ci.yml` also holds lists a PR extends and no local check runs: a docs input outside `website/` (a Twoslash `paths` entry) in `changes`, or the break first shows on master's deploy (#729); a file added to a package (`tools/<name>/dist/`) in the exact list of its package-contents step, in the commit that adds it: `npm pack --dry-run` shows the file but asserts nothing (#830, #847).
 

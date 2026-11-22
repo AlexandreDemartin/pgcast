@@ -11,6 +11,7 @@ The cases of skill `code-style` that serve a minority of steps; [SKILL.md](SKILL
 An error says what to do (SKILL.md § JSDoc and errors), and:
 
 - Its advice is run as written, on each call and kind of value that throws it ("spread it" split a string into characters, #235), at each position that reaches it and on Postgres (`db.self`, advised for a write, runs only in `update()` and a filter: #666, #677); a warning firing in more cases is reread for each; advice moving where a transaction begins says what it costs, probed by a read, a write and an insert of one key (#486, #492). A tool's "run X to fix it" is tested by running X on that exact state (a `queries.ts` with conflict markers, chapter #62's review).
+- A doc that quotes a tool's message quotes it from a run of the documented install, not from the code, and runs the fix it prints: `peers.ts` checks its peers in order, so `--legacy-peer-deps` stops on another peer first, and the printed `npm install @pgcast/pgcast` failed with `ERESOLVE` again (#873).
 - A message the docs quote is one template, each interpolation one word, and holds no backtick if a table cell quotes it: otherwise `check-prose.mjs` says only "is no message of zapatos/db", not that a ternary or a phrase in the template blocks the match (#569, #596, #647, #748). It matches by source text: renaming an interpolated variable breaks every quote of the message; a SQL block matches its probe's queries exactly (no comment at a line's end, `…` for a number that changes from run to run) (#727, #730).
 
 ## Claims
