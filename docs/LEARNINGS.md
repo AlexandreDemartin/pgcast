@@ -36,6 +36,10 @@ Candidates for a check, a rule or a skill line.
 - 7.1.2 range — `npm pack --dry-run` shows no CHANGELOG gap in the extensions: a docs PR that changes an extension's README after it shipped (#889, after adapters 0.1.2 and typegen 0.2.0) leaves its `[Unreleased]` empty, so the range review checks the `[Unreleased]` of each package whose files the range touches — branch-reviewer
 - 7.1.2 range — consumer declarations compiled against a published and a branch tarball through a symlinked package need `preserveSymlinks: true`, or `pg` resolves from the real path and fails with TS2307 — branch-reviewer
 - 7.1.2 range — #887 updated decision 003 but left `docs/decisions/005-playground.md:51` and `website/.vitepress/playground/globals.ts:3` saying `zapatos/db` calls `process.emitWarning`: they go with the shim's removal (#884's learning) — branch-reviewer
+- #894 — `gh api …/sub_issues` takes the issue's numeric id with `-F sub_issue_id=<id>`: `-f` sends a string and fails with 422 — builder
+- #894 — `git diff origin/master` leaves out untracked files: a leak grep reads new files directly, or runs after `git add` — builder
+- #894 — Zapatos's demo is the separate repository `jawj/zapatos-demo` (`demo.ts`), not a folder of `jawj/zapatos` — builder
+- #894 — the builder made recipe titles an exception to the site's one-or-two-word rule; the orchestrator reverted it, as the owner wants brief titles everywhere: a brief quotes the title rule when a step names pages — orchestrator
 
 ## Minors kept
 
