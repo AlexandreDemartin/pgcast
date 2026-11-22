@@ -1,10 +1,11 @@
 // Copyright (C) 2026 Alexandre Demartin
-// A code block with hover types (`<lazy-pre>`, from twoslash.ts § lazyHydratedCode). Its HTML is the `<pre>` it stands for, so
-// the page, its text and its styles do not change; what changes is when Vue hydrates it: on the first pointer, focus or touch
-// on the block, not at load, where a reference page's 278 menus cost 350 to 420 ms of blocking time on a slowed CPU.
+// A code block with hover types (`<pre is="vue:lazy-pre">`, from twoslash.ts § lazyHydratedCode). It renders the `<pre>` it
+// stands for with all its attributes, so the page, its styles and its tab order do not change: a functional component without
+// props would pass on only `class`, `style` and listeners, and drop Shiki's `tabindex` and `dir`. What changes is when Vue
+// hydrates the block and its floating-vue menus: on the first pointer, focus or touch on the block, not at load.
 // Hydrating is not enough for the menu under the pointer or the focus: it did not exist for the event that woke the block, so the
 // event goes again to the menu's trigger, the `<span>` that floating-vue listens on (mouseenter, focus, touchstart).
-import { defineAsyncComponent, h, nextTick, type HydrationStrategy } from 'vue';
+import { defineAsyncComponent, h, nextTick, type FunctionalComponent, type HydrationStrategy } from 'vue';
 
 const trigger = (target: EventTarget | null) => {
   const el = target instanceof Element ? target.closest('.twoslash-hover') : null;
@@ -29,7 +30,7 @@ const wake: HydrationStrategy = (hydrate, forEach) => {
   return teardown;
 };
 
-export default defineAsyncComponent({
-  loader: () => Promise.resolve((_: unknown, { slots }: { slots: { default?: () => unknown } }) => h('pre', null, slots.default?.() as never)),
-  hydrate: wake,
-});
+const pre: FunctionalComponent = (_, { attrs, slots }) => h('pre', attrs, slots.default?.());
+pre.inheritAttrs = false;
+
+export default defineAsyncComponent({ loader: () => Promise.resolve(pre), hydrate: wake });
