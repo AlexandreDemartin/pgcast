@@ -63,6 +63,7 @@ const groups: Group[] = [
     collapsed: true,  // folded: read once, for the why
     items: [
       { text: { en: 'Why pgcast', fr: 'Pourquoi pgcast' }, link: '/why' },
+      { text: { en: 'What\'s new', fr: 'Nouveautés' }, link: '/whats-new' },
       { text: { en: 'The catalog', fr: 'Le catalogue' }, link: '/catalog-types' },
       { text: { en: 'Versions<small class="since">6.7</small>', fr: 'Versions<small class="since">6.7</small>' }, link: '/versions' },
       { text: { en: 'Security', fr: 'Sécurité' }, link: '/security' },
