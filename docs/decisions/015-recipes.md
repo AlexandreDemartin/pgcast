@@ -50,7 +50,7 @@ The corpus is real usage of Zapatos: about two thousand non-test files that impo
 
 | Part | Rule |
 |---|---|
-| Title | The need, as a verb phrase of at most four words with no code: *Filter by optional fields*. It is also the outline entry's text. `website/README.md` § Conventions (one or two words, the concept's name) gets an exception for this group, as the Epic names recipes by need. |
+| Title | One or two words naming the need, as everywhere on the site (`website/README.md` § Conventions): *Optional filters*, from the page's slug. It is also the outline entry's text. The need's full sentence opens the page. |
 | Lede | One or two sentences giving the need and the API it uses, with the function names, so that search finds them. |
 | Example | One cast panel: a module `examples/<page>_<case>.ts` in the film world, run by `docs:examples` and opened by its *Open in playground* link. The panel shows the SQL Postgres runs and the type TypeScript gives (`website/README.md` § Examples). |
 | Under the panel | Bullets: what the SQL does, with its probes; the typed result; the pitfall a newcomer would hit. Each option links to its reference entry, and nothing in the entry is repeated. |
@@ -112,7 +112,7 @@ The batches run in order, the most useful and least guessed first. "Seen" is the
 | `text-search` | Search what users type: a substring of one or several columns. | `ilike()` with `%`, `_` and `\` escaped; `or()` over columns; `ilikeAny()` for several patterns; accents through `unaccent`, in prose only | `conditions.md` § `ilike()`, § `likeAny()` | One line on escaping, in `likeAny()` | about two hundred `ILIKE`s, almost none escaping the input |
 | `update-in-place` | Update from the current value: a counter, a value set once, a JSON merge, an array item added. | `update()` with a `sql` fragment on `db.self`: `${self} + 1`, `coalesce(${self}, …)`, `${self} \|\| ${param(patch, 'jsonb')}`, `array_append(${self}, …)`; `conditions.add()` | `insert.md` § `update()`, `sql-template.md` § `self`, `conditions.md` § Arithmetic | The rule that `self` is the column; no task page | over a hundred set-once updates; dozens of JSON merges |
 
-Batch 1 also adds the group to `outline.ts`, the landing page `recipes.md` with § Answered elsewhere, and the title exception to `website/README.md` § Conventions. It waits for #893, which also edits `outline.ts`.
+Batch 1 also adds the group to `outline.ts`, the landing page `recipes.md` with § Answered elsewhere. It waits for #893, which also edits `outline.ts`.
 
 ### Batch 2: JSON, groups and search ([#899](https://github.com/AlexandreDemartin/pgcast/issues/899))
 
