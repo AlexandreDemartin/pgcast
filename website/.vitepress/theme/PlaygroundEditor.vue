@@ -121,7 +121,7 @@ function run(js: string, postgres: boolean) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const
       stopped = `Stopped after ${limit / 1000} s: the code was still running.`,
-      time = () => { timer = setTimeout(() => done({ queries: [], warnings: [], error: stopped }), limit); },
+      time = () => { timer = setTimeout(() => done({ queries: [], error: stopped }), limit); },
       done = (result?: Run) => { clearTimeout(timer); worker.terminate(); resolve(result); };
     stop = done;
     worker.onmessage = ({ data }: MessageEvent<Message>) => {
@@ -130,7 +130,7 @@ function run(js: string, postgres: boolean) {
       time();
       try { localStorage.setItem(startedKey, ''); } catch { /* no storage: the note shows again after a reload */ }
     };
-    worker.onerror = event => done({ queries: [], warnings: [], error: event.message });
+    worker.onerror = event => done({ queries: [], error: event.message });
     worker.postMessage({ js, postgres } satisfies Code);
     if (!postgres) time();
   });
@@ -197,7 +197,6 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
       result.queries.length && !postgres ? w().noRows(result.error) :
         result.error],
     ...result.queries.length || result.error !== undefined ? [] : [w().noQuery],
-    ...result.warnings,
   ];
 }
 
