@@ -26,7 +26,7 @@ Three classes, from the most direct to the most cautious:
 | **Document** | The behaviour follows Postgres, or is intended. | one line of docs or JSDoc | `Changed` (docs) |
 
 - **Warning**:
-  - runtime: `warnOnce(code, message)` of `src/db/utils.ts` (`process.emitWarning(message, { type: 'DeprecationWarning', code })`, once per code), only when the deprecated path is actually taken;
+  - runtime: `process.emitWarning(message, { type: 'DeprecationWarning', code })`, once per code, only when the deprecated path is actually taken (the helper `warnOnce` of `src/db/utils.ts`, removed by #884 once 7.0 left no caller, is in git history);
   - codegen: through `warningListener`, only if the schema is affected.
   - The message names the option to turn on and says it will be the default in 7.0.
   - Its code `PGCAST_DEP00n` goes in the table below when its PR is opened, so that two opt-ins never share one.
