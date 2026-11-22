@@ -76,6 +76,7 @@ Write a query and see its SQL and its type as you type. Press Run, and a real Po
 [**Tutorial**<small>Install pgcast and run your first typed query.</small>](/tutorial)
 [**Reference**<small>Every export and option, and the SQL it writes.</small>](/reference)
 [**How-to guides**<small>Laterals, pages, batches, retries: one task each.</small>](/guides)
+[**Recipes**<small>Filters, latest rows, upserts, trees: one query each.</small>](/recipes)
 [**Explanation**<small>Why pgcast works as it does.</small>](/explanation)
 
 </div>

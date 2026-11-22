@@ -688,7 +688,7 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .landing .pillars > div { display: flex; flex-direction: column; }
 .landing .pillars p:has(> .next) { margin-top: auto; padding-top: 12px; }
 .landing .pillars .next { font-weight: 500; color: var(--accent); }
-.landing .readnext p { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.landing .readnext p { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .landing .readnext strong { font-weight: 600; }
 .landing .readnext a {
   display: block; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
