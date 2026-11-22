@@ -12,6 +12,7 @@ import CastPanel from './CastPanel.vue';
 import GroupPages from './GroupPages.vue';
 import InstallLine from './InstallLine.vue';
 import Layout from './Layout.vue';
+import LazyPre from './LazyPre.ts';
 import RetryFlow from './RetryFlow.vue';
 import SiteFooter from './SiteFooter.vue';
 import ValuesFlow from './ValuesFlow.vue';
@@ -30,6 +31,7 @@ export default {
     app.component('CastPanel', CastPanel);
     app.component('CatalogFlow', CatalogFlow);
     app.component('GroupPages', GroupPages);
+    app.component('LazyPre', LazyPre);
     app.component('InstallLine', InstallLine);
     app.component('RetryFlow', RetryFlow);
     app.component('SiteFooter', SiteFooter);

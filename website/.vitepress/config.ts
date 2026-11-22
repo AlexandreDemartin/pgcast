@@ -17,7 +17,7 @@ import { markSteps } from './steps.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { svg } from './theme/icons.ts';
-import { createCheckedTwoslasher, focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
+import { createCheckedTwoslasher, focusableHovers, lazyHydratedCode, moduleNames, twoslashOptions } from './twoslash.ts';
 import { languageKey, langs, prefixOf, words, type Lang } from './words.ts';
 
 const
@@ -157,7 +157,7 @@ export default defineConfig({
         twoslashOptions, twoslasher: createCheckedTwoslasher(),
         processHoverInfo: type => defaultHoverInfoProcessor(moduleNames(type)),
       }),
-      focusableHovers, sqlParameters, lineIndents,
+      focusableHovers, lazyHydratedCode, sqlParameters, lineIndents,
     ],
     config: md => {
       keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
