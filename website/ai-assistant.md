@@ -61,8 +61,9 @@ https://pgcast.dev/llms-full.txt
   names and its rows: `` db.sql<s.films.SQL, s.films.Selectable[]>`…` ``.
   https://pgcast.dev/raw-sql
 - Never concatenate a value into SQL, and never pass one to `db.raw()`. A value
-  goes in a shortcut's object, in a Whereable (`${{ studio_id }}`) or in
-  `db.param()`, and Postgres gets it as a parameter, `$1`.
+  goes in a shortcut's object, in a Whereable for a condition on a column in
+  `db.sql` (`${{ studio_id }}`, its value checked against the column's type),
+  or else in `db.param()`, and Postgres gets it as a parameter, `$1`.
   https://pgcast.dev/raw-sql#pass-each-value-as-a-parameter
 - An interpolated string is a table or column name. Never interpolate a string
   from outside the code (a request, a user, a file): map it to a name written

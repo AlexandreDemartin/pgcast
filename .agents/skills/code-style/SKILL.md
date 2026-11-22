@@ -79,6 +79,7 @@ A new example, wherever it is written, uses pgcast's own world (`website/schema.
 | Simple lookups | `tags` |
 
 - Invented names: no real person or film.
+- A condition on a column inside `sql` is a Whereable, `` ${{ release_year: db.conditions.lt(2000) }} ``, checked by column and by value; `param()` only where none fits (`website/README.md` § Conventions).
 - Tests keep their fixture (`test/fixtures/schema.sql`, skill `type-tests`); existing JSDoc keeps Zapatos's tables.
 - Never an extract from a real project (skill `consumer-usage`).
 

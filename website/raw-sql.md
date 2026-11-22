@@ -4,12 +4,12 @@ description: "When no shortcut writes the query you need, write it in the sql te
 
 # Raw SQL
 
-When no shortcut writes the query you need (a join, a window function, an `INSERT … SELECT`), write it in the `sql` template, and keep every value that comes from outside out of its text. You already know the shortcuts from the [tutorial](/tutorial); every interpolation is in [SQL template](/sql-template).
+When no shortcut writes the query you need (a join, a window function, an `INSERT … SELECT`), write it in the `sql` template, and keep every value that comes from outside out of its text. A condition on a column goes in as a Whereable, whose value is checked against the column's type, where `db.param()` takes any value. You already know the shortcuts from the [tutorial](/tutorial); every interpolation is in [SQL template](/sql-template).
 {.lede}
 
 <AtAGlance>
 
-- Names go between `${…}`, checked against the tables you give `sql`; a value from outside goes in as `db.param()` or in a Whereable.
+- Names go between `${…}`, checked against the tables you give `sql`; a condition on a column is a Whereable, its value checked by type, and any other value from outside a `db.param()`.
 - Syntax a caller chooses, such as a sort direction, is one of your own constants: never give `raw()` a caller's text.
 - `.compile()` shows the `text` and `values` a query would send: a test that freezes `text` keeps every value from outside in `values`.
 
@@ -52,7 +52,7 @@ A write is written the same way. This `INSERT … SELECT` copies one film's tags
 
 ## Pass each value as a parameter
 
-A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.param()`](/sql-template#param), or in a [Whereable object](/sql-template#whereable), which makes a parameter of each value:
+A value from a caller (a form, a URL, a row you read elsewhere) goes in as a parameter. Compared with a column, it goes in a [Whereable object](/sql-template#whereable), which makes a parameter of each value and checks it against the column's type; anywhere else, in [`db.param()`](/sql-template#param), which takes any value:
 
 <CastPanel example="raw_sql_values">
 
@@ -62,8 +62,26 @@ A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.
 
 - <code v-pre>${{ studio_id: studioId }}</code> is `("studio_id" = $1)`<!-- probe: examples/raw_sql_values.ts -->: a filter of `films`, as the `where` of [`select()`](/select#select) takes it, so [conditions](/conditions) work in it too: [`gte()`](/conditions#conditions.gte) in `{ release_year: db.conditions.gte(1990) }`.
 - `${db.param(genre)}` is `$2`, in `$2 = ANY("genres")`<!-- probe: examples/raw_sql_values.ts -->: a parameter fits wherever SQL takes a value.
-- An array is one parameter: `` ${'id'} = ANY(${db.param(ids)}) `` sends `ids` as a Postgres array by default; with `castArrayParamsToJson` on, it does not ([below](#cast-a-parameter-postgres-can-t-type)).
+- An array is one parameter: `db.param(ids)` sends `ids` as a Postgres array by default; with `castArrayParamsToJson` on, it does not ([below](#cast-a-parameter-postgres-can-t-type)). On a column, `{ id: db.conditions.eqAny(ids) }` writes `"id" = ANY($1)`<!-- probe: db.sql`${{ id: db.conditions.eqAny([1000]) }}` --> and checks the items' type.
 - A part of the query that only some calls need is a nested fragment, or `[]` for nothing ([Nested fragments](/sql-template#nested-fragments)).
+
+The type refuses a string for `release_year`, which is an integer, and a key qualified by its table:
+
+```ts twoslash
+// @errors: 2345 2353
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+type Tables = s.films.SQL | s.screenings.SQL | s.cinemas.SQL;
+// ---cut---
+db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ release_year: db.conditions.lt('2000') }}`;
+db.sql<Tables>`SELECT * FROM ${'cinemas'} WHERE ${{ 'cinemas.name': 'The Lantern' }}`;
+```
+
+`` ${'release_year'} < ${db.param('2000')} ``<!-- tsc: db.sql<import('zapatos/schema').films.SQL>`…` --> compiles: `param()` takes any value, and only Postgres checks it. Where a Whereable falls short:
+
+- In a join, its keys are not qualified by table: compare a qualified name with `param()`, as `listings()` [above](#write-the-query-its-names-interpolated) does.
+- A comparison that is not a column against a value (two columns, an expression, a row of columns) stays `sql` with `param()`.
+- The row type given to `sql` is still yours: [`@pgcast/typegen`](/typed-sql) reads it from Postgres only for a query of names and `param()`, and refuses one with a Whereable.
 
 A bare string between `${…}` is a name, not a value, so the type refuses it:
 
@@ -229,7 +247,7 @@ db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.raw(`'${title}'
 SELECT "title" FROM "films" WHERE "title" = 'x' OR TRUE --'
 ```
 
-That returns every film. A value is a `param()`, always: `${db.param(title)}` gives `"title" = $1`<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.param('x')}` -->, and no film.
+That returns every film. A value is a parameter, always: <code v-pre>${{ title }}</code> gives `("title" = $1)`<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${{ title: 'x' }}` -->, as `${db.param(title)}` gives `"title" = $1`<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.param('x')}` -->, and no film.
 :::
 
 ## Compare a column with SQL, through `self`
