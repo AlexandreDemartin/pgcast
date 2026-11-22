@@ -21,6 +21,8 @@ Candidates for a check, a rule or a skill line.
 - #874 — a trigger worded "if X keeps growing" fires at every method PR by construction: set a trigger on a threshold a check enforces — builder
 - #874 — a near-miss test runs each form on its own: a probe that follows every heading with the same task item proves only the task-item clause — builder
 - #874 — word counts quoted in a GitHub comment drift between rounds: recount them against the named base when the comment is edited — builder
+- #878 — a docs recipe proved by a harness that passes in a dependency the recipe bundles (a PGlite built in Node) does not test the recipe's command: replay the copyable blocks exactly as written, with the versions the doc names — branch-reviewer
+- #878 — an adapter's install command names every required peer of the core (`pg`): a package manager that installs no peers fails at `import 'zapatos/db'`; the consumer probe runs each README's install with `--legacy-peer-deps`, not only `/install` — audit
 
 ## Minors kept
 
