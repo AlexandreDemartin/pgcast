@@ -78,7 +78,8 @@ An agent knows only what its brief says. It follows the skills, names an excepti
 - **A `builder`'s hand-over**: one that stopped past about 80 calls (agent `builder` § Hand-over) is followed by a fresh `builder` with the issue, the branch and its hand-over note.
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
-- **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR, where the reviewer's harness stays for the fix round, the variables the harness reads (its scratch folder, its probe database) set to the fix round's own (#863).
+- A brief quotes the rule it relies on, with its file and section, never a paraphrase (a section said to name a label named a script, #886; a page title, #894), and states a tool's limits only from its code (#911).
+- **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR and created before the spawn (a log into a missing folder fails silently, #895), where the reviewer's harness stays for the fix round, the variables the harness reads (its scratch folder, its probe database) set to the fix round's own (#863).
 - **A CI-only criterion** (a matrix, a failing job): the orchestrator proves it after `gh pr ready`, which auto mode refuses to a subagent; a draft's **CI passed** proves nothing (skill `ci-gate` § Pitfalls).
 
 ## Ritual rules
