@@ -252,7 +252,6 @@ The build compares each French page with its English page, by VitePress's own pa
   | built-in object, host object, array-like, destructuring, shallow copy, own enumerable keys | objet natif, objet hôte, semblable à un tableau, déstructuration, copie superficielle, propres clés énumérables |
   | namespace, package (npm), patch version, JSDoc tag | espace de noms, paquet, version corrective, balise JSDoc |
   | a (MVCC) snapshot | un instantané |
-  | a row lock (an advisory lock stays in English, below) | un verrou |
   | the docs, the docs schema, custom type, generator, the `sql` template, a fragment | la doc, le schéma de la doc, type personnalisé, générateur, le template `sql`, un fragment |
   | check out, release (a client) | récupérer, libérer |
   | ties, a range of `between()`, a version range (semver), near-miss (a suggestion), the top level (of a query), the arbiter (`ON CONFLICT`) | ex æquo, intervalle (the type: `` `interval` `` in code), une plage de versions, un nom proche, le premier niveau, l’arbitre |
