@@ -3,6 +3,8 @@
 Why pgcast works as it does: the idea it keeps from Zapatos, what the fork adds to it, and what it will never do. The steps are in the [guides](/guides), every option in the [reference](/reference).
 {.lede}
 
+<img src="/favicon.svg" width="24" height="24">
+
 ## Just your database, with type safety
 
 pgcast is Zapatos, kept going. Zapatos's docs open with its aim:
