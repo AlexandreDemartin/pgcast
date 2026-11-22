@@ -36,6 +36,8 @@ const films = await db.select('films', db.all, {
 }).run(pool);
 ```
 
+It uses the `zapatos/*` names. Installed under the `pgcast` alias, with `moduleNames: 'pgcast'` ([Install](#install)), it imports `pgcast/db` and `pgcast/schema` instead.
+
 The SQL it runs, in one round trip:
 
 ```sql
