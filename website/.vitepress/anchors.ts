@@ -4,6 +4,7 @@
 // and on such a site URL in a fenced block, read from the page's Markdown, since a block renders no link.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
 import { earlyCloser, fenceClosed, fenceOpened } from './fences.ts';
 import { host } from './llms.ts';
@@ -128,6 +129,21 @@ export function checkLinks(config: SiteConfig) {
       const problem = problemOf(atHome(new URL(written)));
       if (problem) problems.add(`${page}:${line}: ${written}, ${problem}`);
     }
+  }
+  // A self-check: the redirect as the home ships it, minified, still follows `moved`, a query and `/fr/` kept.
+  const redirect = [...(pages.get('index.html') ?? '').matchAll(/<script>([\s\S]*?)<\/script>/g)]
+    .map(([, script]) => script!).find(script => script.includes('hashchange')) ?? '';
+  for (const [from, to] of [
+    ['/select.html?x=1#count', '/aggregates?x=1#count'], ['/fr/select#count', '/fr/aggregates#count'],
+    ['/runtime-config#value-types', '/value-types'], ['/fr/select#options', null],
+  ] as const) {
+    const url = new URL(from, 'http://site/');
+    let went: string | null = null;
+    runInNewContext(redirect, {
+      location: { pathname: url.pathname, search: url.search, hash: url.hash, replace: (to: string) => { went = to; } },
+      addEventListener() {}, decodeURIComponent,
+    });
+    if (went !== to) problems.add(`movedAnchors (moved.ts): ${from} goes to ${went ?? 'no page'}, not ${to ?? 'no page'}`);
   }
   // each moved anchor, in each language: its new place exists, not moved in turn, and it is no longer an anchor of its old
   // page, so that the redirect hides none; a page gone since keeps its line, as the 404 page runs the redirect too
