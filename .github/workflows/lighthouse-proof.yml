@@ -1,0 +1,42 @@
+name: Lighthouse proof (temporary, removed before the PR is ready)
+
+# A draft PR runs no ci.yml job: this runs the docs job's Lighthouse steps on pushes to this branch, to prove them red and green.
+on:
+  push:
+    branches: [fix/861-lighthouse-ci]
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: .
+      - run: npm ci
+      - run: npm run docs:build
+      - name: Lighthouse scores 95 or more on four pages of the built site
+        env:
+          CHROME_FLAGS: --no-sandbox
+        run: |
+          npm run docs:preview -- --port 4173 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          curl --silent --fail --retry 30 --retry-delay 1 --retry-connrefused --output /dev/null http://localhost:4173/
+          node check-lighthouse.mjs http://localhost:4173
