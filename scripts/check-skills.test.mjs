@@ -164,3 +164,36 @@ test('fails on a section cited after a bare ./reference.md; leaves ../x/referenc
 test('fails on a section cited after a `./reference.md` span', () => {
   assert.deepEqual(sectionsOf('Read `./reference.md` § Lookup.'), missing('Lookup'));
 });
+
+test('fails on a ## Checklist in a SKILL.md or a reference.md', () => {
+  const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n';
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': head + '## Rules\n\n- A rule.\n\n## Checklist\n\n- [ ] A rule\n'}),
+    ['alpha/SKILL.md: has a ## Checklist; each rule goes in its section, once']);
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': head + 'See reference.md.\n', 'alpha/reference.md': '# R\n\n## Checklist\n'}),
+    ['alpha/reference.md: has a ## Checklist; each rule goes in its section, once']);
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': head + '## Checklists of a PR\n\nA PR body is no checklist.\n'}), []);
+});
+
+test('fails on the near misses of a ## Checklist: its case, level, suffix, or a task item under another heading', () => {
+  const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n';
+  for (const body of ['## checklist\n', '##  Checklist\n', '### Checklist\n', '## Checklist:\n', '## Checklist before the PR\n',
+    '## Before the PR\n\n- [ ] A rule\n', '## Before the PR\n\n* [x] A rule\n', '## Before the PR\n\n  - [X] A rule\n'])
+    assert.deepEqual(errorsOf({'alpha/SKILL.md': head + body}), ['alpha/SKILL.md: has a ## Checklist; each rule goes in its section, once'],
+      JSON.stringify(body));
+});
+
+test('fails on a sentence of eight words or more that a skill holds twice, in one file or across both', () => {
+  const head = '---\nname: alpha\ndescription: \'USE FOR: x\'\n---\n', twice = 'A guard proves something only through a mutant.';
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': `${head}- ${twice} See reference.md.\n`, 'alpha/reference.md': `# R\n\n${twice}\n`}),
+    ["alpha/reference.md:3: repeats SKILL.md:5 ('a guard proves something only through …'); keep it once, a summary and a link in its other place"]);
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': `${head}In a test, it is probed, not read from the declarations:\n\n`
+    + '1. In a test, it is probed, not read from the declarations; then run.\n'}),
+  ["alpha/SKILL.md:7: repeats SKILL.md:5 ('in a test it is probed …'); keep it once, a summary and a link in its other place"]);
+});
+
+test('passes on a sentence under eight words twice, and on one sentence in two skills', () => {
+  const head = name => `---\nname: ${name}\ndescription: 'USE FOR: x'\n---\n`, line = 'Run it in the background, then wait.\n';
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': head('alpha') + line + line}), []);
+  const long = 'A guard proves something only through a mutant.\n';
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': head('alpha') + long, 'beta/SKILL.md': head('beta') + long}), []);
+});

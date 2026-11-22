@@ -20,12 +20,5 @@ Real projects that use Zapatos form a **corpus of examples**, not the target: pg
 - **Public**: pgcast's issues and PRs are public, like the repository. Write only **unnamed patterns** there: no project, no extract, no business name, no path; "a corpus of real usage", with orders of magnitude ("about a thousand hand-written laterals").
 - **Look for the workaround**, not just the usage: `as unknown as`, a rewritten `runResultTransform`, `db.raw` on a value, `sql``` that reimplements a shortcut, a home-made helper around `db.conditions`.
 - **A need is worth an API** if it is **general to Postgres** (a pattern every application meets) and if it recurs in the corpus. A project-specific choice (`simple` + `unaccent` configuration, a business domain name) becomes a parameter, never a dedicated helper. An isolated case stays a `sql` fragment.
-- **The proposed API** replaces the workaround without changing the SQL produced, or by making it valid (empty `and()`); a "one line" replacement is tried on the corpus's real call shape (a list built at run time, which can be empty) (#668).
+- **The proposed API** replaces the workaround without changing the SQL produced, or by making it valid (empty `and()`); a "one line" replacement is tried on the corpus's real call shape (a list built at run time, which can be empty), and the caller's migration is described in one line (#668).
 - **A figure is a count**, rerun before a note cites it, an issue's included: by syntax tree or with the type arguments (`parent<T.Column>(`: a grep for `parent(` found 114 of 1,255), by what each call names, not where it sits, on a dump's `pg_get_constraintdef()` rather than migrations, and split by what the decision touches; a gain is measured on the project's own `schema.d.ts` (#635, #646, #668).
-
-## Checklist
-
-- [ ] Pattern cited with its order of magnitude, without name or extract
-- [ ] Invented examples, on other tables and columns
-- [ ] The workaround's SQL compared with the proposed helper's SQL
-- [ ] The caller's migration described in one line

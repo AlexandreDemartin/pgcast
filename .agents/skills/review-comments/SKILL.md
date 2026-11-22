@@ -35,7 +35,7 @@ A review leaves one comment per round on the PR. The reviewer stays read-only an
 4. **Marked fixed**: once a blocking item's fix is verified, the orchestrator edits the review comment and ends the item with `→ fixed in <sha>`:
    `gh api -X PATCH repos/AlexandreDemartin/pgcast/issues/comments/<id> -F body=@<file>`.
 
-At `normal` there is no verify round: the orchestrator checks the fix commit against the item before marking it.
+At `normal` there is no verify round: the orchestrator checks the fix commit against the item before marking it. A passage rewritten across rounds is reread against skill `concise-docs` before `gh pr ready`: clauses added round by round end as one long sentence (#873).
 
 ## Verify comment
 
@@ -48,10 +48,3 @@ At `normal` there is no verify round: the orchestrator checks the fix commit aga
 - Verdicts: `fixed`, `partly`, `not fixed`, `regressed`, each with the SHA and the evidence (a test, a `file:line`).
 - `not fixed` or `regressed`: back to the fixes, then a new verify comment.
 - New defects found on the way: below the verdicts, in Conventional Comments.
-
-## Checklist
-
-- [ ] One comment per round, posted by the orchestrator
-- [ ] Each item labelled, with `file:line`; blockers with their scenario
-- [ ] Non-blocking items in `docs/LEARNINGS.md` § Minors kept
-- [ ] Each verified blocker ends with `→ fixed in <sha>`

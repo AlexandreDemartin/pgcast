@@ -38,9 +38,10 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in English, concise (skill `concise-docs`):
 
 - **What**: the expected behaviour, the SQL before / after when it matters · **Why**.
-- **Done when**: the acceptance criteria as checkboxes; it names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…).
+- **Done when**: the acceptance criteria as checkboxes; it names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…). A check the agents' tools cannot run (a DevTools panel, a test behind a sign-in) names the proof an agent can give and leaves the live check to the owner (#864, #870).
 - **Files**: the targeted paths, the feature's docs page included (skill `pr-shape` § Splitting like Zapatos), its `outline.ts` entry and `examples/plain/` file, and `db.mjs` for a new export, tracked though built (#723, #724, #729).
 - **Notes**: **Risk** (level, lens, blockers), **Class** (note 003), **Read** (skills), **Frozen by** (tests).
+- A figure or a message the issue quotes comes from a run, or the issue asks the builder for it; the builder reruns it and says what it found (68 pages filed, 70 built, #866; a message read from the code was wrong, #873).
 - Public: unnamed patterns (skill `consumer-usage`); Zapatos, not its author (skill `pr-shape` § PR title).
 - An older issue without **Files** or **Risk** (its **Review** gives the level): the orchestrator adds them before the `builder` starts.
 
@@ -73,11 +74,11 @@ An agent knows only what its brief says. It follows the skills, names an excepti
 
 - **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix), each a red test commit, then its fix commit (#550).
   - Started as the typed `builder`; only if the harness answers "Agent type 'builder' not found", a general-purpose agent told to read `.claude/agents/builder.md` first.
-- **Model and effort** per role, the effort passed in each spawn: a user setting can pin a model at `high` over the session's effort; an agent's frontmatter and a spawn's `effort` both outrank it. A session reads `.claude/agents/` when it starts: a changed agent applies from the next session (#731, #732). The re-run at `high` is the fix round, the review being the failure signal (Anthropic, "Optimizing for cost and intelligence"). The table: [reference.md](reference.md) § Models.
+- **Model and effort** per role, the effort passed in each spawn: a user setting can pin a model at `high` over the session's effort; an agent's frontmatter and a spawn's `effort` both outrank it. A session reads `.claude/agents/` when it starts: a changed agent applies from the next session (#731, #732). The table: [reference.md](reference.md) § Models.
 - **A `builder`'s hand-over**: one that stopped past about 80 calls (agent `builder` § Hand-over) is followed by a fresh `builder` with the issue, the branch and its hand-over note.
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
-- **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR, where the reviewer's harness stays for the fix round.
+- **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR, where the reviewer's harness stays for the fix round, the variables the harness reads (its scratch folder, its probe database) set to the fix round's own (#863).
 - **A CI-only criterion** (a matrix, a failing job): the orchestrator proves it after `gh pr ready`, which auto mode refuses to a subagent; a draft's **CI passed** proves nothing (skill `ci-gate` § Pitfalls).
 
 ## Ritual rules

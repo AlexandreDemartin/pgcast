@@ -1,6 +1,6 @@
 ---
 name: builder
-effort: medium
+effort: high
 description: 'Builds a pgcast step, GitHub sub-issue of an Epic (runtime, codegen, tests, docs): plan comment, code, draft PR with its proofs; or applies the blocking items of a review when started afresh with them. Choose it over the default agent to write the code of a branch.'
 tools: Bash, Read, Edit, Write, Grep, Glob, Skill, Agent, SendMessage, TaskStop, Monitor, ToolSearch, WebFetch, WebSearch, mcp__chrome-devtools, mcp__postgres-readonly
 ---
@@ -31,7 +31,7 @@ Explore, plan, code, commit.
 - A stop point (`AGENTS.md` § Stop points) that the orchestrator has not settled: **stop** and report it.
 - No new dependency, even a dev one, without the user's agreement.
 - A choice that nothing writes down: skill `decision-philosophy`; it goes under **Decided alone** in the PR.
-- Docs: `CHANGELOG.md`, the docs touched and, for an Rn finding, its line in `docs/CHARACTERISATION-REPORT.md` ("**fixed**, PR #n"); nothing else.
+- Docs: `CHANGELOG.md`, the npm package's (a docs-site change goes in `website/README.md`, #870), the docs touched and, for an Rn finding, its line in `docs/CHARACTERISATION-REPORT.md` ("**fixed**, PR #n"); nothing else.
 
 ## Verify
 
@@ -64,6 +64,7 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 
 - `AGENTS.md` § Local environment (npm 10 and `npm install`); the lib's `tsc` uses the dummy schema `src/typings/zapatos/schema.ts`, the tests the fixture's generated schema (skill `type-tests`).
 - French pages hold U+00A0 (`website/README.md` § Typography): a scripted find-and-replace matches it, normalises first or anchors on the line's start; a conflict keeps its own text, never retyped (checked by byte); `docs:translated` runs once the page is checked, never chained after the edit, and again in each commit that changes the English page, whose hash its mark follows (#262, #484, #575, #632, #667, #741).
+- `docs:build` takes about three minutes, over the shell's 120 s default: run it in the background or with a 300 s timeout. Stop a background process by its PID: auto mode refuses a compound command that starts with `pkill` (#854, #865).
 - The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier), `'==='`, a heredoc (`<<'EOF'`, or its backticks run) and a glob (`--include='*.ts'`, or "no matches found" zeroes a count); `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`, and BSD `sed` no `\|` (`sed -E`): check that a scripted edit changed its file (#516, #521, #680).
 
 ## Hand-over

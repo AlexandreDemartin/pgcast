@@ -121,4 +121,8 @@ npm run test:types
 npm pack --dry-run --json
 ```
 
-CI runs the suite with pg 8.6.0 and the lockfile's pg on Postgres 14, 16, 18 and 19.
+CI runs the suite with pg 8.6.0 and the lockfile's pg on Postgres 14, 16, 18 and 19, and three of its files on TypeScript 4.1.6 and 6.0.3. To replay those locally, `npm run check:floor` at the root installs 4.1.6 in `node_modules/.cache/pgcast-ts41`, and `npm install --prefix <dir> --no-save typescript@6.0.3` the other:
+
+```sh
+PGCAST_TEST_TYPESCRIPT=<dir>/node_modules/typescript npm test -- test/scan.test.ts test/neutralise.test.ts test/watch.test.ts
+```

@@ -1,6 +1,6 @@
 # Codegen output: reference
 
-The cases of skill `codegen-output` for the typed SQL tool, `tools/typegen` (decision 012); [SKILL.md](SKILL.md) names each section with when to read it.
+The cases of skill `codegen-output`, the typed SQL tool's (`tools/typegen`, decision 012) first; [SKILL.md](SKILL.md) names each section with when to read it.
 
 ## Describing
 
@@ -58,7 +58,7 @@ A `NOT NULL` proof from the catalog:
 
 ## Determinism
 
-- explicitly sorted order (`ORDER BY` + name), never `pg_catalog`'s order nor query timing. Relations are read concurrently (`Promise.all` in `tsOutput.ts`): a value they share (`customTypes`, its imports and origins) is merged whatever the order, through state the run already shares, or a new out-parameter written under Decided alone when the order needs data per column (#669), and tested through `placeholdersInEveryOrder` (`test/integration/codegen.test.ts`); no `await` inside `definitionForRelationInSchema`'s row loop. Within one relation, 6.6.1's winner is kept by the position Postgres returns the column at, not by its name compared in JavaScript; a determinism fix is replayed on the reviewer's grid and on the cases whose winner was already fixed (#669). A byte-for-byte proof leaves #42's shared placeholders out or compares several runs; "only where 6.6.1's output already varied" is probed with `db: { max: 1 }` and the schemas in both orders (#184, #449, #484, #490).
+- Relations are read concurrently (`Promise.all` in `tsOutput.ts`): a value they share (`customTypes`, its imports and origins) is merged whatever the order, through state the run already shares, or a new out-parameter written under Decided alone when the order needs data per column (#669), and tested through `placeholdersInEveryOrder` (`test/integration/codegen.test.ts`); no `await` inside `definitionForRelationInSchema`'s row loop. Within one relation, 6.6.1's winner is kept by the position Postgres returns the column at, not by its name compared in JavaScript; a determinism fix is replayed on the reviewer's grid and on the cases whose winner was already fixed (#669). A byte-for-byte proof leaves #42's shared placeholders out or compares several runs; "only where 6.6.1's output already varied" is probed with `db: { max: 1 }` and the schemas in both orders (#184, #449, #484, #490).
 
 ## Qualifying by schema
 
@@ -74,4 +74,4 @@ A `NOT NULL` proof from the catalog:
 
 ## Comments
 
-- a `COMMENT ON` text goes into a JSDoc; `*/` must be neutralised in the whole string, template text included, by one quoting helper per kind of string (`src/generate/quote.ts`). Line ends are normalised first (`/^/gm` matches after `\r`, U+2028, U+2029); a generated string literal escapes U+2028 and U+2029, which `JSON.stringify` leaves raw and 4.1.6 ends a literal at (TS1002, #746). What TypeScript reads (a tag, a hover, a strike-through) is checked with its own parser (`ts.getJSDocTags`, `getQuickInfoAtPosition`) on the real `tsForConfig` output, margins included, against master's output; any doubt keeps master's layout. A rule that predicts how TypeScript reads the output ships with a seeded fuzz, `typescript` as the oracle, over the parser's token classes (`\` escapes, `\n`, `\r`, U+2028, U+2029, quotes, backticks, `/`, conflict markers, NBSP) (#46, #48, #308, #473, #488).
+- Template text is neutralised too. Line ends are normalised first (`/^/gm` matches after `\r`, U+2028, U+2029); a generated string literal escapes U+2028 and U+2029, which `JSON.stringify` leaves raw and 4.1.6 ends a literal at (TS1002, #746). What TypeScript reads (a tag, a hover, a strike-through) is checked with its own parser (`ts.getJSDocTags`, `getQuickInfoAtPosition`) on the real `tsForConfig` output, margins included, against master's output; any doubt keeps master's layout. A rule that predicts how TypeScript reads the output ships with a seeded fuzz, `typescript` as the oracle, over the parser's token classes (`\` escapes, `\n`, `\r`, U+2028, U+2029, quotes, backticks, `/`, conflict markers, NBSP) (#46, #48, #308, #473, #488).

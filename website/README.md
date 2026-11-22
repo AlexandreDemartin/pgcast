@@ -189,6 +189,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - `docs:preview` keeps the file list it read at start-up: restart it after each rebuild, or the new hashed CSS gives 404.
 - Headless Chrome stops at about 500px with `--window-size`: a phone's width goes through the DevTools protocol, `Emulation.setDeviceMetricsOverride` with `mobile: true`.
 - The nav has no fixed breakpoints, it moves what does not fit into `⋯`: a change to its text is checked at every width from 768 to 1280px.
+- A PR that says the built HTML does not change proves it in its first round with a tag-level diff of the built pages against master's (#871).
 - A theme override is checked in the computed style: a default-theme component's scoped rules (`[data-v-…]` counts as a class) win without an error; read its `<style scoped>` first.
 
 ### Before the PR
@@ -203,7 +204,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - [ ] Links to the other groups; British spelling
 - [ ] Its French page, `fr/<page>.md`, says the same, marked with `npm run docs:translated -- <page>` (§ Languages)
 - [ ] `npm run docs:build` passes, and `npm run docs:examples` if an example changed
-- [ ] If the theme changed, Lighthouse locally: after `docs:build`, `npm run docs:preview -- --port 4173 &` then `node check-lighthouse.mjs http://localhost:4173` (the median of three runs on four pages, at least 95 in each category; [accessibility.md](../docs/design/accessibility.md))
+- [ ] If the theme changed, Lighthouse locally: after `docs:build`, `npm run docs:preview -- --port 4173 &` then `node check-lighthouse.mjs http://localhost:4173` (the median of three runs on four pages, at least 95 in each category; [accessibility.md](../docs/design/accessibility.md)); a performance change is measured locally under CPU slowdown, as runner scores swing several points (#871)
 - [ ] Screenshots of a new page, or of one that looks different
 
 ## Languages

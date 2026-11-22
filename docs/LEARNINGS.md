@@ -9,62 +9,7 @@ What the agents returned during the chapter and what waits for its end. Written 
 ## Learnings
 
 Candidates for a check, a rule or a skill line.
-- #853 — `check:agents` cannot read a `§` heading that holds `'` or `-`: a reference heading meant to be cited is plain letters and spaces — builder
-- #853 — a `reference.md` nears the 1,800-word cap fast (`codegen-output` at 1,799): split it before its next addition — builder
-- #854 — the `tsc` marks come in two forms, `<!-- tsc -->` and `<!-- tsc: … -->`: grep `<!-- tsc`, not `tsc -->` — builder
-- #854 — `useTestDatabase`'s own connection shares the test database: a probe that kills the watch's backend diffs the pids before and after the start, with `backend_type = 'client backend'` (autovacuum shares `datname`) — builder
-- #854 — `docs:build` takes about 160–190 s, over the 120 s foreground timeout: run it in the background — builder
-- #854 — a citation check is proved by mutating every real citation of the tree, not only synthetic probes (68 mutants in under a second) — branch-reviewer
-- #854 — a docs check reads every page, as `check-prose.mjs` does, never a hand list: a hand list reopens the hole at the next page that gets a mark — branch-reviewer
-- #854 — CodeQL runs on a draft PR while the CI jobs are skipped: read it before the review (it caught what lint and the tests did not) — branch-reviewer
-- #854 — a check that reads every page skips every page-level comment, VitePress's `<!-- @content -->` and `<!-- @changelog -->` included, not only the other checks' marks — builder
-- #854 — a planting harness tied to line numbers goes stale at the next master merge; appending a line to the page does not — builder
-- #848 — `check:agents`' `sectionErrors` regex ends a section name at its last lowercase letter, so a heading that ends in a capital (`## The method PR`) cannot be cited; name such headings to end lowercase until #845 lands — builder
-- #848 — a verdict that sends a learning to an open issue's check fix (#845) also comments on that issue with the new cases and the rule text the fix must update — builder
-- #848 — a method PR's § Watch reread rereads the triggers earlier rereads left in the Epic ("becomes a sub-issue if …") and states, for each, whether it fired — branch-reviewer
-- #848 — an issue carried over from an Epic that closes ("Minors kept from Epic #n") is attached to an open Epic, or its place said, before `Closes #n` merges, or `run-step` § Finding the step never reaches it — branch-reviewer
-- #848 — merging two learnings into one rule can drop the condition of one (here the base tsconfig with no `include`): reread each merged rule against each source line — orchestrator
-- #848 — when a fix moves a rule or a pointer, grep the PR body, the verdict comment and the Epic comments for its old location (three places named it) — builder
-- #855 — Vite 8 is rolldown-based (no esbuild in `node_modules`): a build whose entry is a virtual module names it without a null byte and maps it to the `\0` id in `resolveId` — builder
-- #855 — `adapters/pglite`'s `check:browser` reads `dist`: `npm run build` in the adapter first — builder
-- #864 — the chrome-devtools tools cannot open DevTools › Application › Manifest: a Done-when that needs that panel says the owner checks it, or proves the manifest by fetching it and loading each icon — builder
-- #863 — a hook that ends a session must close what a constructor that threw had already opened: `createWatchProgram` that throws leaves its file watchers alive — reviewer
-- #863 — an early return on SIGINT turns a hang into a process only SIGKILL ends: test that the process exits, not only that it stops printing — reviewer
-- #863 — CI's TypeScript loop replays locally with `check:floor` and `npm install --prefix <scratch>/ts<version> typescript@<version>`, pointed to by `PGCAST_TEST_TYPESCRIPT` — builder
-- #863 — a fix round that runs the reviewer's harness needs its own probe database and its own scratch folder exported, since the harness reads them from there — builder
-- #865 — auto mode refuses a compound command that starts with `pkill`: a builder stops its own background process by its PID — builder
-- #867 — a consumer probe replays `release.yml`'s build from a `git archive` with both `npm ci --ignore-scripts`: the pack matched the checkout's byte for byte (shasum 0c9d396b) — orchestrator
-- #866 — a check meant to be proved red on its own lives in a module that plain Node loads: `llms.ts` imports `cast.data.ts`, which only VitePress loads — builder
-- #866 — an issue's counts go stale between filing and building (68 pages then, 70 now): the builder recounts from `dist` and says so — orchestrator
-- #870 — Google's Rich Results Test now asks for a sign-in: an agent validates with validator.schema.org, and the live test goes to the owner after deploy — builder
-- #870 — the root `CHANGELOG.md` is the npm package's: a docs-site change goes in `website/README.md`, not there — orchestrator
-- #869 — VitePress keeps a fence's highlighted HTML as it is only when it starts with `<pre`: to swap a block for a component, set `is="vue:<name>"` on the `<pre>`, never rename the tag — branch-reviewer
-- #869 — a Vue functional component without props passes only `class`, `style` and listeners to its root: set `inheritAttrs: false` and pass `attrs` by hand — branch-reviewer
-- #869 — a PR that claims "the built HTML does not change" proves it in its first round with a tag-level diff of the built pages against master — branch-reviewer
-- #869 — `el.__vnode` is not set in a production build: test hydration by reading the element's event listeners — builder
-- #869 — `vitepress preview` can serve the assets of the previous build: rebuild and restart it, then check the asset hashes, before measuring — builder
-- #869 — runner Lighthouse scores swing several points run to run (`/select` 93 to 99 on the same commit): measure a performance change locally under CPU slowdown, the runner median only gates — orchestrator
-- #861 — a draft PR runs no CI job: a check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready — orchestrator
-- #861 — a failure planted in a page with a French twin trips the translation check first: plant it in the theme, which both languages share — builder
-- #861 — a Lighthouse gate on a shared runner reads the median of three runs per page: a single run swings several points — builder
-- #850 range — a PR that fixes a check (#854) also checks the § Learnings lines that describe the check's old limits (#853, #848), or the method PR judges learnings that are already false — branch-reviewer
-- #850 range — a design fix recorded in `docs/design/accessibility.md` also updates the rule in `art-direction.md` it overrides (#868): Lighthouse does not audit focus contrast — branch-reviewer
-- #850 range — a step that moves a paragraph into a `reference.md` greps its first sentence afterwards, to catch a duplicated lead-in (#853) — branch-reviewer
-- #850 range — the orchestrator's `record.py` appended lines without their `- `, merging nine learnings into one bullet: it now adds the bullet and refuses an untagged minor — branch-reviewer
-- #872 — a script that re-wraps comments ends each range before the ` */` line, or it swallows it: read the diff for a lost delimiter — builder
-- #872 — a word diff of re-wrapped comments is noisy on `*` and `//`: strip the comment prefixes before comparing the words — builder
-- #873 — a doc that quotes a tool's error message quotes it from a run of the documented install, not from the code: `peers.ts` checks its peers in order and the documented alias leaves the first one missing — branch-reviewer
-- #873 — a lookbehind meant to skip other folders' paths (`(?<![\w/])`) also skips `./`: test the `./` form of a citation along with the path form — branch-reviewer
-- #873 — an issue that spells out an expected message from reading the code passes its error on to the builder: the orchestrator quotes it from a run, or asks the builder to — orchestrator
-- #873 — a table of citation forms (plain, `./`, code span, link, anchor, other skill's path) found a form both regexes missed, where the tests did not: a pattern check is proved on such a table — builder
-- #873 — the fix a tool's error message prints can itself be a dead end (`npm install @pgcast/pgcast` fails with `ERESOLVE` again on TypeScript 7): a doc that quotes an error runs the fix it prints too — builder
-- #873 — a passage built clause by clause in review rounds ends as one long sentence: the orchestrator rereads the final wording against `concise-docs` before ready — orchestrator
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
-- #853 — six skills keep a `## Checklist` (`backward-compat`, `code-style`, `consumer-usage`, `merge-gate`, `review-comments`, `zero-abstraction`) after #853 cut the six others as duplicates: one rule for all, at the next method PR
-- #854 — `sectionErrors` still leaves unchecked `[reference.md](reference.md#x) § X` and `[reference.md](./reference.md) § X`, and checks a bare `skills/code-style/reference.md § Claims` against the citing skill's own reference; no such citation in the tree
-- #867 — `website/typed-sql.md` § Install and `tools/typegen/README.md`: `--legacy-peer-deps`, which npm's ERESOLVE hint suggests on TypeScript 7, skips the peers, so the missing-peer line comes before the TypeScript 7 one; neither says so — orchestrator
-- #866 — `website/.vitepress/meta.ts:4` and `:54`: two comment lines lengthened past the file's wrap width, not re-wrapped — orchestrator
-- #873 — `scripts/check-skills.mjs:44` is 142 columns, and two more lines in `scripts/` are over 120; lint does not enforce the width — `form` — builder

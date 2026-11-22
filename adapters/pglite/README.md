@@ -140,6 +140,7 @@ cd adapters/pglite
 npm ci
 npm test                  # the tables above, the shortcuts, prepared queries and transactions
 npm run test:types        # the tests, and asPool() against the root's db.d.ts
+npm run build             # dist/, which check:browser reads
 npm run check:browser     # dist/, then zapatos/db with it, bundled for a page with no Node built-in and run given only TextEncoder and Buffer
 ```
 
