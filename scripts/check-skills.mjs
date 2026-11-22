@@ -1,9 +1,9 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The checks of `npm run check:agents` on .agents/skills (.agents/README.md § Writing a skill): each SKILL.md's
 // frontmatter, and the size and citations of each SKILL.md and of the reference.md beside it, read in full when its
-// core names a case, so under the same limits.
+// core names a case, so under the same limits; neither holds a `## Checklist`, nor a sentence the other already holds.
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {basename, join} from 'node:path';
 
 const maxDescriptionLength = 350;
 const maxLines = 150;  // hard limits of a skill, its reference or an agent; the budget is ~100 lines
@@ -63,6 +63,32 @@ export function sectionErrors(path, text, reference) {
   return errors;
 }
 
+/** One error if `text` has a `## Checklist`, which repeats rules its sections state; empty if none. */
+export function checklistErrors(path, text) {
+  return /^## Checklist\s*$/m.test(text) ? [`${path}: has a ## Checklist; each rule goes in its section, once`] : [];
+}
+
+/**
+ * One error per sentence of eight words or more that a skill's files, `texts` (path, text), hold twice, naming the
+ * first by its file and line: a copy, where a core gives a summary and a link. A sentence ends at `.`, `;` or `:` before a space, and is compared in lower case,
+ * its bullet's marker and every character but letters, digits, `_`, backticks and spaces dropped.
+ */
+export function duplicateErrors(texts) {
+  const seen = new Map(), errors = [];
+  for (const [path, text] of texts) {
+    text.split('\n').forEach((line, index) => {
+      for (const sentence of line.replace(/^\s*(?:[-*]|\d+\.)\s+/, '').split(/(?<=[.;:])\s+/)) {
+        const words = sentence.toLowerCase().replace(/[^\p{L}\p{N}_` ]/gu, '').split(/\s+/).filter(Boolean);
+        if (words.length < 8) continue;
+        const key = words.join(' ');
+        if (seen.has(key)) errors.push(`${path}:${index + 1}: repeats ${seen.get(key)} ('${words.slice(0, 6).join(' ')} …')`);
+        else seen.set(key, `${basename(path)}:${index + 1}`);
+      }
+    });
+  }
+  return errors;
+}
+
 /** The frontmatter's keys, or `undefined` if it has none. */
 export function frontmatterOf(text) {
   const match = text.match(/^---\n([\s\S]*?)\n---\n/);
@@ -83,17 +109,20 @@ export function checkSkills(directory) {
       errors.push(`${path}: missing`);
       continue;
     }
-    const text = readFileSync(path, 'utf8');
+    const text = readFileSync(path, 'utf8'), texts = [[path, text]];
     files.push(path);
     const reference = join(directory, skill, 'reference.md');
     if (existsSync(reference)) {
       const referenceText = readFileSync(reference, 'utf8');
       files.push(reference);
+      texts.push([reference, referenceText]);
       errors.push(...sizeErrors(reference, referenceText), ...sectionErrors(path, text, referenceText));
       if (!/reference\.md/.test(text)) errors.push(`${reference}: not cited by its SKILL.md`);
     } else if (/reference\.md/.test(text)) {
       errors.push(`${path}: links reference.md, which does not exist`);
     }
+    for (const [file, fileText] of texts) errors.push(...checklistErrors(file, fileText));
+    errors.push(...duplicateErrors(texts));
     const frontmatter = frontmatterOf(text);
     if (!frontmatter) {
       errors.push(`${path}: missing frontmatter`, ...sizeErrors(path, text));
