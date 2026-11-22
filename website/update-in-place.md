@@ -11,6 +11,7 @@ Add a vote to a film's four-star count:
 
 <<< ./examples/update_in_place.ts{ts twoslash}
 
+<template #caption><span>The docs schema seeds no ratings, so there is no row to update: an empty array. Once film 1002 has a four-star row, the same update adds one vote to it.</span></template>
 </CastPanel>
 
 - [`add(1)`](/conditions#conditions.add) is `"votes" + $1`<!-- probe: examples/update_in_place.ts -->. `` db.sql`${db.self} + 1` `` writes the same with `1` in the SQL text.

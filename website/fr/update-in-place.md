@@ -1,5 +1,5 @@
 ---
-english: 40523215b823
+english: d6faaff2b6af
 ---
 
 # Mises à jour en place
@@ -15,6 +15,7 @@ Ajouter un vote au compte de quatre étoiles d’un film :
 
 <<< ../examples/update_in_place.ts{ts twoslash}
 
+<template #caption><span>Le schéma de la doc ne contient aucune note, donc aucune ligne à mettre à jour : un tableau vide. Une fois que le film 1002 a une ligne quatre étoiles, la même mise à jour lui ajoute un vote.</span></template>
 </CastPanel>
 
 - [`add(1)`](/fr/conditions#conditions.add) donne `"votes" + $1`<!-- probe: examples/update_in_place.ts -->. `` db.sql`${db.self} + 1` `` écrit la même chose, avec `1` dans le texte SQL.
