@@ -71,6 +71,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - An explanation links the entries it discusses.
 - **Voice**: warm and brief, first person where natural, British spelling (`colour`, `behaviour`, `licence`), Zapatos rather than its author (skill [`code-style`](../.agents/skills/code-style/SKILL.md) § Docs voice).
 - **The film world**: every example on the docs schema (§ The docs schema), every name invented, an explicit date rather than `now()`.
+- **Conditions in `sql`**: an example's condition on a column is a Whereable, which the type checks by column and by value; `param()` stays for a join's qualified name, a cast, a comparison that is not a column against a value, and a query `@pgcast/typegen` types (`raw-sql.md` § Pass each value as a parameter).
 
 ### Easy reading
 
