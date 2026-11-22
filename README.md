@@ -121,7 +121,8 @@ The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin
 4. Done: [Infer the types of raw SQL](https://github.com/AlexandreDemartin/pgcast/issues/21).
 5. Done: [Give pgcast its own documentation](https://github.com/AlexandreDemartin/pgcast/issues/85), alongside the others: a site in the spirit of Zapatos's docs, then docs that move with the code.
 6. Done: [Make the opt-in fixes the default (7.0)](https://github.com/AlexandreDemartin/pgcast/issues/766).
-7. [Ready pgcast for its first users](https://github.com/AlexandreDemartin/pgcast/issues/850).
+7. Done: [Ready pgcast for its first users](https://github.com/AlexandreDemartin/pgcast/issues/850).
+8. [Publish the fixes made since 7.1.0](https://github.com/AlexandreDemartin/pgcast/issues/875).
 
 ## Relationship with Zapatos
 
