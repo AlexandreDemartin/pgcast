@@ -3,7 +3,7 @@
 // code as the TypeScript worker emits it. `zapatos/db` is pgcast's runtime, bundled in. As you type, `pool` only
 // records each query and gives no rows back, as cast.data.ts's at build; on a Run, it is Postgres, PGlite on the docs
 // schema (pglite.ts), imported then only. A worker has no DOM and no access to the page.
-import { warnings } from './globals.ts';  // first: zapatos/db reads them as it loads
+import './globals.ts';  // first: zapatos/db reads `Buffer` as it loads
 import * as db from 'zapatos/db';
 import { layOut, normalised, valuesShown } from '../panel.ts';
 import { configOf, poolOf, type QueryConfig } from './pool.ts';
@@ -22,7 +22,6 @@ export interface Query {
 
 export interface Run {
   queries: Query[];
-  warnings: string[];
   error?: string;
 }
 
@@ -102,7 +101,7 @@ onmessage = async ({ data: { js, postgres: onPostgres } }: MessageEvent<Code>) =
   try {
     Object.assign(globalThis, { pgcastDb: db, pool: onPostgres ? await postgres() : recording });
   } catch (thrown) {  // PGlite's files did not load
-    postMessage({ queries, warnings, error: `Postgres did not start: ${message(thrown)}` } satisfies Run);
+    postMessage({ queries, error: `Postgres did not start: ${message(thrown)}` } satisfies Run);
     return;
   }
   if (onPostgres) postMessage({ started: true } satisfies Message);
@@ -112,5 +111,5 @@ onmessage = async ({ data: { js, postgres: onPostgres } }: MessageEvent<Code>) =
     error ??= message(thrown);
   }
   await new Promise(resolve => setTimeout(resolve));  // a query the code does not await is still recorded
-  postMessage({ queries, warnings, error } satisfies Run);
+  postMessage({ queries, error } satisfies Run);
 };

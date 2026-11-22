@@ -1,11 +1,11 @@
 ---
-english: da3099309d6a
+english: ff848a2eef68
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
 # Quitter Zapatos ou mettre à niveau pgcast
 
-Vous utilisez déjà pgcast 6.x ? Commencez par la [migration vers la 7.0](#from-7-0). Si vous partez de Zapatos 6.6.1, suivez d’abord les étapes 1 à 6 avec pgcast 6.x. Les avertissements de cette série vous aideront à préparer le passage à la 7.0. Pour un nouveau projet, commencez par [Installation](/fr/install).
+Vous utilisez déjà pgcast 6.x ? Commencez par la [migration vers la 7.0](#from-7-0). Si vous partez de Zapatos 6.6.1, suivez d’abord les étapes 1 à 6 avec pgcast 6.x. Les avertissements de cette série vous aideront à préparer le passage à la 7.0. Pour un nouveau projet, commencez par [Installation](/fr/install). Ce que pgcast ajoute, une ligne par ajout : [Nouveautés](/fr/whats-new).
 {.lede}
 
 <AtAGlance>

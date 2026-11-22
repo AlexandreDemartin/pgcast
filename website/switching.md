@@ -4,7 +4,7 @@ description: "Move from Zapatos 6.6.1 to pgcast 6.x, then migrate to 7.0 and che
 
 # Switch from Zapatos or upgrade pgcast
 
-Already on pgcast 6.x? Start with the [7.0 migration](#from-7-0). From Zapatos 6.6.1, follow steps 1–6 on pgcast 6.x first. That release line emits the warnings that help you prepare for 7.0. For a new project, start at [Install](/install).
+Already on pgcast 6.x? Start with the [7.0 migration](#from-7-0). From Zapatos 6.6.1, follow steps 1–6 on pgcast 6.x first. That release line emits the warnings that help you prepare for 7.0. For a new project, start at [Install](/install). What pgcast adds, one line each: [What's new](/whats-new).
 {.lede}
 
 <AtAGlance>

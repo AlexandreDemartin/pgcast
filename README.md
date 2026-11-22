@@ -76,6 +76,8 @@ Switching from Zapatos 6.6.1? Keep your `zapatos/*` imports and [install pgcast 
 
 ## What differs from Zapatos 6.6.1
 
+What pgcast adds, one line each, with its version: [What's new](https://pgcast.dev/whats-new).
+
 - **Security.** From 6.6.2, a string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](https://pgcast.dev/changelog#6.6.2-security). Later releases closed more holes that Zapatos 6.6.1 shares, each with its advisory: [fixes by release](https://pgcast.dev/security#fixes-by-release).
 - **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns, and a result that contradicts the function's name, type or docs changes, such as `not()`, which now negates its whole condition: each is listed under `Fixed` in the [changelog](https://pgcast.dev/changelog).
 - **Opt-ins**, for surprises that code may rely on. In 6.x each is off by default; the old path emits a `DeprecationWarning` once per process, with a code to search for, except `selectExactlyOneChecksForSecondRow`'s and the generator's `domainsTypedAsUnions`, which stay opt-in for good, and the generator's others, which note through `warningListener` ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
@@ -124,7 +126,8 @@ The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin
 5. Done: [Give pgcast its own documentation](https://github.com/AlexandreDemartin/pgcast/issues/85), alongside the others: a site in the spirit of Zapatos's docs, then docs that move with the code.
 6. Done: [Make the opt-in fixes the default (7.0)](https://github.com/AlexandreDemartin/pgcast/issues/766).
 7. Done: [Ready pgcast for its first users](https://github.com/AlexandreDemartin/pgcast/issues/850).
-8. [Publish the fixes made since 7.1.0](https://github.com/AlexandreDemartin/pgcast/issues/875).
+8. Done: [Publish the fixes made since 7.1.0](https://github.com/AlexandreDemartin/pgcast/issues/875).
+9. [Show what pgcast can do in its docs](https://github.com/AlexandreDemartin/pgcast/issues/891).
 
 ## Relationship with Zapatos
 
