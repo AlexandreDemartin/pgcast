@@ -38,6 +38,12 @@ Candidates for a check, a rule or a skill line.
 - #866 — an issue's counts go stale between filing and building (68 pages then, 70 now): the builder recounts from `dist` and says so — orchestrator
 - #870 — Google's Rich Results Test now asks for a sign-in: an agent validates with validator.schema.org, and the live test goes to the owner after deploy — builder
 - #870 — the root `CHANGELOG.md` is the npm package's: a docs-site change goes in `website/README.md`, not there — orchestrator
+#869 — VitePress keeps a fence's highlighted HTML as it is only when it starts with `<pre`: to swap a block for a component, set `is="vue:<name>"` on the `<pre>`, never rename the tag — branch-reviewer
+#869 — a Vue functional component without props passes only `class`, `style` and listeners to its root: set `inheritAttrs: false` and pass `attrs` by hand — branch-reviewer
+#869 — a PR that claims "the built HTML does not change" proves it in its first round with a tag-level diff of the built pages against master — branch-reviewer
+#869 — `el.__vnode` is not set in a production build: test hydration by reading the element's event listeners — builder
+#869 — `vitepress preview` can serve the assets of the previous build: rebuild and restart it, then check the asset hashes, before measuring — builder
+#869 — runner Lighthouse scores swing several points run to run (`/select` 93 to 99 on the same commit): measure a performance change locally under CPU slowdown, the runner median only gates — orchestrator
 
 ## Minors kept
 
