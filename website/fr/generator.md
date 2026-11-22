@@ -1,5 +1,5 @@
 ---
-english: b44e430361d0
+english: e8ce1d01ae29
 ---
 
 # Générateur
@@ -146,6 +146,8 @@ await generate({
 
 Toutes les options sont facultatives. Une option donnée remplace entièrement sa valeur par défaut : `schemas` sans `public` laisse `public` de côté.
 
+Les réglages courants :
+
 | Option | Par défaut | Ce qu’elle règle |
 |---|---|---|
 | [`db`](#generate.db) | aucune : les valeurs par défaut de `pg` | la connexion |
@@ -157,19 +159,24 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`customTypesTransform`](#generate.customTypesTransform) | `"PgMy_type"` | les noms des types personnalisés |
 | [`schemaJSDoc`](#generate.schemaJSDoc) | `true` | un commentaire JSDoc sur chaque relation et chaque colonne |
 | [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers) | `false` | le type `JSONSelectable` de `bigint` et `numeric` |
-| [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `true` | le type d’un enum d’un autre schéma |
-| [`enumOrder`](#generate.enumOrder) | `"declared"` | l’ordre des labels d’un enum |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
-| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
-| [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | les noms figurant dans l’`UniqueIndex` de chaque relation |
 | [`constraintNames`](#generate.constraintNames) | `false` | les noms figurant dans le type `Constraint` de chaque relation |
-| [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | le type des domaines imbriqués et des tableaux de domaines, ainsi que celui des domaines sur `bigint`, `numeric`, `bytea`, `money`, une date ou un tableau de ces types hors de `Selectable` |
-| [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | le type `Selectable` d’un tableau d’un enum |
-| [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | `true` | le type d’un `interval` dans `Selectable` et dans une écriture |
 | [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions) | `false` | le type d’un domaine sur `text` dont le `CHECK` liste les valeurs |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
+
+Les options suivantes ont changé de valeur par défaut en 7.0.0. Chacune garde le comportement de la 6.x avec la valeur indiquée. Voir le [guide de migration](/fr/switching#regenerate-for-7-0).
+
+| Option | Par défaut | Valeur 6.x | En 8.0 | Ce qu’elle règle |
+|---|---|---|---|---|
+| [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `true` | `false` | retirée | le type d’un enum d’un autre schéma |
+| [`enumOrder`](#generate.enumOrder) | `"declared"` | `"alphabetical"` | retirée | l’ordre des labels d’un enum |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | `false` | reste | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
+| [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | `false` | retirée | les noms figurant dans l’`UniqueIndex` de chaque relation |
+| [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | `false` | retirée | le type des domaines imbriqués et des tableaux de domaines, ainsi que celui des domaines sur `bigint`, `numeric`, `bytea`, `money`, une date ou un tableau de ces types hors de `Selectable` |
+| [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | `false` | reste | le type `Selectable` d’un tableau d’un enum |
+| [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | `true` | `false` | reste | le type d’un `interval` dans `Selectable` et dans une écriture |
 
 ### `db` {#generate.db}
 
