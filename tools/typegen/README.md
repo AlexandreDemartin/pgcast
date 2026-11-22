@@ -9,7 +9,7 @@ npm install pgcast@npm:@pgcast/pgcast pg
 npm install --save-dev @pgcast/typegen
 ```
 
-The tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the `--project` tsconfig resolves. TypeScript 7 has none: npm refuses the install with `ERESOLVE`, and from 0.2.0 a tool installed anyway stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`; installed with `--legacy-peer-deps`, which `ERESOLVE` suggests, it first stops on the peer that flag skipped, `@pgcast/pgcast is not installed: …`, whose `npm install @pgcast/pgcast` fails with `ERESOLVE` again. Instead, on TypeScript 7, install the tool in a folder of its own with `typescript@6` and the same `@pgcast/pgcast` version as your application's:
+The tool reads your sources with the JavaScript API of TypeScript 4.1 to 6, from the `typescript` that the `--project` tsconfig resolves. TypeScript 7 has none. npm refuses the install with `ERESOLVE`, and from 0.2.0 a tool installed anyway stops with `typescript 7.0.2 from <tsconfig> has no JavaScript API`. With `--legacy-peer-deps`, which `ERESOLVE` suggests, it stops first on the peer that flag skipped (`@pgcast/pgcast is not installed: …`), and the `npm install @pgcast/pgcast` it suggests fails with `ERESOLVE` again. On TypeScript 7, install the tool in a folder of its own instead, with `typescript@6` and the same `@pgcast/pgcast` version as your application's:
 
 ```sh
 npm install --save-dev --prefix typegen @pgcast/typegen @pgcast/pgcast@<your version> pg typescript@6
