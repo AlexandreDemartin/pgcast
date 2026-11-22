@@ -2,7 +2,7 @@
 description: "Move from Zapatos 6.6.1 to pgcast 6.x, then migrate to 7.0 and check the new defaults, types and install requirements."
 ---
 
-# Switch from Zapatos or upgrade pgcast
+# Switch from Zapatos
 
 Already on pgcast 6.x? Start with the [7.0 migration](#from-7-0). From Zapatos 6.6.1, follow steps 1–6 on pgcast 6.x first. That release line emits the warnings that help you prepare for 7.0. For a new project, start at [Install](/install). What pgcast adds, one line each: [What's new](/whats-new).
 {.lede}
@@ -116,7 +116,7 @@ Look through your code for the first column of each table below. Each change in 
 | Your code | Zapatos 6.6.1 | pgcast | What to do |
 |---|---|---|---|
 | [`not()`](/conditions#conditions.not) of a fragment with a bare `OR` or `AND`: on `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` | `(NOT a) OR b`, so the 1991 film too | `(NOT (a OR b))`<!-- probe: db.conditions.not(db.sql`a OR b`) --> | for the old rows, `` db.sql`(NOT ${db.self} = 1974) OR ${db.self} = 1991` `` |
-| [`and()`](/conditions#conditions.and) of a fragment with a bare `OR` and another operand: `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, so film 1000 too | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | for the old rows, one fragment: `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
+| [`and()`](/conditions#conditions.and) of a fragment with a bare `OR` and another operand: `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, so film 1000 too | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | for the old rows, one fragment: `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${{ studio_id: 1001 }})` `` |
 | [`and()`](/conditions#conditions.and) of fragments that split one expression: `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, films 1000 and 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, which Postgres refuses (42601) | one condition: `{ release_year: db.conditions.between(1970, 2000) }` |
 | `groupBy` given an `and()` or `or()` with no argument: `count('films', db.all, { groupBy: db.conditions.and() })` | `GROUP BY ()`, the empty grouping set: 4 | `GROUP BY TRUE`<!-- probe: db.count('films', db.all, { groupBy: db.conditions.and() }) -->, which Postgres refuses (42601), `GROUP BY FALSE` for `or()` | leave `groupBy` out: 4 |
 | [`db.all`](/sql-template#all) as a condition's value, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` or `arrayContains([db.all])`: `deletes('films', { title: db.conditions.ne(db.all) })`; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, a fragment or `parent()` as an item of [`arrayContains()`](/conditions#conditions.arrayContains), `arrayContainedIn()` or `arrayOverlaps()`: `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, so every film with a title deleted; the item as its text or JSON in the array, `'{"Symbol(DEFAULT)"}'`, so every film renamed | refused by `tsc` on these columns, accepted on a column typed `any`; throws while compiling | for the same rows, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }`; else a value to compare with |
