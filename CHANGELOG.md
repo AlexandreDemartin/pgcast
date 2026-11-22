@@ -6,6 +6,12 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [7.1.2] - 2026-11-22
+
+### Fixed
+
+- The README's install commands under the `pgcast` alias add `pg`, which `--legacy-peer-deps` leaves out, and its first example says it imports `zapatos/*` (`pgcast/*` under the alias with `moduleNames: 'pgcast'`). [#886](https://github.com/AlexandreDemartin/pgcast/issues/886)
+
 ## [7.1.1] - 2026-11-22
 
 ### Added
