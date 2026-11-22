@@ -23,6 +23,10 @@ Candidates for a check, a rule or a skill line.
 - #874 — word counts quoted in a GitHub comment drift between rounds: recount them against the named base when the comment is edited — builder
 - #878 — a docs recipe proved by a harness that passes in a dependency the recipe bundles (a PGlite built in Node) does not test the recipe's command: replay the copyable blocks exactly as written, with the versions the doc names — branch-reviewer
 - #878 — an adapter's install command names every required peer of the core (`pg`): a package manager that installs no peers fails at `import 'zapatos/db'`; the consumer probe runs each README's install with `--legacy-peer-deps`, not only `/install` — audit
+- #886 — an orchestrator brief asked for "the label the languages section names", but `website/README.md` § Languages names a script (`docs:translated`), not a label: a brief quotes the rule it relies on rather than paraphrasing it — builder
+- #886 — the home's install line (`website/index.md`) drops `pg` by #371's choice, so a `pg` sweep of install commands skips it rather than flagging it — builder
+- #886 — a find-and-replace anchored on a French line ending in "PGlite : c’est" missed (the space before the colon is U+00A0); anchoring on the line's start worked — builder
+- #886 — two fixes in separate hunks of one file were committed apart with `git apply --cached --unidiff-zero` on one hunk, as `git add -p` is interactive here — builder
 
 ## Minors kept
 
