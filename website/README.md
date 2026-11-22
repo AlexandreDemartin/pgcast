@@ -21,8 +21,8 @@ The site is in the four groups of [Diátaxis](https://diataxis.fr/) (decision 00
 | Group | The question | It holds | It never holds |
 |---|---|---|---|
 | Tutorial | Is the reader learning? | one path, each step shown and checked | choices, every option, the why |
-| How-to guide | Do they have a task in mind? | the steps of that task, in their order | a lesson from scratch, every option |
 | Reference | Are they looking something up? | every export and option: its signature, the SQL it writes, its effect on the type | steps, opinions, the why |
+| How-to guide | Do they have a task in mind? | the steps of that task, in their order | a lesson from scratch, every option |
 | Explanation | Do they want the why? | prose: the idea, its history, its trade-offs | steps to follow, lists of options |
 
 - What belongs to another job goes to its page, as a link.
@@ -64,7 +64,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - The hash is the anchor exactly as written: an entry's name, case and dots kept (`` [`Config.castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) ``, `` [`SelectResultMode`](#SelectResultMode) `` on its own page); a heading without `{#…}` by its slug, in lower case with hyphens (`## Insert options` → `#insert-options`). No raw `<a href>`.
   - The build also fails on a raw `<a href>` to a page that does not exist, on a link to an anchor that its page does not define (the part before a text fragment's `:~:`, if any), and on a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A link written with the site's host (`https://pgcast.dev/…`) is checked the same way. A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
   - A URL of the site in a fenced block (`https://pgcast.dev/…`), such as the rules file of `ai-assistant.md` that readers copy into their projects, is checked the same way, page and anchor, and reported with its line. The home may be written without its slash.
-  - A tutorial ends on the three other groups.
+  - A tutorial ends on the other groups, in the order of the outline.
   - A how-to links each option it uses to its entry.
   - A reference entry links its explanation for the why.
   - An explanation links the entries it discusses.

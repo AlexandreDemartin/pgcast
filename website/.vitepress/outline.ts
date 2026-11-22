@@ -20,6 +20,21 @@ const groups: Group[] = [
     ],
   },
   {
+    text: { en: 'Reference', fr: 'Référence' },
+    nav: { en: 'Reference', fr: 'Référence' },
+    link: '/reference',
+    collapsed: false,  // open: what a reader looks up every day
+    items: [
+      { text: { en: 'SQL template', fr: 'Template SQL' }, link: '/sql-template' },
+      { text: { en: 'Select', fr: 'Lectures' }, link: '/select' },
+      { text: { en: 'Writes', fr: 'Écritures' }, link: '/insert' },
+      { text: { en: 'Conditions', fr: 'Conditions' }, link: '/conditions' },
+      { text: { en: 'Transactions', fr: 'Transactions' }, link: '/transaction' },
+      { text: { en: 'Configuration', fr: 'Configuration' }, link: '/runtime-config' },
+      { text: { en: 'Generator', fr: 'Générateur' }, link: '/generator' },
+    ],
+  },
+  {
     text: { en: 'How-to guides', fr: 'Guides pratiques' },
     nav: { en: 'Guides', fr: 'Guides' },
     link: '/guides',
@@ -40,21 +55,6 @@ const groups: Group[] = [
       { text: { en: 'Testing', fr: 'Tests' }, link: '/testing' },
       { text: { en: 'AI assistants', fr: 'Assistants IA' }, link: '/ai-assistant' },
       { text: { en: 'Switch from Zapatos', fr: 'Venir de Zapatos' }, link: '/switching' },
-    ],
-  },
-  {
-    text: { en: 'Reference', fr: 'Référence' },
-    nav: { en: 'Reference', fr: 'Référence' },
-    link: '/reference',
-    collapsed: false,  // open: what a reader looks up every day
-    items: [
-      { text: { en: 'SQL template', fr: 'Template SQL' }, link: '/sql-template' },
-      { text: { en: 'Select', fr: 'Lectures' }, link: '/select' },
-      { text: { en: 'Writes', fr: 'Écritures' }, link: '/insert' },
-      { text: { en: 'Conditions', fr: 'Conditions' }, link: '/conditions' },
-      { text: { en: 'Transactions', fr: 'Transactions' }, link: '/transaction' },
-      { text: { en: 'Configuration', fr: 'Configuration' }, link: '/runtime-config' },
-      { text: { en: 'Generator', fr: 'Générateur' }, link: '/generator' },
     ],
   },
   {
