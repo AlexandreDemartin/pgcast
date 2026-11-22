@@ -44,6 +44,9 @@ Candidates for a check, a rule or a skill line.
 #869 — `el.__vnode` is not set in a production build: test hydration by reading the element's event listeners — builder
 #869 — `vitepress preview` can serve the assets of the previous build: rebuild and restart it, then check the asset hashes, before measuring — builder
 #869 — runner Lighthouse scores swing several points run to run (`/select` 93 to 99 on the same commit): measure a performance change locally under CPU slowdown, the runner median only gates — orchestrator
+#861 — a draft PR runs no CI job: a check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready — orchestrator
+#861 — a failure planted in a page with a French twin trips the translation check first: plant it in the theme, which both languages share — builder
+#861 — a Lighthouse gate on a shared runner reads the median of three runs per page: a single run swings several points — builder
 
 ## Minors kept
 
