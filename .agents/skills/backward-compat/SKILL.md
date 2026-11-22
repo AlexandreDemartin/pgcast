@@ -15,6 +15,7 @@ Cases that serve a minority of steps are in [reference.md](reference.md), read w
 - The generated types and their shape (`Selectable`, `Insertable`, `Whereable`, `Updatable`, `*ForTable<T>`).
 - The SQL produced by each shortcut: a user may log, test or depend on it.
 - The config (`zapatosconfig.json`, `setConfig`) and the CLI (`npx zapatos`).
+- No export removed nor added by accident: `git diff $(git merge-base origin/master HEAD) -- db.mjs generate.mjs` after `npm run build`. Each export of a module in `src/generate/index.ts`'s `export *` is public, so a helper goes in its own module; under `node10` a consumer's `.d.ts` names `zapatos/dist/db/*` paths, so an export of `dist` stays (#581).
 
 ## Breaking, hence a stop point
 
@@ -48,10 +49,3 @@ Each claim about what 6.6.1 does (issue, plan, review item, `CHANGELOG.md` line,
 - **Where**: a scratch folder outside `test/` (Vitest collects only `test/` and swallows `console.log`), output to a file, nothing committed.
 - **Three runtimes**: 6.6.1, master and the branch, both ways: a half-done fix on master can be worse than both (#24), and "the same under both" fails going back. Once on the pre-fix commit too, to show the grid finds the defect; the proof is the whole grid's diff, never a count nor the targeted values (#34, #168, #501). A read count "as in 6.6.1" is measured on 6.6.1's `dist`, not master's, which adds reads (#550); a claim about a range of versions replays each one (#568); 6.6.1's type name replays what it now resolves to (#539).
 - Before building the cases: each case, what to replay and the types grid, in [reference.md](reference.md) § Replay, do not reason.
-
-## Checklist
-
-- [ ] No export removed nor added by accident: `git diff $(git merge-base origin/master HEAD) -- db.mjs generate.mjs` after `npm run build` (each `export` of a module in `src/generate/index.ts`'s `export *` is public: a helper goes in its own module; under `node10` a consumer's `.d.ts` names `zapatos/dist/db/*` paths, so an export of `dist` stays, #581)
-- [ ] Characterisation tests unchanged, or diff justified
-- [ ] Each claim about 6.6.1 replayed, on 6.6.1, master and the branch
-- [ ] `CHANGELOG.md` line (`Added`, `Changed`, `Fixed`)
