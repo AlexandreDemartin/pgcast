@@ -121,6 +121,8 @@ npm run test:types
 npm pack --dry-run --json
 ```
 
+Its `npm ci` installs the published `@pgcast/pgcast`, so these checks test a change to the root only once the root's `npm pack` is unpacked into `node_modules/@pgcast/pgcast`; a symlink to the root fails, as Vitest inlines its `generate.mjs` (#885).
+
 CI runs the suite with pg 8.6.0 and the lockfile's pg on Postgres 14, 16, 18 and 19, and three of its files on TypeScript 4.1.6 and 6.0.3. To replay those locally, `npm run check:floor` at the root installs 4.1.6 in `node_modules/.cache/pgcast-ts41`, and `npm install --prefix <dir> --no-save typescript@6.0.3` the other:
 
 ```sh

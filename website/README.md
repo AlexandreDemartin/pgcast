@@ -26,6 +26,7 @@ The site is in the four groups of [Diátaxis](https://diataxis.fr/) (decision 00
 | Explanation | Do they want the why? | prose: the idea, its history, its trade-offs | steps to follow, lists of options |
 
 - What belongs to another job goes to its page, as a link.
+- A new group touches every list of the groups, in the outline's order: `outline.ts` (which `llms.txt` follows), each home's read-next cards and `README.md`'s docs line (#903, #905, #915).
 - A recipe is a how-to of one need met with one query, in the *Recipes* group after the guides: its list, format and title rule are [decision 015](../docs/decisions/015-recipes.md) § 2, from `templates/how-to.md`.
 - A new page: its entry in `outline.ts`, then `<link>.md`. Until the file exists, `[page].paths.ts` makes the entry a "Coming" page.
 - A page that documents a minor carries its version in its entry, glued to the text: `'Versions<small class="since">6.7</small>'`.
@@ -65,14 +66,14 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - The hash is the anchor exactly as written: an entry's name, case and dots kept (`` [`Config.castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) ``, `` [`SelectResultMode`](#SelectResultMode) `` on its own page); a heading without `{#…}` by its slug, in lower case with hyphens (`## Insert options` → `#insert-options`). No raw `<a href>`.
   - The build also fails on a raw `<a href>` to a page that does not exist, on a link to an anchor that its page does not define (the part before a text fragment's `:~:`, if any), and on a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A link written with the site's host (`https://pgcast.dev/…`) is checked the same way. A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
   - A URL of the site in a fenced block (`https://pgcast.dev/…`), such as the rules file of `ai-assistant.md` that readers copy into their projects, is checked the same way, page and anchor, and reported with its line. The home may be written without its slash.
-  - An anchor that leaves its page gets its line in `.vitepress/moved.ts`, `'/select#count': '/aggregates#count'`, and the site's links go to its new place: a bookmark of the old one opens the new one, in each language. The build fails on a line whose new place does not exist, whose new place has moved again, or whose old anchor is still on its page.
+  - An anchor that leaves its page gets its line in `.vitepress/moved.ts`, `'/select#count': '/aggregates#count'`, and the site's links go to its new place: a bookmark of the old one opens the new one, in each language. The build fails on a line whose new place does not exist, whose new place has moved again, or whose old anchor is still on its page. A page split proves that it loses no anchor: the old tag's anchors minus the new pages' are each a line of `moved.ts` (#913).
   - A tutorial ends on the other groups, in the order of the outline.
   - A how-to links each option it uses to its entry.
   - A reference entry links its explanation for the why.
   - An explanation links the entries it discusses.
 - **Voice**: warm and brief, first person where natural, British spelling (`colour`, `behaviour`, `licence`), Zapatos rather than its author (skill [`code-style`](../.agents/skills/code-style/SKILL.md) § Docs voice).
 - **The film world**: every example on the docs schema (§ The docs schema), every name invented, an explicit date rather than `now()`.
-- **Conditions in `sql`**: an example's condition on a column is a Whereable, which the type checks by column and by value; `param()` stays for a join's qualified name, a cast, a comparison that is not a column against a value, and a query `@pgcast/typegen` types (`raw-sql.md` § Pass each value as a parameter).
+- **Conditions in `sql`**: an example's condition on a column is a Whereable, which the type checks by column and by value; `param()` stays for a join's qualified name, a cast, a comparison that is not a column against a value, and a query `@pgcast/typegen` types (`raw-sql.md` § Pass each value as a parameter). In prose or a table, the `{{ … }}` of a Whereable in a code span is Vue's interpolation and breaks the page: write it `<code v-pre>`, a backtick as `&#96;`; a fenced block is safe (#914).
 
 ### Easy reading
 
@@ -134,9 +135,10 @@ A reader scans before reading, so a page breathes. Less is more: it keeps every 
   - The code below `// ---cut---` of each `ts twoslash` block and `<<< ./examples/<name>.ts{ts twoslash}` (unindented) above it, up to the previous such line, is joined in page order and type-checked: a name declared twice or an import the page never gives fails.
   - A block that shows an error (`// @errors:`) stays out of the join, as the reader does not keep it. Its code is type-checked below the steps above it, in a `{ … }` of its own, and must give exactly the codes it lists: Twoslash checks it only against its own setup.
   - If the first `ts twoslash` block under the line is titled with the file (`ts twoslash [src/films.ts]`), it shows the whole file: it must be the join, imports in any order and blank lines aside.
-- An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
+- An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`). What it says comes from a run, with the session's `TimeZone` set to UTC before reading an offset: the probe server's is not (#900).
 - On a docs page, the panel's code label ends with **Open in playground**, a link that opens its example in `/playground`, the code after `// ---cut---` and above it, deflated into `#code/…` at build (`.vitepress/playgroundLinks.ts`); its accessible name adds the heading above the panel (`Open in playground: Arrays, example 2`). None on the home nor on the playground. The playground gives the type of its code's first `const`; an example that runs a query above its cut, so that another `const` comes first, writes `// the playground gives the type of the next const` on the line above `// ---cut---` (`examples/paginate_keyset.ts`), or gets no link. After VitePress, the build decodes each link of the built pages as the playground does, and fails on a panel without its link, or whose link opens other code.
 - The playground runs `zapatos/db` in a worker, with a stand-in for Node's `Buffer` (`.vitepress/playground/globals.ts`), where `docs:examples` has the real one. Before VitePress, `docs:build` fails on a static method of `Buffer` that the built `dist/db` calls and the stand-in lacks (`check-buffer.mjs`), naming the method and each `file:line` that calls it.
+- A PR proves its panels run in the playground with their links read from the built pages' HTML, each opened by its own navigate (the list kept in `localStorage`) or in a same-origin iframe, then one `evaluate_script` that presses Run and returns the live region's `innerText`: `take_snapshot` and `wait_for` dump the schema block, about 1,100 nodes a call (#898, #899, #906, #911).
 
 ### The reference
 
@@ -190,7 +192,8 @@ A "Coming" page has no `.md` file, so it is in neither; nor are the templates an
 
 A PR that changes how a page looks shows it, in light and dark, at a phone's width (375px) and a desktop's: from `npm run docs:preview`, on a private artifact linked from **Proofs** (skill [`plan-and-proofs`](../.agents/skills/plan-and-proofs/SKILL.md) § Proofs), as `gh` cannot attach images. In the browser, they can go in the PR's description instead.
 
-- `docs:preview` keeps the file list it read at start-up: restart it after each rebuild, or the new hashed CSS gives 404.
+- `docs:preview` keeps the file list it read at start-up: restart it after each rebuild, or the new hashed CSS gives 404. Agents in parallel each serve it on a port of their own (`-- --port <n>`), as all take 4173 by default (#906).
+- An element is shot in a viewport screenshot after scrolling it into view, cropped at the device pixel ratio: a full-page one lays the page out again (#914). chrome-devtools `take_screenshot` writes only inside its workspace roots, not into the session's scratch folder (#895).
 - Headless Chrome stops at about 500px with `--window-size`: a phone's width goes through the DevTools protocol, `Emulation.setDeviceMetricsOverride` with `mobile: true`.
 - The nav has no fixed breakpoints, it moves what does not fit into `⋯`: a change to its text is checked at every width from 768 to 1280px.
 - A PR that says the built HTML does not change proves it in its first round with a tag-level diff of the built pages against master's (#871).
@@ -249,6 +252,7 @@ The build compares each French page with its English page, by VitePress's own pa
   | built-in object, host object, array-like, destructuring, shallow copy, own enumerable keys | objet natif, objet hôte, semblable à un tableau, déstructuration, copie superficielle, propres clés énumérables |
   | namespace, package (npm), patch version, JSDoc tag | espace de noms, paquet, version corrective, balise JSDoc |
   | a (MVCC) snapshot | un instantané |
+  | a row lock (an advisory lock stays in English, below) | un verrou |
   | the docs, the docs schema, custom type, generator, the `sql` template, a fragment | la doc, le schéma de la doc, type personnalisé, générateur, le template `sql`, un fragment |
   | check out, release (a client) | récupérer, libérer |
   | ties, a range of `between()`, a version range (semver), near-miss (a suggestion), the top level (of a query), the arbiter (`ON CONFLICT`) | ex æquo, intervalle (the type: `` `interval` `` in code), une plage de versions, un nom proche, le premier niveau, l’arbitre |
