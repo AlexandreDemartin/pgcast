@@ -38,15 +38,27 @@ Candidates for a check, a rule or a skill line.
 - #866 — an issue's counts go stale between filing and building (68 pages then, 70 now): the builder recounts from `dist` and says so — orchestrator
 - #870 — Google's Rich Results Test now asks for a sign-in: an agent validates with validator.schema.org, and the live test goes to the owner after deploy — builder
 - #870 — the root `CHANGELOG.md` is the npm package's: a docs-site change goes in `website/README.md`, not there — orchestrator
-#869 — VitePress keeps a fence's highlighted HTML as it is only when it starts with `<pre`: to swap a block for a component, set `is="vue:<name>"` on the `<pre>`, never rename the tag — branch-reviewer
-#869 — a Vue functional component without props passes only `class`, `style` and listeners to its root: set `inheritAttrs: false` and pass `attrs` by hand — branch-reviewer
-#869 — a PR that claims "the built HTML does not change" proves it in its first round with a tag-level diff of the built pages against master — branch-reviewer
-#869 — `el.__vnode` is not set in a production build: test hydration by reading the element's event listeners — builder
-#869 — `vitepress preview` can serve the assets of the previous build: rebuild and restart it, then check the asset hashes, before measuring — builder
-#869 — runner Lighthouse scores swing several points run to run (`/select` 93 to 99 on the same commit): measure a performance change locally under CPU slowdown, the runner median only gates — orchestrator
-#861 — a draft PR runs no CI job: a check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready — orchestrator
-#861 — a failure planted in a page with a French twin trips the translation check first: plant it in the theme, which both languages share — builder
-#861 — a Lighthouse gate on a shared runner reads the median of three runs per page: a single run swings several points — builder
+- #869 — VitePress keeps a fence's highlighted HTML as it is only when it starts with `<pre`: to swap a block for a component, set `is="vue:<name>"` on the `<pre>`, never rename the tag — branch-reviewer
+- #869 — a Vue functional component without props passes only `class`, `style` and listeners to its root: set `inheritAttrs: false` and pass `attrs` by hand — branch-reviewer
+- #869 — a PR that claims "the built HTML does not change" proves it in its first round with a tag-level diff of the built pages against master — branch-reviewer
+- #869 — `el.__vnode` is not set in a production build: test hydration by reading the element's event listeners — builder
+- #869 — `vitepress preview` can serve the assets of the previous build: rebuild and restart it, then check the asset hashes, before measuring — builder
+- #869 — runner Lighthouse scores swing several points run to run (`/select` 93 to 99 on the same commit): measure a performance change locally under CPU slowdown, the runner median only gates — orchestrator
+- #861 — a draft PR runs no CI job: a check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready — orchestrator
+- #861 — a failure planted in a page with a French twin trips the translation check first: plant it in the theme, which both languages share — builder
+- #861 — a Lighthouse gate on a shared runner reads the median of three runs per page: a single run swings several points — builder
+- #850 range — a PR that fixes a check (#854) also checks the § Learnings lines that describe the check's old limits (#853, #848), or the method PR judges learnings that are already false — branch-reviewer
+- #850 range — a design fix recorded in `docs/design/accessibility.md` also updates the rule in `art-direction.md` it overrides (#868): Lighthouse does not audit focus contrast — branch-reviewer
+- #850 range — a step that moves a paragraph into a `reference.md` greps its first sentence afterwards, to catch a duplicated lead-in (#853) — branch-reviewer
+- #850 range — the orchestrator's `record.py` appended lines without their `- `, merging nine learnings into one bullet: it now adds the bullet and refuses an untagged minor — branch-reviewer
+- #872 — a script that re-wraps comments ends each range before the ` */` line, or it swallows it: read the diff for a lost delimiter — builder
+- #872 — a word diff of re-wrapped comments is noisy on `*` and `//`: strip the comment prefixes before comparing the words — builder
+- #873 — a doc that quotes a tool's error message quotes it from a run of the documented install, not from the code: `peers.ts` checks its peers in order and the documented alias leaves the first one missing — branch-reviewer
+- #873 — a lookbehind meant to skip other folders' paths (`(?<![\w/])`) also skips `./`: test the `./` form of a citation along with the path form — branch-reviewer
+- #873 — an issue that spells out an expected message from reading the code passes its error on to the builder: the orchestrator quotes it from a run, or asks the builder to — orchestrator
+- #873 — a table of citation forms (plain, `./`, code span, link, anchor, other skill's path) found a form both regexes missed, where the tests did not: a pattern check is proved on such a table — builder
+- #873 — the fix a tool's error message prints can itself be a dead end (`npm install @pgcast/pgcast` fails with `ERESOLVE` again on TypeScript 7): a doc that quotes an error runs the fix it prints too — builder
+- #873 — a passage built clause by clause in review rounds ends as one long sentence: the orchestrator rereads the final wording against `concise-docs` before ready — orchestrator
 
 ## Minors kept
 
@@ -55,4 +67,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #854 — `sectionErrors` still leaves unchecked `[reference.md](reference.md#x) § X` and `[reference.md](./reference.md) § X`, and checks a bare `skills/code-style/reference.md § Claims` against the citing skill's own reference; no such citation in the tree
 - #867 — `website/typed-sql.md` § Install and `tools/typegen/README.md`: `--legacy-peer-deps`, which npm's ERESOLVE hint suggests on TypeScript 7, skips the peers, so the missing-peer line comes before the TypeScript 7 one; neither says so — orchestrator
 - #866 — `website/.vitepress/meta.ts:4` and `:54`: two comment lines lengthened past the file's wrap width, not re-wrapped — orchestrator
-
+- #873 — `scripts/check-skills.mjs:44` is 142 columns, and two more lines in `scripts/` are over 120; lint does not enforce the width — `form` — builder

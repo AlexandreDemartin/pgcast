@@ -34,13 +34,15 @@ export function citationErrors(path, text, skills) {
 
 /**
  * One error per section cited after a `reference.md` of a SKILL.md that is no heading of `reference`, its text; empty if
- * none. The citation is a link to `reference.md`, whatever its text, or a `reference.md` span, then `§` and a heading,
- * read as the longest one the text starts with and that ends at a punctuation mark or a backtick, an "and", an "or", a
- * "then" or the end of the line; a bare `§` joined to it by a comma, "and", "or" or "then" is read as a section too.
+ * none. The citation is `reference.md` or `./reference.md`, as a link (`#anchor` allowed) whatever its text, a code
+ * span or plain text, then `§` and a heading, read as the longest one the text starts with and that ends at a
+ * punctuation mark or a backtick, an "and", an "or", a "then" or the end of the line; a bare `§` joined to it by a
+ * comma, "and", "or" or "then" is read as a section too. Left unchecked: any other path to a `reference.md`, such as
+ * another skill's (`skills/x/reference.md`, `../x/reference.md`).
  */
 export function sectionErrors(path, text, reference) {
   const headings = [...reference.matchAll(/^#+ (.+?)\s*$/gm)].map(([, heading]) => heading).sort((a, b) => b.length - a.length);
-  const errors = [], citation = /(?:\]\(reference\.md\)|`reference\.md`|reference\.md) § /g;
+  const errors = [], citation = /(?:\]\((?:\.\/)?reference\.md(?:#[^)]*)?\)|`(?:\.\/)?reference\.md`|(?<![\w/.])(?:\.\/)?reference\.md) § /g;
   const end = /^(?:$|\s*[\p{P}`]|\s+(?:and|or|then)\b)/u, join = /^(?:[,;])? ?(?:(?:then|and|or) )?§ /;
   for (const line of text.split('\n')) {
     for (const {index, 0: cited} of line.matchAll(citation)) {
