@@ -27,6 +27,7 @@ Candidates for a check, a rule or a skill line.
 - #848 — when a fix moves a rule or a pointer, grep the PR body, the verdict comment and the Epic comments for its old location (three places named it) — builder
 - #855 — Vite 8 is rolldown-based (no esbuild in `node_modules`): a build whose entry is a virtual module names it without a null byte and maps it to the `\0` id in `resolveId` — builder
 - #855 — `adapters/pglite`'s `check:browser` reads `dist`: `npm run build` in the adapter first — builder
+- #864 — the chrome-devtools tools cannot open DevTools › Application › Manifest: a Done-when that needs that panel says the owner checks it, or proves the manifest by fetching it and loading each icon — builder
 
 ## Minors kept
 
