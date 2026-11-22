@@ -4,6 +4,10 @@ All notable changes to `@pgcast/typegen` are documented here. Format: [Keep a Ch
 
 ## [Unreleased]
 
+### Changed
+
+- The README says `--help` prints the usage, and that `--check` with `--watch` prints it and exits 1.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
