@@ -1,6 +1,6 @@
 # Aggregates
 
-By default, `count()` returns a number, `sum()` and `avg()` a number or `null`, and `min()` and `max()` a column value or `null`.
+`count()`, `sum()`, `avg()`, `min()` and `max()` reduce a table's rows to one value, and take the options of `select()`. By default, `count()` returns a number, `sum()` and `avg()` a number or `null`, and `min()` and `max()` a column value or `null`.
 {.lede}
 
 ## `count()` {#count}

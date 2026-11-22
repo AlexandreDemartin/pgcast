@@ -1,10 +1,10 @@
 ---
-english: 2440c96789c3
+english: 79987aa6e68a
 ---
 
 # Agrégats
 
-Par défaut, `count()` renvoie un nombre, `sum()` et `avg()` un nombre ou `null`, et `min()` et `max()` une valeur de la colonne ou `null`.
+`count()`, `sum()`, `avg()`, `min()` et `max()` réduisent les lignes d’une table à une seule valeur, et prennent les options de `select()`. Par défaut, `count()` renvoie un nombre, `sum()` et `avg()` un nombre ou `null`, et `min()` et `max()` une valeur de la colonne ou `null`.
 {.lede}
 
 ## `count()` {#count}
