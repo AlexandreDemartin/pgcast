@@ -64,6 +64,10 @@ Candidates for a check, a rule or a skill line.
 - #900 — a probe span that starts with `(` carries every pair of parentheses around it: an `and()` of comparisons is quoted as one span per comparison, each probed — builder
 - #900 — the local probe server's session TimeZone is not UTC: a probe sets UTC before reading offsets for captions — builder
 - #900 — the French proofreader moves a marked pgcast message into « »: a brief says that `<!-- message -->` keeps straight quotes — builder
+- #901 — a panel whose query runs on a transaction's client aliases the pool as a typed const above the cut (`const txnClient: db.Queryable = pool`): the playground skips typed consts — builder
+- #901 — the French site says « lock » for an advisory lock and « verrou » only for a row lock: a brief for a lock page says so — builder
+- #901 — `cmd; echo exit $?` in the background showed 0 for a failed `docs:build`: append the exit code to the log and read it there — builder
+- #901 — `docs:translated` runs again after any later edit of the English page, or the build fails on the French page's stale `english:` mark — builder
 
 ## Minors kept
 
