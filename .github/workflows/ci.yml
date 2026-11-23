@@ -6,6 +6,8 @@ on:
   # Every PR, including a layer of a stack whose base is the branch below it (skill pr-shape, § Stacking).
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # By hand, on any branch: everything runs, the large bench's libCheck included.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,11 +15,12 @@ permissions:
 jobs:
   changes:
     # Draft PRs run nothing: the CI starts with `gh pr ready` (skill ci-gate).
-    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.diff.outputs.code }}
       docs: ${{ steps.diff.outputs.docs }}
+      types: ${{ steps.diff.outputs.types }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,17 +33,24 @@ jobs:
         # The docs site builds on a change to website/ (its pages are Markdown too), to CHANGELOG.md, its /changelog page, to
         # src/, which its examples use, to adapters/*/src/, which its Drivers page compiles against, to what builds the library
         # it installs (the root package.json, package-lock.json, tsconfig.json), or to the workflows.
-        # A push to master always runs everything.
+        # The large type bench runs on a change to what a consumer's type-check reads or what it measures with: src/db/ and
+        # src/generate/ (the declarations and the generated schema), the bench itself, TypeScript's version, the workflows.
+        # A push to master or a run by hand always runs everything.
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.base_ref }}
         run: |
           code=true
           docs=true
+          types=true
           if [ "$EVENT" = pull_request ]; then
             code=false
             docs=false
+            types=false
             while IFS= read -r file; do
+              case "$file" in
+                src/db/*|src/generate/*|src/typings/*|bench/*|scripts/bench-types-large.mjs|package.json|package-lock.json|tsconfig.json|.github/workflows/*) types=true ;;
+              esac
               case "$file" in
                 '') ;;
                 website/*|CHANGELOG.md) docs=true ;;
@@ -53,6 +63,7 @@ jobs:
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
           echo "docs=$docs" | tee -a "$GITHUB_OUTPUT"
+          echo "types=$types" | tee -a "$GITHUB_OUTPUT"
 
   build:
     needs: changes
@@ -156,6 +167,46 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run bench:types
+
+  bench-types-large:
+    # Check time and memory on a synthetic schema of 280 tables, against Zapatos 6.6.1 in the same job (scripts/bench-types-large.mjs).
+    # Postgres only creates the schema that each library's codegen reads; the gate is the ratio of their medians.
+    # The lib check takes most of the time (about 27 min), so it runs in a job of its own, on master and by hand only;
+    # a PR that changes the declarations runs it locally (docs/WORKFLOW.md § Commands).
+    needs: changes
+    if: needs.changes.outputs.types == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cases: ${{ fromJSON(github.event_name == 'pull_request' && '["parentOf,lateralFor,selectWith"]' || '["parentOf,lateralFor,selectWith", "libCheck"]') }}
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pgcast
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pgcast
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run bench:types:large -- --cases "$CASES"
+        env:
+          CASES: ${{ matrix.cases }}
 
   typescript-7:
     # A consumer project on TypeScript 7 compiles the generated schema: the committed test/generated/, no Postgres.
@@ -477,13 +528,13 @@ jobs:
   ci-passed:
     # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
     name: CI passed
-    needs: [changes, build, release-dry-run, bench-types, typescript-7, typescript-4-1, docs, adapter-postgres-js, adapter-pglite, typegen]
+    needs: [changes, build, release-dry-run, bench-types, bench-types-large, typescript-7, typescript-4-1, docs, adapter-postgres-js, adapter-pglite, typegen]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed, or was skipped on purpose
         env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.release-dry-run.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-postgres-js.result }} ${{ needs.adapter-pglite.result }} ${{ needs.typegen.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.release-dry-run.result }} ${{ needs.bench-types.result }} ${{ needs.bench-types-large.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-postgres-js.result }} ${{ needs.adapter-pglite.result }} ${{ needs.typegen.result }}
         run: |
           for result in $RESULTS; do
             case "$result" in
