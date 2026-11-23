@@ -13,6 +13,10 @@ Candidates for a check, a rule or a skill line.
 - #928 — a claim that a value "is no longer assignable" is tested where a type is expected too: a generic class's `new C()` takes its type argument from the annotation or parameter it meets — branch-reviewer
 - #928 — the "README changed after its package shipped" rule is checked per package from its own last tag: `git diff <tag>..origin/master -- README.md tools/*/README.md adapters/*/README.md` — branch-reviewer
 - #928 — declaration emit writes a type argument's default in full, so changing a default reaches consumers through their dependencies' published `.d.ts`; a compat grid for such a change includes an emitted `.d.ts` — branch-reviewer
+- #931 — in a scratch measuring script that joins errors onto one line, `grep -o` with a length cap hid the first error; print the raw `tsc` errors before drawing a conclusion — builder
+- #931 — `tsc` prints a file's path relative to the cwd it runs in, with no leading `/` below it: a normaliser anchored on `^.*/sweep/` stripped one run's paths and not the other's, and the diff showed every line; anchor on `^(.*/)?` and compare the line counts first — builder
+- #931 — the same generic case checked in 9.5 s under `bench:types:large` and in 12.3 s in a scratch runner on a saved copy of its schema: a figure the docs quote is the lower bound ("over 9 s") of both, not one run's — builder
+- #931 — a type test appended as the last test of its `describe` keeps every earlier line number, so a sweep of `@ts-expect-error` diffs master and branch with no line shift to account for — builder
 
 ## Minors kept
 
