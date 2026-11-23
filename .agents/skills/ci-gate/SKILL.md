@@ -35,6 +35,8 @@ We validate locally while iterating; CI runs **once ready**.
 
 - **Proofs on a draft**: **CI passed** is green with every job skipped; they are local only. A check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready (#868, #871). CodeQL does run on a draft: read its alerts before the review, as it caught what lint and the tests did not (#854).
 - **A conflicting PR**: GitHub runs no CI on it (CodeQL only). Before review, `gh pr ready` and merge, `gh pr view <n> --json mergeable` says `MERGEABLE` and **CI passed** is in `statusCheckRollup`; a French page's `english:` hash conflicts each time master edits its English page.
+- **A push just before `gh pr ready`**: the full run can start on the previous head. Wait until `gh pr view <n> --json headRefOid` shows the pushed SHA before `gh pr ready`, or check the ready run's `headSha` (#924).
+- **A job's log**: `gh api repos/AlexandreDemartin/pgcast/actions/jobs/<id>/logs --allow-escape-sequences` reads a finished job while the run's others go, where `gh run view --job <id> --log` refuses; without the flag it refuses a log holding terminal escape sequences, which are stripped after (#920, #925).
 - **A job added to `ci.yml`**: add it to the `needs` of **CI passed** and its result to `RESULTS`, otherwise its failure does not block the merge. `ci.yml` also holds lists a PR extends and no local check runs: a docs input outside `website/` (a Twoslash `paths` entry) in `changes`, or the break first shows on master's deploy (#729); a file added to a package (`tools/<name>/dist/`) in the exact list of its package-contents step, in the commit that adds it: `npm pack --dry-run` shows the file but asserts nothing (#830, #847).
 
 ## Rerun
