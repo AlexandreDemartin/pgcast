@@ -12,6 +12,9 @@ Candidates for a check, a rule or a skill line.
 - #916 — a method PR's proof checks a merged row only against its kept term, so a merge that drops a source line's qualifier passes (twice here: `--unidiff-zero`, "an adapter's"): grep each source line's actor, flag and exception in the merged rule before the first push — branch-reviewer
 - #916 — a verdict "the check catches it" is a claim about a check's limit: rerun the check on the learning's exact case (row 51: a fragment probed alone numbers from `$1`) — branch-reviewer
 - #916 — in a worktree's zsh, a shell function named `g` or `gg` collides with the profile's aliases (`gg` ran `git gui`): proof greps go in a bash script in scratch — builder
+- #920 — `Memory used` from `--extendedDiagnostics` moves with the garbage collector (252 to 307 MB between runs of one job), and check time with the other processes on the machine: gate a median, on a ratio against a reference library run interleaved in the same job — builder
+- #920 — a job-level `if` cannot read `matrix`: to run a matrix entry on some events only, build the matrix with `fromJSON(<event test> && '[…]' || '[…]')`, which keeps CI passed's `RESULTS` unchanged — builder
+- #920 — `gh run view --job <id> --log` refuses while other jobs of the run are going; `gh api repos/<o>/<r>/actions/jobs/<id>/logs` reads a finished job's log — builder
 
 ## Minors kept
 
