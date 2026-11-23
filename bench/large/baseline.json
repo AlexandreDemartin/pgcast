@@ -1,0 +1,22 @@
+{
+  "typescript": "5.9.3",
+  "zapatos": "6.6.1",
+  "cases": {
+    "parentOf": {
+      "time": 1.016,
+      "memory": 0.992
+    },
+    "lateralFor": {
+      "time": 2.033,
+      "memory": 1.162
+    },
+    "selectWith": {
+      "time": 1.002,
+      "memory": 1.026
+    },
+    "libCheck": {
+      "time": 1.502,
+      "memory": 1.031
+    }
+  }
+}
