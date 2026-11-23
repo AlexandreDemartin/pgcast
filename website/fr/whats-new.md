@@ -1,5 +1,5 @@
 ---
-english: 054b758ebaf7
+english: 905b32e4428a
 ---
 
 # Nouveautés
@@ -47,6 +47,7 @@ Ce que pgcast ajoute à Zapatos 6.6.1, une ligne par ajout : la version qui l�
 | [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) : un domaine sur `text` dont le `CHECK` liste les valeurs, typé comme leur union, en opt-in | 6.10.0 |
 | [`moduleNames`](/fr/generator#generate.moduleNames) et `pgcastconfig.json` : des imports depuis `pgcast/db`, et aucun fichier au nom de Zapatos | 6.7.0 |
 | [`SchemaRules`](/fr/generator#SchemaRules) et [`ColumnOptions`](/fr/generator#ColumnOptions), exportés depuis `zapatos/generate`, pour que les déclarations d’un paquet puissent les nommer | 6.9.0 |
+| [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) : le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nommé par un alias de `zapatos/db`, les mêmes types dans un fichier plus petit, en opt-in | 7.2.0 |
 
 ## Drivers et adaptateurs {#drivers-and-adapters}
 

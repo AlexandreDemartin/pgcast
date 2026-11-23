@@ -1,5 +1,5 @@
 ---
-english: 8a46f4a7083c
+english: 99ae46685f4c
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -452,7 +452,7 @@ En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequir
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
 
-Depuis la 7.0, le générateur active [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) par défaut, sans note de migration. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note. Le générateur cherche par défaut chaque enum dans son propre schéma ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)) et écrit ses labels dans l’ordre de déclaration ([`enumOrder`](/fr/generator#generate.enumOrder)), sans note de migration. Il active également [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) par défaut, sans note de migration.
+Depuis la 7.0, le générateur active [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) par défaut, sans note de migration. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note. L’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) ne donne lieu à aucune note non plus, puisque ses types sont les mêmes, et reste désactivée jusqu’à la 8.0. Le générateur cherche par défaut chaque enum dans son propre schéma ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)) et écrit ses labels dans l’ordre de déclaration ([`enumOrder`](/fr/generator#generate.enumOrder)), sans note de migration. Il active également [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) par défaut, sans note de migration.
 
 Avec pgcast 6.7.0, le générateur appelé depuis un programme pouvait transmettre `PGCAST_DEP006` à [`warningListener`](/fr/generator#generate.warningListener) avant d’arrêter le processus en cas d’erreur de base de données. Depuis la 7.0, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vaut `true` par défaut. La valeur explicite `false` conserve l’arrêt immédiat sans note de migration.
 

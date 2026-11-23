@@ -98,6 +98,7 @@ export const definitionForRelationInSchema = async (
     typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? true,
     enumArraysAsText = config.enumArraysTypedAsText ?? true,
     domainsByContext = config.domainsTypedByContext ?? true,
+    valuesAsAliases = config.valuesTypedAsAliases ?? false,
     inlineIn = (schema: string) => typeEnumsAcrossSchemas && schema !== schemaName,
     // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
     // types it, read once per run if a column is `any`; an enum of another schema by its labels, never by its name in
@@ -272,15 +273,24 @@ export const definitionForRelationInSchema = async (
     selectables.push(`${columnDoc}${possiblyQuotedColumn}: ${selectableType}${orNull};`);
     JSONSelectables.push(`${columnDoc}${possiblyQuotedColumn}: ${JSONSelectableType}${orNull};`);
 
+    // with valuesTypedAsAliases, the aliases of src/db/utils.ts, each the union written out below; `null` and
+    // `db.DefaultType` as their second type argument
+    const extra = orNull + orDefault === '' ? '' : `, ${(orNull + orDefault).replace(/^ \| /, '')}`;
+
     const basicWhereableTypes = `${whereableType} | db.Parameter<${whereableType}> | db.SQLFragment | db.ParentColumn`;
-    whereables.push(`${columnDoc}${possiblyQuotedColumn}?: ${basicWhereableTypes} | db.SQLFragment<any, ${basicWhereableTypes}>;`);
+    whereables.push(`${columnDoc}${possiblyQuotedColumn}?: ${valuesAsAliases ? `db.WhereableValue<${whereableType}>` :
+      `${basicWhereableTypes} | db.SQLFragment<any, ${basicWhereableTypes}>`};`);
 
     // db.SQLFragment<any>: the default RunResult (any[]) refused a fragment typed sql<…, string> or a shortcut (#654)
-    const insertableTypes = `${insertableType} | db.Parameter<${insertableType}>${orNull}${orDefault} | db.SQLFragment<any>`;
+    const insertableTypes = valuesAsAliases ? `db.InsertableValue<${insertableType}${extra}>` :
+      `${insertableType} | db.Parameter<${insertableType}>${orNull}${orDefault} | db.SQLFragment<any>`;
     if (isInsertable) insertables.push(`${columnDoc}${possiblyQuotedColumn}${insertablyOptional}: ${insertableTypes};`);
 
-    const updatableTypes = `${updatableType} | db.Parameter<${updatableType}>${orNull}${orDefault} | db.SQLFragment`;
-    if (isUpdatable) updatables.push(`${columnDoc}${possiblyQuotedColumn}?: ${updatableTypes} | db.SQLFragment<any, ${updatableTypes}>;`);
+    const
+      updatableTypes = `${updatableType} | db.Parameter<${updatableType}>${orNull}${orDefault} | db.SQLFragment`,
+      updatableValue = valuesAsAliases ? `db.UpdatableValue<${updatableType}${extra}>` :
+        `${updatableTypes} | db.SQLFragment<any, ${updatableTypes}>`;
+    if (isUpdatable) updatables.push(`${columnDoc}${possiblyQuotedColumn}?: ${updatableValue};`);
   });
 
   // an index sits in its table's schema: matched on its name alone, it also took another schema's unique index.

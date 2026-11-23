@@ -49,6 +49,32 @@ The type that the generator's [`domainsTypedByContext`](/generator#generate.doma
 - An `any` stays `any`, and an `any[]` stays `any[]`, such as a placeholder Zapatos 6.6.1 wrote over `int8[]` with no import. A placeholder edited to the same type, `` `${number}` `` for `db.Int8String`, counts as left as generated.
 - `DomainInContext<any, any, number>` is `number`: a domain over a domain, whose placeholder the generator wrote as `any`. Edited to `unknown`, it stays `unknown`.
 
+## `WhereableValue` {#WhereableValue}
+
+```ts
+type WhereableValue<T> =
+  T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>
+```
+
+The value a `Whereable` takes for a column of type `T`, which the generator's [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases) writes in place of this union: `db.WhereableValue<number>` for `films.release_year`.
+
+## `InsertableValue` {#InsertableValue}
+
+```ts
+type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>
+```
+
+The value an `Insertable` takes for a column of type `T`, written by `valuesTypedAsAliases` too. `Extra` is `null | DefaultType` for a nullable column, `DefaultType` for one with a default: `db.InsertableValue<string, null | db.DefaultType>` for `films.tagline`.
+
+## `UpdatableValue` {#UpdatableValue}
+
+```ts
+type UpdatableValue<T, Extra = never> =
+  T | Parameter<T> | Extra | SQLFragment | SQLFragment<any, T | Parameter<T> | Extra | SQLFragment>
+```
+
+The value an `Updatable` takes for a column of type `T`, with `Extra` as in `InsertableValue`: `db.UpdatableValue<string>` for `films.title`.
+
 ## `PostgresInterval` {#PostgresInterval}
 
 ```ts

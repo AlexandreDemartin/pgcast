@@ -41,6 +41,7 @@ export interface OptionalConfig {
   intervalsTypedAsObjects?: boolean;  // pg returns a PostgresInterval in Selectable by default; false keeps string for a custom parser
   // optional too; read it with ?? false
   domainsTypedAsUnions?: boolean;  // a domain over text whose valid CHECK lists its values is declared as their union, which a new placeholder names
+  valuesTypedAsAliases?: boolean;  // a column's value in Whereable, Insertable and Updatable is written as db.WhereableValue<…> and its siblings: the same types
 }
 
 /** The type of `schemas`: by schema, the relations to generate. */
