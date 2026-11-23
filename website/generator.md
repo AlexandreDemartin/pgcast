@@ -572,7 +572,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
 
-`boolean`, default `false`; an opt-in. Each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), rather than spelling out its union. The types are the same, so every call that compiles still does, and every call that fails still fails:
+`boolean`, default `false`; an opt-in, from 7.2.0. Each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), rather than spelling out its union. The types are the same, so every call that compiles still does, and every call that fails still fails:
 
 | `films` | `false` | `true` |
 |---|---|---|

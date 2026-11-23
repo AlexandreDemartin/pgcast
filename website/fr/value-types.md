@@ -1,5 +1,5 @@
 ---
-english: 612d22669725
+english: 67a8c504c405
 ---
 
 # Types de valeurs
@@ -60,7 +60,7 @@ type WhereableValue<T> =
   T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>
 ```
 
-La valeur que prend un `Whereable` pour une colonne de type `T`, que l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) du générateur écrit à la place de cette union : `db.WhereableValue<number>` pour `films.release_year`.
+À partir de la 7.2.0. La valeur que prend un `Whereable` pour une colonne de type `T`, que l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) du générateur écrit à la place de cette union : `db.WhereableValue<number>` pour `films.release_year`.
 
 ## `InsertableValue` {#InsertableValue}
 
@@ -68,7 +68,7 @@ La valeur que prend un `Whereable` pour une colonne de type `T`, que l’option 
 type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>
 ```
 
-La valeur que prend un `Insertable` pour une colonne de type `T`, écrite aussi par `valuesTypedAsAliases`. `Extra` vaut `null | DefaultType` pour une colonne nullable, `DefaultType` pour une colonne qui a une valeur par défaut : `db.InsertableValue<string, null | db.DefaultType>` pour `films.tagline`.
+À partir de la 7.2.0. La valeur que prend un `Insertable` pour une colonne de type `T`, écrite aussi par `valuesTypedAsAliases`. `Extra` vaut `null | DefaultType` pour une colonne nullable, `DefaultType` pour une colonne qui a une valeur par défaut : `db.InsertableValue<string, null | db.DefaultType>` pour `films.tagline`.
 
 ## `UpdatableValue` {#UpdatableValue}
 
@@ -77,7 +77,7 @@ type UpdatableValue<T, Extra = never> =
   T | Parameter<T> | Extra | SQLFragment | SQLFragment<any, T | Parameter<T> | Extra | SQLFragment>
 ```
 
-La valeur que prend un `Updatable` pour une colonne de type `T`, avec `Extra` comme dans `InsertableValue` : `db.UpdatableValue<string>` pour `films.title`.
+À partir de la 7.2.0. La valeur que prend un `Updatable` pour une colonne de type `T`, avec `Extra` comme dans `InsertableValue` : `db.UpdatableValue<string>` pour `films.title`.
 
 ## `PostgresInterval` {#PostgresInterval}
 

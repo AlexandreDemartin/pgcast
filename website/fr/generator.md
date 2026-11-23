@@ -1,5 +1,5 @@
 ---
-english: 3a18a3e936bc
+english: 627bbc76186e
 ---
 
 # Générateur
@@ -576,7 +576,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
 
-`boolean`, par défaut `false` ; un opt-in. La valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), au lieu d’écrire son union en entier. Les types sont les mêmes : chaque appel qui compile compile encore, et chaque appel refusé l’est encore :
+`boolean`, par défaut `false` ; un opt-in, à partir de la 7.2.0. La valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), au lieu d’écrire son union en entier. Les types sont les mêmes : chaque appel qui compile compile encore, et chaque appel refusé l’est encore :
 
 | `films` | `false` | `true` |
 |---|---|---|
