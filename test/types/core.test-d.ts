@@ -1162,7 +1162,19 @@ describe('parent() on a generic column (#918)', () => {
     db.parent<'users'>('id');
     // @ts-expect-error neither as an instantiation expression
     db.parent<'users'>;
+    // @ts-expect-error one type argument, as in Zapatos 6.6.1
+    db.parent<s.users.Column, 'users'>('id');
     expectTypeOf(db.parent<s.users.Column | s.accounts.Column>('owner_id')).toEqualTypeOf<db.ParentColumn<s.users.Column | s.accounts.Column>>();
+  });
+
+  test('parent as a value infers the columns, as in Zapatos 6.6.1', () => {
+    const cols: s.users.Column[] = ['id', 'email'];
+    const ps: db.ParentColumn<s.users.Column>[] = cols.map(db.parent);
+    const arrow: db.ParentColumn<s.users.Column>[] = cols.map(col => db.parent(col));
+    const literals: db.ParentColumn<'id' | 'email'>[] = (['id', 'email'] as const).map(db.parent);
+    expectTypeOf(cols.map(db.parent)).toEqualTypeOf<db.ParentColumn<s.users.Column>[]>();
+    expectTypeOf([ps, arrow, literals]).not.toBeAny();
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.isIn(cols.map(db.parent)) }) } });
   });
 
   test('the bare ParentColumn: its value is any column, and its type argument any string (note 016)', () => {
