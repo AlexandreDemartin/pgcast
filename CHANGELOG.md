@@ -10,6 +10,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 - Type-checking cost on a large schema: `npm run bench:types:large` checks generic helpers (`parent()` of a `ColumnForTable<T>`, a lateral on it, a forwarder to `select()`, and the three with `skipLibCheck: false`) against a synthetic schema of 280 tables and 1,706 column names, for pgcast and for Zapatos 6.6.1 in the same run, and fails when pgcast's median check time or memory over Zapatos's moves by more than 20 % from `bench/large/baseline.json`. CI runs the three generic cases on a PR that can change the types and on master, the lib check (about 27 min) only on master and by hand; a PR that changes the declarations runs `npm run bench:types:large -- --cases libCheck` locally and quotes it. On 7.1.2 the lateral takes 2.0 times Zapatos's check time, and the lib check 1.5 times. [#920](https://github.com/AlexandreDemartin/pgcast/issues/920)
 
+### Fixed
+
+- Type-checking a helper generic over a table no longer relates its `ColumnForTable<T>` to every column of the schema: on the large bench, `parent()` of such a column, a lateral on it and a forwarder to `select()` check in 0.03 s, 0.50 s and 0.12 s, where they took 9.3 s, 19.3 s and 9.7 s (Zapatos 6.6.1: about 9.6 s each), and the three with `skipLibCheck: false` in 1.9 s (Zapatos 6.6.1: 133 s). `parent()` gets a first overload for such a column, so a name that is no column now reads "No overload matches this call"; `ParentColumn<T>` takes any string as `T` and still types `value` as a column, so a bare `ParentColumn` is no longer assignable to a `ParentColumn<Column | undefined>` written by hand; `LateralOption`'s parameters are constrained by a string array and a map of fragments or strings ([note 016](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/016-parent-column-default.md)). [#918](https://github.com/AlexandreDemartin/pgcast/issues/918)
+
 ## [7.1.2] - 2026-11-22
 
 ### Fixed
