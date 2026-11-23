@@ -101,9 +101,12 @@ export type ColumnsOption<T extends Table> = readonly ColumnForTable<T>[] | unde
 
 type LimitedLateralOption = SQLFragmentMap | undefined;
 type FullLateralOption = LimitedLateralOption | SQLFragment<any>;
+// constraints that only gate the conditional: ColumnsOption<Table> made each generic `L extends LateralOption<C, E>`
+// relate C to the union of every column name, seconds on a large schema; SQLFragmentOrColumnMap<any> would break a
+// schema with no table, where any is no Table (#918, note 016)
 export type LateralOption<
-  C extends ColumnsOption<Table>,
-  E extends ExtrasOption<Table>,
+  C extends readonly string[] | undefined,
+  E extends { [k: string]: SQLFragment<any> | string } | undefined,
 > =
   undefined extends C ? undefined extends E ? FullLateralOption : LimitedLateralOption : LimitedLateralOption;
 

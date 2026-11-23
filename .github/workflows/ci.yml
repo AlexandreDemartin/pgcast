@@ -179,7 +179,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cases: ${{ fromJSON(github.event_name == 'pull_request' && '["parentOf,lateralFor,selectWith"]' || '["parentOf,lateralFor,selectWith", "libCheck"]') }}
+        cases: ${{ fromJSON(github.event_name == 'pull_request' && '["parentOf,lateralFor,selectWith,literals"]' || '["parentOf,lateralFor,selectWith,literals", "libCheck"]') }}
     services:
       postgres:
         image: postgres:18

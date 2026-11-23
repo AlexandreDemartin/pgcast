@@ -1638,3 +1638,46 @@ describe('result types', () => {
     expectTypeOf<db.RunResultForSQLFragment<ReturnType<typeof db.count>>>().toEqualTypeOf<number>();
   });
 });
+
+// the repro shapes of #918, which cost seconds each on a schema of a thousand column names: they keep their types
+describe('generic helpers over a column or the options (#918)', () => {
+  test('a lateral on a generic column keeps its type, and its callers get the row', () => {
+    const lateralFor = <T extends s.Table>(col: s.ColumnForTable<T>) =>
+      db.selectExactlyOne('accounts', { owner_id: db.parent(col) }, { columns: ['id'] });
+    const q = lateralFor<'users'>('id');
+    expectTypeOf<Run<typeof q>>().toEqualTypeOf<Pick<s.accounts.JSONSelectable, 'id'>>();
+    expectTypeOf<Run<typeof q>>().not.toBeAny();
+    const rows = db.select('users', db.all, { lateral: { account: lateralFor<'users'>('id') } });
+    expectTypeOf<Run<typeof rows>>().toEqualTypeOf<(s.users.JSONSelectable & { account: Pick<s.accounts.JSONSelectable, 'id'> })[]>();
+    // @ts-expect-error sku is no column of users
+    lateralFor<'users'>('sku');
+  });
+
+  test('a forwarder of select() and its options keeps the types of its callers', () => {
+    const selectWith = <T extends s.Table, C extends db.ColumnsOption<T> = undefined,
+      E extends db.ExtrasOption<T> = undefined, L extends db.LateralOption<C, E> = undefined, A extends string = never>(
+      table: T, where: s.WhereableForTable<T>, options?: db.SelectOptionsForTable<T, C, L, E, A>,
+    ) => db.select(table, where, options);
+    const all = selectWith('users', { id: 1 });
+    expectTypeOf<Run<typeof all>>().toEqualTypeOf<s.users.JSONSelectable[]>();
+    const some = selectWith('users', { id: 1 }, { columns: ['id', 'email'] });
+    expectTypeOf<Run<typeof some>>().toEqualTypeOf<Pick<s.users.JSONSelectable, 'id' | 'email'>[]>();
+    const counted = selectWith('users', {}, { lateral: { n: db.count('accounts', { owner_id: db.parent('id') }) } });
+    expectTypeOf<Run<typeof counted>>().toEqualTypeOf<(s.users.JSONSelectable & { n: number })[]>();
+    expectTypeOf<Run<typeof counted>>().not.toBeAny();
+    // @ts-expect-error a key that users lacks
+    selectWith('users', { nope: 1 });
+    // @ts-expect-error a column that users lacks
+    selectWith('users', {}, { columns: ['sku'] });
+  });
+
+  test('LateralOption keeps its types: a fragment only with neither columns nor extras', () => {
+    type Full = db.SQLFragmentMap | db.SQLFragment<any> | undefined;
+    expectTypeOf<db.LateralOption<undefined, undefined>>().toEqualTypeOf<Full>();
+    expectTypeOf<db.LateralOption<db.ColumnsOption<'users'>, db.ExtrasOption<'users'>>>().toEqualTypeOf<Full>();
+    expectTypeOf<db.LateralOption<['id'], undefined>>().toEqualTypeOf<db.SQLFragmentMap | undefined>();
+    expectTypeOf<db.LateralOption<undefined, { up: db.SQLFragment<string> }>>().toEqualTypeOf<db.SQLFragmentMap | undefined>();
+    // @ts-expect-error a fragment as lateral, beside columns
+    db.select('users', db.all, { columns: ['id'], lateral: db.count('accounts', { owner_id: db.parent('id') }) });
+  });
+});

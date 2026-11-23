@@ -394,10 +394,10 @@ A column of the parent query's table, in a subquery given to `lateral` ([Joins](
 ### `ParentColumn` {#ParentColumn}
 
 ```ts
-class ParentColumn<T extends Column | undefined = Column | undefined> { value?: T }
+class ParentColumn<T extends string | undefined = string | undefined> { value?: T & (Column | undefined) }
 ```
 
-What `parent()` returns. A type-only member keeps `cols()` and `vals()` from passing as a `ParentColumn`.
+What `parent()` returns. A type-only member keeps `cols()` and `vals()` from passing as a `ParentColumn`. `value` is a column, as in Zapatos 6.6.1, but `T` takes any string, so that a Whereable column, which takes a bare `ParentColumn`, relates no generic column to every column of the schema. A bare `ParentColumn`, or `new ParentColumn()`, is no longer assignable to a `ParentColumn<Column | undefined>` written by hand: write the bare `ParentColumn` instead.
 
 ## `Default` {#Default}
 

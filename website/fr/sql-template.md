@@ -1,5 +1,5 @@
 ---
-english: 3b810480b6c2
+english: c89dcf019443
 ---
 
 # Template SQL
@@ -398,10 +398,10 @@ Une colonne de la table de la requête parente, dans une sous-requête donnée �
 ### `ParentColumn` {#ParentColumn}
 
 ```ts
-class ParentColumn<T extends Column | undefined = Column | undefined> { value?: T }
+class ParentColumn<T extends string | undefined = string | undefined> { value?: T & (Column | undefined) }
 ```
 
-Ce que renvoie `parent()`. Un membre qui n’existe que dans le type empêche `cols()` et `vals()` de passer pour un `ParentColumn`.
+Ce que renvoie `parent()`. Un membre qui n’existe que dans le type empêche `cols()` et `vals()` de passer pour un `ParentColumn`. `value` est une colonne, comme dans Zapatos 6.6.1, mais `T` accepte toute chaîne, si bien qu’une colonne d’un Whereable, qui accepte le `ParentColumn` nu, ne compare aucune colonne générique à chaque colonne du schéma. Un `ParentColumn` nu, ou `new ParentColumn()`, n’est plus assignable à un `ParentColumn<Column | undefined>` écrit à la main : écrivez plutôt le `ParentColumn` nu.
 
 ## `Default` {#Default}
 

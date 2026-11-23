@@ -299,13 +299,15 @@ export class ColumnValues<T> { private declare readonly [wrapper]: 'vals'; const
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
+// T is a string, and `value` checks the column: a generic column then meets no union of every column name, which costs
+// seconds on a large schema, wherever a Whereable column holds the bare ParentColumn (#918, note 016)
 /**
  * Compiles to the name of the column it wraps in the table of the parent query.
  * @param value The column name
  */
-export class ParentColumn<T extends Column | undefined = Column | undefined> { constructor(public value?: T) { } }
+export class ParentColumn<T extends string | undefined = string | undefined> { constructor(public value?: T & (Column | undefined)) { } }
 // eslint-disable-next-line no-redeclare, @typescript-eslint/no-unused-vars -- as for Parameter
-export interface ParentColumn<T extends Column | undefined = Column | undefined> extends Unwrapped { }
+export interface ParentColumn<T extends string | undefined = string | undefined> extends Unwrapped { }
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes

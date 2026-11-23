@@ -18,8 +18,17 @@ Candidates for a check, a rule or a skill line.
 - #921 — a check that compiles a `.d.ts` under `skipLibCheck` proves nothing about the names it uses (an unresolved type becomes `any`): give it a `@ts-expect-error` line that reads the type through a consumer, and a mutant that renames what it names — branch-reviewer
 - #921 — `npx vitest run -u <file>` ran all 26 test files; without `-u` the same command ran only that file — builder
 - #921 — `guard.mjs` refuses a bare `git merge origin/master`, even one that stops on a conflict: give it `-m "<subject>" -m "Co-Authored-By: …"` — builder
+- #918 — an overloaded function passed as a value (`xs.map(db.parent)`) is inferred from its last signature only: an overload added in front of a public generic function changes every higher-order use while each direct call keeps its type; a new overload of a public function needs a type test that passes it as a value — branch-reviewer
+- #918 — an instantiation expression (`db.parent<X.Column>`, TS ≥ 4.7) checks the constraint of every overload of matching arity, so an overload's type parameter constrained to `Table` broke one on a production app (TS2344) — orchestrator
+- #918 — a gain on generic calls can hide a cost on literal ones: the large bench measured only generic helpers until a `literals` case was added; a type change on a hot public function is measured on its common, literal path too — branch-reviewer
+- #918 — a gate case with a time floor catches only a regression larger than the floor: the `literals` case catches round 0's overload by 0.35 s over the 0.25 s floor because it holds 300 calls; a smaller case would sit under it — branch-reviewer
+- #918 — a ratio gate on a case near 0 (`selectWith` at 0.01) moves by large percentages on noise: the 0.25 s absolute floor is what keeps it stable — builder
+- #918 — `npm ci` clears `node_modules/.cache`, Zapatos 6.6.1's copy for `bench:types:large` included, so a harness that reads that copy fails until the bench fetches it again — builder
+- #918 — `npm run docs:translated` needs the page names as arguments to refresh their `english:` mark — builder
+- #918 — an orchestrator check script run without its argument printed its pass message: a check refuses a missing argument with a non-zero exit — orchestrator
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 
+- #918 — form — `CHANGELOG.md:17`: the #918 bullet grew to seven sentences; the cost and its verdict could stand apart from the type changes (skill `concise-docs`) — branch-reviewer
