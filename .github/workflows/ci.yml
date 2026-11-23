@@ -171,7 +171,7 @@ jobs:
   bench-types-large:
     # Check time and memory on a synthetic schema of 280 tables, against Zapatos 6.6.1 in the same job (scripts/bench-types-large.mjs).
     # Postgres only creates the schema that each library's codegen reads; the gate is the ratio of their medians.
-    # The lib check takes most of the time (about 27 min), so it runs in a job of its own, on master and by hand only;
+    # The lib check takes most of the time (about 14 min since #924), so it runs in a job of its own, on master and by hand only;
     # a PR that changes the declarations runs it locally (docs/WORKFLOW.md § Commands).
     needs: changes
     if: needs.changes.outputs.types == 'true'

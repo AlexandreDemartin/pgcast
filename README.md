@@ -129,6 +129,7 @@ The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin
 7. Done: [Ready pgcast for its first users](https://github.com/AlexandreDemartin/pgcast/issues/850).
 8. Done: [Publish the fixes made since 7.1.0](https://github.com/AlexandreDemartin/pgcast/issues/875).
 9. Done: [Show what pgcast can do in its docs](https://github.com/AlexandreDemartin/pgcast/issues/891).
+10. Done: [Keep type-checking cheap on large schemas](https://github.com/AlexandreDemartin/pgcast/issues/919).
 
 ## Relationship with Zapatos
 
