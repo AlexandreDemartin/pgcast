@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+
+- Type-checking cost on a large schema: `npm run bench:types:large` checks generic helpers (`parent()` of a `ColumnForTable<T>`, a lateral on it, a forwarder to `select()`, and the three with `skipLibCheck: false`) against a synthetic schema of 280 tables and 1,706 column names, for pgcast and for Zapatos 6.6.1 in the same run, and fails when pgcast's median check time or memory over Zapatos's moves by more than 20 % from `bench/large/baseline.json`. Runs in CI when the types can change. On 7.1.2 the lateral takes 2.0 times Zapatos's check time, and the lib check 1.5 times. [#920](https://github.com/AlexandreDemartin/pgcast/issues/920)
+
 ## [7.1.2] - 2026-11-22
 
 ### Fixed
