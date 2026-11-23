@@ -15,6 +15,9 @@ Candidates for a check, a rule or a skill line.
 - #920 — `Memory used` from `--extendedDiagnostics` moves with the garbage collector (252 to 307 MB between runs of one job), and check time with the other processes on the machine: gate a median, on a ratio against a reference library run interleaved in the same job — builder
 - #920 — a job-level `if` cannot read `matrix`: to run a matrix entry on some events only, build the matrix with `fromJSON(<event test> && '[…]' || '[…]')`, which keeps CI passed's `RESULTS` unchanged — builder
 - #920 — `gh run view --job <id> --log` refuses while other jobs of the run are going; `gh api repos/<o>/<r>/actions/jobs/<id>/logs` reads a finished job's log — builder
+- #921 — a check that compiles a `.d.ts` under `skipLibCheck` proves nothing about the names it uses (an unresolved type becomes `any`): give it a `@ts-expect-error` line that reads the type through a consumer, and a mutant that renames what it names — branch-reviewer
+- #921 — `npx vitest run -u <file>` ran all 26 test files; without `-u` the same command ran only that file — builder
+- #921 — `guard.mjs` refuses a bare `git merge origin/master`, even one that stops on a conflict: give it `-m "<subject>" -m "Co-Authored-By: …"` — builder
 
 ## Minors kept
 

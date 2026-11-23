@@ -1,5 +1,5 @@
 ---
-english: 333de48f72f4
+english: acade224d622
 ---
 
 # Générateur
@@ -162,6 +162,7 @@ Les réglages courants :
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`constraintNames`](#generate.constraintNames) | `false` | les noms figurant dans le type `Constraint` de chaque relation |
 | [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions) | `false` | le type d’un domaine sur `text` dont le `CHECK` liste les valeurs |
+| [`valuesTypedAsAliases`](#generate.valuesTypedAsAliases) | `false` | la façon d’écrire le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -572,6 +573,21 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 - Avec [`customTypesTransform`](#generate.customTypesTransform) à `'my_type'`, ou à une fonction qui garde le nom, un placeholder de [`unprefixedSchema`](#generate.unprefixedSchema) prend le nom même de l’union, et la nomme sans import : `export type certificate = import('zapatos/schema').certificate;`.
 - Avec [`schemaJSDoc`](#generate.schemaJSDoc), la JSDoc de l’union donne son nom, `Domain in database`, et son `COMMENT ON DOMAIN`.
 - Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus, et le générateur ne lit aucune contrainte de domaine. L’option reste désactivée en 7.0 : un placeholder qui contient le type de base est la façon dont Zapatos type un domaine ([décision 008](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/008-domains-jsonb-validators.md)).
+
+### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
+
+`boolean`, par défaut `false` ; un opt-in. La valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), au lieu d’écrire son union en entier. Les types sont les mêmes : chaque appel qui compile compile encore, et chaque appel refusé l’est encore :
+
+| `films` | `false` | `true` |
+|---|---|---|
+| `Whereable` | `release_year?: number \| db.Parameter<number> \| db.SQLFragment \| db.ParentColumn \| db.SQLFragment<any, …>;` | `release_year?: db.WhereableValue<number>;` |
+| `Insertable` | `tagline?: string \| db.Parameter<string> \| null \| db.DefaultType \| db.SQLFragment<any>;` | `tagline?: db.InsertableValue<string, null \| db.DefaultType>;` |
+| `Updatable` | `title?: string \| db.Parameter<string> \| db.SQLFragment \| db.SQLFragment<any, …>;` | `title?: db.UpdatableValue<string>;` |
+
+- Le second argument de type est `null | db.DefaultType` pour une colonne nullable, `db.DefaultType` pour une colonne qui a une valeur par défaut, et absent sinon.
+- Le fichier du schéma est plus petit, et `tsc` utilise moins de mémoire : sur 300 tables de 20 colonnes, 5,1 Mo au lieu de 7,0 Mo, et 293 Mo au lieu de 387 Mo.
+- Le survol d’un éditeur et une erreur nomment l’alias avec TypeScript 5.9 : `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`. TypeScript 4.1 affiche l’union en entier.
+- Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus. L’option devient la valeur par défaut en 8.0, et `false` reste possible ([décision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
 
 ### `progressListener` {#generate.progressListener}
 

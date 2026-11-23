@@ -20,3 +20,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [014](./014-constraint-violations.md) | Tell which constraint Postgres refused a write for | accepted (2026-11-19), under the owner's delegation |
 | [015](./015-recipes.md) | Recipes: the list, the format, the place and the schema | accepted (2026-11-22), by delegation: 19 recipes in four batches, a group of their own, the film schema unchanged |
 | [016](./016-parent-column-default.md) | `parent()` and `ParentColumn` on a generic column: no generic column related to the `Column` union | accepted (2026-11-23), by delegation: a first overload of `parent()`, `ParentColumn<T extends string>`, structural `LateralOption` constraints |
+| [017](./017-value-aliases.md) | Value aliases: each column's value type named in the generated schema | accepted (2026-11-23), by delegation: `valuesTypedAsAliases`, three aliases of `zapatos/db`, the default in 8.0 |

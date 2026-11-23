@@ -17,7 +17,7 @@
 //   counts only when pgcast's median is also `timeFloor` seconds or more from what the baseline's ratio gives: at a
 //   ratio of 0.01, a tenth of a second of noise doubles it (#918).
 import {spawnSync} from 'node:child_process';
-import {existsSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -38,15 +38,18 @@ const
   args = process.argv.slice(2),
   option = name => args.includes(name) ? args[args.indexOf(name) + 1] : undefined,
   runs = Number(option('--runs') ?? 5),
-  update = args.includes('--update');
+  update = args.includes('--update'),
+  aliases = args.includes('--aliases');
 
 function fail(...lines) {
   for (const line of lines) console.error(line);
   process.exit(1);
 }
 
+// `--aliases`: pgcast's output with valuesTypedAsAliases as well, measured beside the default, outside the gate (#921)
 const libraries = {
   pgcast: {generate: join(root, 'dist/generate'), db: join(root, 'dist/db')},
+  ...aliases && {aliases: {generate: join(root, 'dist/generate'), db: join(root, 'dist/db'), config: {valuesTypedAsAliases: true}}},
   zapatos: {generate: join(zapatosRoot, 'dist/generate'), db: join(zapatosRoot, 'dist/db')},
 };
 
@@ -152,7 +155,9 @@ try {
   for (const [name, library] of Object.entries(libraries)) {
     await require(library.generate).generate({
       db: {connectionString: urlFor(database)}, outDir: join(work, name), progressListener: false, warningListener: false,
+      ...library.config,
     });
+    console.log(`${name}: schema.d.ts ${statSync(join(work, name, 'zapatos/schema.d.ts')).size} bytes`);
   }
 } finally {
   await withClient(admin, client => client.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`));
@@ -227,7 +232,7 @@ const
   megabytes = value => `${Math.round(value / 1024)} MB`,
   percent = value => `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)} %`,
   baseline = !existsSync(baselinePath) ? undefined : JSON.parse(readFileSync(baselinePath, 'utf8')),
-  rows = [['', 'pgcast', 'Zapatos', 'ratio', 'baseline', 'change', 'spread (pgcast, Zapatos)']],
+  rows = [['', 'pgcast', ...aliases ? ['aliases'] : [], 'Zapatos', 'ratio', 'baseline', 'change', 'spread (pgcast, Zapatos)']],
   outside = [];
 
 for (const [name, figures] of Object.entries(current)) {
@@ -237,7 +242,8 @@ for (const [name, figures] of Object.entries(current)) {
       change = before === undefined ? undefined : figures[key] / before - 1,
       gap = key === 'time' && before !== undefined ? Math.abs(figures.pgcast.time - before * figures.zapatos.time) : Infinity;
     if (change !== undefined && Math.abs(change) > threshold && gap >= timeFloor) outside.push(`${name} ${key} ${percent(change)}`);
-    rows.push([`${name} ${key === 'time' ? 'check time' : 'memory'}`, show(figures.pgcast[key]), show(figures.zapatos[key]),
+    rows.push([`${name} ${key === 'time' ? 'check time' : 'memory'}`, show(figures.pgcast[key]),
+      ...aliases ? [show(figures.aliases[key])] : [], show(figures.zapatos[key]),
       ratio(figures[key]), before === undefined ? '' : ratio(before), change === undefined ? '' : percent(change),
       key === 'time' ? `${percent(figures.spread.pgcast)}, ${percent(figures.spread.zapatos)}` : '']);
   }

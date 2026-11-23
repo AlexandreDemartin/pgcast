@@ -1,5 +1,5 @@
 ---
-english: d54b799e9b68
+english: 612d22669725
 ---
 
 # Types de valeurs
@@ -52,6 +52,32 @@ L’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContex
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.
 - Un `any` reste `any`, et un `any[]` reste `any[]`, comme un placeholder écrit par Zapatos 6.6.1 sur `int8[]` sans import. Un placeholder modifié vers le même type, `` `${number}` `` pour `db.Int8String`, compte comme laissé tel que généré.
 - `DomainInContext<any, any, number>` est `number` : un domaine sur un domaine, dont le générateur a écrit `any` dans le placeholder. Modifié vers `unknown`, il reste `unknown`.
+
+## `WhereableValue` {#WhereableValue}
+
+```ts
+type WhereableValue<T> =
+  T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>
+```
+
+La valeur que prend un `Whereable` pour une colonne de type `T`, que l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) du générateur écrit à la place de cette union : `db.WhereableValue<number>` pour `films.release_year`.
+
+## `InsertableValue` {#InsertableValue}
+
+```ts
+type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>
+```
+
+La valeur que prend un `Insertable` pour une colonne de type `T`, écrite aussi par `valuesTypedAsAliases`. `Extra` vaut `null | DefaultType` pour une colonne nullable, `DefaultType` pour une colonne qui a une valeur par défaut : `db.InsertableValue<string, null | db.DefaultType>` pour `films.tagline`.
+
+## `UpdatableValue` {#UpdatableValue}
+
+```ts
+type UpdatableValue<T, Extra = never> =
+  T | Parameter<T> | Extra | SQLFragment | SQLFragment<any, T | Parameter<T> | Extra | SQLFragment>
+```
+
+La valeur que prend un `Updatable` pour une colonne de type `T`, avec `Extra` comme dans `InsertableValue` : `db.UpdatableValue<string>` pour `films.title`.
 
 ## `PostgresInterval` {#PostgresInterval}
 
