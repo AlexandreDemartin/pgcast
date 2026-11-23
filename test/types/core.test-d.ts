@@ -1156,10 +1156,13 @@ describe('parent() on a generic column (#918)', () => {
     parentOf('sku');
   });
 
-  test('a table as the type argument checks the column against that table, an undocumented form', () => {
-    expectTypeOf(db.parent<'users'>('id')).toEqualTypeOf<db.ParentColumn<s.users.Column>>();
-    // @ts-expect-error sku is no column of users
-    db.parent<'users'>('sku');
+  test('an explicit type argument is a list of columns, never a table: it skips the overload of a generic column', () => {
+    // were it a table, parent<s.films.Column>('id') would be checked against a table named like one of its columns
+    // @ts-expect-error a table is no list of columns
+    db.parent<'users'>('id');
+    // @ts-expect-error neither as an instantiation expression
+    db.parent<'users'>;
+    expectTypeOf(db.parent<s.users.Column | s.accounts.Column>('owner_id')).toEqualTypeOf<db.ParentColumn<s.users.Column | s.accounts.Column>>();
   });
 
   test('the bare ParentColumn: its value is any column, and its type argument any string (note 016)', () => {

@@ -310,8 +310,9 @@ export class ParentColumn<T extends string | undefined = string | undefined> { c
 // eslint-disable-next-line no-redeclare, @typescript-eslint/no-unused-vars -- as for Parameter
 export interface ParentColumn<T extends string | undefined = string | undefined> extends Unwrapped { }
 // a generic column takes the first overload, inferring X from ColumnForTable<T>; a literal infers nothing, so X is never
-// and the call falls through. X is a string, intersected with Table inside, so that `parent<s.films.Column>` as an
-// instantiation expression meets every overload's constraint (#918, note 016)
+// and the call falls through. An explicit type argument binds _T, which the first overload leaves unused, so X stays
+// never: `parent<s.films.Column>('id')` and the instantiation expression `parent<s.films.Column>` take the second
+// overload, even where a column of films is named like a table (#918, note 016)
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes
@@ -325,7 +326,7 @@ export interface ParentColumn<T extends string | undefined = string | undefined>
  * `update()` value. Zapatos 6.6.1 sent it in `isIn()` and in `vals({…})` as
  * JSON (`'{"value":"id"}'`).
  */
-export function parent<X extends string = never>(x: ColumnForTable<X & Table>): ParentColumn<ColumnForTable<X & Table>>;
+export function parent<_T extends string = never, X extends Table = never>(x: ColumnForTable<X>): ParentColumn<ColumnForTable<X>>;
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes
