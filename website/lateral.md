@@ -193,7 +193,7 @@ db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('stu
 db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('billing')) } });
 ```
 
-- The type still checks the column against `T`.
+- The type still checks the column against `T`, which the caller names: `studioOf<'films'>(…)`. TypeScript cannot infer `T` from the column, so without it `T` is any table and no column is refused.
 - It is far cheaper to check. On a synthetic schema of 300 tables and views, this helper type-checks in about 0.4 s. Written with `col: s.ColumnForTable<T>` and `db.parent(col)` inside, it takes over 9 s: TypeScript compares the generic column with each column name of the schema.
 
 ## Watch for

@@ -1,5 +1,5 @@
 ---
-english: ea7adb2cd6ac
+english: bdfe726c008a
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -198,7 +198,7 @@ db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('stu
 db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('billing')) } });
 ```
 
-- Le type vérifie toujours la colonne par rapport à `T`.
+- Le type vérifie toujours la colonne par rapport à `T`, que l’appelant nomme : `studioOf<'films'>(…)`. TypeScript ne peut pas déduire `T` de la colonne : sans lui, `T` est n’importe quelle table, et aucune colonne n’est refusée.
 - Sa vérification est bien moins coûteuse. Sur un schéma synthétique de 300 tables et vues, la vérification de types de ce helper prend 0,4 s environ, et plus de 9 s avec `col: s.ColumnForTable<T>` et `db.parent(col)` à l’intérieur : TypeScript compare alors la colonne générique à chaque nom de colonne du schéma.
 
 ## À surveiller {#watch-for}
