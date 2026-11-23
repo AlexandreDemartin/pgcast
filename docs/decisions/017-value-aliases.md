@@ -43,7 +43,7 @@ Probed on the fixture's `users`, with `strict`:
 
 | | Without the option | With it, TypeScript 5.9 |
 |---|---|---|
-| Hover on `Whereable['manager_id']` | `number \| Parameter<number> \| SQLFragment<any[], never> \| ParentColumn<Column \| undefined> \| SQLFragment<any, …> \| undefined` | `WhereableValue<number> \| undefined` |
+| Hover on `Whereable['manager_id']` | `number \| Parameter<number> \| SQLFragment<any[], never> \| ParentColumn<string \| undefined> \| SQLFragment<any, …> \| undefined` | `WhereableValue<number> \| undefined` |
 | Hover on `Insertable['manager_id']` | `number \| Parameter<number> \| SQLFragment<any, never> \| typeof Default \| null \| undefined` | `InsertableValue<number, typeof Default \| null> \| undefined` |
 | Hover on `Updatable['display_name']` (NOT NULL) | the written-out union | `UpdatableValue<string> \| undefined` |
 | `{ manager_id: 'x' }` as a `Whereable` | `Type 'string' is not assignable to type 'number \| Parameter<number> \| …'` | `Type 'string' is not assignable to type 'WhereableValue<number> \| undefined'` |
