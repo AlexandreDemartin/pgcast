@@ -1101,3 +1101,58 @@ describe('QueryableLike: what run() takes (#695)', () => {
     vi.spyOn(q, 'run').mockImplementation(async (queryable: db.Queryable) => { void queryable; return []; });
   });
 });
+
+// parent() and ParentColumn on a generic column: each type a call got before is kept, and no generic column is related
+// to the global Column union, which costs seconds on a schema of a thousand column names (#918, note 016)
+describe('parent() on a generic column (#918)', () => {
+  test('a literal, a union of literals, no column, any and a column of one table keep their types', () => {
+    expectTypeOf(db.parent('id')).toEqualTypeOf<db.ParentColumn<'id'>>();
+    expectTypeOf(db.parent('id' as 'id' | 'email')).toEqualTypeOf<db.ParentColumn<'id' | 'email'>>();
+    expectTypeOf(db.parent()).toEqualTypeOf<db.ParentColumn<s.Column | undefined>>();
+    expectTypeOf(db.parent(undefined)).toEqualTypeOf<db.ParentColumn<undefined>>();
+    expectTypeOf(db.parent('id' as any)).toEqualTypeOf<db.ParentColumn<any>>();
+    expectTypeOf(db.parent('id' as s.ColumnForTable<'users'>)).toEqualTypeOf<db.ParentColumn<s.users.Column>>();
+    expectTypeOf(db.parent('id' as s.Column)).toEqualTypeOf<db.ParentColumn<s.Column>>();
+    expectTypeOf(db.parent<s.users.Column>('id')).toEqualTypeOf<db.ParentColumn<s.users.Column>>();
+    expectTypeOf(db.parent('id').value).toEqualTypeOf<'id' | undefined>();
+    expectTypeOf(db.parent('id')).not.toBeAny();
+  });
+
+  test('a generic column gives the ParentColumn of that column', () => {
+    const parentOf = <T extends s.Table>(col: s.ColumnForTable<T>) => {
+      const p = db.parent(col);
+      expectTypeOf(p).toEqualTypeOf<db.ParentColumn<s.ColumnForTable<T>>>();
+      const value: s.ColumnForTable<T> | undefined = p.value;
+      void value;
+      return p;
+    };
+    expectTypeOf(parentOf<'users'>('id')).toEqualTypeOf<db.ParentColumn<s.users.Column>>();
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: parentOf<'users'>('id') }) } });
+    // @ts-expect-error sku is no column of users
+    parentOf<'users'>('sku');
+  });
+
+  test('refuses a name that is no column, a string, and the same as a Whereable value', () => {
+    const name: string = 'id';
+    // @ts-expect-error 'nope' is no column of any table
+    db.parent('nope');
+    // @ts-expect-error a string is no column name
+    db.parent(name);
+    // @ts-expect-error a ParentColumn of no column is no Whereable value
+    db.select('users', { id: db.parent('nope') });
+    // @ts-expect-error sku is no column of users
+    db.parent<s.users.Column>('sku');
+    // @ts-expect-error new ParentColumn() checks its column too
+    new db.ParentColumn('nope');
+    // @ts-expect-error and as a Whereable value
+    db.select('users', { id: new db.ParentColumn('nope') });
+  });
+
+  test('an instantiation expression of parent() takes the columns of one table', () => {
+    const parentOf = db.parent<s.users.Column>;
+    expectTypeOf(parentOf('id')).toEqualTypeOf<db.ParentColumn<s.users.Column>>();
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: parentOf('id') }) } });
+    // @ts-expect-error sku is no column of users
+    parentOf('sku');
+  });
+});
