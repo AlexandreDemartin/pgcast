@@ -14,7 +14,6 @@ import type {
   Whereable,
   Table,
   Column,
-  ColumnForTable,
 } from 'zapatos/schema';
 
 const timing = typeof performance === 'object' ?
@@ -309,10 +308,6 @@ export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 export class ParentColumn<T extends string | undefined = string | undefined> { constructor(public value?: T & (Column | undefined)) { } }
 // eslint-disable-next-line no-redeclare, @typescript-eslint/no-unused-vars -- as for Parameter
 export interface ParentColumn<T extends string | undefined = string | undefined> extends Unwrapped { }
-// a generic column takes the first overload, inferring X from ColumnForTable<T>; a literal infers nothing, so X is never
-// and the call falls through. An explicit type argument binds _T, which the first overload leaves unused, so X stays
-// never: `parent<s.films.Column>('id')` and the instantiation expression `parent<s.films.Column>` take the second
-// overload, even where a column of films is named like a table (#918, note 016)
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes
@@ -326,24 +321,7 @@ export interface ParentColumn<T extends string | undefined = string | undefined>
  * `update()` value. Zapatos 6.6.1 sent it in `isIn()` and in `vals({…})` as
  * JSON (`'{"value":"id"}'`).
  */
-export function parent<_T extends string = never, X extends Table = never>(x: ColumnForTable<X>): ParentColumn<ColumnForTable<X>>;
-/**
- * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
- * that column name of the table of the parent query. Without a column, it takes
- * the column of the filter; with no filter, as in `` sql`${parent()}` ``, it
- * throws before writing anything, saying to name the column (Zapatos 6.6.1
- * wrote the table and its `.`, then threw on `undefined`). As a `Whereable`
- * value, in `eq()` and in `isIn()` / `isNotIn()`, in a `lateral` subquery of `authors`:
- * `{ authorId: isIn([parent('id'), 2]) }` gives `("authorId" IN ("authors"."id", $1))`.
- * In `vals({…})` it is the parent column too, with no column the column of its
- * key. Outside a nested query it throws, so as an `insert()`, `upsert()` or
- * `update()` value. Zapatos 6.6.1 sent it in `isIn()` and in `vals({…})` as
- * JSON (`'{"value":"id"}'`).
- */
-// eslint-disable-next-line no-redeclare -- an overload
-export function parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>;
-// eslint-disable-next-line no-redeclare -- an overload
-export function parent(x?: Column) { return new ParentColumn(x); }
+export function parent<T extends Column | undefined = Column | undefined>(x?: T) { return new ParentColumn<T>(x); }
 
 
 // ColumnNames and ColumnValues of any value: a `Parameter` accepted them in a `sql` template before the tag above

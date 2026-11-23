@@ -1156,8 +1156,7 @@ describe('parent() on a generic column (#918)', () => {
     parentOf('sku');
   });
 
-  test('an explicit type argument is a list of columns, never a table: it skips the overload of a generic column', () => {
-    // were it a table, parent<s.films.Column>('id') would be checked against a table named like one of its columns
+  test('an explicit type argument is a list of columns, never a table, as in Zapatos 6.6.1', () => {
     // @ts-expect-error a table is no list of columns
     db.parent<'users'>('id');
     // @ts-expect-error neither as an instantiation expression
