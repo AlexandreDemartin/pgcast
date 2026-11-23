@@ -1,5 +1,5 @@
 ---
-english: 8a6b94d3f929
+english: ea7adb2cd6ac
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -181,6 +181,25 @@ db.select('films', db.all, {
 
 - Il vérifie la table que vous nommez, pas la requête qui l’entoure : `db.parent<s.studios.Column>('id')` sous `films` compile aussi.
 - Le type ne la vérifie pas sans qu’on le lui demande : la sous-requête est construite, et typée, avant la requête qui l’entoure, donc son type ne connaît pas la table parente. La vérifier ralentirait chaque compilation, et refuserait du code qui s’exécute.
+
+### Dans un helper générique {#in-a-generic-helper}
+
+Un helper générique sur sa table parente prend le `db.parent()` de l’appelant, typé `db.ParentColumn<s.ColumnForTable<T>>`, plutôt qu’une colonne qu’il passe lui-même à `db.parent()` :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+// ---cut---
+const studioOf = <T extends s.Table>(col: db.ParentColumn<s.ColumnForTable<T>>) =>
+  db.selectExactlyOne('studios', { id: col });
+
+db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('studio_id')) } });
+// @ts-expect-error billing is a column of roles, not of films (TS2345)
+db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('billing')) } });
+```
+
+- Le type vérifie toujours la colonne par rapport à `T`.
+- Sa vérification est bien moins coûteuse. Sur un schéma synthétique de 300 tables et vues, la vérification de types de ce helper prend 0,4 s environ, et plus de 9 s avec `col: s.ColumnForTable<T>` et `db.parent(col)` à l’intérieur : TypeScript compare alors la colonne générique à chaque nom de colonne du schéma.
 
 ## À surveiller {#watch-for}
 

@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+
+- The docs check the parent column of a helper generic over its table (`lateral.md` § In a generic helper): the helper takes the caller's `db.parent('studio_id')`, typed `db.ParentColumn<s.ColumnForTable<T>>`<!-- tsc: import type * as s from 'zapatos/schema'; export const studioOf = <T extends s.Table>(col: …) => db.selectExactlyOne('studios', { id: col }); -->, which the type still checks against `T`. On the large bench's schema it type-checks in about 0.4 s, against over 9 s for a `ColumnForTable<T>` passed to `parent()` inside the helper ([#931](https://github.com/AlexandreDemartin/pgcast/issues/931)).
+
 ## [7.2.0] - 2026-11-23
 
 ### Added
