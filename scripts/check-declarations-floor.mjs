@@ -95,6 +95,14 @@ export const user: s.users.Insertable = { email: 'ada@example.com', display_name
 // @ts-expect-error display_name is NOT NULL with no default
 export const nameless: s.users.Insertable = { email: 'ada@example.com' };
 
+// a value refused through each of WhereableValue, InsertableValue and UpdatableValue, which valuesTypedAsAliases names
+// @ts-expect-error manager_id is an integer
+export const managerText: s.users.Whereable = { manager_id: 'x' };
+// @ts-expect-error manager_id is an integer
+export const managedText: s.users.Insertable = { email: 'ada@example.com', display_name: 'Ada', manager_id: 'x' };
+// @ts-expect-error display_name is NOT NULL
+export const unnamed: s.users.Updatable = { display_name: null };
+
 export const config: gen.Config = { db: { connectionString: 'postgres://localhost/films' }, outDir: 'src' };
 // @ts-expect-error outDir is a path
 export const outDirNumber: gen.Config = { db: {}, outDir: 1 };
@@ -118,7 +126,8 @@ console.log(compiled.status === 0 ?
   `✓ a consumer on TypeScript ${ts.version} compiles against them, with skipLibCheck` :
   `✗ a consumer on TypeScript ${ts.version} does not compile against them, with skipLibCheck:\n${compiled.stdout}${compiled.stderr}`);
 
-// the same consumer against the schema the generator's valuesTypedAsAliases writes, which names zapatos/db's aliases
+// the same consumer against the schema the generator's valuesTypedAsAliases writes, which names zapatos/db's aliases:
+// under skipLibCheck an alias that does not resolve is `any`, and only the refused values above catch it (TS2578)
 cpSync(join(root, 'test/__snapshots__/codegen/valuesTypedAsAliases.d.ts'), join(consumer, 'zapatos/schema.d.ts'));
 const aliased = tsc();
 console.log(aliased.status === 0 ?
