@@ -286,9 +286,11 @@ export const definitionForRelationInSchema = async (
       `${insertableType} | db.Parameter<${insertableType}>${orNull}${orDefault} | db.SQLFragment<any>`;
     if (isInsertable) insertables.push(`${columnDoc}${possiblyQuotedColumn}${insertablyOptional}: ${insertableTypes};`);
 
-    const updatableTypes = `${updatableType} | db.Parameter<${updatableType}>${orNull}${orDefault} | db.SQLFragment`;
-    if (isUpdatable) updatables.push(`${columnDoc}${possiblyQuotedColumn}?: ${valuesAsAliases ?
-      `db.UpdatableValue<${updatableType}${extra}>` : `${updatableTypes} | db.SQLFragment<any, ${updatableTypes}>`};`);
+    const
+      updatableTypes = `${updatableType} | db.Parameter<${updatableType}>${orNull}${orDefault} | db.SQLFragment`,
+      updatableValue = valuesAsAliases ? `db.UpdatableValue<${updatableType}${extra}>` :
+        `${updatableTypes} | db.SQLFragment<any, ${updatableTypes}>`;
+    if (isUpdatable) updatables.push(`${columnDoc}${possiblyQuotedColumn}?: ${updatableValue};`);
   });
 
   // an index sits in its table's schema: matched on its name alone, it also took another schema's unique index.
