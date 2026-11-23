@@ -1187,4 +1187,17 @@ describe('parent() on a generic column (#918)', () => {
     const fromParent: db.ParentColumn<s.Column | undefined> = db.parent();
     expectTypeOf([full, fromParent]).not.toBeAny();
   });
+
+  test('characterization: a type argument that is no column passes ParentColumn, whose value stays a column (note 016)', () => {
+    // Zapatos 6.6.1 refused each with TS2344; without a cast, value holds no name that is no column, so the SQL is that
+    // of parent() with no column
+    expectTypeOf(new db.ParentColumn<'nope'>().value).toEqualTypeOf<undefined>();
+    expectTypeOf(new db.ParentColumn<string>().value).toEqualTypeOf<s.Column | undefined>();
+    db.select('users', { id: new db.ParentColumn<'nope'>() });
+    // @ts-expect-error its value is still a column
+    new db.ParentColumn<'nope'>('nope');
+    // @ts-expect-error and a ParentColumn of no column is still no ParentColumn of a column
+    const id: db.ParentColumn<'id'> = new db.ParentColumn<'nope'>();
+    void id;
+  });
 });
