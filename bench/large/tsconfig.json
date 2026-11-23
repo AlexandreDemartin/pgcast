@@ -1,0 +1,11 @@
+{
+  // The options of a consumer project, which `npm run bench:types:large` (scripts/bench-types-large.mjs) extends once
+  // per case and library, with that library's generated schema and declarations. Not a project of its own.
+  "compilerOptions": {
+    "target": "ES2019",
+    "module": "CommonJS",
+    "strict": true,
+    "noEmit": true,
+    "types": []
+  }
+}
