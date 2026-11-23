@@ -31,7 +31,7 @@ In a test, the docs or the CHANGELOG, it is probed, not read from the declaratio
 ## Compile cost
 
 - `npm run bench:types` compiles an example project and compares `Instantiations` (deterministic) with the stored baseline.
-- `npm run bench:types:large`: check time and memory of generic helpers on 280 tables, as a ratio to Zapatos 6.6.1; a PR that changes the declarations runs `-- --cases libCheck` locally (CI runs it only on master and by hand) and quotes it.
+- `npm run bench:types:large`: check time and memory of generic helpers and of 300 literal `parent()` calls (case `literals`) on 280 tables, as a ratio to Zapatos 6.6.1; a PR that changes the declarations runs `-- --cases libCheck` locally (CI runs it only on master and by hand) and quotes it.
 - Above **+20 %**: a stop point (`AGENTS.md`), with the figure and its cause.
 - A justified rise updates the baseline in the same PR, figure in the description; a PR that moves the bench refreshes it, or says how much of its change it inherits (#541).
 - The bench is a small program that calls neither a new condition nor a new function: measure N calls against the nearest sibling with `tsc --extendedDiagnostics`, the per-program part apart from the per-call part, and a type over every table on a synthetic schema of 50 to 100 tables, where TS2590 and a lookup spelled out per table in a consumer's `.d.ts` show; each option of a decision is measured, not inferred (#532, #541, #569, #572, #646, #682). A micro-measure (N calls, all using an opt-in type) is that type's cost where it is written, not the +20 % stop point of the bench: the PR gives one verdict (#824).
