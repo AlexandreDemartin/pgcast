@@ -28,12 +28,12 @@ export type WhereableValue<T> =
   T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>;
 
 /**
- * The value an `Insertable` takes for a column of type `T`, as `WhereableValue`: `Extra` is `null | DefaultType` for a
- * nullable column, `DefaultType` for one with a default.
+ * The value an `Insertable` takes for a column of type `T`, written as `WhereableValue` is. `Extra` is
+ * `null | DefaultType` for a nullable column, `DefaultType` for one with a default.
  */
 export type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>;
 
-/** The value an `Updatable` takes for a column of type `T`, as `InsertableValue`. */
+/** The value an `Updatable` takes for a column of type `T`, with `Extra` as in `InsertableValue`. */
 export type UpdatableValue<T, Extra = never> =
   T | Parameter<T> | Extra | SQLFragment | SQLFragment<any, T | Parameter<T> | Extra | SQLFragment>;
 
