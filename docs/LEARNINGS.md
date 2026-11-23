@@ -26,6 +26,12 @@ Candidates for a check, a rule or a skill line.
 - #918 — `npm ci` clears `node_modules/.cache`, Zapatos 6.6.1's copy for `bench:types:large` included, so a harness that reads that copy fails until the bench fetches it again — builder
 - #918 — `npm run docs:translated` needs the page names as arguments to refresh their `english:` mark — builder
 - #918 — an orchestrator check script run without its argument printed its pass message: a check refuses a missing argument with a non-zero exit — orchestrator
+- #919 — a ratio gate's baseline comes from the CI runs it is compared with, not from a local `--update`: #924's local baseline sat 7 % off CI's lateralFor ratio, which widened the real threshold; compare `bench/large/baseline.json` with the master job's medians — branch-reviewer (range review)
+- #919 — a PR that changes how a public type prints greps the decision notes and docs for the old spelling (`git grep 'ParentColumn<Column'`): note 017 § 3 recorded a hover that #924 made stale — branch-reviewer (range review)
+- #919 — an Epic's absolute Done when ("at or under Zapatos") is reread against the final baseline whenever a step accepts a cost above it; the step that accepts the cost amends the Epic in the same round — branch-reviewer (range review)
+- #924 — a push made while the PR is a draft and a `gh pr ready` right after it race: the full run started on the previous head; wait for the push's run before `gh pr ready`, or check `headSha` of the ready run — orchestrator
+- #925 — "about 27 min" for the libCheck job is stale in `docs/WORKFLOW.md:124` and `.github/workflows/ci.yml:174`: it took 14 min on CI after #924 — builder
+- #925 — a CI baseline refresh rebuilds each ratio from the job log's per-run lines (`run i of 5: <case> <lib> <s> <kB>K`), more exact than the printed table (2 decimals, MB); `gh api …/actions/jobs/<id>/logs` prints nothing without `--allow-escape-sequences`, then strip the ANSI codes — builder
 
 ## Minors kept
 
