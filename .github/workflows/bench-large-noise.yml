@@ -1,0 +1,47 @@
+name: Bench noise (temporary)
+
+# Measures the noise of `npm run bench:types:large` on CI for #920: three jobs per case group, five runs each.
+# Removed in its own commit before the PR is ready.
+on:
+  push:
+    branches: [chore/920-large-bench]
+
+permissions:
+  contents: read
+
+jobs:
+  noise:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cases: ['parentOf,lateralFor,selectWith', libCheck]
+        replica: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pgcast
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pgcast
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run bench:types:large -- --cases "$CASES" --runs 5 --update
+        env:
+          CASES: ${{ matrix.cases }}
+      - run: cat bench/large/baseline.json
