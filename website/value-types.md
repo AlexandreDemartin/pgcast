@@ -56,7 +56,7 @@ type WhereableValue<T> =
   T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>
 ```
 
-The value a `Whereable` takes for a column of type `T`, which the generator's [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases) writes in place of this union: `db.WhereableValue<number>` for `films.release_year`.
+From 7.2.0. The value a `Whereable` takes for a column of type `T`, which the generator's [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases) writes in place of this union: `db.WhereableValue<number>` for `films.release_year`.
 
 ## `InsertableValue` {#InsertableValue}
 
@@ -64,7 +64,7 @@ The value a `Whereable` takes for a column of type `T`, which the generator's [`
 type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>
 ```
 
-The value an `Insertable` takes for a column of type `T`, written by `valuesTypedAsAliases` too. `Extra` is `null | DefaultType` for a nullable column, `DefaultType` for one with a default: `db.InsertableValue<string, null | db.DefaultType>` for `films.tagline`.
+From 7.2.0. The value an `Insertable` takes for a column of type `T`, written by `valuesTypedAsAliases` too. `Extra` is `null | DefaultType` for a nullable column, `DefaultType` for one with a default: `db.InsertableValue<string, null | db.DefaultType>` for `films.tagline`.
 
 ## `UpdatableValue` {#UpdatableValue}
 
@@ -73,7 +73,7 @@ type UpdatableValue<T, Extra = never> =
   T | Parameter<T> | Extra | SQLFragment | SQLFragment<any, T | Parameter<T> | Extra | SQLFragment>
 ```
 
-The value an `Updatable` takes for a column of type `T`, with `Extra` as in `InsertableValue`: `db.UpdatableValue<string>` for `films.title`.
+From 7.2.0. The value an `Updatable` takes for a column of type `T`, with `Extra` as in `InsertableValue`: `db.UpdatableValue<string>` for `films.title`.
 
 ## `PostgresInterval` {#PostgresInterval}
 

@@ -1,5 +1,5 @@
 ---
-english: c89dcf019443
+english: 067042182e43
 ---
 
 # Template SQL
@@ -401,7 +401,10 @@ Une colonne de la table de la requête parente, dans une sous-requête donnée �
 class ParentColumn<T extends string | undefined = string | undefined> { value?: T & (Column | undefined) }
 ```
 
-Ce que renvoie `parent()`. Un membre qui n’existe que dans le type empêche `cols()` et `vals()` de passer pour un `ParentColumn`. `value` est une colonne, comme dans Zapatos 6.6.1, mais `T` accepte toute chaîne, si bien qu’une colonne d’un Whereable, qui accepte le `ParentColumn` nu, ne compare aucune colonne générique à chaque colonne du schéma. Un `ParentColumn` nu, ou `new ParentColumn()`, n’est plus assignable à un `ParentColumn<Column | undefined>` écrit à la main : écrivez plutôt le `ParentColumn` nu.
+Ce que renvoie `parent()`. Un membre qui n’existe que dans le type empêche `cols()` et `vals()` de passer pour un `ParentColumn`. `value` est une colonne, comme dans Zapatos 6.6.1, mais, à partir de la 7.2.0, `T` accepte toute chaîne, si bien qu’une colonne d’un Whereable, qui accepte le `ParentColumn` nu, ne compare aucune colonne générique à chaque colonne du schéma.
+
+- Une valeur typée par le `ParentColumn` nu, comme `const start = new ParentColumn()`, n’est plus assignable à un `ParentColumn<Column | undefined>`, écrit à la main ou émis dans le `.d.ts` d’une bibliothèque compilée avec une version antérieure : écrivez plutôt le `ParentColumn` nu, ou recompilez la bibliothèque.
+- `new ParentColumn()` écrit là où un `ParentColumn<Column | undefined>` est attendu en tire son argument de type, et compile, comme `parent()`.
 
 ## `Default` {#Default}
 

@@ -572,7 +572,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
 
-`boolean`, default `false`; an opt-in. Each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), rather than spelling out its union. The types are the same, so every call that compiles still does, and every call that fails still fails:
+`boolean`, default `false`; an opt-in, from 7.2.0. Each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), rather than spelling out its union. The types are the same, so every call that compiles still does, and every call that fails still fails:
 
 | `films` | `false` | `true` |
 |---|---|---|
@@ -581,7 +581,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 | `Updatable` | `title?: string \| db.Parameter<string> \| db.SQLFragment \| db.SQLFragment<any, …>;` | `title?: db.UpdatableValue<string>;` |
 
 - The second type argument is `null | db.DefaultType` for a nullable column, `db.DefaultType` for one with a default, and left out otherwise.
-- The schema file is smaller, and `tsc` uses less memory: on 300 tables of 20 columns, 5.1 MB rather than 7.0 MB, and 293 MB rather than 387 MB.
+- The schema file is smaller, and `tsc` uses less memory: on 300 tables of 20 columns, 5.1 MB rather than 7.0 MB, and 293 MB rather than 387 MB with `skipLibCheck: false`, 196 MB rather than 280 MB with `skipLibCheck: true`.
 - An editor's hover and an error name the alias on TypeScript 5.9: `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`. TypeScript 4.1 shows the union in full.
 - The queries' SQL doesn't change. With `false`, nor does the output. It becomes the default in 8.0, and `false` stays ([decision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
 
