@@ -14,6 +14,7 @@ import type {
   Whereable,
   Table,
   Column,
+  ColumnForTable,
 } from 'zapatos/schema';
 
 const timing = typeof performance === 'object' ?
@@ -299,13 +300,18 @@ export class ColumnValues<T> { private declare readonly [wrapper]: 'vals'; const
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
+// T is a string, and `value` checks the column: a generic column then meets no union of every column name, which costs
+// seconds on a large schema, wherever a Whereable column holds the bare ParentColumn (#918, note 016)
 /**
  * Compiles to the name of the column it wraps in the table of the parent query.
  * @param value The column name
  */
-export class ParentColumn<T extends Column | undefined = Column | undefined> { constructor(public value?: T) { } }
+export class ParentColumn<T extends string | undefined = string | undefined> { constructor(public value?: T & (Column | undefined)) { } }
 // eslint-disable-next-line no-redeclare, @typescript-eslint/no-unused-vars -- as for Parameter
-export interface ParentColumn<T extends Column | undefined = Column | undefined> extends Unwrapped { }
+export interface ParentColumn<T extends string | undefined = string | undefined> extends Unwrapped { }
+// a generic column takes the first overload, inferring X from ColumnForTable<T>; a literal infers nothing, so X is never
+// and the call falls through. X is a string, intersected with Table inside, so that `parent<s.films.Column>` as an
+// instantiation expression meets every overload's constraint (#918, note 016)
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes
@@ -319,7 +325,24 @@ export interface ParentColumn<T extends Column | undefined = Column | undefined>
  * `update()` value. Zapatos 6.6.1 sent it in `isIn()` and in `vals({…})` as
  * JSON (`'{"value":"id"}'`).
  */
-export function parent<T extends Column | undefined = Column | undefined>(x?: T) { return new ParentColumn<T>(x); }
+export function parent<X extends string = never>(x: ColumnForTable<X & Table>): ParentColumn<ColumnForTable<X & Table>>;
+/**
+ * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
+ * that column name of the table of the parent query. Without a column, it takes
+ * the column of the filter; with no filter, as in `` sql`${parent()}` ``, it
+ * throws before writing anything, saying to name the column (Zapatos 6.6.1
+ * wrote the table and its `.`, then threw on `undefined`). As a `Whereable`
+ * value, in `eq()` and in `isIn()` / `isNotIn()`, in a `lateral` subquery of `authors`:
+ * `{ authorId: isIn([parent('id'), 2]) }` gives `("authorId" IN ("authors"."id", $1))`.
+ * In `vals({…})` it is the parent column too, with no column the column of its
+ * key. Outside a nested query it throws, so as an `insert()`, `upsert()` or
+ * `update()` value. Zapatos 6.6.1 sent it in `isIn()` and in `vals({…})` as
+ * JSON (`'{"value":"id"}'`).
+ */
+// eslint-disable-next-line no-redeclare -- an overload
+export function parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>;
+// eslint-disable-next-line no-redeclare -- an overload
+export function parent(x?: Column) { return new ParentColumn(x); }
 
 
 // ColumnNames and ColumnValues of any value: a `Parameter` accepted them in a `sql` template before the tag above

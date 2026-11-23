@@ -1155,4 +1155,22 @@ describe('parent() on a generic column (#918)', () => {
     // @ts-expect-error sku is no column of users
     parentOf('sku');
   });
+
+  test('a table as the type argument checks the column against that table, an undocumented form', () => {
+    expectTypeOf(db.parent<'users'>('id')).toEqualTypeOf<db.ParentColumn<s.users.Column>>();
+    // @ts-expect-error sku is no column of users
+    db.parent<'users'>('sku');
+  });
+
+  test('the bare ParentColumn: its value is any column, and its type argument any string (note 016)', () => {
+    expectTypeOf<db.ParentColumn['value']>().toEqualTypeOf<s.Column | undefined>();
+    expectTypeOf<db.ParentColumn>().toEqualTypeOf<db.ParentColumn<string | undefined>>();
+    expectTypeOf(new db.ParentColumn()).toEqualTypeOf<db.ParentColumn>();
+    expectTypeOf(new db.ParentColumn('id')).toEqualTypeOf<db.ParentColumn<'id'>>();
+    const bare: db.ParentColumn = db.parent('id');
+    // @ts-expect-error a bare ParentColumn is no ParentColumn<s.Column | undefined>: they are compared by variance
+    const full: db.ParentColumn<s.Column | undefined> = bare;
+    const fromParent: db.ParentColumn<s.Column | undefined> = db.parent();
+    expectTypeOf([full, fromParent]).not.toBeAny();
+  });
 });
