@@ -1,5 +1,5 @@
 ---
-english: acade224d622
+english: 3a18a3e936bc
 ---
 
 # Générateur
@@ -585,7 +585,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 | `Updatable` | `title?: string \| db.Parameter<string> \| db.SQLFragment \| db.SQLFragment<any, …>;` | `title?: db.UpdatableValue<string>;` |
 
 - Le second argument de type est `null | db.DefaultType` pour une colonne nullable, `db.DefaultType` pour une colonne qui a une valeur par défaut, et absent sinon.
-- Le fichier du schéma est plus petit, et `tsc` utilise moins de mémoire : sur 300 tables de 20 colonnes, 5,1 Mo au lieu de 7,0 Mo, et 293 Mo au lieu de 387 Mo.
+- Le fichier du schéma est plus petit, et `tsc` utilise moins de mémoire : sur 300 tables de 20 colonnes, 5,1 Mo au lieu de 7,0 Mo, et 293 Mo au lieu de 387 Mo avec `skipLibCheck: false`, 196 Mo au lieu de 280 Mo avec `skipLibCheck: true`.
 - Le survol d’un éditeur et une erreur nomment l’alias avec TypeScript 5.9 : `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`. TypeScript 4.1 affiche l’union en entier.
 - Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus. L’option devient la valeur par défaut en 8.0, et `false` reste possible ([décision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
 
