@@ -82,6 +82,9 @@ const variants: [string, Config][] = [
   // the fixture's schema unions, which only this variant reads, beside public.users: a domains section in each schema,
   // the unions of unions.book_format, cover, edition, quirk and shelf, and their placeholders naming them
   ['domainsTypedAsUnions', { schemas: { public: only('users'), unions: all }, domainsTypedAsUnions: true }],
+  // main, every Whereable, Insertable and Updatable line naming an alias of zapatos/db; test/types-aliases compiles
+  // test/types against it, and the placeholders are test/generated's
+  ['valuesTypedAsAliases', { ...main, valuesTypedAsAliases: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -203,21 +206,40 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
 
   /**
    * The type errors of `probe`, compiled against the schema and custom types that `config` generates, each placeholder
-   * named in `edits` replaced by its text, as a user edits it.
+   * named in `edits` replaced by its text, as a user edits it, and `files` beside them, by name.
    */
-  const probeErrors = async (config: Config, probe: string, extraOptions: ts.CompilerOptions = {}, edits: Record<string, string> = {}) => {
+  const probeErrors = async (config: Config, probe: string, extraOptions: ts.CompilerOptions = {}, edits: Record<string, string> = {},
+    files: Record<string, string> = {}) => {
     const { ts: schema, customTypeSourceFiles } = await codegen(config);
     const dir = mkdtempSync(join(declarationDir, 'probe-'));
     writeFileSync(join(dir, 'schema.d.ts'), schema);
     writeFileSync(join(dir, 'custom.d.ts'), customFiles({ ...customTypeSourceFiles, ...edits }));
     writeFileSync(join(dir, 'probe.ts'), probe);
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
     const { config: tsconfig } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
     const { options } = ts.parseJsonConfigFileContent(tsconfig, ts.sys, generatedDir);
-    const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
+    const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts', ...Object.keys(files)].map(f => join(dir, f));
     const program = ts.createProgram(rootNames, { ...options, ...extraOptions, paths: dbPaths(config) });
     return ts.getPreEmitDiagnostics(program).map(d =>
       `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
   };
+
+  // with valuesTypedAsAliases, a second copy of the schema declared as 'aliased/schema', beside the default output
+  it('gives the same types with valuesTypedAsAliases', async () => {
+    const aliased = (await codegen({ ...main, valuesTypedAsAliases: true })).ts
+      .replace("declare module 'zapatos/schema' {", "declare module 'aliased/schema' {");
+    expect(aliased).toContain("declare module 'aliased/schema' {");
+    expect(await probeErrors(main, `
+      import type * as s from 'zapatos/schema';
+      import type * as a from 'aliased/schema';
+      type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+      type Differing = { [T in s.Table]:
+        [Same<s.WhereableForTable<T>, a.WhereableForTable<T>>, Same<s.InsertableForTable<T>, a.InsertableForTable<T>>,
+          Same<s.UpdatableForTable<T>, a.UpdatableForTable<T>>] extends [true, true, true] ? never : T }[s.Table];
+      export const tables: Same<s.Table, a.Table> = true;
+      export const differing: [Differing] extends [never] ? true : Differing = true;
+    `, {}, {}, { 'aliased.d.ts': aliased })).toEqual([]);
+  });
 
   it.each([false, true])('checks foreign labels by default, skipLibCheck %s', async skipLibCheck => {
     expect(await probeErrors(main, `
