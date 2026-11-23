@@ -375,6 +375,7 @@ The type of `db.self`, one of the [`GenericSQLExpression`](#GenericSQLExpression
 ## `parent()` {#parent}
 
 ```ts
+db.parent<_T extends string = never, X extends Table = never>(x: ColumnForTable<X>): ParentColumn<ColumnForTable<X>>
 db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
@@ -390,14 +391,15 @@ A column of the parent query's table, in a subquery given to `lateral` ([Joins](
 - It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
 - In `vals({…})` too, where without a column it takes the column of its key: `` db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` ``, in a `lateral` of `studios`, gives `SELECT "studios"."name" AS result`<!-- probe: db.select('studios', db.all, { lateral: { n: db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` } }) -->. Zapatos 6.6.1 sent it there as JSON too.
 - Outside a nested query, it throws "The 'parent' table alias has no meaning here"<!-- message -->, so `run()` rejects before any query. So does every `insert()`, `upsert()` or `update()` value, where Zapatos 6.6.1 stored `{"value":"id"}` on a text column, and the `where` of `exists()` or `isInSelect()` without `parent`, inside a `lateral` too.
+- A column typed `ColumnForTable<T>`, in a function generic over the table `T`, takes the first signature, which gives the same type without comparing `T`'s columns with every column of the schema: on a schema of a thousand column names, that comparison cost seconds of type-checking per helper ([note 016](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/016-parent-column-default.md)). A literal column name takes the second, and so does an explicit type argument, `db.parent<s.films.Column>('id')`. A name that is no column is refused by both, with "No overload matches this call".
 
 ### `ParentColumn` {#ParentColumn}
 
 ```ts
-class ParentColumn<T extends Column | undefined = Column | undefined> { value?: T }
+class ParentColumn<T extends string | undefined = string | undefined> { value?: T & (Column | undefined) }
 ```
 
-What `parent()` returns. A type-only member keeps `cols()` and `vals()` from passing as a `ParentColumn`.
+What `parent()` returns. A type-only member keeps `cols()` and `vals()` from passing as a `ParentColumn`. `value` is a column, as in Zapatos 6.6.1, but `T` takes any string, so that a Whereable column, which takes a bare `ParentColumn`, relates no generic column to every column of the schema. A bare `ParentColumn`, or `new ParentColumn()`, is no longer assignable to a `ParentColumn<Column | undefined>` written by hand: write the bare `ParentColumn` instead.
 
 ## `Default` {#Default}
 

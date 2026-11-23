@@ -1,5 +1,5 @@
 ---
-english: 3b810480b6c2
+english: 376cdad5dc27
 ---
 
 # Template SQL
@@ -379,6 +379,7 @@ Le type de `db.self`, l’un des types de [`GenericSQLExpression`](#GenericSQLEx
 ## `parent()` {#parent}
 
 ```ts
+db.parent<_T extends string = never, X extends Table = never>(x: ColumnForTable<X>): ParentColumn<ColumnForTable<X>>
 db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
@@ -394,14 +395,15 @@ Une colonne de la table de la requête parente, dans une sous-requête donnée �
 - Il fonctionne comme valeur d’un Whereable, dans un fragment `sql`, dans `eq()` et dans `vals([…])`, donc dans `isIn()` : `{ film_id: isIn([db.parent()]) }` donne `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. Dans `vals([…])`, Zapatos 6.6.1 l’envoyait en JSON : `isIn([parent('id')])` comparait avec `'{"value":"id"}'`.
 - Dans `vals({…})` aussi, où, sans colonne, il prend la colonne de sa clé : `` db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` ``, dans un `lateral` de `studios`, donne `SELECT "studios"."name" AS result`<!-- probe: db.select('studios', db.all, { lateral: { n: db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` } }) -->. Zapatos 6.6.1 l’y envoyait en JSON aussi.
 - Hors d’une requête imbriquée, il lève "The 'parent' table alias has no meaning here"<!-- message -->, si bien que `run()` est rejetée avant toute requête. De même pour toute valeur d’`insert()`, d’`upsert()` ou d’`update()`, là où Zapatos 6.6.1 stockait `{"value":"id"}` sur une colonne texte, et pour le `where` d’`exists()` ou d’`isInSelect()` sans `parent`, même à l’intérieur d’un `lateral`.
+- Une colonne typée `ColumnForTable<T>`, dans une fonction générique sur la table `T`, prend la première signature, qui donne le même type sans comparer les colonnes de `T` à chaque colonne du schéma : sur un schéma d’un millier de noms de colonnes, cette comparaison coûtait des secondes de vérification de types par fonction ([note 016](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/016-parent-column-default.md)). Un nom de colonne littéral prend la seconde, de même qu’un argument de type explicite, `db.parent<s.films.Column>('id')`. Un nom qui n’est pas une colonne est refusé par les deux, avec « <span lang="en">No overload matches this call</span> ».
 
 ### `ParentColumn` {#ParentColumn}
 
 ```ts
-class ParentColumn<T extends Column | undefined = Column | undefined> { value?: T }
+class ParentColumn<T extends string | undefined = string | undefined> { value?: T & (Column | undefined) }
 ```
 
-Ce que renvoie `parent()`. Un membre qui n’existe que dans le type empêche `cols()` et `vals()` de passer pour un `ParentColumn`.
+Ce que renvoie `parent()`. Un membre qui n’existe que dans le type empêche `cols()` et `vals()` de passer pour un `ParentColumn`. `value` est une colonne, comme dans Zapatos 6.6.1, mais `T` accepte toute chaîne, si bien qu’une colonne d’un Whereable, qui accepte le `ParentColumn` nu, ne compare aucune colonne générique à chaque colonne du schéma. Un `ParentColumn` nu, ou `new ParentColumn()`, n’est plus assignable à un `ParentColumn<Column | undefined>` écrit à la main : écrivez plutôt le `ParentColumn` nu.
 
 ## `Default` {#Default}
 
