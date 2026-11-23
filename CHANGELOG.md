@@ -6,6 +6,11 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+
+- The generator's `valuesTypedAsAliases` option (`"valuesTypedAsAliases": true` in `zapatosconfig.json`, `false` by default, optional in `Config`): each column's value type in `Whereable`, `Insertable` and `Updatable` names an alias, `db.WhereableValue<number>`, rather than spelling out its union. The types are the same. On a schema of 300 tables of 20 columns, the file takes 5.1 MB rather than 7.0 MB, and `tsc` 293 MB rather than 387 MB. Off, the output is unchanged; it becomes the default in 8.0 ([decision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)). [#921](https://github.com/AlexandreDemartin/pgcast/issues/921)
+- `zapatos/db` exports the types it names: `WhereableValue<T>`, `InsertableValue<T, Extra>` and `UpdatableValue<T, Extra>` ([Value types](https://pgcast.dev/value-types#WhereableValue)). [#921](https://github.com/AlexandreDemartin/pgcast/issues/921)
+
 ## [7.1.2] - 2026-11-22
 
 ### Fixed

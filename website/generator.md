@@ -158,6 +158,7 @@ The everyday settings:
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`constraintNames`](#generate.constraintNames) | `false` | the names in each relation's `Constraint` type |
 | [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions) | `false` | the type of a domain over `text` whose `CHECK` lists its values |
+| [`valuesTypedAsAliases`](#generate.valuesTypedAsAliases) | `false` | how each column's value type is written in `Whereable`, `Insertable` and `Updatable` |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -568,6 +569,21 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 - With [`customTypesTransform`](#generate.customTypesTransform) `'my_type'`, or a function that keeps the name, a placeholder of [`unprefixedSchema`](#generate.unprefixedSchema) takes the union's own name, and names it with no import: `export type certificate = import('zapatos/schema').certificate;`.
 - Under [`schemaJSDoc`](#generate.schemaJSDoc), the union's JSDoc gives its name, `Domain in database`, and its `COMMENT ON DOMAIN`.
 - The queries' SQL doesn't change. With `false`, nor does the output, and the generator reads no constraint of a domain. It stays off in 7.0: a placeholder holding the base type is how Zapatos types a domain ([decision 008](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/008-domains-jsonb-validators.md)).
+
+### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
+
+`boolean`, default `false`; an opt-in. Each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), rather than spelling out its union. The types are the same, so every call that compiles still does, and every call that fails still fails:
+
+| `films` | `false` | `true` |
+|---|---|---|
+| `Whereable` | `release_year?: number \| db.Parameter<number> \| db.SQLFragment \| db.ParentColumn \| db.SQLFragment<any, …>;` | `release_year?: db.WhereableValue<number>;` |
+| `Insertable` | `tagline?: string \| db.Parameter<string> \| null \| db.DefaultType \| db.SQLFragment<any>;` | `tagline?: db.InsertableValue<string, null \| db.DefaultType>;` |
+| `Updatable` | `title?: string \| db.Parameter<string> \| db.SQLFragment \| db.SQLFragment<any, …>;` | `title?: db.UpdatableValue<string>;` |
+
+- The second type argument is `null | db.DefaultType` for a nullable column, `db.DefaultType` for one with a default, and left out otherwise.
+- The schema file is smaller, and `tsc` uses less memory: on 300 tables of 20 columns, 5.1 MB rather than 7.0 MB, and 293 MB rather than 387 MB.
+- An editor's hover and an error name the alias on TypeScript 5.9: `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`. TypeScript 4.1 shows the union in full.
+- The queries' SQL doesn't change. With `false`, nor does the output. It becomes the default in 8.0, and `false` stays ([decision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
 
 ### `progressListener` {#generate.progressListener}
 
