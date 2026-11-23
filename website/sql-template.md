@@ -397,7 +397,10 @@ A column of the parent query's table, in a subquery given to `lateral` ([Joins](
 class ParentColumn<T extends string | undefined = string | undefined> { value?: T & (Column | undefined) }
 ```
 
-What `parent()` returns. A type-only member keeps `cols()` and `vals()` from passing as a `ParentColumn`. `value` is a column, as in Zapatos 6.6.1, but `T` takes any string, so that a Whereable column, which takes a bare `ParentColumn`, relates no generic column to every column of the schema. A bare `ParentColumn`, or `new ParentColumn()`, is no longer assignable to a `ParentColumn<Column | undefined>` written by hand: write the bare `ParentColumn` instead.
+What `parent()` returns. A type-only member keeps `cols()` and `vals()` from passing as a `ParentColumn`. `value` is a column, as in Zapatos 6.6.1, but, from 7.2.0, `T` takes any string, so that a Whereable column, which takes a bare `ParentColumn`, relates no generic column to every column of the schema.
+
+- A value typed with the bare `ParentColumn`, such as `const start = new ParentColumn()`, is no longer assignable to a `ParentColumn<Column | undefined>`, written by hand or emitted in the `.d.ts` of a library built against an earlier version: write the bare `ParentColumn` instead, or rebuild the library.
+- `new ParentColumn()` written where a `ParentColumn<Column | undefined>` is expected takes its type argument from there, and compiles, as `parent()` does.
 
 ## `Default` {#Default}
 
