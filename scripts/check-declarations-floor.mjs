@@ -111,11 +111,19 @@ writeFileSync(join(consumer, 'tsconfig.json'), JSON.stringify({
   },
 }, null, 2));
 
-const compiled = spawnSync(process.execPath, [join(cache, 'node_modules/typescript/bin/tsc'), '-p', consumer, '--pretty', 'false'],
+const tsc = () => spawnSync(process.execPath, [join(cache, 'node_modules/typescript/bin/tsc'), '-p', consumer, '--pretty', 'false'],
   {cwd: consumer, encoding: 'utf8'});
+const compiled = tsc();
 console.log(compiled.status === 0 ?
   `✓ a consumer on TypeScript ${ts.version} compiles against them, with skipLibCheck` :
   `✗ a consumer on TypeScript ${ts.version} does not compile against them, with skipLibCheck:\n${compiled.stdout}${compiled.stderr}`);
+
+// the same consumer against the schema the generator's valuesTypedAsAliases writes, which names zapatos/db's aliases
+cpSync(join(root, 'test/__snapshots__/codegen/valuesTypedAsAliases.d.ts'), join(consumer, 'zapatos/schema.d.ts'));
+const aliased = tsc();
+console.log(aliased.status === 0 ?
+  `✓ it compiles against the schema valuesTypedAsAliases writes too` :
+  `✗ it does not compile against the schema valuesTypedAsAliases writes:\n${aliased.stdout}${aliased.stderr}`);
 
 // the same program, every shipped declaration a root and checked: the one error allowed is core.d.ts's
 // `Buffer<ArrayBuffer>` (TS2315), from the `@types/node` the package is built with, which install.md covers
@@ -135,4 +143,4 @@ console.log(lib.length ?
     ts.formatDiagnostics(lib, host) :
   `✓ TypeScript ${ts.version} checks the shipped declarations, without skipLibCheck, Buffer<ArrayBuffer> aside`);
 
-process.exit(syntax.length || compiled.status !== 0 || lib.length ? 1 : 0);
+process.exit(syntax.length || compiled.status !== 0 || aliased.status !== 0 || lib.length ? 1 : 0);
