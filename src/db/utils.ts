@@ -4,6 +4,8 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
+import type { Parameter, ParentColumn, SQLFragment } from './core';
+
 // no longer used in src/db (core.ts and shortcuts.ts declare their own), and kept: the declarations a package emitted
 // under node10 resolution, against Zapatos 6.6.1 or against pgcast before #578, name it as `zapatos/dist/db/utils`
 // (test/types/utils.test-d.ts)
@@ -17,6 +19,23 @@ export type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/
  */
 export type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom;
+
+/**
+ * The value a `Whereable` takes for a column of type `T`, written by the generator's `valuesTypedAsAliases` in place of
+ * the union it otherwise spells out on each line: the same type.
+ */
+export type WhereableValue<T> =
+  T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>;
+
+/**
+ * The value an `Insertable` takes for a column of type `T`, as `WhereableValue`: `Extra` is `null | DefaultType` for a
+ * nullable column, `DefaultType` for one with a default.
+ */
+export type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>;
+
+/** The value an `Updatable` takes for a column of type `T`, as `InsertableValue`. */
+export type UpdatableValue<T, Extra = never> =
+  T | Parameter<T> | Extra | SQLFragment | SQLFragment<any, T | Parameter<T> | Extra | SQLFragment>;
 
 // an identifier as Postgres lexes it, as a regexp source for the `u` flag: unquoted, any non-ASCII character
 // is a letter and `$` may follow the first one; quoted, or `U&` quoted, anything but NUL, with `""` for `"`;

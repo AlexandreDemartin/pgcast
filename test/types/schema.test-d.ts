@@ -142,6 +142,36 @@ describe('PostgresInterval, the type intervalsTypedAsObjects writes', () => {
   });
 });
 
+describe('WhereableValue, InsertableValue and UpdatableValue, the types valuesTypedAsAliases writes', () => {
+  type Update<V> = V | db.Parameter<V> | db.SQLFragment | db.SQLFragment<any, V | db.Parameter<V> | db.SQLFragment>;
+
+  test('each is the union the generator writes out otherwise', () => {
+    expectTypeOf<db.WhereableValue<number>>().toEqualTypeOf<Where<number>>();
+    expectTypeOf<db.WhereableValue<number | db.Int8String>>().toEqualTypeOf<Where<number | db.Int8String>>();
+    expectTypeOf<db.InsertableValue<number>>().toEqualTypeOf<number | db.Parameter<number> | db.SQLFragment<any>>();
+    expectTypeOf<db.InsertableValue<number, db.DefaultType>>()
+      .toEqualTypeOf<number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>>();
+    expectTypeOf<db.InsertableValue<number, null | db.DefaultType>>()
+      .toEqualTypeOf<number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>>();
+    expectTypeOf<db.UpdatableValue<number>>().toEqualTypeOf<Update<number>>();
+    expectTypeOf<db.UpdatableValue<number, null | db.DefaultType>>().toEqualTypeOf<number | db.Parameter<number> | null |
+      db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>>();
+    expectTypeOf<db.WhereableValue<any>>().toEqualTypeOf<Where<any>>();
+    expectTypeOf<db.WhereableValue<number>>().not.toBeAny();
+  });
+
+  test('refused', () => {
+    // @ts-expect-error a text value for a number column
+    expectTypeOf<db.WhereableValue<number>>().toEqualTypeOf<Where<string>>();
+    // @ts-expect-error a Whereable value takes a ParentColumn, an Updatable value does not
+    expectTypeOf<db.UpdatableValue<number>>().toEqualTypeOf<Where<number>>();
+    // @ts-expect-error null only with the Extra that says so
+    expectTypeOf<db.InsertableValue<number>>().toEqualTypeOf<number | db.Parameter<number> | null | db.SQLFragment<any>>();
+    // @ts-expect-error a parameter of the column's type, not of null
+    expectTypeOf<db.InsertableValue<number, null>>().toEqualTypeOf<number | db.Parameter<number | null> | null | db.SQLFragment<any>>();
+  });
+});
+
 describe('DomainInContext, the type domainsTypedByContext writes', () => {
   test('a placeholder that holds what the generator wrote takes the type of the context', () => {
     expectTypeOf<db.DomainInContext<db.Int8String, db.Int8String, number>>().toEqualTypeOf<number>();
