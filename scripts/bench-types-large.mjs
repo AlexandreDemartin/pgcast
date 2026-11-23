@@ -55,7 +55,7 @@ const allCases = {
 };
 // `--cases parentOf,lateralFor`: a CI job runs some of them
 const cases = Object.fromEntries((option('--cases')?.split(',') ?? Object.keys(allCases)).map(name =>
-  [name, allCases[name] ?? fail(`bench:types:large: no case ${name}; the cases are ${Object.keys(allCases).join(', ')}.`)]));
+  [name, Object.hasOwn(allCases, name) ? allCases[name] : fail(`bench:types:large: no case ${name}; the cases are ${Object.keys(allCases).join(', ')}.`)]));
 
 function run(command, commandArgs) {
   const result = spawnSync(command, commandArgs, {cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024});
