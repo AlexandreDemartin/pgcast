@@ -34,6 +34,7 @@ description: 'Simple big wins, nothing shaky: measured gain weighed against adde
 - A test of a process's end asserts that it exits, not only that it stops printing: an early return on SIGINT left one that only SIGKILL ends. The end closes what a constructor that threw had opened: `createWatchProgram` leaves its file watchers (#863).
 - A speed claim compares master and the branch in one process, interleaved, then again in reversed order (#545, #553).
 - A check (a docs checker, `check:agents`, a guard) is first proved in the direction that passes silently: plant near misses of its marker (`<!---`, a plural, case, spacing, an info string), a duplicate, a comment; and every form it must refuse, not only the one the tree uses: a guard that read a command's words with quotes emptied missed each quoted argument and `src:dst` refspec (#690, #834).
+  - Run with no input (a missing argument, an empty list), it exits non-zero, never with its pass message: an orchestrator check run without its argument passed (#918).
   - A loose detector beside the strict parser fails on any line it sees and cannot read; a scanner is compared with the real parser (markdown-it's `fence` tokens) on every page.
   - Equality, not `[\s\S]*?` between expected lines, which accepts a dropped one.
   - Its rule sits in a module a self-check can import alone, not one that pulls in a data loader (#236).
