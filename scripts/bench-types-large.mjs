@@ -13,7 +13,9 @@
 // - Each case runs `--runs` times (5 by default) per library, the libraries alternated and the order reversed each run.
 // - The gate: per case, pgcast's median over Zapatos's, for check time and for memory, against the baseline's ratio.
 //   Both libraries run on the same machine, so the ratio holds across machines where a time does not. Fails above
-//   +`threshold` or below -`threshold` (a gain then needs `--update`, so that the baseline follows it).
+//   +`threshold` or below -`threshold` (a gain then needs `--update`, so that the baseline follows it). A check time
+//   counts only when pgcast's median is also `timeFloor` seconds or more from what the baseline's ratio gives: at a
+//   ratio of 0.01, a tenth of a second of noise doubles it (#918).
 import {spawnSync} from 'node:child_process';
 import {existsSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
@@ -28,6 +30,7 @@ const
   baselineName = 'bench/large/baseline.json',
   baselinePath = join(root, baselineName),
   threshold = 0.2,
+  timeFloor = 0.25,
   zapatosVersion = '6.6.1',
   zapatosCache = join(root, 'node_modules/.cache/pgcast-zapatos-661'),
   zapatosRoot = join(zapatosCache, 'node_modules/zapatos'),
@@ -231,8 +234,9 @@ for (const [name, figures] of Object.entries(current)) {
   for (const [key, show] of [['time', seconds], ['memory', megabytes]]) {
     const
       before = baseline?.cases?.[name]?.[key],
-      change = before === undefined ? undefined : figures[key] / before - 1;
-    if (change !== undefined && Math.abs(change) > threshold) outside.push(`${name} ${key} ${percent(change)}`);
+      change = before === undefined ? undefined : figures[key] / before - 1,
+      gap = key === 'time' && before !== undefined ? Math.abs(figures.pgcast.time - before * figures.zapatos.time) : Infinity;
+    if (change !== undefined && Math.abs(change) > threshold && gap >= timeFloor) outside.push(`${name} ${key} ${percent(change)}`);
     rows.push([`${name} ${key === 'time' ? 'check time' : 'memory'}`, show(figures.pgcast[key]), show(figures.zapatos[key]),
       ratio(figures[key]), before === undefined ? '' : ratio(before), change === undefined ? '' : percent(change),
       key === 'time' ? `${percent(figures.spread.pgcast)}, ${percent(figures.spread.zapatos)}` : '']);
