@@ -3,20 +3,20 @@
   "zapatos": "6.6.1",
   "cases": {
     "parentOf": {
-      "time": 1.016,
-      "memory": 0.992
+      "time": 0.003,
+      "memory": 0.905
     },
     "lateralFor": {
-      "time": 2.033,
-      "memory": 1.162
+      "time": 0.051,
+      "memory": 1.081
     },
     "selectWith": {
-      "time": 1.002,
-      "memory": 1.026
+      "time": 0.013,
+      "memory": 0.911
     },
     "libCheck": {
-      "time": 1.502,
-      "memory": 1.031
+      "time": 0.014,
+      "memory": 1.05
     }
   }
 }
