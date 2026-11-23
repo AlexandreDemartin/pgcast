@@ -1,5 +1,5 @@
 ---
-english: 09508742f0c2
+english: 285b7ffd66e7
 ---
 
 # Pourquoi pgcast
@@ -94,7 +94,7 @@ Les corrections de sécurité sont venues d’abord, toutes dans la 6.6.2 ([Séc
 
 pgcast 6.x vous permet d’activer les corrections avant leur activation par défaut. En 7.0, six réglages du runtime et sept du générateur changent. Le [guide de migration](/fr/switching#from-7-0) précise quels anciens réglages disparaissent en 8.0 et lesquels restent disponibles pour un parser personnalisé ou pour arrêter le processus en cas d’erreur de base de données, comme le fait la CLI.
 
-[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
+[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés ; l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) aussi, jusqu’à la 8.0. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 
 Zapatos 6.6.1 n’avait pas de suite de tests à lui (les tests de son premier utilisateur exerçaient « <span lang="en">most of the code base at least a little</span> ») ; sa CI faisait le lint et le build. Sa feuille de route en jugeait une « <span lang="en">kind of indispensable</span> », une qui teste « <span lang="en">not just returned values but also inferred types</span> ».
 
