@@ -28,3 +28,5 @@ Candidates for a check, a rule or a skill line.
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 
+
+- #950 (defect) — the 63-byte guard on a key alias (`src/db/shortcuts.ts` `SQLForKeyAlias`, `website/runtime-config.md` and `website/select.md` § With `shortcutsUseJson`) counts UTF-8 bytes, where Postgres truncates an identifier in the server encoding: in an `EUC_JP` database a key of 31 × `é` (62 bytes in UTF-8, 93 there) passes and comes back cut to 21 characters. The wording could say "in a UTF-8 database", where the count is exact; `src/db/conditions.ts` counts the same way. — branch-reviewer
