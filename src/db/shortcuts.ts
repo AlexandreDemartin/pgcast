@@ -930,8 +930,9 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * is `selectRows()`'s query, and `run()` gives the same array, one result per
  * row: `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
  * A single `lateral` passed through is converted above that query,
- * `SELECT to_jsonb(result) AS result FROM (…) AS "sq_films"`, so its value
- * stays JSON, ordered and made distinct by its raw value. Nested (a
+ * `SELECT to_jsonb(result) AS result FROM (…) AS "sq_films"` (`to_json` with
+ * `shortcutsUseJson`), so its value stays JSON, ordered and made distinct by
+ * its raw value. Nested (a
  * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
  * `cursor()`, it keeps its `jsonb_agg`. The rows form runs with its own
  * `runResultTransform`: one set on the query applies to the aggregate only.
@@ -1079,10 +1080,11 @@ function selectQuery(
     // fragment of its own, never the one nested in the aggregate, which would carry the name and noop nested
     const
       topLevelQuery = checksSecondRow ? rowsSQL(2) :
-        // a single lateral passed through keeps its JSON value, as jsonb_agg() converts it (pg parses the bare column,
-        // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
-        // still act on the raw value
-        lateral instanceof SQLFragment ? sql<SQL, any>`SELECT to_jsonb(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
+        // a single lateral passed through keeps its JSON value, as jsonb_agg() or json_agg() converts it (pg parses the
+        // bare column, a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY
+        // and DISTINCT still act on the raw value; to_json() with shortcutsUseJson keeps a json child's key order
+        lateral instanceof SQLFragment ?
+          sql<SQL, any>`SELECT ${raw(json ? 'to_json' : 'to_jsonb')}(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
           rowsSQL(limit),
       nestedCompile = query.compile,
       topLevel = () => Object.assign(topLevelQuery,
