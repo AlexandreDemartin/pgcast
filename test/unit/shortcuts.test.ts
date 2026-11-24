@@ -1932,6 +1932,137 @@ describe('selectRows', () => {
   it('adds no member to SelectResultMode', () => {
     expect(Object.keys(db.SelectResultMode)).toEqual(['0', '1', '2', '3', 'Many', 'One', 'ExactlyOne', 'Numeric']);
   });
+
+  describe('select() with topLevelSelectAsRows (note 018 § 3)', () => {
+    const
+      asRows = () => db.setConfig({ topLevelSelectAsRows: true }),
+      // what `build()` compiles to without the option, then with it
+      offAndOn = (build: () => db.SQLFragment<any, any>) => {
+        const off = build().compile();
+        asRows();
+        return [off, build().compile()];
+      },
+      passthrough = { lateral: db.count('accounts', { owner_id: parent('id') }) as any },  // selectRows()'s type refuses a lateral typed number (#749)
+      passthroughRows = 'SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true';
+
+    it.each(cases.filter(([name]) => name !== 'a lateral passed through'))('%s: compiled on its own, select() sends selectRows()\'s query', (_, table, where, options) => {
+      asRows();
+      expect(db.select(table, where, options).compile()).toEqual(db.selectRows(table, where, options).compile());
+    });
+
+    it.each(cases)('%s, with topLevelSelectAsRows: false: select() sends the same query, in jsonb_agg', (_, table, where, options) => {
+      db.setConfig({ topLevelSelectAsRows: false });
+      expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
+    });
+
+    it('the rows query, with no jsonb_agg', () => {
+      asRows();
+      expect(db.select('accounts', { owner_id: 1 }, { order: { by: 'id', direction: 'ASC' } }).compile()).toEqual({
+        text: 'SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) ORDER BY "id" ASC',
+        values: [1],
+      });
+    });
+
+    it('a single lateral passed through is converted to JSON above the same rows query, as jsonb_agg() converts it', () => {
+      expect(db.selectRows('users', all, passthrough).compile().text).toBe(passthroughRows);
+      asRows();
+      expect(db.select('users', all, passthrough).compile()).toEqual({ text: `SELECT to_jsonb(result) AS result FROM (${passthroughRows}) AS "sq_users"`, values: [] });
+    });
+
+    it('a lateral map: the parent gives its rows, each lateral select() its jsonb_agg', () => {
+      asRows();
+      expect(db.select('users', all, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } }).compile()).toEqual({
+        text: `SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_accounts".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true`,
+        values: ['id', 'accounts'],
+      });
+    });
+
+    it('nested, it keeps its jsonb_agg: a lateral, a lateral passed through, extras, a sql template', () => {
+      const accounts = () => db.select('accounts', { owner_id: parent('id') });
+      for (const build of [
+        () => db.selectOne('users', { id: 1 }, { lateral: { accounts: accounts() } }),
+        () => db.selectOne('users', { id: 1 }, { lateral: accounts() }),
+        () => db.selectOne('users', { id: 1 }, { extras: { accounts: db.select('accounts', { owner_id: 1 }) } }),
+        () => sql`SELECT (${db.select('accounts', { owner_id: 1 })}) AS accounts`,
+      ]) {
+        const [off, on] = offAndOn(build);
+        expect(on).toEqual(off);
+        expect(on.text).toContain(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE`);
+        db.setConfig({ topLevelSelectAsRows: false });
+      }
+    });
+
+    it('a copy compiles as nested, with its jsonb_agg, and keeps the aggregate\'s runResultTransform', () => {
+      asRows();
+      const q = db.select('accounts', { owner_id: 1 }), qr = (results: unknown[]) => ({ rows: results.map(result => ({ result })) }) as any;
+      expect(q.copy().compile()).toEqual({
+        text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)) AS "sq_accounts"`,
+        values: [1],
+      });
+      expect(q.copy({ preparedName: 'copied' }).compile()).toMatchObject({ text: q.copy().compile().text, name: 'copied' });
+      // the rows form runs with its own: one set on the query is the aggregate's, as a copy runs it
+      expect(q.runResultTransform(qr([[{ id: 1 }, { id: 2 }]]))).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(q.copy().runResultTransform).toBe(q.runResultTransform);
+    });
+
+    it('prepared(), noop and parentTable set on the query go with the rows form', () => {
+      asRows();
+      const text = 'SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)';
+      expect(db.select('accounts', { owner_id: 1 }).prepared('accounts_rows').compile()).toEqual({ text, values: [1], name: 'accounts_rows' });
+      const q = db.select('accounts', { owner_id: 1 });
+      q.noop = true;
+      expect(q.compile()).toEqual({ text: `/* marked no-op: won't hit DB unless forced -> */ ${text}`, values: [1] });
+      const owned = db.select('accounts', { owner_id: parent('id') });
+      owned.parentTable = 'users';
+      expect(owned.compile().text).toBe('SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")');
+    });
+
+    it('compiled on its own first, its name and noop stay off its nested forms: a CTE, a copy', () => {
+      asRows();
+      for (const options of [{}, passthrough]) {
+        const
+          aggregate = db.select('users', all, options).copy().compile(),
+          prepared = db.select('users', all, options).prepared('users_rows'),
+          noop = db.select('users', all, options);
+        noop.noop = true;
+        expect(prepared.compile().name).toBe('users_rows');
+        expect(noop.compile().text).toMatch(/^\/\* marked no-op/);
+        expect(db.withCTEs({ f: prepared }, sql`SELECT result FROM f`).compile()).toEqual({ text: `WITH "f" AS (${aggregate.text}) SELECT result FROM f`, values: aggregate.values });
+        expect(noop.copy({ noop: false }).compile()).toEqual(aggregate);
+      }
+    });
+
+    it('is read when select() is called, not when the query is compiled', () => {
+      const off = db.select('accounts', all);
+      asRows();
+      const on = db.select('accounts', all);
+      db.setConfig({ topLevelSelectAsRows: false });
+      expect([off.compile().text, on.compile().text]).toEqual([
+        `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts") AS "sq_accounts"`,
+        'SELECT to_jsonb("accounts".*) AS result FROM "accounts"',
+      ]);
+    });
+
+    it('leaves selectRows(), selectOne(), selectExactlyOne(), count() and the other aggregates as they are', () => {
+      for (const build of [
+        () => db.selectRows('accounts', { owner_id: 1 }),
+        () => db.selectOne('accounts', { owner_id: 1 }),
+        () => db.selectExactlyOne('accounts', { owner_id: 1 }),
+        () => db.count('accounts', { owner_id: 1 }),
+        () => db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }),
+      ]) {
+        const [off, on] = offAndOn(build);
+        expect(on).toEqual(off);
+        db.setConfig({ topLevelSelectAsRows: false });
+      }
+    });
+
+    it('with selectExactlyOneChecksForSecondRow too, each keeps its own top-level form', () => {
+      db.setConfig({ topLevelSelectAsRows: true, selectExactlyOneChecksForSecondRow: true });
+      expect(db.select('accounts', { owner_id: 1 }).compile().text).toBe('SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)');
+      expect(db.selectExactlyOne('accounts', { owner_id: 1 }).compile().values).toEqual([1, 2]);
+    });
+  });
 });
 
 

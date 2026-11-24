@@ -1,5 +1,5 @@
 ---
-english: 99ae46685f4c
+english: 5f80af6b82c9
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -79,6 +79,7 @@ interface Config {
   transactionRequiresSatisfyingLevel?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
   aggregatesTypedByColumn?: boolean;
+  topLevelSelectAsRows?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -103,6 +104,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul demande deux lignes et sa promesse est rejetée s’il en trouve une deuxième | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
+| [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) | `false` | un `select()` exécuté seul envoie la requête de `selectRows()`, une ligne par résultat, au lieu d’une seule valeur `jsonb_agg` | à chaque `select()` |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
 | [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque retry | à chaque `transaction()` |
@@ -287,6 +289,27 @@ Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne 
 - Chaque appel à `.run()` lit l’option même si la requête a été construite avant `setConfig()`. Réglez l’option sur `true` pour rétablir la valeur par défaut. JavaScript accepte aussi `null` et `undefined`. TypeScript refuse `null` avec `strictNullChecks` et `undefined` avec `exactOptionalPropertyTypes`. Une requête qui ne renvoie aucune ligne donne alors `null`.
 - Les exemples, et chaque type : [Typé par colonne](/fr/aggregates#typed-by-column).
 
+### `topLevelSelectAsRows` {#Config.topLevelSelectAsRows}
+
+```ts
+topLevelSelectAsRows?: boolean  // default: false; true in 8.0
+```
+
+À partir de la 7.3.0. Avec l’option activée, un [`select()`](/fr/select#select) exécuté ou compilé seul envoie la requête de [`selectRows()`](/fr/select#selectRows), une ligne par résultat, et `.run()` donne le même tableau, `[]` quand aucune ligne ne correspond. Aucune valeur unique ne contient tout le résultat : une grosse lecture coûte moins cher, et la [limite](/fr/performance#limits) de 256 Mo de `jsonb_agg` ne s’y applique plus.
+
+| Appel | `.compile().text` |
+|---|---|
+| `db.select('films', { studio_id: 1000 })` | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }) --> |
+| le même, avec l’option | `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', { studio_id: 1000 })) --> |
+
+- `.compile()` montre la requête des lignes : du code qui exécute ce texte avec son propre client et lit `rows[0].result` n’obtient que la première ligne. Gardez ce code sur `false`, qui reste disponible après la 8.0.
+- Comme requête principale de [`withCTEs()`](/fr/sql-template#withCTEs), de même. Imbriqué dans un `lateral`, des `extras`, un template `sql` ou une CTE, copié avec [`.copy()`](/fr/sql-template#copy), et dans [`cursor()`](/fr/transaction#cursor), `select()` garde son `jsonb_agg` : la requête parente le lit comme une seule valeur.
+- Un [`lateral` transmis tel quel](/fr/select#lateral), seul, est converti au-dessus de la requête des lignes, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) -->, pour qu’un `count()` reste un nombre, comme dans le tableau de `select()`, là où `selectRows()` donne la chaîne que `pg` parse, et pour que `order` et `distinct` agissent sur sa valeur brute, comme dans l’agrégat.
+- La requête des lignes s’exécute avec son propre `runResultTransform` : celui que vous définissez sur la requête ne s’applique qu’à ses copies et à la requête imbriquée.
+- [`prepared()`](/fr/sql-template#prepared), `noop` et les écouteurs fonctionnent comme avant : [`queryListener`](#Config.queryListener) reçoit la requête des lignes.
+- `selectOne()`, `selectExactlyOne()`, `selectRows()`, `count()` et les autres agrégats ne changent pas, ni les types.
+- Lue quand `select()` est appelée, pas à `.run()`. Désactivée, l’option n’émet jamais d’avertissement : les valeurs sont les mêmes ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)).
+
 ### `queryListener` {#Config.queryListener}
 
 ```ts
@@ -451,6 +474,8 @@ type TransactionEvent =
 En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
+
+[`topLevelSelectAsRows`](#Config.topLevelSelectAsRows), à partir de la 7.3.0, n’émet pas d’avertissement non plus, puisque ses valeurs sont les mêmes : désactivée en 7.x, activée par défaut en 8.0, et `false` garde l’agrégat après la 8.0.
 
 Depuis la 7.0, le générateur active [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) par défaut, sans note de migration. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note. L’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) ne donne lieu à aucune note non plus, puisque ses types sont les mêmes, et reste désactivée jusqu’à la 8.0. Le générateur cherche par défaut chaque enum dans son propre schéma ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)) et écrit ses labels dans l’ordre de déclaration ([`enumOrder`](/fr/generator#generate.enumOrder)), sans note de migration. Il active également [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) par défaut, sans note de migration.
 

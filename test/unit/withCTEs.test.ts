@@ -91,6 +91,24 @@ describe('withCTEs', () => {
     expect(db.withCTEs({ recent }, one).prepared('one_with').compile()).toMatchObject({ values: [1, 2], name: 'one_with' });
   });
 
+  it('select() with topLevelSelectAsRows: the main query is its rows query, a CTE keeps its jsonb_agg', () => {
+    db.setConfig({ topLevelSelectAsRows: true });
+    const ids = db.select('users', all, { columns: ['id'] }), idsText = 'SELECT jsonb_build_object($2::text, "id") AS result FROM "users"';
+    expect(db.withCTEs({ recent }, ids).compile()).toEqual({ text: `${recentSQL} ${idsText}`, values: [1, 'id'] });
+    expect(db.withCTEs({}, ids).compile()).toEqual({ text: 'SELECT jsonb_build_object($1::text, "id") AS result FROM "users"', values: ['id'] });
+    expect(db.withCTEs({ s: db.select('users', { id: 1 }) }, db.select('accounts', all)).compile()).toEqual({
+      text: `WITH "s" AS (SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1)) AS "sq_users") SELECT to_jsonb("accounts".*) AS result FROM "accounts"`,
+      values: [1],
+    });
+    // nested and copied, the aggregate, as the shortcut nested; prepared on request, the name goes with the rows text
+    const nested = db.selectOne('users', { id: 1 }, { lateral: { ids: db.withCTEs({ recent }, ids) } }).compile().text;
+    expect(nested).toContain(`AS (SELECT "id" FROM "users" WHERE "manager_id" = $`);
+    expect(nested).toContain(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object(`);
+    expect(db.withCTEs({ recent }, ids).copy().compile().text).toBe(`${recentSQL} SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${idsText}) AS "sq_users"`);
+    expect(db.withCTEs({ recent }, ids).prepared('ids_with').compile()).toEqual({ text: `${recentSQL} ${idsText}`, values: [1, 'id'], name: 'ids_with' });
+    expect(db.withCTEs({ recent }, ids).runResultTransform).toBe(ids.runResultTransform);
+  });
+
   it('a write shortcut as a CTE', () => {
     const eve = db.insert('users', { email: 'eve@example.com', display_name: 'Eve' }, { returning: ['id'] });
     expect(db.withCTEs({ eve }, db.select('users', all, { columns: ['display_name'] })).compile()).toEqual({

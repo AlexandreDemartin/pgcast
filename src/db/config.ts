@@ -42,6 +42,7 @@ export interface Config {
   transactionRequiresSatisfyingLevel?: boolean;  // transaction() rejects the client of a transaction at a level that doesn't satisfy its own
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
   aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value; declare false in ConfigTypes for the 6.x types
+  topLevelSelectAsRows?: boolean;  // select() run or compiled on its own is selectRows()'s query, one row per result; nested, its aggregate
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -69,6 +70,7 @@ const defaults: Config = {
   transactionRequiresSatisfyingLevel: true,
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
   aggregatesTypedByColumn: true,
+  topLevelSelectAsRows: false,  // the default in 8.0
 };
 
 let config: Config = { ...defaults };
