@@ -1023,14 +1023,15 @@ function selectQuery(
     // compiled on its own, as `run()` does, the query asks for a second row, or is selectRows()'s; a parent query
     // compiles it into its own `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`, where a
     // second row would duplicate the parent row, or its aggregate, which the parent reads as one value; the top-level
-    // form takes the properties a caller may have set on the query since (those `copy()` carries over)
+    // form takes the properties a caller may have set on the query since (those `copy()` carries over), so it is a
+    // fragment of its own, never the one nested in the aggregate, which would carry the name and noop nested
     const
       topLevelQuery = checksSecondRow ? rowsSQL(2) :
         // a single lateral passed through keeps its JSON value, as jsonb_agg() converts it (pg parses the bare column,
         // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
         // still act on the raw value
         lateral instanceof SQLFragment ? sql<SQL, any>`SELECT to_jsonb(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
-          rowsQuery,
+          rowsSQL(limit),
       nestedCompile = query.compile,
       topLevel = () => Object.assign(topLevelQuery,
         { parentTable: query.parentTable, preparedName: query.preparedName, noop: query.noop, noopResult: query.noopResult });
