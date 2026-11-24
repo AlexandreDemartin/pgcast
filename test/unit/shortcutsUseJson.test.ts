@@ -139,8 +139,14 @@ describe('shortcutsUseJson on', () => {
     // a passed-through child of a passed-through child: json too
     expect(text(on(() => db.select('accounts', all, { distinct: true, lateral: db.selectOne('users', { id: parent('owner_id') }, { lateral: db.selectOne('accounts', { owner_id: parent('id') }) }) }))))
       .toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
-    // a child of another kind keeps its type: an aggregate, a child built with the option off, a distinct child
-    for (const child of [db.count('accounts', { owner_id: parent('id') }), off(owner), on(() => db.selectOne('users', { id: parent('owner_id') }, { distinct: true }))]) {
+    // a copy() or withCTEs() child stands for the shortcut: json too
+    for (const child of [on(owner).copy(), db.withCTEs({ s: sql`SELECT 1` }, on(owner)), db.withCTEs({}, on(owner))]) {
+      expect(text(on(() => db.select('accounts', all, { distinct: true, lateral: child })))).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
+    }
+    // a child of another kind keeps its type: an aggregate, a child built with the option off and its copy, a
+    // distinct child, and a sql child given a shortcut's transform, the caller's SQL
+    const borrowed = Object.assign(sql`SELECT 1 AS result`, { runResultTransform: on(owner).runResultTransform });
+    for (const child of [db.count('accounts', { owner_id: parent('id') }), off(owner), off(owner).copy(), on(() => db.selectOne('users', { id: parent('owner_id') }, { distinct: true })), borrowed]) {
       expect(text(on(() => db.selectOne('users', all, { distinct: true, lateral: child })))).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
     }
     // without distinct, or with distinct on columns, the child's json is kept

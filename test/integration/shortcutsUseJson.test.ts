@@ -109,6 +109,19 @@ describe('shortcutsUseJson: distinct: true over a passed-through lateral', () =>
     expect(json).toEqual(jsonb);
   });
 
+  it('a copy() or withCTEs() child, with a CTE or none: the same rows, as it stands for the shortcut', async () => {
+    const children: Record<string, () => db.SQLFragment<any>> = {
+      copy: () => owner().copy(),
+      withCTE: () => db.withCTEs({ s: sql`SELECT 1` }, owner()),
+      withNoCTE: () => db.withCTEs({}, owner()),
+    };
+    for (const child of Object.values(children)) {
+      const { jsonb, json } = await bothWays(() => db.select('accounts', all, { distinct: true, lateral: child() }));
+      expect(jsonb.map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
+      expect(byId(json)).toEqual(byId(jsonb));
+    }
+  });
+
   it('a count() child keeps its bigint, a string', async () => {
     const { jsonb, json } = await bothWays(() => db.selectOne('users', { id: 1 }, { distinct: true, lateral: db.count('accounts', { owner_id: parent('id') }) }));
     expect(jsonb).toBe('2');
