@@ -1,0 +1,28 @@
+{
+  "machine": "Apple M3 Pro, darwin",
+  "postgresMajor": 17,
+  "node": "22.23.4",
+  "rounds": 9,
+  "scenarios": {
+    "lateral/default": 63.777,
+    "lateral/prepared": 64.886,
+    "profile/default": 0.811,
+    "profile/prepared": 0.649,
+    "columns/default": 19.289,
+    "columns/prepared": 19.442,
+    "jsonb4k/default": 630.765,
+    "jsonb4k/prepared": 618.626,
+    "jsonb115k/default": null,
+    "jsonb115k/prepared": null,
+    "page/default": 0.283,
+    "page/prepared": 0.206,
+    "byKey/default": 0.111,
+    "byKey/prepared": 0.081,
+    "insert100/default": 0.563,
+    "insert100/prepared": 0.563,
+    "insert1000/default": 4.134,
+    "insert1000/prepared": 3.996,
+    "insert10000/default": 42.984,
+    "insert10000/prepared": 36.763
+  }
+}
