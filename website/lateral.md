@@ -176,25 +176,7 @@ db.select('films', db.all, {
 
 - It checks the table you name, not the query around it: `db.parent<s.studios.Column>('id')` under `films` compiles too.
 - The type doesn't check it unasked: the subquery is built, and typed, before the query around it, so its type doesn't know the parent table. Checking it would slow every compile, and refuse code that runs.
-
-### In a generic helper
-
-A helper generic over its parent table takes the caller's `db.parent()`, typed `db.ParentColumn<s.ColumnForTable<T>>`, rather than a column it passes to `db.parent()` itself:
-
-```ts twoslash
-import * as db from 'zapatos/db';
-import type * as s from 'zapatos/schema';
-// ---cut---
-const studioOf = <T extends s.Table>(col: db.ParentColumn<s.ColumnForTable<T>>) =>
-  db.selectExactlyOne('studios', { id: col });
-
-db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('studio_id')) } });
-// @ts-expect-error billing is a column of roles, not of films (TS2345)
-db.select('films', db.all, { lateral: { studio: studioOf<'films'>(db.parent('billing')) } });
-```
-
-- The type still checks the column against `T`, which the caller names: `studioOf<'films'>(…)`. TypeScript cannot infer `T` from the column, so without it `T` is any table and no column is refused.
-- It is far cheaper to check. On a synthetic schema of 300 tables and views, this helper type-checks in about 0.4 s. Written with `col: s.ColumnForTable<T>` and `db.parent(col)` inside, it takes over 9 s: TypeScript compares the generic column with each column name of the schema.
+- A helper that gives `db.parent()` a column generic over its table, `s.ColumnForTable<T>`, takes seconds to type-check on a large schema: 12.5 s on a synthetic one of 300 tables and views. Take a `db.ParentColumn` instead, and let the caller write `db.parent<s.films.Column>('studio_id')`: 0.3 s.
 
 ## Watch for
 
