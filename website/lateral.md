@@ -176,7 +176,7 @@ db.select('films', db.all, {
 
 - It checks the table you name, not the query around it: `db.parent<s.studios.Column>('id')` under `films` compiles too.
 - The type doesn't check it unasked: the subquery is built, and typed, before the query around it, so its type doesn't know the parent table. Checking it would slow every compile, and refuse code that runs.
-- A helper that gives `db.parent()` a column generic over its table, `s.ColumnForTable<T>`, is still checked, but takes seconds to type-check on a large schema: over 9 s on a synthetic one of 300 tables and views, with TypeScript 5.9 to 7.0. The cost is in TypeScript itself, and pgcast's types cannot avoid it without giving up the check. Where check time matters, name the table: take a `db.ParentColumn`, and let the caller write `db.parent<s.films.Column>('studio_id')`: under 0.3 s.
+- A helper that gives `db.parent()` a column generic over its table, `s.ColumnForTable<T>`, is still checked, but takes seconds to type-check on a large schema: over 9 s on a synthetic one of 300 tables and views, with TypeScript 5.9 to 7.0. The cost is in TypeScript itself ([reported](https://github.com/microsoft/TypeScript/issues/65654)), and pgcast's types cannot avoid it without giving up the check. Where check time matters, name the table: take a `db.ParentColumn`, and let the caller write `db.parent<s.films.Column>('studio_id')`: under 0.3 s.
 
 ## Watch for
 

@@ -8,7 +8,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Added
 
-- The docs give the cost of a parent column generic over its table, and the way round it (`lateral.md` § Check the parent column): a helper that gives `db.parent()` an `s.ColumnForTable<T>` type-checks in over 9 s on the large bench's schema, a cost in TypeScript itself from 5.9 to 7.0; one that takes a `db.ParentColumn` from the caller's `db.parent<s.films.Column>('studio_id')` checks in under 0.3 s. [#931](https://github.com/AlexandreDemartin/pgcast/issues/931), [#933](https://github.com/AlexandreDemartin/pgcast/issues/933)
+- The docs give the cost of a parent column generic over its table, and the way round it (`lateral.md` § Check the parent column): a helper that gives `db.parent()` an `s.ColumnForTable<T>` type-checks in over 9 s on the large bench's schema, a cost in TypeScript itself from 5.9 to 7.0; one that takes a `db.ParentColumn` from the caller's `db.parent<s.films.Column>('studio_id')` checks in under 0.3 s. [#931](https://github.com/AlexandreDemartin/pgcast/issues/931), [#933](https://github.com/AlexandreDemartin/pgcast/issues/933), [microsoft/TypeScript#65654](https://github.com/microsoft/TypeScript/issues/65654)
 
 ## [7.2.0] - 2026-11-23
 
