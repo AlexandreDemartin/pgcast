@@ -26,11 +26,12 @@ In this order, stopping as soon as the answer is written:
 
 1. **Security**: no injection, a parameter rather than a literal, the safest option (skill `sql-safety`).
 2. **6.6.1 backward compatibility** (skill `backward-compat`).
-3. **The 5 principles** of `AGENTS.md` § Philosophy.
+3. **The 6 principles** of `AGENTS.md` § Philosophy.
 
 ## 3. Within these limits, all else equal
 
 - The SQL closest to what you would write by hand.
+- The cheaper SQL for the same result, measured (`AGENTS.md` § Philosophy, point 6).
 - The type derived from the database rather than written by hand.
 - Opt-in rather than default; a separate package rather than the core.
 - The one a test or the compiler checks rather than review.
