@@ -1,5 +1,5 @@
 ---
-english: e76d485c11c1
+english: eda734f36a0d
 ---
 
 # Curseurs
@@ -27,7 +27,7 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-Chaque lecture coûte un aller-retour. Pour limiter le nombre de lignes chargées en mémoire à chaque lecture, fixez la taille du batch à un entier compris entre 1 et 2147483647. Prévoyez assez de mémoire pour que deux batchs successifs puissent s’y trouver en même temps.
+Chaque lecture coûte un aller-retour. Pour limiter le nombre de lignes chargées en mémoire à chaque lecture, fixez la taille du batch à un entier compris entre 1 et 2147483647. Prévoyez assez de mémoire pour que deux batchs successifs puissent s’y trouver en même temps. D’autres façons de garder une grosse lecture peu coûteuse : [Performance](/fr/performance).
 
 [`cursor()`](/fr/transaction#cursor) envoie la déclaration sans nom de requête préparée. Vous pouvez réutiliser les fragments préparés à n’importe quel niveau d’imbrication. Le numéro du curseur peut changer le texte SQL de la déclaration. `pg` exige qu’un nom de requête préparée corresponde à un seul texte SQL.
 
