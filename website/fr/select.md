@@ -1,5 +1,5 @@
 ---
-english: d9edfe62e65d
+english: dd0a5e8834a0
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -34,6 +34,7 @@ Pour ses lignes une à une, comme les lit [`cursor()`](/fr/transaction#cursor), 
 
 - Chaque ligne est une seule valeur `jsonb`, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, donc les dates et les heures reviennent en chaînes et un `bigint` en nombre : les types `JSONSelectable` le disent ([Le catalogue](/fr/catalog-types)).
 - Les lignes sont rassemblées en un seul tableau, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, autour d’une sous-requête d’alias `"sq_<alias or table>"`, pour que `ORDER BY` et `LIMIT` s’appliquent aux lignes. Une requête, une valeur en retour. Sur de grandes valeurs, de nombreuses lignes ou des laterals imbriqués, ce JSON coûte : [Performance](/fr/performance).
+  - Avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), un `select()` exécuté ou compilé seul envoie les lignes elles-mêmes, `SELECT to_jsonb("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all)) -->, la requête de [`selectRows()`](#selectRows), et `.run()` donne le même tableau ; imbriqué, il garde l’agrégat.
 - À l’intérieur, les clauses viennent dans cet ordre : `SELECT [DISTINCT …]` · les colonnes `AS result` · `FROM` la table `[AS alias]` · chaque `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` ou `FETCH FIRST … WITH TIES` · `OFFSET` · chaque verrou `FOR …`.
 - Chaque valeur est un paramètre (`$1`, `$2`) ; chaque nom est mis entre guillemets comme le fait Postgres, et tout `"` qu’il contient est doublé. Zapatos 6.6.1 laissait un nom contenant un `"` fermer ses guillemets ; pgcast l’a corrigé ([changelog](/fr/changelog#6.6.2-security)).
 
@@ -274,6 +275,7 @@ Le raccourci prend la `table`, le `where` et les [options](#options) de `select(
 |---|---|
 | `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
 | `db.select(…)`, avec les mêmes arguments | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, la même requête à l’intérieur, avec les mêmes valeurs |
+| `db.select(…)` avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) | la requête de `selectRows()`, exécutée ou compilée seule ; un `lateral` transmis tel quel, seul, est converti, `to_jsonb("lateral_passthru".result)`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
 
 Les films d’un studio, lus 100 à la fois :
 
