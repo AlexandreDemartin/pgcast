@@ -199,3 +199,64 @@ describe('shortcutsUseJson: keys a row level cannot alias, and more keys than js
     expect(failure(off(() => db.select('users', all, { columns: ['id', 'email'], extras: extras(25), lateral: laterals(24) })))).toBe('compiled');
   });
 });
+
+describe('shortcutsUseJson with topLevelSelectAsRows (note 018 § 3)', () => {
+  const
+    both = <Q>(build: () => Q): Q => { db.setConfig({ shortcutsUseJson: true, topLevelSelectAsRows: true }); return build(); },
+    jsonAlone = <Q>(build: () => Q): Q => { db.setConfig({ shortcutsUseJson: true, topLevelSelectAsRows: false }); return build(); },
+    owner = () => db.selectOne('users', { id: parent('owner_id') }),
+    compiledText = (build: () => db.SQLFragment<any, any>) => both(build).compile().text,
+    aggregated = (rows: string, alias: string) => `SELECT coalesce(json_agg(result), '[]') AS result FROM (${rows}) AS "sq_${alias}"`;
+
+  it('select() on its own: selectRows()\'s query, its rows built with to_json', () => {
+    expect(both(() => db.select('accounts', { owner_id: 1 }, { order })).compile()).toEqual({
+      text: 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) ORDER BY "id" ASC',
+      values: [1],
+    });
+    // each select() shape but the passed-through lateral: the rows query that json_agg wraps with the json option alone
+    for (const name of ['all', 'columns', 'distinctColumn', 'distinctExtras', 'distinctStringExtras', 'groupBy', 'lateral', 'lateralColumns', 'lock']) {
+      const rows = both(shapes[name]).compile(), json = jsonAlone(shapes[name]).compile();
+      expect(json, name).toEqual({ text: aggregated(rows.text, 'users'), values: rows.values });
+    }
+    const rows = both(shapes.lateralAlias).compile();
+    expect(jsonAlone(shapes.lateralAlias).compile()).toEqual({ text: aggregated(rows.text, 'u'), values: rows.values });
+  });
+
+  it('a lateral map: the parent\'s rows are to_json() of a row level, each lateral select() its json_agg', () => {
+    expect(both(shapes.lateral).compile()).toEqual({
+      text: `SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_accounts".result AS "accounts" FROM "users" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") ORDER BY "id" ASC) AS "sq_accounts") AS "lateral_accounts" ON true ORDER BY "users"."id" ASC) AS "row_users"`,
+      values: [],
+    });
+    expect(both(() => db.select('users', all, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } })).compile()).toEqual({
+      text: `SELECT json_build_object($1::text, "id", $2::text, "lateral_accounts".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true`,
+      values: ['id', 'accounts'],
+    });
+  });
+
+  it('withCTEs(): the main query its rows, a CTE its json_agg', () => {
+    expect(both(() => db.withCTEs({ s: db.select('users', { id: 1 }) }, db.select('accounts', { owner_id: 1 }, { order }))).compile()).toEqual({
+      text: `WITH "s" AS (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1)) AS "sq_users") SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "id" ASC`,
+      values: [1, 1],
+    });
+  });
+
+  it('a single lateral passed through is converted with to_json above the rows query, as json_agg() converts it', () => {
+    expect(both(() => db.select('users', all, { order, lateral: db.selectOne('accounts', { owner_id: parent('id') }, { order }) })).compile()).toEqual({
+      text: `SELECT to_json(result) AS result FROM (SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") ORDER BY "id" ASC LIMIT $1) AS "lateral_passthru" ON true ORDER BY "id" ASC) AS "sq_users"`,
+      values: [1],
+    });
+    // a count() child: the bigint converted as json_agg() converts it
+    expect(both(() => db.select('users', all, { lateral: count() })).compile().text)
+      .toBe(`SELECT to_json(result) AS result FROM (SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true) AS "sq_users"`);
+  });
+
+  it('distinct: true keeps its jsonb rows, a json child compared as jsonb', () => {
+    expect(compiledText(() => db.select('users', all, { distinct: true }))).toBe('SELECT DISTINCT to_jsonb("users".*) AS result FROM "users"');
+    expect(compiledText(shapes.distinctTrueExtras)).toBe('SELECT DISTINCT to_jsonb("users".*) || jsonb_build_object($1::text, upper("email")) AS result FROM "users"');
+    expect(compiledText(() => db.select('accounts', all, { distinct: true, lateral: owner() })))
+      .toBe(`SELECT to_json(result) AS result FROM (SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result FROM "accounts" LEFT JOIN LATERAL (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = "accounts"."owner_id") LIMIT $1) AS "lateral_passthru" ON true) AS "sq_accounts"`);
+    // a select() child stays nested, its json_agg marked json
+    expect(compiledText(() => db.select('accounts', all, { distinct: true, lateral: db.select('users', { id: parent('owner_id') }) })))
+      .toBe(`SELECT to_json(result) AS result FROM (SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result FROM "accounts" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = "accounts"."owner_id")) AS "sq_users") AS "lateral_passthru" ON true) AS "sq_accounts"`);
+  });
+});

@@ -174,3 +174,62 @@ describe('shortcutsUseJson: json_build_object() and 100 arguments', () => {
     expect(sent).toHaveLength(0);
   });
 });
+
+describe('shortcutsUseJson with topLevelSelectAsRows (note 018 § 3): the same results each way', () => {
+  const
+    combinations = {
+      off: { shortcutsUseJson: false, topLevelSelectAsRows: false },
+      json: { shortcutsUseJson: true, topLevelSelectAsRows: false },
+      rows: { shortcutsUseJson: false, topLevelSelectAsRows: true },
+      both: { shortcutsUseJson: true, topLevelSelectAsRows: true },
+    },
+    /** The query built and run under each combination of the two options. */
+    eachWay = async (build: () => db.SQLFragment<any, any>) => {
+      const results: Record<string, any> = {};
+      for (const [name, config] of Object.entries(combinations)) {
+        db.setConfig(config);
+        results[name] = await build().run(t.client);
+      }
+      return results;
+    },
+    owner = () => db.selectOne('users', { id: parent('owner_id') }),
+    byId = (rows: any[]) => [...rows].sort((a, b) => a.id - b.id),
+    shapes: Record<string, () => db.SQLFragment<any, any>> = {
+      users: () => db.select('users', all, { order }),
+      columns: () => db.select('users', all, { columns: ['id', 'email', 'home'], order }),
+      alias: () => db.select('users', { manager_id: 1 }, { alias: 'u', order }),
+      extras: () => db.select('users', all, { order, limit: 2, offset: 1, extras: { upper: sql`upper(${'display_name'})` } }),
+      groupBy: () => db.select('accounts', all, { columns: ['owner_id'], extras: { n: sql<db.SQL, number>`count(*)` }, groupBy: 'owner_id', order: { by: 'owner_id', direction: 'ASC' } }),
+      lateral: () => db.select('users', all, { order, lateral: { accounts: db.select('accounts', { owner_id: parent('id') }, { order }), n: count() } }),
+      lateralColumns: () => db.select('users', all, { columns: ['id'], order, lateral: { accounts: db.select('accounts', { owner_id: parent('id') }, { columns: ['id', 'balance'], order }) } }),
+      passthrough: () => db.select('users', all, { order, lateral: db.selectOne('accounts', { owner_id: parent('id') }, { order }) }),
+      passthroughCount: () => db.select('users', all, { order, lateral: count() }),
+      none: () => db.select('users', sql`false`, { lateral: { n: count() } }),
+      withCTEs: () => db.withCTEs({ rich: db.select('accounts', sql`balance > 10`) }, db.select('users', all, { order, extras: { e: 'email' } })),
+    };
+
+  it.each(Object.keys(shapes))('%s', async name => {
+    const results = await eachWay(shapes[name]);
+    for (const combination of ['json', 'rows', 'both']) expect(results[combination], combination).toEqual(results.off);
+  });
+
+  it('distinct: true, its jsonb rows compared as today, over a passed-through json child too: the same distinct rows', async () => {
+    const
+      byManager = (rows: any[]) => [...rows].sort((a, b) => (a.manager_id ?? 0) - (b.manager_id ?? 0)),
+      managers = await eachWay(() => db.select('users', all, { columns: ['manager_id'], distinct: true })),
+      owners = await eachWay(() => db.select('accounts', all, { distinct: true, lateral: owner() }));
+    expect(byManager(managers.off)).toEqual([{ manager_id: null }, { manager_id: 1 }]);
+    expect(owners.off.map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
+    for (const combination of ['json', 'rows', 'both']) {
+      expect(byManager(managers[combination]), combination).toEqual(byManager(managers.off));
+      expect(byId(owners[combination]), combination).toEqual(byId(owners.off));
+    }
+  });
+
+  it('both keep the json key order of a row, a passed-through child\'s included', async () => {
+    for (const build of [shapes.users, shapes.lateral, shapes.passthrough]) {
+      const results = await eachWay(build);
+      expect(Object.keys(results.both[0])).toEqual(Object.keys(results.json[0]));
+    }
+  });
+});
