@@ -24,6 +24,7 @@
     "test:types": "tsc --emitDeclarationOnly --outDir node_modules/.cache/pgcast && vitest run --typecheck.only --mode typecheck && tsc -p test/types-opt-in && node scripts/check-declarations.mjs && tsc -p test/types-order && tsc -p test/types-opt-in/legacy && tsc -p test/types-aliases",
     "bench:types": "node scripts/bench-types.mjs",
     "bench:types:large": "node scripts/bench-types-large.mjs",
+    "bench:runtime": "node scripts/bench-runtime.mjs",
     "check:floor": "node scripts/check-declarations-floor.mjs",
     "version": "npm run lint && npm run typecheck && npm test && npm run test:types && npm run build",
     "check:agents": "node scripts/check-agents.mjs"
