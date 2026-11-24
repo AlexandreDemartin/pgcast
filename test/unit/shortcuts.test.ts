@@ -1943,7 +1943,7 @@ describe('selectRows', () => {
         return [off, build().compile()];
       },
       passthrough = { lateral: db.count('accounts', { owner_id: parent('id') }) as any },  // selectRows()'s type refuses a lateral typed number (#749)
-      passthroughText = 'SELECT to_jsonb("lateral_passthru".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true';
+      passthroughRows = 'SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true';
 
     it.each(cases.filter(([name]) => name !== 'a lateral passed through'))('%s: compiled on its own, select() sends selectRows()\'s query', (_, table, where, options) => {
       asRows();
@@ -1963,10 +1963,10 @@ describe('selectRows', () => {
       });
     });
 
-    it('a single lateral passed through is converted to JSON, as jsonb_agg() converts it', () => {
-      expect(db.selectRows('users', all, passthrough).compile().text).toBe(passthroughText.replace('to_jsonb("lateral_passthru".result)', '"lateral_passthru".result'));
+    it('a single lateral passed through is converted to JSON above the same rows query, as jsonb_agg() converts it', () => {
+      expect(db.selectRows('users', all, passthrough).compile().text).toBe(passthroughRows);
       asRows();
-      expect(db.select('users', all, passthrough).compile()).toEqual({ text: passthroughText, values: [] });
+      expect(db.select('users', all, passthrough).compile()).toEqual({ text: `SELECT to_jsonb(result) AS result FROM (${passthroughRows}) AS "sq_users"`, values: [] });
     });
 
     it('a lateral map: the parent gives its rows, each lateral select() its jsonb_agg', () => {

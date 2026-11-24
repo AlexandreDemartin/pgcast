@@ -1043,7 +1043,8 @@ describe('selectRows', () => {
         sorted = (r: unknown[]) => options?.order ? r : [...r].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
       expect(sorted(on)).toEqual(sorted(off));
       expect(on.length > 0).toBe(where?.id !== -1);
-      expect(texts).toEqual([db.selectRows(table, where, options).compile().text.replace(/^SELECT "lateral_passthru"\.result AS/, 'SELECT to_jsonb("lateral_passthru".result) AS')]);
+      expect(texts).toEqual([db.selectRows(table, where, options).compile().text
+        .replace(/^SELECT "lateral_passthru"\.result AS .*$/s, rows => `SELECT to_jsonb(result) AS result FROM (${rows}) AS "sq_users"`)]);
     });
 
     it('each lateral passed through keeps the value select() reads from JSON', async () => {
@@ -1058,6 +1059,25 @@ describe('selectRows', () => {
         const { off, on } = await offAndOn(() => db.select('users', all, { lateral: lateral as any, order: byId }));
         expect(on).toEqual(off);
       }
+    });
+
+    it('a lateral passed through is ordered and made distinct by its raw value, as in the aggregate', async () => {
+      // around the end of summer time in Paris, a later instant can read as an earlier local time
+      await t.client.query(`SET LOCAL TimeZone = 'Europe/Paris'`);
+      await t.client.query(`UPDATE memberships SET since = CASE user_id WHEN 1 THEN timestamptz '2024-10-27 00:30:00+00' ELSE timestamptz '2024-10-27 01:10:00+00' END`);
+      const latest = await offAndOn(() => db.select('users', all, {
+        lateral: db.max('memberships', { user_id: parent('id') }, { columns: ['since'] }) as any,
+        order: { by: sql`result`, direction: 'ASC', nulls: 'LAST' },
+      }));
+      expect(latest.off).toEqual(['2024-10-27T02:30:00+02:00', '2024-10-27T02:10:00+01:00', null]);
+      expect(latest.on).toEqual(latest.off);
+      const counts = await offAndOn(() => db.select('users', all, {
+        distinct: true,
+        lateral: db.count('accounts', { owner_id: parent('id') }) as any,
+        order: { by: sql`"lateral_passthru".result`, direction: 'DESC' },
+      }));
+      expect(counts.off).toEqual([2, 1, 0]);
+      expect(counts.on).toEqual(counts.off);
     });
 
     it('nested, it keeps its aggregate: a lateral, a lateral passed through, extras, a sql template', async () => {
