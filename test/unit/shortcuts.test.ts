@@ -2017,6 +2017,21 @@ describe('selectRows', () => {
       expect(owned.compile().text).toBe('SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")');
     });
 
+    it('compiled on its own first, its name and noop stay off its nested forms: a CTE, a copy', () => {
+      asRows();
+      for (const options of [{}, passthrough]) {
+        const
+          aggregate = db.select('users', all, options).copy().compile(),
+          prepared = db.select('users', all, options).prepared('users_rows'),
+          noop = db.select('users', all, options);
+        noop.noop = true;
+        expect(prepared.compile().name).toBe('users_rows');
+        expect(noop.compile().text).toMatch(/^\/\* marked no-op/);
+        expect(db.withCTEs({ f: prepared }, sql`SELECT result FROM f`).compile()).toEqual({ text: `WITH "f" AS (${aggregate.text}) SELECT result FROM f`, values: aggregate.values });
+        expect(noop.copy({ noop: false }).compile()).toEqual(aggregate);
+      }
+    });
+
     it('is read when select() is called, not when the query is compiled', () => {
       const off = db.select('accounts', all);
       asRows();

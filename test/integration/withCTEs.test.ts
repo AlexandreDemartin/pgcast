@@ -90,6 +90,18 @@ describe('withCTEs', () => {
     expect([await prepared.run(t.client), await prepared.run(t.client)]).toEqual([[{ id: 2 }, { id: 3 }], [{ id: 2 }, { id: 3 }]]);
   });
 
+  it('select() with topLevelSelectAsRows, prepared and run on its own, then a CTE: the CTE is its aggregate, unprepared', async () => {
+    db.setConfig({ topLevelSelectAsRows: true });
+    const tag = randomBytes(4).toString('hex');
+    for (const [i, options] of [{}, { lateral: db.count('accounts', { owner_id: parent('id') }) }].entries()) {
+      const query = db.select('users', all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, ...options } as any).prepared(`pgcast_ctes_rows_${tag}_${i}`);
+      expect(await query.run(t.client)).toHaveLength(3);
+      const length = db.withCTEs({ f: query }, sql`SELECT jsonb_array_length(result) AS n FROM f`);
+      expect(length.compile().name).toBeUndefined();
+      expect(await length.run(t.client)).toEqual([{ n: 3 }]);
+    }
+  });
+
   it('an insert() as a CTE runs, and the main query sees the table as it was before the statement', async () => {
     const eve = db.insert('users', { email: 'eve@example.com', display_name: 'Eve', manager_id: 1 }, { returning: ['id'] });
     expect(await db.withCTEs({ eve }, db.count('users', { manager_id: 1 })).run(t.client)).toBe(2);
