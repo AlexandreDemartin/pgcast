@@ -88,6 +88,7 @@ describe('shortcutsUseJson: the same results both ways', () => {
     expect(await sql`SELECT json_typeof((${q})) AS v`.run(t.client)).toEqual([{ v: 'object' }]);
     // characterization: a jsonb function over the nested json fails (42883), as note 018 § 4 says
     expect(await pgError(t.client, () => sql`SELECT jsonb_typeof((${q})) AS v`.run(t.client))).toMatchObject({ code: '42883' });
+    expect(await sql`SELECT jsonb_typeof((${q})::jsonb) AS v, (${q}) ->> 'id' AS id`.run(t.client)).toEqual([{ v: 'object', id: '1' }]);
   });
 });
 
