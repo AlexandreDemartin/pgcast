@@ -1201,16 +1201,14 @@ describe('parent() on a generic column (#918)', () => {
     void id;
   });
 
-  test('a helper generic over a table takes the caller\'s parent(), checked against that table (#931)', () => {
-    // the docs' pattern: the caller's literal parent('id') is checked, and the helper relates no generic column
-    const accountOf = <T extends s.Table>(col: db.ParentColumn<s.ColumnForTable<T>>) =>
-      db.selectExactlyOne('accounts', { owner_id: col });
-    const q = db.select('users', db.all, { lateral: { account: accountOf<'users'>(db.parent('id')) } });
+  test('a plain helper takes the caller\'s parent(), checked against the table it names (#931, #933)', () => {
+    const accountOf = (col: db.ParentColumn) => db.selectExactlyOne('accounts', { owner_id: col });
+    const q = db.select('users', db.all, { lateral: { account: accountOf(db.parent<s.users.Column>('id')) } });
     expectTypeOf<Run<typeof q>[number]['account']>().toEqualTypeOf<s.accounts.JSONSelectable>();
-    expectTypeOf(accountOf<'users'>(db.parent('id'))).not.toBeAny();
+    expectTypeOf(accountOf(db.parent<s.users.Column>('id'))).not.toBeAny();
     // @ts-expect-error sku is no column of users
-    accountOf<'users'>(db.parent('sku'));
+    accountOf(db.parent<s.users.Column>('sku'));
     // @ts-expect-error 'nope' is no column of any table
-    accountOf<'users'>(db.parent('nope'));
+    accountOf(db.parent('nope'));
   });
 });
