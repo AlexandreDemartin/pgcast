@@ -92,6 +92,30 @@ describe('shortcutsUseJson: the same results both ways', () => {
   });
 });
 
+describe('shortcutsUseJson: distinct: true over a passed-through lateral', () => {
+  const
+    owner = () => db.selectOne('users', { id: parent('owner_id') }),
+    byId = (rows: any[]) => [...rows].sort((a, b) => a.id - b.id);
+
+  it('select(): the same distinct rows, a json child compared as jsonb', async () => {
+    const { jsonb, json } = await bothWays(() => db.select('accounts', all, { distinct: true, lateral: owner() }));
+    expect(jsonb.map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
+    expect(byId(json)).toEqual(byId(jsonb));
+  });
+
+  it('selectOne(): the same row', async () => {
+    const { jsonb, json } = await bothWays(() => db.selectOne('accounts', { owner_id: 1 }, { distinct: true, lateral: owner() }));
+    expect(jsonb).toMatchObject({ display_name: 'Ada' });
+    expect(json).toEqual(jsonb);
+  });
+
+  it('a count() child keeps its bigint, a string', async () => {
+    const { jsonb, json } = await bothWays(() => db.selectOne('users', { id: 1 }, { distinct: true, lateral: db.count('accounts', { owner_id: parent('id') }) }));
+    expect(jsonb).toBe('2');
+    expect(json).toBe('2');
+  });
+});
+
 describe('shortcutsUseJson: a key equal to a column', () => {
   it('is written twice, and the key last written wins, as || makes it win', async () => {
     const { jsonb, json } = await bothWays(() => db.select('users', all, { extras: { email: sql`upper(${'email'})` }, order: { by: 'email', direction: 'ASC' } }));

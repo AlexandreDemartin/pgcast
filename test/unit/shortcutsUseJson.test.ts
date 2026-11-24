@@ -131,6 +131,23 @@ describe('shortcutsUseJson on', () => {
     expect(compiled('noopCTE').text).toBe(`WITH "none" AS (SELECT NULL::json AS result WHERE false) SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users"`);
   });
 
+  it('distinct: true over a passed-through lateral: to_jsonb() of a json child alone', () => {
+    const owner = () => db.selectOne('users', { id: parent('owner_id') });
+    expect(text(on(() => db.select('accounts', all, { distinct: true, lateral: owner() })))).toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result FROM "accounts" LEFT JOIN LATERAL (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = "accounts"."owner_id") LIMIT $1) AS "lateral_passthru" ON true) AS "sq_accounts"`);
+    expect(text(on(() => db.selectOne('accounts', all, { distinct: true, lateral: db.select('users', { id: parent('owner_id') }) }))))
+      .toBe(`SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result FROM "accounts" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = "accounts"."owner_id")) AS "sq_users") AS "lateral_passthru" ON true LIMIT $1`);
+    // a passed-through child of a passed-through child: json too
+    expect(text(on(() => db.select('accounts', all, { distinct: true, lateral: db.selectOne('users', { id: parent('owner_id') }, { lateral: db.selectOne('accounts', { owner_id: parent('id') }) }) }))))
+      .toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
+    // a child of another kind keeps its type: an aggregate, a child built with the option off, a distinct child
+    for (const child of [db.count('accounts', { owner_id: parent('id') }), off(owner), on(() => db.selectOne('users', { id: parent('owner_id') }, { distinct: true }))]) {
+      expect(text(on(() => db.selectOne('users', all, { distinct: true, lateral: child })))).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
+    }
+    // without distinct, or with distinct on columns, the child's json is kept
+    expect(text(on(() => db.select('accounts', all, { distinct: 'owner_id', lateral: owner() })))).toContain('SELECT DISTINCT ON ("owner_id") "lateral_passthru".result AS result');
+    expect(text(off(() => db.select('accounts', all, { distinct: true, lateral: owner() })))).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
+  });
+
   it('a key equal to a column is written twice, columns first, as || merges them', () => {
     expect(text(on(() => db.select('users', all, { extras: { email: sql`upper(${'email'})` }, order: { by: 'email', direction: 'ASC' } }))))
       .toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, upper("email") AS "email" FROM "users" ORDER BY "users"."email" ASC) AS "row_users") AS "sq_users"`);
