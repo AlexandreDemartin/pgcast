@@ -184,6 +184,28 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
       Object.keys(extras), sql`, `, k => sql`${param(k)}::text, ${asScalar(extras[k])}`)})`;
 }
 
+// with shortcutsUseJson (decision 018 § 2), json having no `||`, a row of `columns` takes its columns, extras and
+// lateral keys in one json_build_object(), whose arguments Postgres limits to 100 (max_function_args; 54023 beyond),
+// where each part takes a jsonb_build_object() of its own without the option
+const maxJSONKeys = 50;
+function SQLForJSONObject(pairs: [string, SQL][]) {
+  return pairs.length > maxJSONKeys ? refusedSQL(`\`shortcutsUseJson\` builds this row with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${pairs.length} keys (columns, extras and lateral keys together) take ${pairs.length * 2}. Give ${maxJSONKeys} keys at most, or set \`shortcutsUseJson: false\`, under which columns, extras and lateral keys take one \`jsonb_build_object()\` each.`) :
+    sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v]) => sql`${param(k)}::text, ${v}`)})`;
+}
+
+// with shortcutsUseJson, an extras or lateral key beside every column is a column alias, as to_json() names its keys
+// after the columns: one quoted identifier, every `"` doubled, so that it comes back as given (SQLForAlias keeps a
+// hand-escaped `a""b`, which would come back as `a"b`), never split on `.`. Postgres refuses an empty one (42601) and
+// a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles
+function SQLForKeyAlias(key: string) {
+  const
+    text = `${key}`,
+    bytes = Buffer.byteLength(text),
+    problem = text === '' ? 'it is empty' : text.includes('\0') ? 'it holds a NUL' : bytes > 63 ? `it takes ${bytes} bytes in UTF-8, over Postgres's 63` : undefined;
+  return problem === undefined ? raw(`"${text.replace(/"/g, '""')}"`) :
+    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` or \`lateral\` key beside every column: ${problem}. Give \`columns\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.`);
+}
+
 
 // an undefined value is a missing key: `toDefault` sends DEFAULT (insert), otherwise the
 // key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
@@ -944,16 +966,33 @@ function selectQuery(
     columns = callerValue(allOptions, 'columns'), extras = callerValue(allOptions, 'extras'),
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
+    // shortcutsUseJson (decision 018 § 2), read once per call: the JSON of a row is built with json functions, but
+    // under a plain DISTINCT, which compares today's jsonb rows, json having no equality operator (42883)
+    json = getConfig().shortcutsUseJson ?? false,
+    passthrough = lateral instanceof SQLFragment,
+    plainDistinct = !!distinct && !(distinct instanceof SQLFragment || typeof distinct === 'string' || Array.isArray(distinct)),
+    asJson = json && !plainDistinct && !passthrough && mode !== SelectResultMode.Numeric,
+    keyPairs: [string, SQL][] = !asJson || extras == null ? [] : Object.keys(extras).map(k => [k, asScalar(extras[k])]),
+    lateralPairs: [string, SQL][] = !asJson ? [] : Object.keys(lateral ?? {}).sort().map(k => [k, sql`${SQLForAlias('lateral_', k)}.result`]),
+    // every column beside extras or lateral keys: to_json() of a row level, "row_<alias>", whose output columns a bare
+    // name in ORDER BY or DISTINCT ON would match first, so a string there is written after the alias (42702 beside
+    // a key of the same name); a fragment is the caller's SQL, written as given
+    asRow = asJson && columns === undefined && extras !== null && keyPairs.length + lateralPairs.length > 0,
+    qualified = (name: SQL): SQL => asRow && typeof name === 'string' && !name.includes('.') ? sql`${alias}.${name}` : name,
     tableAliasSQL = alias === table ? [] : sql<string>` AS ${alias}`,
-    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct})` :
-      Array.isArray(distinct) ? sql` ON (${cols(distinct)})` : []}`,
-    colsSQL = lateral instanceof SQLFragment ? [] :
+    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${qualified(distinct)})` :
+      Array.isArray(distinct) ? sql` ON (${asRow ? mapWithSeparator(distinct, sql`, `, c => qualified(String(c))) : cols(distinct)})` : []}`,
+    colsSQL = passthrough ? [] :
       mode === SelectResultMode.Numeric ?
         (columns ? sql`${raw(aggregate)}(${cols(columns)})` : sql`${raw(aggregate)}(*)`) :
-        SQLForColumnsOfTable(columns, alias as Table, columnsNull),
-    colsExtraSQL = lateral instanceof SQLFragment || mode === SelectResultMode.Numeric ? [] : SQLForExtras(extras),
-    colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric ? [] :
-      lateral instanceof SQLFragment ? sql`"lateral_passthru".result` :
+        !asJson ? SQLForColumnsOfTable(columns, alias as Table, columnsNull) :
+          columns === null ? refusedSQL(columnsNull) :
+          extras === null ? refusedSQL(extrasNull) :
+          columns === undefined ? sql`to_json(${asRow ? SQLForAlias('row_', alias) : alias}.*)` :
+          SQLForJSONObject([...columns.map((c): [string, SQL] => [c, c]), ...keyPairs, ...lateralPairs]),
+    colsExtraSQL = passthrough || mode === SelectResultMode.Numeric || asJson ? [] : SQLForExtras(extras),
+    colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric || asJson ? [] :
+      passthrough ? sql`"lateral_passthru".result` :
         sql` || jsonb_build_object(${mapWithSeparator(
           Object.keys(lateral).sort(), sql`, `, k => sql`${param(k)}::text, ${SQLForAlias('lateral_', k)}.result`)})`,
     allColsSQL = sql`${colsSQL}${colsExtraSQL}${colsLateralSQL}`,
@@ -969,7 +1008,7 @@ function selectQuery(
         if (!['ASC', 'DESC'].includes(direction)) throw new Error(`Direction must be ASC/DESC, not '${direction}'`);
         const nulls = callerValue(o, 'nulls');
         if (nulls && !['FIRST', 'LAST'].includes(nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${nulls}'`);
-        return sql`${callerValue(o, 'by')!} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
+        return sql`${qualified(callerValue(o, 'by')!)} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
       })}`,
     limitSQL = (limit: number | undefined) => limit === undefined ? [] :
       callerValue(allOptions, 'withTies') ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
@@ -996,11 +1035,16 @@ function selectQuery(
         });
 
   const
-    rowsSQL = (limit: number | undefined) => sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
+    fromSQL = (limit: number | undefined) => sql` FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
+    keysAsSQL = asRow ? [...keyPairs, ...lateralPairs].map(([k, v]) => sql`, ${v} AS ${SQLForKeyAlias(k)}`) : [],
+    rowsSQL = (limit: number | undefined) => asRow ?
+      sql<SQL, any>`SELECT ${allColsSQL} AS result FROM (SELECT${distinctSQL} ${alias}.*${keysAsSQL}${fromSQL(limit)}) AS ${SQLForAlias('row_', alias)}` :
+      sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result${fromSQL(limit)}`,
     rowsQuery = rowsSQL(callerValue(allOptions, 'limit')),
     query = mode !== SelectResultMode.Many || rows ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
-      sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
+      json ? sql<SQL, any>`SELECT coalesce(json_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
+        sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
     checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false);
 
   if (checksSecondRow) {
@@ -1377,9 +1421,9 @@ export const max: TypedByColumn extends true ? ColumnAggregateSignatures : Numer
 // made at the call, so that a prepared() on the fragment afterwards stays its own. A no-op (an insert() or upsert()
 // of no row) is a query of no row, from no table: its own text, which runs if forced, is refused on a GENERATED
 // ALWAYS column and on a view (428C9)
-const inWith = <F>(fragment: F) =>
+const inWith = <F>(fragment: F, json: boolean) =>
   !(fragment instanceof SQLFragment) ? fragment :
-    fragment.noop ? sql`SELECT NULL::jsonb AS result WHERE false` :
+    fragment.noop ? (json ? sql`SELECT NULL::json AS result WHERE false` : sql`SELECT NULL::jsonb AS result WHERE false`) :
       Object.assign(fragment.copy(), { preparedName: undefined });
 
 /**
@@ -1405,8 +1449,9 @@ const inWith = <F>(fragment: F) =>
 export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q => {
   const
     entries = Object.entries(ctes),
+    json = getConfig().shortcutsUseJson ?? false,  // read at the call, as the shortcuts read it
     withClause = (main: SQLFragment<any, any>) =>
-      sql`WITH ${mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${inWith(cte)})`)} ${inWith(main)}`,
+      sql`WITH ${mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${inWith(cte, json)})`)} ${inWith(main, json)}`,
     result = Object.assign(entries.length === 0 ? query.copy() as Q :
       query.copy({ literals: ['', ''], expressions: [withClause(query)], noop: false }) as Q, { preparedName: undefined }),
     topLevelQuery = (query as SecondRowChecked)[secondRowQuery];

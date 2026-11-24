@@ -74,6 +74,7 @@ describe('setConfig()', () => {
     transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: false,
     aggregatesTypedByColumn: true,
+    shortcutsUseJson: false,
   };
   const changed = {
     transactionAttemptsMax: 2,
@@ -87,6 +88,7 @@ describe('setConfig()', () => {
     transactionRequiresSatisfyingLevel: false,
     selectExactlyOneChecksForSecondRow: true,
     aggregatesTypedByColumn: false,
+    shortcutsUseJson: true,
   };
 
   it.each([undefined, null])('resets each write option independently with %s', value => {
