@@ -269,7 +269,7 @@ From 6.12.0. The query [`select()`](#select) wraps in `jsonb_agg`, as a fragment
 |---|---|
 | `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
 | `db.select(…)`, the same arguments | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, the same query inside, with the same values |
-| `db.select(…)` with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows) | `selectRows()`'s query, run or compiled on its own; a single `lateral` passed through is converted, `to_jsonb("lateral_passthru".result)`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
+| `db.select(…)` with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows) | `selectRows()`'s query, run or compiled on its own; a single `lateral` passed through is converted above it, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
 
 A studio's films, read 100 at a time:
 

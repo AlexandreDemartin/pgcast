@@ -1,5 +1,5 @@
 ---
-english: dd0a5e8834a0
+english: e89aa3c95b07
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -275,7 +275,7 @@ Le raccourci prend la `table`, le `where` et les [options](#options) de `select(
 |---|---|
 | `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
 | `db.select(…)`, avec les mêmes arguments | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, la même requête à l’intérieur, avec les mêmes valeurs |
-| `db.select(…)` avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) | la requête de `selectRows()`, exécutée ou compilée seule ; un `lateral` transmis tel quel, seul, est converti, `to_jsonb("lateral_passthru".result)`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
+| `db.select(…)` avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) | la requête de `selectRows()`, exécutée ou compilée seule ; un `lateral` transmis tel quel, seul, est converti au-dessus d’elle, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
 
 Les films d’un studio, lus 100 à la fois :
 

@@ -900,11 +900,12 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * `select()` run or compiled on its own, or as the main query of `withCTEs()`,
  * is `selectRows()`'s query, and `run()` gives the same array, one result per
  * row: `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
- * A single `lateral` passed through is written `to_jsonb("lateral_passthru".result)`,
- * so its value stays JSON. Nested (a `lateral`, `extras`, a `sql` template, a
- * CTE), in a `copy()` and in `cursor()`, it keeps its `jsonb_agg`. The rows form
- * runs with its own `runResultTransform`: one set on the query applies to the
- * aggregate only.
+ * A single `lateral` passed through is converted above that query,
+ * `SELECT to_jsonb(result) AS result FROM (…) AS "sq_films"`, so its value
+ * stays JSON, ordered and made distinct by its raw value. Nested (a
+ * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
+ * `cursor()`, it keeps its `jsonb_agg`. The rows form runs with its own
+ * `runResultTransform`: one set on the query applies to the aggregate only.
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -1010,7 +1011,7 @@ function selectQuery(
 
   const
     limit = callerValue(allOptions, 'limit'),
-    rowsSQL = (limit: number | undefined, colsSQL = allColsSQL) => sql<SQL, any>`SELECT${distinctSQL} ${colsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
+    rowsSQL = (limit: number | undefined) => sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
     rowsQuery = rowsSQL(limit),
     query = mode !== SelectResultMode.Many || rows ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
@@ -1025,9 +1026,11 @@ function selectQuery(
     // form takes the properties a caller may have set on the query since (those `copy()` carries over)
     const
       topLevelQuery = checksSecondRow ? rowsSQL(2) :
-        // a single lateral passed through keeps its JSON value, as jsonb_agg() converts it: pg parses the bare column,
-        // a count() as a string, a date as a Date
-        rowsSQL(limit, lateral instanceof SQLFragment ? sql`to_jsonb(${colsLateralSQL})` : allColsSQL),
+        // a single lateral passed through keeps its JSON value, as jsonb_agg() converts it (pg parses the bare column,
+        // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
+        // still act on the raw value
+        lateral instanceof SQLFragment ? sql<SQL, any>`SELECT to_jsonb(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
+          rowsQuery,
       nestedCompile = query.compile,
       topLevel = () => Object.assign(topLevelQuery,
         { parentTable: query.parentTable, preparedName: query.preparedName, noop: query.noop, noopResult: query.noopResult });
