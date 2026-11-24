@@ -62,6 +62,7 @@ One line each; the whole table is in [docs/WORKFLOW.md § Commands](docs/WORKFLO
 - `npm ci` (npm ≥ 10), `npm run build`, `npm run lint`, `npm run typecheck`, `npm test` (needs `TEST_DATABASE_URL`), `npm run test:watch`.
 - `npm run test:types`: the type tests on the fixture's schema. `npm run bench:types`: compile cost against `bench/baseline.json`, fails above +20 %.
 - `npm run bench:types:large` (needs `TEST_DATABASE_URL`): check time and memory against Zapatos 6.6.1 on a large schema; a PR changing the declarations quotes its `-- --cases libCheck`, which CI runs only on master and by hand.
+- `npm run bench:runtime` (needs `TEST_DATABASE_URL`): each shortcut scenario timed on a throwaway database, against `bench/runtime/baseline.json`; a speed PR quotes its table before and after, `-- --config <json>` beside the default.
 - `npm run check:floor` (after `build`): the declarations on TypeScript 4.1. `npm run check:agents`: skills, agents, § Architecture, changelog and report.
 - An extension runs its own checks from its folder (its README § Development, and [docs/WORKFLOW.md § Commands](docs/WORKFLOW.md#commands)).
 
