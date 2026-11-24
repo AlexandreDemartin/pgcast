@@ -1738,3 +1738,61 @@ describe('exists() and isInSelect()', () => {
     expect(await adaName()).toBe('Ada');
   });
 });
+
+describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every column', () => {
+  // compiled text: test/unit/injection.test.ts; with no parameter, so through the simple protocol, which would run a
+  // second statement; the key must come back as given, as the one key it is
+  const
+    shortUpdate = `UPDATE users SET display_name='i'`,
+    payloads = {
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b', backslash: 'a\\b',
+      dot: 'a.b', newline: 'a\nb', escaped: 'a""b', film: 'année 🎬', dollarQuote: '$$a$$',
+      // under 63 bytes, which a key may not pass
+      closes: `x" FROM "users"; ${shortUpdate}; --`, closesParen: `x") AS "row_users"; ${shortUpdate};--`, longest: 'k'.repeat(63),
+    },
+    keyBack = (build: (key: string) => db.SQLFragment<any[], any>) => async (key: string) => {
+      const q = build(key);
+      expect(q.compile().values, key).toEqual([]);
+      const rows = await q.run(t.client);
+      return rows.length === 1 && Object.keys(rows[0]).includes(key) ? rows[0][key] : rows;
+    };
+
+  afterEach(resetConfig);
+
+  it('an extras key and a lateral key come back as given, and nothing else runs', async () => {
+    db.setConfig({ shortcutsUseJson: true });
+    const
+      extras = keyBack(key => db.selectRows('users', sql`"id" = 1`, { extras: { [key]: sql`'v'` } } as any)),
+      lateral = keyBack(key => db.selectRows('users', sql`"id" = 1`, { lateral: { [key]: db.count('accounts', { owner_id: db.parent('id') }) } } as any)),
+      outcomes: Record<string, unknown> = {};
+    for (const [name, key] of Object.entries(payloads)) outcomes[name] = [await extras(key), await lateral(key), await adaName()];
+    expect(outcomes).toEqual(Object.fromEntries(Object.keys(payloads).map(name => [name, ['v', 2, 'Ada']])));
+  });
+
+  it('an alias stays one alias in "row_<alias>", and nothing else runs', async () => {
+    db.setConfig({ shortcutsUseJson: true });
+    const rows = (q: db.SQLFragment<any[]>) => ({ run: async (client: pg.ClientBase) => `${(await q.run(client)).length} rows` });
+    // a dotted alias is split on `.` in `FROM "users" AS "a"."b"`, 42601 without the option too
+    expect(await identifierOutcomes(payloads, input => ({
+      alias: rows(db.select('users', all, { alias: input, extras: { e: sql`1` } } as any)),
+    }))).toMatchInlineSnapshot(`
+      {
+        "backslash alias": "3 rows",
+        "closes alias": "3 rows",
+        "closesParen alias": "3 rows",
+        "comment alias": "3 rows",
+        "dashes alias": "3 rows",
+        "dollar alias": "3 rows",
+        "dollarQuote alias": "3 rows",
+        "dot alias": "42601",
+        "dquote alias": "3 rows",
+        "escaped alias": "3 rows",
+        "film alias": "3 rows",
+        "longest alias": "3 rows",
+        "newline alias": "3 rows",
+        "semicolon alias": "3 rows",
+        "squote alias": "3 rows",
+      }
+    `);
+  });
+});

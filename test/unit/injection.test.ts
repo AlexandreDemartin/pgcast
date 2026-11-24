@@ -3055,3 +3055,176 @@ describe('selectRows()', () => {
     }
   });
 });
+
+describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every column', () => {
+  const
+    payloads: Record<string, string> = { ...hostile, newline: 'a\nb', closes: 'x" FROM "users"; DROP TABLE users; --', dollarQuote: '$$a$$' },
+    // the select list of the row level alone, where the key is written as an alias
+    selectList = (build: () => db.SQLFragment<any, any>) => {
+      const result = compiled(build);
+      if (typeof result === 'string') return result;
+      const { text, values } = result, start = text.indexOf('(SELECT "users".*') + 1;
+      return `${visible(text.slice(start, text.indexOf(' FROM "users"', start)))} [${values.length} values]`;
+    },
+    sub = () => db.count('accounts', { owner_id: db.parent('id') });
+
+  afterEach(resetConfig);
+
+  it('each key is one quoted identifier, every " doubled; with no parameter but the lateral\'s', () => {
+    db.setConfig({ shortcutsUseJson: true });
+    expect(Object.fromEntries(Object.entries(payloads).map(([name, v]) => [name, {
+      extras: selectList(() => db.selectRows('users', all, { extras: { [v]: 'id' } } as any)),
+      lateral: selectList(() => db.selectRows('users', all, { lateral: { [v]: sub() } } as any)),
+    }]))).toMatchInlineSnapshot(`
+      {
+        "backslash": {
+          "extras": "SELECT "users".*, "id" AS "a\\b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a\\b".result AS "a\\b" [0 values]",
+        },
+        "closes": {
+          "extras": "SELECT "users".*, "id" AS "x"" FROM ""users""; DROP TABLE users; --" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_x"" FROM ""users""; DROP TABLE users; --".result AS "x"" FROM ""users""; DROP TABLE users; --" [0 values]",
+        },
+        "comment": {
+          "extras": "SELECT "users".*, "id" AS "a/*b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a/*b".result AS "a/*b" [0 values]",
+        },
+        "dashes": {
+          "extras": "SELECT "users".*, "id" AS "a--b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a--b".result AS "a--b" [0 values]",
+        },
+        "dollar": {
+          "extras": "SELECT "users".*, "id" AS "a$1b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a$1b".result AS "a$1b" [0 values]",
+        },
+        "dollarQuote": {
+          "extras": "SELECT "users".*, "id" AS "$$a$$" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_$$a$$".result AS "$$a$$" [0 values]",
+        },
+        "dot": {
+          "extras": "SELECT "users".*, "id" AS "a.b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a.b".result AS "a.b" [0 values]",
+        },
+        "dquote": {
+          "extras": "SELECT "users".*, "id" AS "a""b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a""b".result AS "a""b" [0 values]",
+        },
+        "escapedCloses": {
+          "extras": "SELECT "users".*, "id" AS "a"""" OR TRUE OR """"b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a"" OR TRUE OR ""b".result AS "a"""" OR TRUE OR """"b" [0 values]",
+        },
+        "escapedDot": {
+          "extras": "SELECT "users".*, "id" AS "a"".""b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a"".""b".result AS "a"".""b" [0 values]",
+        },
+        "escapedNul": {
+          "extras": "throws: The key "a\\"\\"\\u0000\\"\\"b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` or \`lateral\` key beside every column: it holds a NUL. Give \`columns\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+          "lateral": "throws: The key "a\\"\\"\\u0000\\"\\"b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` or \`lateral\` key beside every column: it holds a NUL. Give \`columns\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+        },
+        "escapedOdd": {
+          "extras": "SELECT "users".*, "id" AS "a""""""b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a""""""b".result AS "a""""""b" [0 values]",
+        },
+        "lone": {
+          "extras": "SELECT "users".*, "id" AS """" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""".result AS """" [0 values]",
+        },
+        "mixedEscaped": {
+          "extras": "SELECT "users".*, "id" AS """s"".a$1.""b"""" OR TRUE OR """"c""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""s"".a$1.""b"""" OR TRUE OR """"c""".result AS """s"".a$1.""b"""" OR TRUE OR """"c""" [0 values]",
+        },
+        "newline": {
+          "extras": "SELECT "users".*, "id" AS "a
+      b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a
+      b".result AS "a
+      b" [0 values]",
+        },
+        "nul": {
+          "extras": "throws: The key "a\\u0000b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` or \`lateral\` key beside every column: it holds a NUL. Give \`columns\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+          "lateral": "throws: The key "a\\u0000b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` or \`lateral\` key beside every column: it holds a NUL. Give \`columns\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+        },
+        "prequoted": {
+          "extras": "SELECT "users".*, "id" AS """a""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""a""".result AS """a""" [0 values]",
+        },
+        "prequotedCloses": {
+          "extras": "SELECT "users".*, "id" AS """a"" OR TRUE OR ""b""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""a"" OR TRUE OR ""b""".result AS """a"" OR TRUE OR ""b""" [0 values]",
+        },
+        "prequotedEmpty": {
+          "extras": "SELECT "users".*, "id" AS """""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""".result AS """""" [0 values]",
+        },
+        "prequotedEscaped": {
+          "extras": "SELECT "users".*, "id" AS """a"""" OR TRUE OR """"b""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""a"""" OR TRUE OR """"b""".result AS """a"""" OR TRUE OR """"b""" [0 values]",
+        },
+        "qualifiedEscaped": {
+          "extras": "SELECT "users".*, "id" AS "s.a"""" OR TRUE OR """"b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_s.a"" OR TRUE OR ""b".result AS "s.a"""" OR TRUE OR """"b" [0 values]",
+        },
+        "semicolon": {
+          "extras": "SELECT "users".*, "id" AS "a;b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a;b".result AS "a;b" [0 values]",
+        },
+        "squote": {
+          "extras": "SELECT "users".*, "id" AS "a'b" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_a'b".result AS "a'b" [0 values]",
+        },
+        "uescape": {
+          "extras": "SELECT "users".*, "id" AS """s"".U&""a"" UESCAPE '!' || ""b""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""s"".U&""a"" UESCAPE '!' || ""b""".result AS """s"".U&""a"" UESCAPE '!' || ""b""" [0 values]",
+        },
+        "unicodeCloses": {
+          "extras": "SELECT "users".*, "id" AS """s"".U&""a\\"" OR TRUE OR \\""b""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""s"".U&""a\\"" OR TRUE OR \\""b""".result AS """s"".U&""a\\"" OR TRUE OR \\""b""" [0 values]",
+        },
+        "unicodeEscaped": {
+          "extras": "SELECT "users".*, "id" AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" [0 values]",
+          "lateral": "SELECT "users".*, "lateral_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""".result AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" [0 values]",
+        },
+      }
+    `);
+  });
+
+  it('an alias is one identifier in "row_<alias>", as in "sq_<alias>"', () => {
+    db.setConfig({ shortcutsUseJson: true });
+    expect(Object.fromEntries(Object.entries(payloads).map(([name, v]) => [name,
+      (r => typeof r === 'string' ? r : visible(r.text))(compiled(() => db.select('users', all, { alias: v, extras: { e: 'id' } } as any)))]))).toMatchInlineSnapshot(`
+        {
+          "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a\\b".*) AS result FROM (SELECT "a\\b".*, "id" AS "e" FROM "users" AS "a\\b") AS "row_a\\b") AS "sq_a\\b"",
+          "closes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_x"" FROM ""users""; DROP TABLE users; --".*) AS result FROM (SELECT "x"" FROM ""users""; DROP TABLE users; --".*, "id" AS "e" FROM "users" AS "x"" FROM ""users""; DROP TABLE users; --") AS "row_x"" FROM ""users""; DROP TABLE users; --") AS "sq_x"" FROM ""users""; DROP TABLE users; --"",
+          "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a/*b".*) AS result FROM (SELECT "a/*b".*, "id" AS "e" FROM "users" AS "a/*b") AS "row_a/*b") AS "sq_a/*b"",
+          "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a--b".*) AS result FROM (SELECT "a--b".*, "id" AS "e" FROM "users" AS "a--b") AS "row_a--b") AS "sq_a--b"",
+          "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a$1b".*) AS result FROM (SELECT "a$1b".*, "id" AS "e" FROM "users" AS "a$1b") AS "row_a$1b") AS "sq_a$1b"",
+          "dollarQuote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_$$a$$".*) AS result FROM (SELECT "$$a$$".*, "id" AS "e" FROM "users" AS "$$a$$") AS "row_$$a$$") AS "sq_$$a$$"",
+          "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a.b".*) AS result FROM (SELECT "a"."b".*, "id" AS "e" FROM "users" AS "a"."b") AS "row_a.b") AS "sq_a.b"",
+          "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a""b".*) AS result FROM (SELECT "a""b".*, "id" AS "e" FROM "users" AS "a""b") AS "row_a""b") AS "sq_a""b"",
+          "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a"" OR TRUE OR ""b".*) AS result FROM (SELECT "a"" OR TRUE OR ""b".*, "id" AS "e" FROM "users" AS "a"" OR TRUE OR ""b") AS "row_a"" OR TRUE OR ""b") AS "sq_a"" OR TRUE OR ""b"",
+          "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a"".""b".*) AS result FROM (SELECT "a"".""b".*, "id" AS "e" FROM "users" AS "a"".""b") AS "row_a"".""b") AS "sq_a"".""b"",
+          "escapedNul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a""""<NUL>""""b".*) AS result FROM (SELECT "a""""<NUL>""""b".*, "id" AS "e" FROM "users" AS "a""""<NUL>""""b") AS "row_a""""<NUL>""""b") AS "sq_a""""<NUL>""""b"",
+          "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a""""""b".*) AS result FROM (SELECT "a""""""b".*, "id" AS "e" FROM "users" AS "a""""""b") AS "row_a""""""b") AS "sq_a""""""b"",
+          "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""".*) AS result FROM (SELECT """".*, "id" AS "e" FROM "users" AS """") AS "row_""") AS "sq_"""",
+          "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""s"".a$1.""b"""" OR TRUE OR """"c""".*) AS result FROM (SELECT "s".a$1."b"" OR TRUE OR ""c".*, "id" AS "e" FROM "users" AS "s".a$1."b"" OR TRUE OR ""c") AS "row_""s"".a$1.""b"""" OR TRUE OR """"c""") AS "sq_""s"".a$1.""b"""" OR TRUE OR """"c"""",
+          "newline": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a
+        b".*) AS result FROM (SELECT "a
+        b".*, "id" AS "e" FROM "users" AS "a
+        b") AS "row_a
+        b") AS "sq_a
+        b"",
+          "nul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a<NUL>b".*) AS result FROM (SELECT "a<NUL>b".*, "id" AS "e" FROM "users" AS "a<NUL>b") AS "row_a<NUL>b") AS "sq_a<NUL>b"",
+          "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""a""".*) AS result FROM (SELECT "a".*, "id" AS "e" FROM "users" AS "a") AS "row_""a""") AS "sq_""a"""",
+          "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""a"" OR TRUE OR ""b""".*) AS result FROM (SELECT """a"" OR TRUE OR ""b""".*, "id" AS "e" FROM "users" AS """a"" OR TRUE OR ""b""") AS "row_""a"" OR TRUE OR ""b""") AS "sq_""a"" OR TRUE OR ""b"""",
+          "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""".*) AS result FROM (SELECT """".*, "id" AS "e" FROM "users" AS """") AS "row_""") AS "sq_"""",
+          "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""a"""" OR TRUE OR """"b""".*) AS result FROM (SELECT "a"" OR TRUE OR ""b".*, "id" AS "e" FROM "users" AS "a"" OR TRUE OR ""b") AS "row_""a"""" OR TRUE OR """"b""") AS "sq_""a"""" OR TRUE OR """"b"""",
+          "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_s.a"" OR TRUE OR ""b".*) AS result FROM (SELECT "s"."a"" OR TRUE OR ""b".*, "id" AS "e" FROM "users" AS "s"."a"" OR TRUE OR ""b") AS "row_s.a"" OR TRUE OR ""b") AS "sq_s.a"" OR TRUE OR ""b"",
+          "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a;b".*) AS result FROM (SELECT "a;b".*, "id" AS "e" FROM "users" AS "a;b") AS "row_a;b") AS "sq_a;b"",
+          "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a'b".*) AS result FROM (SELECT "a'b".*, "id" AS "e" FROM "users" AS "a'b") AS "row_a'b") AS "sq_a'b"",
+          "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""s"".U&""a"" UESCAPE '!' || ""b""".*) AS result FROM (SELECT """s"""."U&""a"" UESCAPE '!' || ""b""".*, "id" AS "e" FROM "users" AS """s"""."U&""a"" UESCAPE '!' || ""b""") AS "row_""s"".U&""a"" UESCAPE '!' || ""b""") AS "sq_""s"".U&""a"" UESCAPE '!' || ""b"""",
+          "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""s"".U&""a\\"" OR TRUE OR \\""b""".*) AS result FROM (SELECT """s"""."U&""a\\"" OR TRUE OR \\""b""".*, "id" AS "e" FROM "users" AS """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "row_""s"".U&""a\\"" OR TRUE OR \\""b""") AS "sq_""s"".U&""a\\"" OR TRUE OR \\""b"""",
+          "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""".*) AS result FROM (SELECT "s".U&"a\\0022"" OR TRUE OR ""\\0022b".*, "id" AS "e" FROM "users" AS "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "row_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""") AS "sq_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b"""",
+        }
+      `);
+  });
+});

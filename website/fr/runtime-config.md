@@ -1,5 +1,5 @@
 ---
-english: 5f80af6b82c9
+english: a88a60e1274c
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -79,6 +79,7 @@ interface Config {
   transactionRequiresSatisfyingLevel?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
   aggregatesTypedByColumn?: boolean;
+  shortcutsUseJson?: boolean;
   topLevelSelectAsRows?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
@@ -104,6 +105,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul demande deux lignes et sa promesse est rejetée s’il en trouve une deuxième | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
+| [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` et ses semblables construisent leur JSON avec les fonctions `json` : `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | à chaque `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()` et `withCTEs()` |
 | [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) | `false` | un `select()` exécuté seul envoie la requête de `selectRows()`, une ligne par résultat, au lieu d’une seule valeur `jsonb_agg` | à chaque `select()` |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
@@ -289,6 +291,25 @@ Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne 
 - Chaque appel à `.run()` lit l’option même si la requête a été construite avant `setConfig()`. Réglez l’option sur `true` pour rétablir la valeur par défaut. JavaScript accepte aussi `null` et `undefined`. TypeScript refuse `null` avec `strictNullChecks` et `undefined` avec `exactOptionalPropertyTypes`. Une requête qui ne renvoie aucune ligne donne alors `null`.
 - Les exemples, et chaque type : [Typé par colonne](/fr/aggregates#typed-by-column).
 
+### `shortcutsUseJson` {#Config.shortcutsUseJson}
+
+```ts
+shortcutsUseJson?: boolean  // default: false; true in 8.0
+```
+
+Avec `true`, [`select()`](/fr/select#select), [`selectOne()`](/fr/select#selectOne), [`selectExactlyOne()`](/fr/select#selectExactlyOne) et [`selectRows()`](/fr/select#selectRows) construisent chaque ligne avec `to_json` et `json_build_object`, et `select()` son tableau avec `json_agg`, à la place de leurs équivalents `jsonb` : `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. `json` garde le texte tel que Postgres l’écrit, là où `jsonb` le parse et le trie : sur 1000 studios avec un `lateral` de 20 films chacun, 37 ms au lieu de 110 ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Le SQL de chaque option : [Avec `shortcutsUseJson`](/fr/select#shortcutsUseJson).
+
+Les valeurs et les types sont les mêmes, sauf :
+
+- Les clés d’une ligne viennent dans l’ordre de la table, puis `extras`, puis les clés de `lateral`, et non les clés les plus courtes d’abord comme avec `jsonb` : un code qui lit `Object.keys()` ou compare des `JSON.stringify()` le voit. Une colonne `json` garde ses clés telles qu’elles sont stockées, et un `-0` de type `float8` reste `-0`.
+- Un résultat imbriqué est du `json` : une fonction `jsonb` appliquée dessus échoue, `jsonb_typeof((…))` donne 42883, de même que `DISTINCT` et `UNION` ; `->` et `->>` fonctionnent, tout comme un cast, `::jsonb`.
+- Un parseur de type réglé pour `jsonb` (3802) seul ne s’applique plus ; [`enableCustomJSONParsingForLargeNumbers()`](/fr/value-types#enableCustomJSONParsingForLargeNumbers) règle les deux.
+- À côté de toutes les colonnes, chaque clé d’`extras` ou de `lateral` est un alias de colonne. Une clé que Postgres refuserait ou tronquerait, vide, avec un NUL ou de plus de 63 octets en UTF-8, lève une erreur à la compilation, donc `.run()` est rejetée avant toute requête : passez `columns`, dont les clés restent des paramètres.
+- Avec `columns`, les colonnes et les clés d’`extras` et de `lateral` partagent un seul `json_build_object()`, que Postgres limite à 100 arguments : au-delà de 50 clés, une erreur est levée à la compilation, là où chaque partie en avait 50 à elle seule.
+- Le tableau de `select()` peut atteindre le 1 Go d’une valeur, là où `jsonb_agg` s’arrête à 256 Mo (54000).
+
+`insert()`, `update()`, `upsert()` et `deletes()` gardent `jsonb`, tout comme [les agrégats](/fr/aggregates), qui ne construisent pas de JSON. L’option est lue quand le raccourci est appelé, pas à `.run()`. Désactivée, le SQL est inchangé ; elle reste désactivée, sans avertissement, pendant toute la série 7.x, et `false` la garde désactivée après la 8.0 aussi.
+
 ### `topLevelSelectAsRows` {#Config.topLevelSelectAsRows}
 
 ```ts
@@ -304,7 +325,7 @@ topLevelSelectAsRows?: boolean  // default: false; true in 8.0
 
 - `.compile()` montre la requête des lignes : du code qui exécute ce texte avec son propre client et lit `rows[0].result` n’obtient que la première ligne. Gardez ce code sur `false`, qui reste disponible après la 8.0.
 - Comme requête principale de [`withCTEs()`](/fr/sql-template#withCTEs), de même. Imbriqué dans un `lateral`, des `extras`, un template `sql` ou une CTE, copié avec [`.copy()`](/fr/sql-template#copy), et dans [`cursor()`](/fr/transaction#cursor), `select()` garde son `jsonb_agg` : la requête parente le lit comme une seule valeur.
-- Un [`lateral` transmis tel quel](/fr/select#lateral), seul, est converti au-dessus de la requête des lignes, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) -->, pour qu’un `count()` reste un nombre, comme dans le tableau de `select()`, là où `selectRows()` donne la chaîne que `pg` parse, et pour que `order` et `distinct` agissent sur sa valeur brute, comme dans l’agrégat.
+- Un [`lateral` transmis tel quel](/fr/select#lateral), seul, est converti au-dessus de la requête des lignes, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> (`to_json` avec [`shortcutsUseJson`](#Config.shortcutsUseJson)), pour qu’un `count()` reste un nombre, comme dans le tableau de `select()`, là où `selectRows()` donne la chaîne que `pg` parse, et pour que `order` et `distinct` agissent sur sa valeur brute, comme dans l’agrégat.
 - La requête des lignes s’exécute avec son propre `runResultTransform` : celui que vous définissez sur la requête ne s’applique qu’à ses copies et à la requête imbriquée.
 - [`prepared()`](/fr/sql-template#prepared), `noop` et les écouteurs fonctionnent comme avant : [`queryListener`](#Config.queryListener) reçoit la requête des lignes.
 - `selectOne()`, `selectExactlyOne()`, `selectRows()`, `count()` et les autres agrégats ne changent pas, ni les types.
@@ -473,7 +494,7 @@ type TransactionEvent =
 
 En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
-Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
+Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente. [`shortcutsUseJson`](#Config.shortcutsUseJson) n’a pas d’avertissement non plus, puisque ses valeurs sont les mêmes : elle est désactivée en 7.x et activée en 8.0.
 
 [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows), à partir de la 7.3.0, n’émet pas d’avertissement non plus, puisque ses valeurs sont les mêmes : désactivée en 7.x, activée par défaut en 8.0, et `false` garde l’agrégat après la 8.0.
 

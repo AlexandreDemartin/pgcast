@@ -74,6 +74,7 @@ interface Config {
   transactionRequiresSatisfyingLevel?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
   aggregatesTypedByColumn?: boolean;
+  shortcutsUseJson?: boolean;
   topLevelSelectAsRows?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
@@ -99,6 +100,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | the client of a transaction at a level that doesn't satisfy the one asked for: reject, not run the callback at that level | at each `transaction()` given such a client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a standalone `selectExactlyOne()` requests two rows and rejects on a second | at each `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` and `max()`: `null` when no row matches, and `min()` and `max()` the column's value, not `Number()` of it | at each `run()` of those |
+| [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` and its kin build their JSON with `json` functions: `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | at each `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()` and `withCTEs()` |
 | [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) | `false` | a standalone `select()` sends `selectRows()`'s query, one row per result, in place of one `jsonb_agg` value | at each `select()` |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
@@ -284,6 +286,25 @@ With `false`, `.run()` applies `Number()` to the result. An empty set gives `0`,
 - Each `.run()` reads the setting, even for a query built before `setConfig()`. Set it to `true` to restore the default. JavaScript also accepts `null` or `undefined`. TypeScript rejects `null` with `strictNullChecks` and `undefined` with `exactOptionalPropertyTypes`. A query that returns no row then gives `null`.
 - Examples, and each type: [Typed by column](/aggregates#typed-by-column).
 
+### `shortcutsUseJson` {#Config.shortcutsUseJson}
+
+```ts
+shortcutsUseJson?: boolean  // default: false; true in 8.0
+```
+
+With `true`, [`select()`](/select#select), [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) and [`selectRows()`](/select#selectRows) build each row with `to_json` and `json_build_object`, and `select()` its array with `json_agg`, in place of their `jsonb` twins: `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. `json` keeps the text as Postgres writes it, where `jsonb` parses and sorts it: on 1000 studios with a `lateral` of 20 films each, 37 ms in place of 110 ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). The SQL of each option: [With `shortcutsUseJson`](/select#shortcutsUseJson).
+
+The values and the types are the same, except:
+
+- A row's keys come in the table's order, then `extras`, then the `lateral` keys, not `jsonb`'s shorter keys first: code that reads `Object.keys()` or compares `JSON.stringify()` sees it. A `json` column keeps its keys as stored, and a `float8` `-0` stays `-0`.
+- A nested result is `json`: a `jsonb` function over it fails, `jsonb_typeof((…))` gives 42883, and so do `DISTINCT` and `UNION`; `->` and `->>` work, and so does a cast, `::jsonb`.
+- A type parser set for `jsonb` (3802) alone no longer applies; [`enableCustomJSONParsingForLargeNumbers()`](/value-types#enableCustomJSONParsingForLargeNumbers) sets both.
+- Beside every column, each `extras` or `lateral` key is a column alias. A key Postgres would refuse or truncate, empty, with a NUL or over 63 bytes in UTF-8, throws while compiling, so `.run()` rejects before any query: give `columns`, whose keys stay parameters.
+- With `columns`, the columns, `extras` and `lateral` keys share one `json_build_object()`, which Postgres limits to 100 arguments: over 50 keys throw while compiling, where each part had 50 of its own.
+- `select()`'s array may reach a value's 1 GB, where `jsonb_agg` stops at 256 MB (54000).
+
+`insert()`, `update()`, `upsert()` and `deletes()` keep `jsonb`, and so do [the aggregates](/aggregates), which build no JSON. Read when the shortcut is called, not at `.run()`. Off, the SQL is unchanged; it stays off, with no warning, through 7.x, and `false` keeps it after 8.0 too.
+
 ### `topLevelSelectAsRows` {#Config.topLevelSelectAsRows}
 
 ```ts
@@ -299,7 +320,7 @@ From 7.3.0. With it on, a [`select()`](/select#select) run or compiled on its ow
 
 - `.compile()` shows the rows query: code that runs its text with a client of its own and reads `rows[0].result` gets the first row alone. Keep such code on `false`, which stays after 8.0.
 - As the main query of [`withCTEs()`](/sql-template#withCTEs), the same. Nested in a `lateral`, `extras`, a `sql` template or a CTE, copied with [`.copy()`](/sql-template#copy), and in [`cursor()`](/transaction#cursor), `select()` keeps its `jsonb_agg`: its parent reads it as one value.
-- A single [`lateral` passed through](/select#lateral) is converted above the rows query, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) -->, so a `count()` stays a number, as in `select()`'s array, where `selectRows()` gives the string `pg` parses, and `order` and `distinct` act on its raw value, as in the aggregate.
+- A single [`lateral` passed through](/select#lateral) is converted above the rows query, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> (`to_json` with [`shortcutsUseJson`](#Config.shortcutsUseJson)), so a `count()` stays a number, as in `select()`'s array, where `selectRows()` gives the string `pg` parses, and `order` and `distinct` act on its raw value, as in the aggregate.
 - The rows query runs with a `runResultTransform` of its own: one you set on the query applies only to its copies and to the query nested.
 - [`prepared()`](/sql-template#prepared), `noop` and the listeners work as before: [`queryListener`](#Config.queryListener) gets the rows query.
 - `selectOne()`, `selectExactlyOne()`, `selectRows()`, `count()` and the other aggregates don't change, nor do the types.
@@ -468,7 +489,7 @@ From 6.12.0. What [`transactionEventListener`](#Config.transactionEventListener)
 
 In 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) and [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) were opt-ins whose old behaviour triggered warnings. In 7.0, all six are on by default and none warns. An explicit `false` keeps the old behaviour without warnings through 7.x (see [Versions](/versions) and the [7.0 migration](/switching#from-7-0)).
 
-One opt-in stays off by default in 7.0 and emits no warning: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
+One opt-in stays off by default in 7.0 and emits no warning: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents. Nor does [`shortcutsUseJson`](#Config.shortcutsUseJson) warn, as its values are the same: it is off in 7.x and on in 8.0.
 
 [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows), from 7.3.0, emits no warning either, as its values are the same: off through 7.x, on by default in 8.0, and `false` keeps the aggregate after 8.0.
 

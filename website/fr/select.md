@@ -1,5 +1,5 @@
 ---
-english: e89aa3c95b07
+english: d3b453ec4716
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -33,7 +33,7 @@ Pour ses lignes une à une, comme les lit [`cursor()`](/fr/transaction#cursor), 
 ### Le SQL qu’il écrit {#the-sql-it-writes}
 
 - Chaque ligne est une seule valeur `jsonb`, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, donc les dates et les heures reviennent en chaînes et un `bigint` en nombre : les types `JSONSelectable` le disent ([Le catalogue](/fr/catalog-types)).
-- Les lignes sont rassemblées en un seul tableau, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, autour d’une sous-requête d’alias `"sq_<alias or table>"`, pour que `ORDER BY` et `LIMIT` s’appliquent aux lignes. Une requête, une valeur en retour. Sur de grandes valeurs, de nombreuses lignes ou des laterals imbriqués, ce JSON coûte : [Performance](/fr/performance).
+- Les lignes sont rassemblées en un seul tableau, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, autour d’une sous-requête d’alias `"sq_<alias or table>"`, pour que `ORDER BY` et `LIMIT` s’appliquent aux lignes. Une requête, une valeur en retour. Sur de grandes valeurs, de nombreuses lignes ou des laterals imbriqués, ce JSON coûte : [Performance](/fr/performance), et [Avec `shortcutsUseJson`](#shortcutsUseJson).
   - Avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), un `select()` exécuté ou compilé seul envoie les lignes elles-mêmes, `SELECT to_jsonb("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all)) -->, la requête de [`selectRows()`](#selectRows), et `.run()` donne le même tableau ; imbriqué, il garde l’agrégat.
 - À l’intérieur, les clauses viennent dans cet ordre : `SELECT [DISTINCT …]` · les colonnes `AS result` · `FROM` la table `[AS alias]` · chaque `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` ou `FETCH FIRST … WITH TIES` · `OFFSET` · chaque verrou `FOR …`.
 - Chaque valeur est un paramètre (`$1`, `$2`) ; chaque nom est mis entre guillemets comme le fait Postgres, et tout `"` qu’il contient est doublé. Zapatos 6.6.1 laissait un nom contenant un `"` fermer ses guillemets ; pgcast l’a corrigé ([changelog](/fr/changelog#6.6.2-security)).
@@ -62,6 +62,29 @@ Le SQL de chaque ligne du tableau est ce que compile la bibliothèque construite
 ::: tip Strict
 `columns`, `extras` et `lateral` ne changent le type qu’avec `strictNullChecks` (ou `strict`) activé. Sans lui, le résultat reste le `JSONSelectable` complet, et une clé d’extra ou de lateral n’est pas dans le type ; le type ne refuse rien, pas même `columns` à côté d’une seule sous-requête `lateral`, et une sous-requête seule est typée comme la ligne de la table, alors que c’est son propre résultat qui revient.
 :::
+
+### Avec `shortcutsUseJson` {#shortcutsUseJson}
+
+Avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), chaque ligne et le tableau sont construits avec les fonctions `json`, à la place de leurs équivalents `jsonb`. Les valeurs et les types sont les mêmes, à part l’ordre des clés d’une ligne et le type d’un résultat imbriqué, `json`.
+
+| Option | SQL avec `shortcutsUseJson` |
+|---|---|
+| aucune | `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->, et le tableau `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> |
+| `columns`, avec ou sans `extras` et `lateral` | un seul `json_build_object($1::text, "title", $2::text, upper("title"))`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { columns: ['title'], extras: { upper: db.sql`upper(${'title'})` } })) -->, dont les clés sont des paramètres |
+| `extras` ou `lateral`, à côté de toutes les colonnes | `to_json("row_films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) --> de la ligne avec ses clés en alias, `"lateral_cast".result AS "cast"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) -->, dans une sous-requête `AS "row_films"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) --> |
+| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { distinct: true })) -->, car `json` n’a pas d’égalité, sous `json_agg` ; sur un `select()`, un `selectOne()` ou un `selectExactlyOne()` transmis, `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) })) --> |
+
+- À côté de toutes les colonnes, chaque clé est un identifiant, chaque `"` doublé. Une clé vide, avec un NUL ou de plus de 63 octets en UTF-8, que Postgres refuserait ou tronquerait, lève une erreur à la compilation : passez `columns`, dont les clés restent des paramètres.
+- Dans ce cas, un `order.by` ou un `distinct` en chaîne est écrit après la table, `ORDER BY "films"."title" ASC`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { order: { by: 'title', direction: 'ASC' }, extras: { upper: db.sql`upper(${'title'})` } })) -->, sauf s’il contient un `.` : un nom seul correspondrait aussi à une clé du même nom (42702). Ainsi `by: 'result'` désigne la colonne de la table. Un fragment `sql` est écrit tel quel.
+- Une clé égale à une colonne apparaît deux fois dans le JSON, et la dernière l’emporte, comme `||` la fait l’emporter.
+- Avec `columns`, un seul `json_build_object()` prend 100 arguments : au-delà de 50 clés, colonnes et clés d’`extras` et de `lateral` comprises, une erreur est levée à la compilation.
+- Un `lateral` transmis, sauf sous `distinct: true`, et les [agrégats](/fr/aggregates) gardent leur SQL ; la sous-requête construit le sien avec `json`.
+
+<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } })) -->
+```sql
+SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_films".*) AS result FROM (SELECT "films".*, "lateral_cast".result AS "cast" FROM "films" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "character") AS result FROM "roles" WHERE ("film_id" = "films"."id")) AS "sq_roles") AS "lateral_cast" ON true WHERE ("studio_id" = $2) ORDER BY "films"."title" ASC) AS "row_films") AS "sq_films"
+-- ["character", 1000]
+```
 
 ### `columns` {#columns}
 

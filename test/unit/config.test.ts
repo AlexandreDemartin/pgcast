@@ -74,6 +74,7 @@ describe('setConfig()', () => {
     transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: false,
     aggregatesTypedByColumn: true,
+    shortcutsUseJson: false,
     topLevelSelectAsRows: false,
   };
   const changed = {
@@ -88,6 +89,7 @@ describe('setConfig()', () => {
     transactionRequiresSatisfyingLevel: false,
     selectExactlyOneChecksForSecondRow: true,
     aggregatesTypedByColumn: false,
+    shortcutsUseJson: true,
     topLevelSelectAsRows: true,
   };
 
