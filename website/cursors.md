@@ -23,7 +23,7 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-Each fetch costs one round trip. Choose a whole number of rows from 1 to 2147483647 to limit how many each fetch brings into memory. Allow room for one batch to overlap the next.
+Each fetch costs one round trip. Choose a whole number of rows from 1 to 2147483647 to limit how many each fetch brings into memory. Allow room for one batch to overlap the next. Other ways to keep a large read cheap: [Performance](/performance).
 
 [`cursor()`](/transaction#cursor) runs the declaration unnamed. You can reuse prepared fragments at any depth. The cursor number can change the declaration's SQL, and `pg` requires one query text per name.
 

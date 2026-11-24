@@ -19,6 +19,9 @@ Candidates for a check, a rule or a skill line.
 - #931 — a type test appended as the last test of its `describe` keeps every earlier line number, so a sweep of `@ts-expect-error` diffs master and branch with no line shift to account for — builder
 - #946 — timings beside another agent's `npm test` spread 100–480 % on the sub-millisecond rows, medians within ±30 %: a speed PR runs `bench:runtime` on a quiet machine, or twice — builder
 - #946 — a scenario whose SQL changes per call (an `OFFSET` that moves) makes client and `EXPLAIN` times disagree: each scenario compiles one text, so `EXPLAIN` measures what was timed — builder
+- #943 — a cast panel's type is the built hover, not the one written by hand: check it in `.vitepress/dist/<page>.md` after `docs:build` — builder
+- #943 — a PR body that names an upstream issue as `owner/repo#n` adds a backlink there: a reference "not posted" goes in backticks — builder
+- #943 — an example that needs Postgres 17 (`EXPLAIN … SERIALIZE`) cannot go in `examples/`, which `docs:examples` runs on CI's oldest Postgres (14) and on PGlite: an inline twoslash block, compiled only — builder
 
 ## Minors kept
 
