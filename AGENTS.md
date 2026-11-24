@@ -12,6 +12,7 @@ Goals: modernise, test, then extend, **without betraying the philosophy** and st
 3. **SQL stays visible and predictable.** Each helper produces readable, unique, documented SQL. You can always drop down to the `sql` template.
 4. **Minimal surface.** Whatever can live in a separate package or stay opt-in must. No new mandatory runtime dependency (Zod/Valibot as an optional peer dependency).
 5. **The codegen stays a simple CLI** that reads the database and writes `.d.ts` / `.ts` files.
+6. **Fast by construction.** Each helper writes the cheapest SQL Postgres offers for the same result and the same types, and the gain is measured (`bench:runtime`), never assumed. Speed never buys hidden state, a cache, an implicit client, or SQL you cannot read; a gain drowned in network latency is not one.
 
 If a request breaks one of these points: **stop and say so** instead of implementing it.
 

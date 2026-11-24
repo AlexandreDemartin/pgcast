@@ -4,7 +4,7 @@ Thank you for helping. pgcast is small on purpose: this page says what it accept
 
 ## What pgcast accepts
 
-- Types derived from Postgres, never written by hand; SQL you can read, with no ORM, no hidden state and nothing new required at run time. The five principles: [AGENTS.md § Philosophy](AGENTS.md#philosophy-non-negotiable).
+- Types derived from Postgres, never written by hand; SQL you can read, with no ORM, no hidden state and nothing new required at run time; the cheapest SQL for the result, measured. The six principles: [AGENTS.md § Philosophy](AGENTS.md#philosophy-non-negotiable).
 - No breaking change for a project on Zapatos 6.6.1: a fix that changes a valid result comes as an opt-in ([decision 003](docs/decisions/003-fixes-and-deprecation.md)).
 - An idea that needs a design choice starts as an issue, then a decision note in [docs/decisions/](docs/decisions/), before any code.
 
