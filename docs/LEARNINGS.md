@@ -28,3 +28,4 @@ Candidates for a check, a rule or a skill line.
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 
+- #940 — `defect` — with `topLevelSelectAsRows` on, `query.run = (queryable, force) => topLevel().run(queryable, force)` (`src/db/shortcuts.ts:1043`) no longer goes through `query.compile`, so a caller who wraps `compile` on a `select()` (to prefix a `/* tag */`) sees the wrap dropped on, where `selectExactlyOneChecksForSecondRow`'s `run()` calls `this.compile` and keeps it; worth a line in `runtime-config.md` beside the one on `runResultTransform`? — branch-reviewer
