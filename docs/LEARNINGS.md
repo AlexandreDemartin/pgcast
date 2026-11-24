@@ -22,6 +22,7 @@ Candidates for a check, a rule or a skill line.
 - #943 — a cast panel's type is the built hover, not the one written by hand: check it in `.vitepress/dist/<page>.md` after `docs:build` — builder
 - #943 — a PR body that names an upstream issue as `owner/repo#n` adds a backlink there: a reference "not posted" goes in backticks — builder
 - #943 — an example that needs Postgres 17 (`EXPLAIN … SERIALIZE`) cannot go in `examples/`, which `docs:examples` runs on CI's oldest Postgres (14) and on PGlite: an inline twoslash block, compiled only — builder
+- #948: a count written from memory in a note was wrong twice ("30 cases" for 33, "45 Postgres types" for "45 cases"); grepping the probe's output and the quoted issue before the commit caught both.
 
 ## Minors kept
 
