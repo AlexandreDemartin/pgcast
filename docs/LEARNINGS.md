@@ -17,7 +17,10 @@ Candidates for a check, a rule or a skill line.
 - #931 — `tsc` prints a file's path relative to the cwd it runs in, with no leading `/` below it: a normaliser anchored on `^.*/sweep/` stripped one run's paths and not the other's, and the diff showed every line; anchor on `^(.*/)?` and compare the line counts first — builder
 - #931 — the same generic case checked in 9.5 s under `bench:types:large` and in 12.3 s in a scratch runner on a saved copy of its schema: a figure the docs quote is the lower bound ("over 9 s") of both, not one run's — builder
 - #931 — a type test appended as the last test of its `describe` keeps every earlier line number, so a sweep of `@ts-expect-error` diffs master and branch with no line shift to account for — builder
+- #946 — timings beside another agent's `npm test` spread 100–480 % on the sub-millisecond rows, medians within ±30 %: a speed PR runs `bench:runtime` on a quiet machine, or twice — builder
+- #946 — a scenario whose SQL changes per call (an `OFFSET` that moves) makes client and `EXPLAIN` times disagree: each scenario compiles one text, so `EXPLAIN` measures what was timed — builder
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
+
