@@ -36,8 +36,15 @@ describe('getConfig() and setConfig()', () => {
       | 'queryListener' | 'resultListener' | 'transactionListener'
       | 'upsertRequiresSameKeys' | 'undefinedMeansMissing' | 'transactionRequiresCommit' | 'transactionRequiresIdleClient'
       | 'transactionRequiresSatisfyingLevel' | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn'
-      | 'transactionEventListener'
+      | 'transactionEventListener' | 'shortcutsUseJson'
     >();
+  });
+
+  test('shortcutsUseJson is an optional boolean, so a Config written for Zapatos 6.6.1 still compiles', () => {
+    expectTypeOf<db.Config['shortcutsUseJson']>().toEqualTypeOf<boolean | undefined>();
+    db.setConfig({ shortcutsUseJson: true });
+    // @ts-expect-error the option is a boolean
+    db.setConfig({ shortcutsUseJson: 'json' });
   });
 });
 
