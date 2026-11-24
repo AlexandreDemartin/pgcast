@@ -176,7 +176,7 @@ db.select('films', db.all, {
 
 - It checks the table you name, not the query around it: `db.parent<s.studios.Column>('id')` under `films` compiles too.
 - The type doesn't check it unasked: the subquery is built, and typed, before the query around it, so its type doesn't know the parent table. Checking it would slow every compile, and refuse code that runs.
-- A helper that gives `db.parent()` a column generic over its table, `s.ColumnForTable<T>`, takes seconds to type-check on a large schema: 12.5 s on a synthetic one of 300 tables and views. Take a `db.ParentColumn` instead, and let the caller write `db.parent<s.films.Column>('studio_id')`: 0.3 s.
+- A helper that gives `db.parent()` a column generic over its table, `s.ColumnForTable<T>`, takes seconds to type-check on a large schema: over 9 s on a synthetic one of 300 tables and views. Take a `db.ParentColumn` instead, and let the caller write `db.parent<s.films.Column>('studio_id')`: under 0.3 s.
 
 ## Watch for
 

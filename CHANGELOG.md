@@ -8,7 +8,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Added
 
-- The docs give the cost of a parent column generic over its table (`lateral.md` § Check the parent column): a helper that gives `db.parent()` an `s.ColumnForTable<T>` type-checks in 12.5 s on the large bench's schema, one that takes a `db.ParentColumn` from the caller's `db.parent<s.films.Column>('studio_id')` in 0.3 s. [#931](https://github.com/AlexandreDemartin/pgcast/issues/931), [#933](https://github.com/AlexandreDemartin/pgcast/issues/933)
+- The docs give the cost of a parent column generic over its table (`lateral.md` § Check the parent column): a helper that gives `db.parent()` an `s.ColumnForTable<T>` type-checks in over 9 s on the large bench's schema, one that takes a `db.ParentColumn` from the caller's `db.parent<s.films.Column>('studio_id')` in under 0.3 s. [#931](https://github.com/AlexandreDemartin/pgcast/issues/931), [#933](https://github.com/AlexandreDemartin/pgcast/issues/933)
 
 ## [7.2.0] - 2026-11-23
 

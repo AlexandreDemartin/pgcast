@@ -1,5 +1,5 @@
 ---
-english: b62490c25cd9
+english: 25f5949cb4bc
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -181,7 +181,7 @@ db.select('films', db.all, {
 
 - Il vérifie la table que vous nommez, pas la requête qui l’entoure : `db.parent<s.studios.Column>('id')` sous `films` compile aussi.
 - Le type ne la vérifie pas sans qu’on le lui demande : la sous-requête est construite, et typée, avant la requête qui l’entoure, donc son type ne connaît pas la table parente. La vérifier ralentirait chaque compilation, et refuserait du code qui s’exécute.
-- Avec un helper qui passe à `db.parent()` une colonne générique sur sa table, `s.ColumnForTable<T>`, la vérification de types prend plusieurs secondes sur un grand schéma : 12,5 s sur un schéma synthétique de 300 tables et vues. Prenez plutôt un `db.ParentColumn`, et laissez l’appelant écrire `db.parent<s.films.Column>('studio_id')` : 0,3 s.
+- Avec un helper qui passe à `db.parent()` une colonne générique sur sa table, `s.ColumnForTable<T>`, la vérification de types prend plusieurs secondes sur un grand schéma : plus de 9 s sur un schéma synthétique de 300 tables et vues. Prenez plutôt un `db.ParentColumn`, et laissez l’appelant écrire `db.parent<s.films.Column>('studio_id')` : moins de 0,3 s.
 
 ## À surveiller {#watch-for}
 
