@@ -66,6 +66,30 @@ describe('withCTEs', () => {
       .toEqual({ id: 1, account: { owner_id: 1 } });
   });
 
+  it('select() with topLevelSelectAsRows: the main query gives the same array from its rows, a CTE its aggregate', async () => {
+    const
+      inReportsAsRows = () => db.select('users', { id: sql`${self} IN (SELECT id FROM reports)` }, { columns: ['display_name'], order: { by: 'id', direction: 'ASC' } }),
+      queries = () => [
+        db.withCTEs({ reports }, inReportsAsRows()),
+        db.withCTEs({}, db.select('users', { manager_id: 1 }, { columns: ['display_name'], order: { by: 'id', direction: 'ASC' } })),
+        db.withCTEs({ bob: db.select('users', { id: 2 }, { columns: ['display_name'] }) }, sql`SELECT result FROM bob`),
+        db.withCTEs({ reports }, inReportsAsRows()).copy(),
+        db.withCTEs({ reports }, db.select('users', { id: -1 })),
+      ],
+      off: unknown[] = [];
+    for (const query of queries()) off.push(await query.run(t.client));
+    db.setConfig({ topLevelSelectAsRows: true });
+    const on: unknown[] = [];
+    for (const query of queries()) on.push(await query.run(t.client));
+    expect(on).toEqual(off);
+    expect(on).toEqual([
+      [{ display_name: 'Bob' }, { display_name: 'Cyd' }], [{ display_name: 'Bob' }, { display_name: 'Cyd' }],
+      [{ result: [{ display_name: 'Bob' }] }], [{ display_name: 'Bob' }, { display_name: 'Cyd' }], [],
+    ]);
+    const prepared = db.withCTEs({ reports }, db.select('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } })).prepared('reports_as_rows');
+    expect([await prepared.run(t.client), await prepared.run(t.client)]).toEqual([[{ id: 2 }, { id: 3 }], [{ id: 2 }, { id: 3 }]]);
+  });
+
   it('an insert() as a CTE runs, and the main query sees the table as it was before the statement', async () => {
     const eve = db.insert('users', { email: 'eve@example.com', display_name: 'Eve', manager_id: 1 }, { returning: ['id'] });
     expect(await db.withCTEs({ eve }, db.count('users', { manager_id: 1 })).run(t.client)).toBe(2);
