@@ -1,5 +1,5 @@
 ---
-english: 7085a09a9d10
+english: 131dd76880bf
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -71,13 +71,13 @@ Avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), chaque li
 | aucune | `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->, et le tableau `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> |
 | `columns`, avec ou sans `extras` et `lateral` | un seul `json_build_object($1::text, "title", $2::text, upper("title"))`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { columns: ['title'], extras: { upper: db.sql`upper(${'title'})` } })) -->, dont les clés sont des paramètres |
 | `extras` ou `lateral`, à côté de toutes les colonnes | `to_json("row_films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) --> de la ligne avec ses clés en alias, `"lateral_cast".result AS "cast"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) -->, dans une sous-requête `AS "row_films"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) --> |
-| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { distinct: true })) -->, car `json` n’a pas d’égalité, sous `json_agg` |
+| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { distinct: true })) -->, car `json` n’a pas d’égalité, sous `json_agg` ; sur un `select()`, un `selectOne()` ou un `selectExactlyOne()` transmis, `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) })) --> |
 
 - À côté de toutes les colonnes, chaque clé est un identifiant, chaque `"` doublé. Une clé vide, avec un NUL ou de plus de 63 octets en UTF-8, que Postgres refuserait ou tronquerait, lève une erreur à la compilation : passez `columns`, dont les clés restent des paramètres.
 - Dans ce cas, un `order.by` ou un `distinct` en chaîne est écrit après la table, `ORDER BY "films"."title" ASC`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { order: { by: 'title', direction: 'ASC' }, extras: { upper: db.sql`upper(${'title'})` } })) -->, sauf s’il contient un `.` : un nom seul correspondrait aussi à une clé du même nom (42702). Ainsi `by: 'result'` désigne la colonne de la table. Un fragment `sql` est écrit tel quel.
 - Une clé égale à une colonne apparaît deux fois dans le JSON, et la dernière l’emporte, comme `||` la fait l’emporter.
 - Avec `columns`, un seul `json_build_object()` prend 100 arguments : au-delà de 50 clés, colonnes et clés d’`extras` et de `lateral` comprises, une erreur est levée à la compilation.
-- Un `lateral` transmis et les [agrégats](/fr/aggregates) gardent leur SQL ; la sous-requête construit le sien avec `json`.
+- Un `lateral` transmis, sauf sous `distinct: true`, et les [agrégats](/fr/aggregates) gardent leur SQL ; la sous-requête construit le sien avec `json`.
 
 <!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } })) -->
 ```sql

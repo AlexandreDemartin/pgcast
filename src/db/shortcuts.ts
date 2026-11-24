@@ -173,6 +173,11 @@ const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInEx
 // the LIMIT 2 form of a selectExactlyOne() that checks for a second row, which withCTEs() writes at the top level too
 const secondRowQuery = Symbol('secondRowQuery');
 type SecondRowChecked = { [secondRowQuery]?: SQLFragment<any, any> };
+// set by select() and its kin on a query whose result is `json`, as shortcutsUseJson builds it: a parent's plain
+// DISTINCT over it as a passed-through lateral compares it as `jsonb` (json has no equality, 42883), where an
+// aggregate's or a `jsonb` result is compared as it is. copy() does not carry it, as it does not carry secondRowQuery
+const jsonResult = Symbol('jsonResult');
+type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
 // a row of entries, a query among its values in parentheses
 const withScalarQueries = (entries: [string, unknown][]) => Object.fromEntries(entries.map(([k, v]) => [k, asScalar(v)]));
@@ -970,6 +975,7 @@ function selectQuery(
     // under a plain DISTINCT, which compares today's jsonb rows, json having no equality operator (42883)
     json = getConfig().shortcutsUseJson ?? false,
     passthrough = lateral instanceof SQLFragment,
+    jsonChild = passthrough && !!(lateral as JSONResult)[jsonResult],
     plainDistinct = !!distinct && !(distinct instanceof SQLFragment || typeof distinct === 'string' || Array.isArray(distinct)),
     asJson = json && !plainDistinct && !passthrough && mode !== SelectResultMode.Numeric,
     keyPairs: [string, SQL][] = !asJson || extras == null ? [] : Object.keys(extras).map(k => [k, asScalar(extras[k])]),
@@ -992,7 +998,7 @@ function selectQuery(
           SQLForJSONObject([...columns.map((c): [string, SQL] => [c, c]), ...keyPairs, ...lateralPairs]),
     colsExtraSQL = passthrough || mode === SelectResultMode.Numeric || asJson ? [] : SQLForExtras(extras),
     colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric || asJson ? [] :
-      passthrough ? sql`"lateral_passthru".result` :
+      passthrough ? (plainDistinct && jsonChild ? sql`to_jsonb("lateral_passthru".result)` : sql`"lateral_passthru".result`) :
         sql` || jsonb_build_object(${mapWithSeparator(
           Object.keys(lateral).sort(), sql`, `, k => sql`${param(k)}::text, ${SQLForAlias('lateral_', k)}.result`)})`,
     allColsSQL = sql`${colsSQL}${colsExtraSQL}${colsLateralSQL}`,
@@ -1083,6 +1089,9 @@ function selectQuery(
         // SelectResultMode.One or SelectResultMode.Many
         (qr) => qr.rows[0]?.result;
 
+  // select()'s json_agg, a row built with json functions, or a passed-through json result kept as it is
+  (query as JSONResult)[jsonResult] = mode !== SelectResultMode.Numeric &&
+    (mode === SelectResultMode.Many && !rows ? json : asJson || (jsonChild && !plainDistinct));
   query['parenthesisedInExtras'] = true;
   return query;
 }
