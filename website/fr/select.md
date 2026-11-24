@@ -1,5 +1,5 @@
 ---
-english: 59d3713b83e2
+english: d9edfe62e65d
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -33,7 +33,7 @@ Pour ses lignes une à une, comme les lit [`cursor()`](/fr/transaction#cursor), 
 ### Le SQL qu’il écrit {#the-sql-it-writes}
 
 - Chaque ligne est une seule valeur `jsonb`, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, donc les dates et les heures reviennent en chaînes et un `bigint` en nombre : les types `JSONSelectable` le disent ([Le catalogue](/fr/catalog-types)).
-- Les lignes sont rassemblées en un seul tableau, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, autour d’une sous-requête d’alias `"sq_<alias or table>"`, pour que `ORDER BY` et `LIMIT` s’appliquent aux lignes. Une requête, une valeur en retour.
+- Les lignes sont rassemblées en un seul tableau, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, autour d’une sous-requête d’alias `"sq_<alias or table>"`, pour que `ORDER BY` et `LIMIT` s’appliquent aux lignes. Une requête, une valeur en retour. Sur de grandes valeurs, de nombreuses lignes ou des laterals imbriqués, ce JSON coûte : [Performance](/fr/performance).
 - À l’intérieur, les clauses viennent dans cet ordre : `SELECT [DISTINCT …]` · les colonnes `AS result` · `FROM` la table `[AS alias]` · chaque `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` ou `FETCH FIRST … WITH TIES` · `OFFSET` · chaque verrou `FOR …`.
 - Chaque valeur est un paramètre (`$1`, `$2`) ; chaque nom est mis entre guillemets comme le fait Postgres, et tout `"` qu’il contient est doublé. Zapatos 6.6.1 laissait un nom contenant un `"` fermer ses guillemets ; pgcast l’a corrigé ([changelog](/fr/changelog#6.6.2-security)).
 

@@ -84,6 +84,7 @@ const groups: Group[] = [
       { text: { en: 'Unions', fr: 'Unions' }, link: '/combine-tables' },
       { text: { en: 'Batch deletes', fr: 'Suppressions par batch' }, link: '/delete-in-batches' },
       { text: { en: 'Job locks', fr: 'Locks de job' }, link: '/one-worker' },
+      { text: { en: 'Performance', fr: 'Performance' }, link: '/performance' },
     ],
   },
   {
