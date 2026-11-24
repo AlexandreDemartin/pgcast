@@ -1,5 +1,5 @@
 ---
-english: 067042182e43
+english: 9172efbed35b
 ---
 
 # Template SQL
@@ -596,7 +596,7 @@ fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?,
 
 Un nouveau fragment sur les mêmes littéraux et expressions. Il garde `runResultTransform`, `parentTable`, `preparedName`, `noop` et `noopResult`, sauf ceux que donne `override`. Un raccourci copié se résout donc en ce que donne le raccourci, comme le dit son type : `count('films', all).copy().run(pool)` donne `4` sur le schéma de la doc, là où Zapatos 6.6.1 donnait à la copie la transformation par défaut, donc les lignes : `[{ result: '4' }]`.
 
-Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de `selectExactlyOne()` garde `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). La promesse d’une copie exécutée seule est rejetée en l’absence de lignes. Avec la vérification et `withTies` activés, une deuxième ligne ex æquo entraîne aussi le rejet de la promesse. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent.
+Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de `selectExactlyOne()` garde `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). La promesse d’une copie exécutée seule est rejetée en l’absence de lignes. Avec la vérification et `withTies` activés, une deuxième ligne ex æquo entraîne aussi le rejet de la promesse. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent. Une copie de `select()` garde son `coalesce(jsonb_agg(result), '[]')`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all).copy()) -->, même avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows).
 
 ## `withCTEs()` {#withCTEs}
 
@@ -612,6 +612,7 @@ withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<an
 - **Le résultat** : une [`copy()`](#copy) de `query`, de son type. Il se résout en ce que donne `query`, imbriqué dans un `lateral` ou dans `extras` aussi, et s’écrit entre parenthèses comme valeur d’`extras` ou d’`insert()` là où `query` l’est.
 - **Sans effet** : un `insert()` ou un `upsert()` sans ligne, comme requête ou comme CTE, s’écrit `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, une requête sans ligne sur n’importe quelle table, et le résultat n’est pas sans effet : ses CTE s’exécutent donc ; comme requête, il se résout en `[]`.
 - **`selectExactlyOne()`** : avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), le résultat demande toujours une deuxième ligne (par défaut `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`). Si la requête en trouve une, sa promesse est rejetée, comme pour le raccourci exécuté seul. Imbriquée, elle demande une ligne et, avec `withTies: true`, les éventuelles lignes ex æquo.
+- **`select()`** : avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), le résultat reste sa requête des lignes, `SELECT to_jsonb("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.select('films', db.all))) --> après le `WITH`, et donne le même tableau. Comme CTE ou imbriqué, il garde son `jsonb_agg`.
 - **Un seul `WITH`** : la requête ne peut pas commencer par son propre `WITH`, un résultat de `withCTEs()` ou un fragment `sql`, ni être un [`truncate()`](/fr/insert#truncate) : Postgres refuse le texte (42601). Mettez toutes les CTE dans un seul appel.
 - **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, `{}` compris, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat. Sur une liste construite à l’exécution, un même nom couvrirait un texte par liste : donnez à chaque texte son propre nom, ou ne préparez pas la requête.
 

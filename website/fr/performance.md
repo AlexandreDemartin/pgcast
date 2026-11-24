@@ -1,5 +1,5 @@
 ---
-english: e88abca03083
+english: c0951e679a55
 ---
 
 # Performance
@@ -41,6 +41,7 @@ Les films d’un studio sans leurs `details`, une colonne `jsonb` :
 
 - `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/performance_select_rows.ts --> : pas de `jsonb_agg`, donc chaque ligne est une valeur à part. Sur les 10 000 lignes de 4 Ko, environ 0,3 s contre 0,6 s. Sur 2 000 lignes de 100 Ko, environ 1,6 s, là où `select()` échoue.
 - Le type est celui de `select()`, `s.films.JSONSelectable[]`.
+- Pour chaque `select()` exécuté seul, activez [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) : chacun envoie cette requête, et ceux qui sont imbriqués gardent leur agrégat.
 
 ## Lire par batches {#read-in-batches}
 

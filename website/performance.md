@@ -37,6 +37,7 @@ The films of a studio without their `details`, a `jsonb` column:
 
 - `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/performance_select_rows.ts -->: no `jsonb_agg`, so each row is a value of its own. On the 10,000 rows of 4 KB, about 0.3 s against 0.6 s. On 2,000 rows of 100 KB, about 1.6 s, where `select()` fails.
 - The type is `select()`'s, `s.films.JSONSelectable[]`.
+- For every `select()` run on its own, turn on [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows): each sends this query, and nested ones keep their aggregate.
 
 ## Read in batches
 

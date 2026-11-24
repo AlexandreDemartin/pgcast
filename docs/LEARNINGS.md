@@ -23,11 +23,18 @@ Candidates for a check, a rule or a skill line.
 - #943 — a PR body that names an upstream issue as `owner/repo#n` adds a backlink there: a reference "not posted" goes in backticks — builder
 - #943 — an example that needs Postgres 17 (`EXPLAIN … SERIALIZE`) cannot go in `examples/`, which `docs:examples` runs on CI's oldest Postgres (14) and on PGlite: an inline twoslash block, compiled only — builder
 - #948: a count written from memory in a note was wrong twice ("30 cases" for 33, "45 Postgres types" for "45 cases"); grepping the probe's output and the quoted issue before the commit caught both.
+- #940 — a top-level form that needs a transform of its own also replaces `run`, since `run()` compiles `this`, not the form a transform expects — builder
+- #940 — a conversion moved into the select list changes what `ORDER BY` and `DISTINCT` compare (`to_jsonb` of a `timestamptz` sorts as text, DISTINCT + ORDER BY expression gives 42P10): convert above the unchanged sub-SELECT, as the aggregate does — branch-reviewer
+- #940 — a top-level form is a fragment of its own even when its SQL is the same: `Object.assign` onto a fragment the nested form also holds leaked `preparedName` and `noop` into a CTE; checked by walking the nested tree and compiling each nested form before and after a top-level compile — branch-reviewer
+- #940 — `setConfig` merges, so a probe harness sets every key it relies on on each run — branch-reviewer
+- #940 — a red test with two cases asserts each right after its own run: when both ran first, one case's 42P10 hid the other's wrong order — builder
+- #940 — a verifier's script that joins `__dirname` with a folder name runs only from its own folder: `path.resolve` lets the fix round aim it at another build — builder
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
 
-
+- #940 — `defect` — with `topLevelSelectAsRows` on, `query.run = (queryable, force) => topLevel().run(queryable, force)` (`src/db/shortcuts.ts:1043`) no longer goes through `query.compile`, so a caller who wraps `compile` on a `select()` (to prefix a `/* tag */`) sees the wrap dropped on, where `selectExactlyOneChecksForSecondRow`'s `run()` calls `this.compile` and keeps it; worth a line in `runtime-config.md` beside the one on `runResultTransform`? — branch-reviewer
+- #940 — `defect` — under `withCTEs()`, the main query's top-level form reads `noop` from the query's last top-level compile (`src/db/shortcuts.ts:1446`, `withClause(topLevelQuery)`), so its SQL depends on the order of calls; master's `selectExactlyOneChecksForSecondRow` does the same; follow-up for both opt-ins: `topLevel()` copies instead of assigning, `withCTEs()` reads `noop` from `query` at the call — branch-reviewer
 - #950 (defect) — the 63-byte guard on a key alias (`src/db/shortcuts.ts` `SQLForKeyAlias`, `website/runtime-config.md` and `website/select.md` § With `shortcutsUseJson`) counts UTF-8 bytes, where Postgres truncates an identifier in the server encoding: in an `EUC_JP` database a key of 31 × `é` (62 bytes in UTF-8, 93 there) passes and comes back cut to 21 characters. The wording could say "in a UTF-8 database", where the count is exact; `src/db/conditions.ts` counts the same way. — branch-reviewer
 - #950 (defect) — `website/select.md` § With `shortcutsUseJson`, the `distinct: true` row, names the passed-through `select()`, `selectOne()` and `selectExactlyOne()` alone: a `sql` child that wraps a shortcut, ``lateral: db.sql`SELECT (${db.selectOne('studios', { id: db.parent('studio_id') })}) AS result` ``, runs with the option off and fails with 42883 with it on, its SQL the caller's and compared as written. One clause could say that a shortcut inside a `sql` child is `json`, so it needs a `to_jsonb()` wrap under `distinct: true`. — branch-reviewer

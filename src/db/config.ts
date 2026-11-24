@@ -43,6 +43,7 @@ export interface Config {
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
   aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value; declare false in ConfigTypes for the 6.x types
   shortcutsUseJson?: boolean;  // select() and its kin build their JSON with to_json, json_agg and json_build_object, not their jsonb twins
+  topLevelSelectAsRows?: boolean;  // select() run or compiled on its own is selectRows()'s query, one row per result; nested, its aggregate
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -71,6 +72,7 @@ const defaults: Config = {
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
   aggregatesTypedByColumn: true,
   shortcutsUseJson: false,  // true in 8.0 (decision 018)
+  topLevelSelectAsRows: false,  // the default in 8.0
 };
 
 let config: Config = { ...defaults };

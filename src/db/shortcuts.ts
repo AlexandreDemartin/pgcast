@@ -170,13 +170,16 @@ function SQLForAlias(prefix: string, name: string) {
 // bare, which Postgres refuses (42601): in extras, in jsonb_build_object() (#262), and as an insert(), upsert() or
 // update() value, in VALUES and ROW() (#656). A sql fragment is the caller's SQL, written as given
 const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInExtras'];
-// the LIMIT 2 form of a selectExactlyOne() that checks for a second row, which withCTEs() writes at the top level too
-const secondRowQuery = Symbol('secondRowQuery');
-type SecondRowChecked = { [secondRowQuery]?: SQLFragment<any, any> };
+// the query a shortcut compiles to on its own, which withCTEs() writes at the top level too: the LIMIT 2 form of a
+// selectExactlyOne() that checks for a second row, or the rows form of a select() with topLevelSelectAsRows, which
+// runs with rowsResult
+const topLevelForm = Symbol('topLevelForm');
+type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
+const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
 // set by select() and its kin on the runResultTransform of a query whose result is `json`, as shortcutsUseJson
 // builds it: a parent's plain DISTINCT over it as a passed-through lateral compares it as `jsonb` (json has no
 // equality, 42883), where an aggregate's or a `jsonb` result is compared as it is. Each query gets a transform of its
-// own, which copy() and so withCTEs() keep, where they do not keep secondRowQuery; a sql fragment given a query's
+// own, which copy() and so withCTEs() keep, where they do not keep topLevelForm; a sql fragment given a query's
 // transform is the caller's SQL, and is read only on a query (isQuery)
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
@@ -921,6 +924,17 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  *
  * For its rows one by one, as `cursor()` reads them, the same query without
  * `jsonb_agg`: `selectRows()`.
+ *
+ * With the `topLevelSelectAsRows` config option, read as `select()` is called,
+ * `select()` run or compiled on its own, or as the main query of `withCTEs()`,
+ * is `selectRows()`'s query, and `run()` gives the same array, one result per
+ * row: `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
+ * A single `lateral` passed through is converted above that query,
+ * `SELECT to_jsonb(result) AS result FROM (…) AS "sq_films"`, so its value
+ * stays JSON, ordered and made distinct by its raw value. Nested (a
+ * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
+ * `cursor()`, it keeps its `jsonb_agg`. The rows form runs with its own
+ * `runResultTransform`: one set on the query applies to the aggregate only.
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -1043,37 +1057,51 @@ function selectQuery(
         });
 
   const
+    limit = callerValue(allOptions, 'limit'),
     fromSQL = (limit: number | undefined) => sql` FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
     keysAsSQL = asRow ? [...keyPairs, ...lateralPairs].map(([k, v]) => sql`, ${v} AS ${SQLForKeyAlias(k)}`) : [],
     rowsSQL = (limit: number | undefined) => asRow ?
       sql<SQL, any>`SELECT ${allColsSQL} AS result FROM (SELECT${distinctSQL} ${alias}.*${keysAsSQL}${fromSQL(limit)}) AS ${SQLForAlias('row_', alias)}` :
       sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result${fromSQL(limit)}`,
-    rowsQuery = rowsSQL(callerValue(allOptions, 'limit')),
+    rowsQuery = rowsSQL(limit),
     query = mode !== SelectResultMode.Many || rows ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
       json ? sql<SQL, any>`SELECT coalesce(json_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
         sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
-    checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false);
+    checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false),
+    asRows = mode === SelectResultMode.Many && !rows && (getConfig().topLevelSelectAsRows ?? false);
 
-  if (checksSecondRow) {
-    // compiled on its own, as `run()` does, the query asks for a second row; a parent query compiles it
-    // into its own `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`,
-    // where a second row would duplicate the parent row; the `LIMIT 2` form takes the properties
-    // a caller may have set on the query since (those `copy()` carries over)
-    const topLevelQuery = rowsSQL(2), nestedCompile = query.compile;
-    (query as SecondRowChecked)[secondRowQuery] = topLevelQuery;
-    query.compile = (result, parentTable, currentColumn) => {
-      if (result) return nestedCompile(result, parentTable, currentColumn);
-      const { parentTable: queryParentTable, preparedName, noop } = query;
-      return Object.assign(topLevelQuery, { parentTable: queryParentTable, preparedName, noop })
-        .compile(undefined, parentTable, currentColumn);
-    };
+  if (checksSecondRow || asRows) {
+    // compiled on its own, as `run()` does, the query asks for a second row, or is selectRows()'s; a parent query
+    // compiles it into its own `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`, where a
+    // second row would duplicate the parent row, or its aggregate, which the parent reads as one value; the top-level
+    // form takes the properties a caller may have set on the query since (those `copy()` carries over), so it is a
+    // fragment of its own, never the one nested in the aggregate, which would carry the name and noop nested
+    const
+      topLevelQuery = checksSecondRow ? rowsSQL(2) :
+        // a single lateral passed through keeps its JSON value, as jsonb_agg() converts it (pg parses the bare column,
+        // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
+        // still act on the raw value
+        lateral instanceof SQLFragment ? sql<SQL, any>`SELECT to_jsonb(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
+          rowsSQL(limit),
+      nestedCompile = query.compile,
+      topLevel = () => Object.assign(topLevelQuery,
+        { parentTable: query.parentTable, preparedName: query.preparedName, noop: query.noop, noopResult: query.noopResult });
+    (query as TopLevelFormed)[topLevelForm] = topLevelQuery;
+    query.compile = (result, parentTable, currentColumn) =>
+      result ? nestedCompile(result, parentTable, currentColumn) : topLevel().compile(undefined, parentTable, currentColumn);
+    if (asRows) {
+      // run() too: a copy, which compiles as nested, keeps the query's own runResultTransform, the aggregate's
+      topLevelQuery.runResultTransform = rowsResult;
+      query.run = (queryable, force) => topLevel().run(queryable, force);
+    }
   }
 
   query.runResultTransform =
 
-    // selectRows(): one result per row, as insert() of an array gives its rows
-    rows ? (qr) => qr.rows.map(r => r.result) :
+    // selectRows(): one result per row, as insert() of an array gives its rows; a transform of its own, which
+    // jsonResult marks, never the shared rowsResult
+    rows ? (qr) => rowsResult(qr) :
 
     mode === SelectResultMode.Numeric ?
       // note: pg deliberately returns strings for int8 in case 64-bit numbers overflow
@@ -1451,9 +1479,10 @@ const inWith = <F>(fragment: F, json: boolean) =>
  * A no-op `query` or CTE (an `insert()` or `upsert()` of no row) is written
  * `SELECT NULL::jsonb AS result WHERE false`, and the result is no no-op, so
  * the CTEs run. A `selectExactlyOne()` that checks for a second row still does
- * at the top level. The result is never prepared, whatever `query` is, even
- * by a `prepared()` called on `query` or a CTE afterwards: call `prepared()`
- * on it.
+ * at the top level, and a `select()` with `topLevelSelectAsRows` is still its
+ * rows query there, a CTE keeping its `jsonb_agg`. The result is never
+ * prepared, whatever `query` is, even by a `prepared()` called on `query` or a
+ * CTE afterwards: call `prepared()` on it.
  * @param ctes The CTEs, keyed by name: a shortcut or a `sql` fragment each
  * @param query The main query
  */
@@ -1465,14 +1494,20 @@ export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]
       sql`WITH ${mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${inWith(cte, json)})`)} ${inWith(main, json)}`,
     result = Object.assign(entries.length === 0 ? query.copy() as Q :
       query.copy({ literals: ['', ''], expressions: [withClause(query)], noop: false }) as Q, { preparedName: undefined }),
-    topLevelQuery = (query as SecondRowChecked)[secondRowQuery];
+    topLevelQuery = (query as TopLevelFormed)[topLevelForm];
 
   if (topLevelQuery) {
-    // compiled on its own, the LIMIT 2 form, as select() compiles it; nested, LIMIT 1
-    const nestedCompile = result.compile;
+    // compiled on its own, the LIMIT 2 form or the rows form, as select() compiles it; nested, LIMIT 1 or the aggregate
+    const
+      nestedCompile = result.compile,
+      topLevel = () => Object.assign(entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery), { parentTable: result.parentTable, preparedName: result.preparedName });
     result.compile = (compiled, parentTable, currentColumn) => compiled ? nestedCompile(compiled, parentTable, currentColumn) :
-      Object.assign(entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery), { parentTable: result.parentTable, preparedName: result.preparedName })
-        .compile(undefined, parentTable, currentColumn);
+      topLevel().compile(undefined, parentTable, currentColumn);
+    // the rows form runs with its own result, one per row, as select() runs it
+    if (topLevelQuery.runResultTransform === rowsResult) {
+      result.run = (queryable, force) =>
+        Object.assign(topLevel(), { runResultTransform: rowsResult, noop: result.noop, noopResult: result.noopResult }).run(queryable, force);
+    }
   }
   return result;
 };

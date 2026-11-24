@@ -35,7 +35,7 @@ describe('getConfig() and setConfig()', () => {
       | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
       | 'queryListener' | 'resultListener' | 'transactionListener'
       | 'upsertRequiresSameKeys' | 'undefinedMeansMissing' | 'transactionRequiresCommit' | 'transactionRequiresIdleClient'
-      | 'transactionRequiresSatisfyingLevel' | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn'
+      | 'transactionRequiresSatisfyingLevel' | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn' | 'topLevelSelectAsRows'
       | 'transactionEventListener' | 'shortcutsUseJson'
     >();
   });

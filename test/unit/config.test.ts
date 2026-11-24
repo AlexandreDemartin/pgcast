@@ -75,6 +75,7 @@ describe('setConfig()', () => {
     selectExactlyOneChecksForSecondRow: false,
     aggregatesTypedByColumn: true,
     shortcutsUseJson: false,
+    topLevelSelectAsRows: false,
   };
   const changed = {
     transactionAttemptsMax: 2,
@@ -89,6 +90,7 @@ describe('setConfig()', () => {
     selectExactlyOneChecksForSecondRow: true,
     aggregatesTypedByColumn: false,
     shortcutsUseJson: true,
+    topLevelSelectAsRows: true,
   };
 
   it.each([undefined, null])('resets each write option independently with %s', value => {
