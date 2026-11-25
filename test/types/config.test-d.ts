@@ -34,10 +34,27 @@ describe('getConfig() and setConfig()', () => {
     expectTypeOf<keyof db.Config>().toEqualTypeOf<
       | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
       | 'queryListener' | 'resultListener' | 'transactionListener'
-      | 'upsertRequiresSameKeys' | 'undefinedMeansMissing' | 'transactionRequiresCommit' | 'transactionRequiresIdleClient'
+      | 'transactionRequiresCommit' | 'transactionRequiresIdleClient'
       | 'transactionRequiresSatisfyingLevel' | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn' | 'topLevelSelectAsRows'
       | 'transactionEventListener' | 'shortcutsUseJson'
     >();
+  });
+
+  test('a key 8.0 removed is no key of Config: set in an object literal, TS2353; in a variable beside a kept key, it compiles', () => {
+    // @ts-expect-error undefinedMeansMissing is no key of Config from 8.0
+    db.setConfig({ undefinedMeansMissing: true });
+    // @ts-expect-error upsertRequiresSameKeys is no key of Config from 8.0
+    db.setConfig({ upsertRequiresSameKeys: true });
+    // @ts-expect-error undefinedMeansMissing is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, undefinedMeansMissing: false });
+    // @ts-expect-error upsertRequiresSameKeys is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, upsertRequiresSameKeys: false });
+    // @ts-expect-error undefinedMeansMissing is no key of the config getConfig() gives
+    db.getConfig().undefinedMeansMissing;
+    // @ts-expect-error upsertRequiresSameKeys is no key of the config getConfig() gives
+    db.getConfig().upsertRequiresSameKeys;
+    const built = { transactionAttemptsMax: 3, undefinedMeansMissing: false, upsertRequiresSameKeys: false };
+    expectTypeOf(db.setConfig).toBeCallableWith(built);  // hence setConfig()'s refusal at run time
   });
 
   test('shortcutsUseJson is an optional boolean, so a Config written for Zapatos 6.6.1 still compiles', () => {

@@ -96,7 +96,6 @@ describe('insert', () => {
 
   // the type takes a readonly array (#683): the rows are read, never written, so a frozen array runs as any other
   it('a frozen array of rows, with different keys and an undefined value, is inserted and left as it was (#683)', async () => {
-    db.setConfig({ undefinedMeansMissing: true });
     const rows = Object.freeze([Object.freeze({ email: 'a@x.org', display_name: 'A' }), Object.freeze({ email: 'b@x.org', display_name: 'B', mood: undefined })]);
     const inserted = await run(db.insert('users', rows, { returning: ['email', 'mood'] }));
     expect(sortBy(inserted, 'email')).toEqual([{ email: 'a@x.org', mood: null }, { email: 'b@x.org', mood: null }]);
@@ -140,20 +139,7 @@ describe('insert', () => {
     expect(await run(db.selectExactlyOne('accounts', { id: account.id }, { columns: ['balance'] }))).toEqual({ balance: 0 });
   });
 
-  it('an undefined value inserts NULL without undefinedMeansMissing, the column DEFAULT with it', async () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    // accounts.balance is NOT NULL DEFAULT 0, yet `balance: undefined` sends NULL
-    expect(await fails(db.insert('accounts', { owner_id: 1, balance: undefined }))).toMatchInlineSnapshot(`
-      {
-        "code": "23502",
-        "message": "null value in column "balance" of relation "accounts" violates not-null constraint",
-      }
-    `);
-    const row = await run(db.insert('accounts', { owner_id: 1, ratio: undefined, lifetime_ops: Default }, {
-      returning: ['ratio', 'lifetime_ops'],
-    }));
-    expect(row).toEqual({ ratio: null, lifetime_ops: 0 });
-    db.setConfig({ undefinedMeansMissing: true });
+  it('an undefined value in one of several rows inserts the column DEFAULT', async () => {
     expect(sortBy(await run(db.insert('accounts', [{ owner_id: 1, balance: undefined }, { owner_id: 1, balance: 5 }], {
       returning: ['balance'],
     })), 'balance')).toEqual([{ balance: 0 }, { balance: 5 }]);
@@ -229,16 +215,6 @@ describe('upsert', () => {
     `);
   });
 
-  it('in several rows, a key missing from one row overwrites with DEFAULT on UPDATE, without upsertRequiresSameKeys', async () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
-    // The missing key is filled with DEFAULT, then `SET title = EXCLUDED.title` erases the title
-    const [, tee] = sortBy(await run(db.upsert('products', [
-      { sku: 'TEE', variant: 'S', price_cents: 1300 },
-      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
-    ], ['sku', 'variant'], { returning: ['sku', 'title'] })), 'sku');
-    expect(tee).toEqual({ sku: 'TEE', title: null, $action: 'UPDATE' });
-  });
-
   it.each([
     [{ updateColumns: 'price_cents' }, 'T-shirt small'],
     [{ updateValues: { title: 'Tee' } }, 'Tee'],
@@ -254,7 +230,7 @@ describe('upsert', () => {
       .toEqual([{ title, price_cents: 1300 }]);
   });
 
-  it('with upsertRequiresSameKeys, new rows without their serial id among existing rows run, and nothing is overwritten', async () => {
+  it('new rows without their serial id among existing rows run, and nothing is overwritten', async () => {
     const { id } = await run(db.selectExactlyOne('products', { sku: 'TEE', variant: 'S' }, { columns: ['id'] }));
     const [cap, tee] = sortBy(await run(db.upsert('products', [
       { id, sku: 'TEE', variant: 'S', price_cents: 1300 },
@@ -265,33 +241,26 @@ describe('upsert', () => {
     expect(cap).not.toMatchObject({ id });
   });
 
-  it('an undefined value: set from EXCLUDED as NULL without undefinedMeansMissing, left as it is with it', async () => {
+  it('an undefined value: the column is left as it is', async () => {
     const tee = { sku: 'TEE', variant: 'S', price_cents: 1400, title: undefined };
     expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
       .toEqual({ title: 'T-shirt small', price_cents: 1400, $action: 'UPDATE' });
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
-      .toEqual({ title: null, price_cents: 1400, $action: 'UPDATE' });
   });
 
-  it('an undefined key of updateValues: the column DEFAULT without undefinedMeansMissing, left as it is with it', async () => {
+  it('an undefined key of updateValues: the column is left as it is', async () => {
     const ada = { email: 'Ada@Example.com', display_name: 'Ada' };
     expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
       .toEqual({ settings: { theme: 'dark' }, $action: 'UPDATE' });
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
-      .toEqual({ settings: {}, $action: 'UPDATE' });
   });
 
-  it('with undefinedMeansMissing, an undefined key of updateValues that leaves nothing to update: DO NOTHING', async () => {
+  it('an undefined key of updateValues that leaves nothing to update: DO NOTHING', async () => {
     // so no row back on conflict, and the row is unchanged
     expect(await run(db.upsert('users', { email: 'Ada@Example.com', display_name: 'Ada' }, 'email',
       { updateColumns: db.doNothing, updateValues: { settings: undefined } }))).toBeUndefined();
     expect(await scalar(`SELECT settings AS v FROM users WHERE email = 'Ada@Example.com'`)).toEqual({ theme: 'dark' });
   });
 
-  it.each([{}, { undefinedMeansMissing: false }])('stores SQL NULL for explicit null on each write path with %j', async config => {
-    db.setConfig(config);
+  it('stores SQL NULL for explicit null on each write path', async () => {
     const ada = { display_name: 'A', email: 'Ada@Example.com' };
     expect((await run(db.insert('users', { ...ada, email: 'new@example.com', mood: null }))).mood).toBeNull();
     for (const write of [
@@ -305,18 +274,13 @@ describe('upsert', () => {
     }
   });
 
-  it.each([{}, { upsertRequiresSameKeys: false }, { undefinedMeansMissing: false },
-    { undefinedMeansMissing: false, upsertRequiresSameKeys: false }])('checks the stored title with %j', async config => {
-    db.setConfig(config);
+  it('refuses a missing or an undefined title, and keeps the stored one', async () => {
     const tee = { sku: 'TEE', variant: 'S', price_cents: 1300 };
     for (const first of [tee, { ...tee, title: undefined }]) {
       await t.client.query("UPDATE products SET title = 'T-shirt small' WHERE sku = 'TEE' AND variant = 'S'");
       const rows = [first, { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' }];
-      const write = () => db.upsert('products', rows, ['sku', 'variant']);
-      const refuses = config.upsertRequiresSameKeys !== false && (!('title' in first) || config.undefinedMeansMissing !== false);
-      if (refuses) expect(write).toThrow('rows have different keys');
-      else await run(write());
-      expect(await scalar("SELECT title AS v FROM products WHERE sku = 'TEE' AND variant = 'S'")).toBe(refuses ? 'T-shirt small' : null);
+      expect(() => db.upsert('products', rows, ['sku', 'variant'])).toThrow('rows have different keys');
+      expect(await scalar("SELECT title AS v FROM products WHERE sku = 'TEE' AND variant = 'S'")).toBe('T-shirt small');
     }
   });
 
@@ -474,7 +438,7 @@ describe('upsert', () => {
     // Zapatos 6.6.1 sent `() VALUES () ON CONFLICT`, which .run() rejected with 42601
     expect((await pgError(t.client, () => run(sql`INSERT INTO ${'users'} () VALUES () ON CONFLICT (${'email'}) DO NOTHING`))).code).toBe('42601');
     expect(() => db.upsert('users', {}, 'email')).toThrow(nothingToInsert);
-    // with undefinedMeansMissing, an undefined key is left out, so no column is left
+    // an undefined key is left out, so no column is left
     expect(() => db.upsert('users', { mood: undefined }, 'email')).toThrow(nothingToInsert);
     expect(await run(db.select('users', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
@@ -585,20 +549,7 @@ describe('update', () => {
     expect(await run(db.select('accounts', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
 
-  it('an undefined value sets the column to NULL without undefinedMeansMissing, leaves it with it', async () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    // Bob loses his manager; on a NOT NULL column the update fails
-    expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 2 }, { returning: ['mood', 'manager_id'] })))
-      .toEqual([{ mood: 'sad', manager_id: null }]);
-    expect(await fails(db.update('users', { display_name: undefined }, { id: 2 }))).toMatchInlineSnapshot(`
-      {
-        "code": "23502",
-        "message": "null value in column "display_name" of relation "users" violates not-null constraint",
-      }
-    `);
-  });
-
-  it('with undefinedMeansMissing, an undefined value leaves its column', async () => {
+  it('an undefined value leaves its column', async () => {
     expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 3 }, { returning: ['mood', 'manager_id'] })))
       .toEqual([{ mood: 'sad', manager_id: 1 }]);
     expect(await run(db.update('users', { mood: 'ok', display_name: undefined }, { id: 2 }, { returning: ['display_name'] })))
@@ -1620,34 +1571,27 @@ describe('copy()', () => {
 describe('a null row among others in upsert()', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('inserts a row of defaults when the key check is off', async () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
+  it('inserts a row of defaults, given updateColumns', async () => {
     // since #27 it threw a TypeError at the call; the null row is read as `{}`, as insert() reads it (#341)
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
-    const rows = await db.upsert('extra.type_zoo', [{ c_text: 'x' }, null as any], 'id', { returning: ['c_text'] }).run(t.client);
+    const rows = await db.upsert('extra.type_zoo', [{ c_text: 'x' }, null as any], 'id', { updateColumns: ['c_text'], returning: ['c_text'] }).run(t.client);
     expect(rows).toEqual([{ c_text: 'x', $action: 'INSERT' }, { c_text: null, $action: 'INSERT' }]);
     expect(emitWarning).not.toHaveBeenCalled();
   });
 });
 
 describe('a key added to Object.prototype beside several upsert() rows', () => {
-  it('is no column: the existing value is kept on conflict, with upsertRequiresSameKeys off and on', async () => {
+  it('is no column: the existing value is kept on conflict', async () => {
     // master inserted it as DEFAULT and set it from EXCLUDED, so Bob's mood went from 'ok' to NULL; with
     // upsertRequiresSameKeys it threw "rows have different keys"
-    const stored: Record<string, unknown> = {}, proto = Object.prototype as any;
-    for (const upsertRequiresSameKeys of [false, true]) {
-      db.setConfig({ upsertRequiresSameKeys });
-      await t.client.query('SAVEPOINT prototype_key');
-      proto.mood = 'sad';
-      try {
-        await run(db.upsert('users', [{ email: 'bob@example.com', display_name: 'Bob 2' }, { email: 'dee@example.com', display_name: 'Dee' }], 'email'));
-      } finally { delete proto.mood; }
-      stored[`upsertRequiresSameKeys ${upsertRequiresSameKeys}`] = (await t.client.query(
-        `SELECT email, display_name, mood FROM users WHERE email IN ('bob@example.com', 'dee@example.com') ORDER BY email`)).rows;
-      await t.client.query('ROLLBACK TO SAVEPOINT prototype_key');
-    }
-    const kept = [{ email: 'bob@example.com', display_name: 'Bob 2', mood: 'ok' }, { email: 'dee@example.com', display_name: 'Dee', mood: null }];
-    expect(stored).toEqual({ 'upsertRequiresSameKeys false': kept, 'upsertRequiresSameKeys true': kept });
+    const proto = Object.prototype as any;
+    proto.mood = 'sad';
+    try {
+      await run(db.upsert('users', [{ email: 'bob@example.com', display_name: 'Bob 2' }, { email: 'dee@example.com', display_name: 'Dee' }], 'email'));
+    } finally { delete proto.mood; }
+    expect((await t.client.query(
+      `SELECT email, display_name, mood FROM users WHERE email IN ('bob@example.com', 'dee@example.com') ORDER BY email`)).rows)
+      .toEqual([{ email: 'bob@example.com', display_name: 'Bob 2', mood: 'ok' }, { email: 'dee@example.com', display_name: 'Dee', mood: null }]);
   });
 });
 

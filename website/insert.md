@@ -161,13 +161,13 @@ A partitioned table needs `'suppress'` when a row lands in a partition whose col
 
 ### Rows with different keys {#upsert-different-keys}
 
-By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+A batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
 - Give every row the key to keep the implicit update.
 - New rows can omit their serial `id` when upserting on `'id'`. A constraint name alone does not identify its columns to pgcast.
 - A `null` row among others counts as a row missing every key.
 
-With [`upsertRequiresSameKeys: false`](/runtime-config#Config.upsertRequiresSameKeys), the missing cell takes `DEFAULT` and can overwrite a stored value. For example, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` sends `($4, $5, DEFAULT)`<!-- probe: (db.setConfig({ upsertRequiresSameKeys: false }), db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])) -->, so an existing count of 4-star votes goes back to 1.
+Through 7.x, [`upsertRequiresSameKeys: false`](/runtime-config#Config.upsertRequiresSameKeys) let the missing cell take `DEFAULT`, which could overwrite a stored value. For example, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` sent `($4, $5, DEFAULT)`, so an existing count of 4-star votes went back to 1. 8.0 removes the option ([8.0 migration](/switching#from-8-0-upsertRequiresSameKeys)).
 
 ## `constraint()` {#constraint}
 
@@ -333,11 +333,11 @@ With `'CASCADE'`, Postgres empties every table that references one of them, at a
 
 ## An `undefined` value {#undefined-values}
 
-In 7.0 an undefined write value counts as a missing key. Use `null` to store SQL `NULL` in a nullable column. These rules apply to the values read at the call, provided they stay unchanged until the query runs and getters return the same value on later reads.
+From 7.0, an undefined write value counts as a missing key, and from 8.0 always. Use `null` to store SQL `NULL` in a nullable column. These rules apply to the values read at the call, provided they stay unchanged until the query runs and getters return the same value on later reads.
 
 <div class="stack">
 
-| In | Default in 7.0 | With `undefinedMeansMissing: false` |
+| In | From 7.0 | Through 7.x, with `undefinedMeansMissing: false` |
 |---|---|---|
 | `insert()` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 }) --> | `NULL` |
 | `update()` | left out: `SET ("title") = ROW($1)`<!-- probe: db.update('films', { title: 'x', tagline: undefined }, { id: 1000 }) -->; with no key left, it throws "nothing to update…"<!-- message --> | sets the column to `NULL`, and counts as a key |
@@ -348,7 +348,7 @@ In 7.0 an undefined write value counts as a missing key. Use `null` to store SQL
 
 An `undefined` in a filter still binds a parameter. On conflict, a defined `updateValues` override wins. Otherwise a selected column takes its value from `EXCLUDED`. For columns protected by `noNullUpdateColumns`, a `CASE` keeps the stored value if the incoming value is `NULL`.
 
-Set [`undefinedMeansMissing: false`](/runtime-config#Config.undefinedMeansMissing) to keep the 6.x write behaviour through 7.x. This choice is independent of the upsert key check.
+Through 7.x, [`undefinedMeansMissing: false`](/runtime-config#Config.undefinedMeansMissing) kept the 6.x write behaviour, independently of the upsert key check. 8.0 removes the option ([8.0 migration](/switching#from-8-0-undefinedMeansMissing)).
 
 ## `ReturningOptionsForTable` {#ReturningOptionsForTable}
 

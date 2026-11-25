@@ -35,8 +35,6 @@ export interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
-  upsertRequiresSameKeys?: boolean;  // multi-row upsert, no updateColumns: a key missing from a row, still set from EXCLUDED, throws
-  undefinedMeansMissing?: boolean;  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
   transactionRequiresCommit?: boolean;  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
   transactionRequiresIdleClient?: boolean;  // transaction() rejects a client already inside a transaction block, before its START TRANSACTION
   transactionRequiresSatisfyingLevel?: boolean;  // transaction() rejects the client of a transaction at a level that doesn't satisfy its own
@@ -64,8 +62,6 @@ const defaults: Config = {
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
-  upsertRequiresSameKeys: true,
-  undefinedMeansMissing: true,
   transactionRequiresCommit: true,
   transactionRequiresIdleClient: true,
   transactionRequiresSatisfyingLevel: true,
@@ -76,6 +72,13 @@ const defaults: Config = {
 };
 
 let config: Config = { ...defaults };
+
+// the runtime keys 8.0 removed (decision 019 § 4), each with the value whose behaviour 8.0 always has, through 8.x:
+// setConfig() takes that value, null or undefined, and keeps none of them, and throws on any other
+const removedOptions: { [key: string]: boolean } = {
+  upsertRequiresSameKeys: true,  // a batch whose rows have different keys throws as it is built, unless updateColumns
+  undefinedMeansMissing: true,  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
+};
 
 /**
  * Get (a copy of) the current configuration.
@@ -91,11 +94,21 @@ export const getConfig = () => {
 /**
  * Set key(s) on the configuration, and return (a copy of) the new configuration.
  * A key that has a default and is set to `undefined` (or `null`) goes back to
- * that default.
+ * that default. A key that 8.0 removed throws, unless it is set to the value
+ * 8.0 always behaves as, `null` or `undefined`, and none of them is kept.
  * @param newConfig Partial configuration object
  */
 export const setConfig = (newConfig: NewConfig) => {
-  config = { ...config, ...newConfig };
+  const given: { [key: string]: unknown } = { ...newConfig };
+  Object.keys(removedOptions).forEach(key => {
+    if (!Object.prototype.hasOwnProperty.call(given, key)) return;
+    const kept = removedOptions[key];
+    if (given[key] != null && given[key] !== kept) {
+      throw new Error(`${key} was removed in 8.0, which always does what ${key}: ${kept} did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-${key}`);
+    }
+    delete given[key];
+  });
+  config = { ...config, ...given };
   (Object.keys(defaults) as (keyof Config)[]).forEach(<K extends keyof Config>(key: K) => { config[key] ??= defaults[key]; });
   return getConfig();
 };

@@ -1,5 +1,5 @@
 ---
-english: 606ca431f40d
+english: 3b569be9346e
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -266,9 +266,7 @@ Pour trouver chaque appel :
 
 En 6.x, quand une exécution se termine sans avertissement ou que vous avez vérifié chaque appel signalé, activez les options une seule fois, avant la première requête :
 
-```ts twoslash
-import * as db from 'zapatos/db';
-// ---cut---
+```ts
 declare module 'zapatos/db' {
   interface ConfigTypes { aggregatesTypedByColumn: true }
 }
@@ -296,6 +294,24 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 ```
 
 :::
+
+Chaque option d’exécution ci-dessous a quitté `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable ou du JavaScript, `setConfig()` lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`, et la configuration n’en garde aucune. Un programme qui n’a jamais donné l’option ne voit aucun changement.
+
+### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
+
+La 8.0 fait toujours ce que faisait `undefinedMeansMissing: true`, la valeur par défaut de la 7.x : une valeur `undefined` dans `insert()`, `update()` et `upsert()` est une clé absente, `DEFAULT` dans `insert()` et omise dans `update()` et `upsert()` ([Une valeur `undefined`](/fr/insert#undefined-values)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->. Une fois l’option retirée, une cellule `undefined` vaut `DEFAULT` dans `insert()`, et non `NULL`, et `update()` laisse sa colonne telle quelle ; un `update()` à qui il ne reste aucune colonne lève "nothing to update…"<!-- message -->.
+- **Trouver les appels** : `grep -rn undefinedMeansMissing`. Une valeur qui n’est `undefined` qu’à l’exécution échappe à `grep` : en 7.x, retirez d’abord l’option et lancez vos tests.
+- **Avant → après** : là où `undefined` voulait dire « effacer », donnez `null`. `db.update('films', { tagline: form.tagline }, { id: 1002 })`<!-- tsc: const form = { tagline: undefined as string | undefined }; … --> devient `db.update('films', { tagline: form.tagline ?? null }, { id: 1002 })`<!-- tsc: const form = { tagline: undefined as string | undefined }; … -->.
+
+### `upsertRequiresSameKeys` {#from-8-0-upsertRequiresSameKeys}
+
+La 8.0 fait toujours ce que faisait `upsertRequiresSameKeys: true`, la valeur par défaut de la 7.x : un upsert de plusieurs lignes dont la mise à jour implicite inclut une colonne absente d’une ligne lève une erreur à l’appel, sauf si la cible du conflit nomme cette colonne, si `updateValues` lui donne une valeur définie ou si `updateColumns` dit quelles colonnes mettre à jour ([Lignes aux clés différentes](/fr/insert#upsert-different-keys)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `upsertRequiresSameKeys was removed in 8.0, which always does what upsertRequiresSameKeys: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-upsertRequiresSameKeys`<!-- message -->. Une fois l’option retirée, un tel lot lève "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->, là où la 7.x avec `false` mettait la cellule absente à `DEFAULT` par-dessus la valeur stockée.
+- **Trouver les appels** : `grep -rn upsertRequiresSameKeys`. Chaque lot aux clés différentes lève une erreur à l’appel, donc vos tests le trouvent.
+- **Avant → après** : `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])`<!-- tsc -->, avec `false`, devient soit chaque ligne avec chaque clé et la valeur voulue, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'])`<!-- tsc -->, soit un [`updateColumns`](/fr/insert#upsert-options) qui ne nomme que les clés que toutes les lignes donnent, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'], { updateColumns: ['votes'] })`<!-- tsc -->. Une clé absente d’une ligne met toujours la valeur stockée de cette ligne à `DEFAULT`, sans erreur, comme le faisait `false`.
 
 Chaque option du générateur ci-dessous a quitté sa `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable, `pgcastconfig.json`, `zapatosconfig.json` ou l’argument JSON de la CLI, la promesse de `generate()` ou de `check()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Une configuration qui n’a jamais donné l’option génère les mêmes fichiers.
 

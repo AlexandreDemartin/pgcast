@@ -1,5 +1,5 @@
 ---
-english: ff4fa87f8f47
+english: cff009669323
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -30,6 +30,7 @@ db.setConfig({
   - Zapatos 6.6.1 réglait la clé à `undefined`. Après `transactionAttemptsMax: undefined`, `transaction()` abandonnait après sa première tentative (« <span lang="en">… on attempt 1 of undefined, giving up</span> ») ; après `transactionRetryDelay: undefined`, chaque `transaction()` était rejetée avec « <span lang="en">TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.</span> » et ne libérait jamais le client qu’elle avait récupéré du pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - Elle renvoie une copie de la nouvelle configuration, comme `getConfig()` : modifier cet objet ne change rien. Zapatos 6.6.1 renvoyait la configuration elle-même ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - Elle garde l’objet `transactionRetryDelay` que vous lui donnez, pas une copie : modifier ensuite son `minMs` ou son `maxMs` modifie la configuration.
+- Une clé que la 8.0 a supprimée, [`undefinedMeansMissing`](#Config.undefinedMeansMissing) ou [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), ne compile pas (TS2353). Donnée quand même, depuis une variable ou du JavaScript, elle lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours (`true`), `null` ou `undefined`, et la configuration n’en garde aucune. Erreur : `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
 - Une clé inconnue ne compile pas (TS2353), pas plus qu’une valeur du mauvais type (TS2322) :
 
 ```ts twoslash
@@ -72,8 +73,6 @@ interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;
   castObjectParamsToJson: boolean;
-  upsertRequiresSameKeys?: boolean;
-  undefinedMeansMissing?: boolean;
   transactionRequiresCommit?: boolean;
   transactionRequiresIdleClient?: boolean;
   transactionRequiresSatisfyingLevel?: boolean;
@@ -98,8 +97,6 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | l’attente avant chaque retry | à chaque `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | un paramètre tableau : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
-| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. | à chaque `upsert()` |
-| [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : la traiter comme une clé absente | à chaque appel de l’une d’elles |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | rejeter la promesse si Postgres répond au `COMMIT` par `ROLLBACK` | à chaque `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | rejeter la promesse avant `START TRANSACTION` uniquement si votre client sans marqueur signale `T` ou `E` avant et après la requête vide. Si le client ne fournit aucun statut, l’appel se poursuit | à chaque `transaction()` qui reçoit un tel client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
@@ -182,25 +179,17 @@ Un cast donné en chaîne l’emporte, la valeur restant du texte JSON : `param
 
 ### `upsertRequiresSameKeys` {#Config.upsertRequiresSameKeys}
 
-À partir de la 7.0.0, l’option vaut `true` par défaut.
+À partir de la 7.0.0, l’option valait `true` par défaut. À partir de la 8.0.0, la clé est supprimée et pgcast se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-upsertRequiresSameKeys)).
 
-```ts
-upsertRequiresSameKeys?: boolean  // default: true
-```
+Un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
-Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
-
-Avec `false`, une clé absente peut entraîner l’écrasement de la valeur stockée sans avertissement. Voir [Lignes aux clés différentes](/fr/insert#upsert-different-keys).
+Pendant toute la 7.x, avec `false`, une clé absente pouvait écraser la valeur stockée sans avertissement. Voir [Lignes aux clés différentes](/fr/insert#upsert-different-keys).
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
-À partir de la 7.0.0, l’option vaut `true` par défaut.
+À partir de la 7.0.0, l’option valait `true` par défaut. À partir de la 8.0.0, la clé est supprimée et pgcast se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-undefinedMeansMissing)).
 
-```ts
-undefinedMeansMissing?: boolean  // default: true
-```
-
-Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/insert#update) et [`upsert()`](/fr/insert#upsert) est une clé manquante : `DEFAULT` dans `insert()`, omise dans `update()` et `upsert()`, `updateValues` compris. Avec `false`, elle est envoyée comme `NULL` (dans `updateValues`, sa colonne prend sa valeur dans `EXCLUDED`), comme dans Zapatos 6.6.1, sans avertissement. Pour le SQL de chaque appel, voir [Une valeur `undefined`](/fr/insert#undefined-values).
+Une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/insert#update) et [`upsert()`](/fr/insert#upsert) est une clé manquante : `DEFAULT` dans `insert()`, omise dans `update()` et `upsert()`, `updateValues` compris. Pendant toute la 7.x, avec `false`, elle était envoyée comme `NULL` (dans `updateValues`, sa colonne prenait sa valeur dans `EXCLUDED`), comme dans Zapatos 6.6.1, sans avertissement. Pour le SQL de chaque appel, voir [Une valeur `undefined`](/fr/insert#undefined-values).
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
@@ -493,7 +482,7 @@ type TransactionEvent =
 
 ## Opt-ins et avertissements {#opt-ins-and-warnings}
 
-En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
+En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x ; la 8.0 supprime les deux premiers (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente ; la 8.0 la retire et ne garde que `LIMIT 1`. [`shortcutsUseJson`](#Config.shortcutsUseJson), à partir de la 7.3.0, n’a pas d’avertissement non plus, puisque ses valeurs sont les mêmes : elle est désactivée en 7.x, et la 8.0 ne garde que `json`.
 

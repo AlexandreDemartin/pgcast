@@ -288,8 +288,8 @@ const row: s.films.Insertable = {
 };
 ```
 
-::: tip Default in 7.0
-An omitted key or an undefined cell uses the column default. With `undefinedMeansMissing: false`, an omitted key still uses the default, but an undefined cell binds `undefined`, which `pg` sends as SQL `NULL`. Omitting the only key throws `nothing to insert`. Give `null` to store SQL `NULL` in a nullable column ([Write values](/insert#undefined-values)).
+::: tip From 7.0
+An omitted key or an undefined cell uses the column default. Through 7.x, with `undefinedMeansMissing: false`, an omitted key still used the default, but an undefined cell bound `undefined`, which `pg` sent as SQL `NULL`; 8.0 removes the option. Omitting the only key throws `nothing to insert`. Give `null` to store SQL `NULL` in a nullable column ([Write values](/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

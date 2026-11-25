@@ -2396,7 +2396,8 @@ describe('cols and vals given a built-in', () => {
       update: [v => db.update('users', wrap(v) as any, { id: 1 }), bufferColsThrows],
       // a row among others: 6.6.1 spread it into a plain object first, so its own keys reached the text (#543)
       insertRows: [v => db.insert('users', [{ email: 'a@b', display_name: 'A' }, wrap(v) as any]), bufferValsThrows],
-      upsertRows: [v => db.upsert('users', [wrap(v) as any, { email: 'a@b', display_name: 'A' }], 'email'), bufferColsThrows],
+      // updateColumns, as the rows' keys differ
+      upsertRows: [v => db.upsert('users', [wrap(v) as any, { email: 'a@b', display_name: 'A' }], 'email', { updateColumns: ['display_name'] }), bufferColsThrows],
       updateValuesCols: [v => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: cols(wrap(v)) } }), bufferColsThrows],
       updateValuesVals: [v => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: vals(wrap(v)) } }), bufferValsThrows],
       lateral: [v => db.select('users', all, { lateral: { n: sql`SELECT ${cols(wrap(v))}` } }), bufferColsThrows],
@@ -2411,7 +2412,6 @@ describe('cols and vals given a built-in', () => {
   });
 
   it('a Date given a hostile own key compiles to the text a plain object of that key gives', () => {
-    db.setConfig({ upsertRequiresSameKeys: false });  // compile the heterogeneous batch too
     const
       dated = builds(v => Object.assign(new Date(0), { [v]: 1 })),
       plain = builds(v => ({ [v]: 1 })),

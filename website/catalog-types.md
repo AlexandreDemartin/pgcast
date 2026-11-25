@@ -164,7 +164,7 @@ The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersi
 
 What pgcast changes on the way in is in the run-time library, not in the generated types. [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`).
 
-In 7.0, writes treat an `undefined` value as a missing key by default. See [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Through 7.x, `typeEnumsAcrossSchemas: false` and `enumOrder: 'alphabetical'` looked up enums in the relation's schema and sorted their labels alphabetically, as in pgcast 6.x; 8.0 removes both ([Versions](/versions)).
+From 7.0, writes treat an `undefined` value as a missing key, and from 8.0 always. See [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Through 7.x, `typeEnumsAcrossSchemas: false` and `enumOrder: 'alphabetical'` looked up enums in the relation's schema and sorted their labels alphabetically, as in pgcast 6.x; 8.0 removes both ([Versions](/versions)).
 
 What pgcast refuses is a second source of truth: a model class, a schema written in TypeScript, a type declared beside the table it describes. The database has the last word, and the cost is a habit: run the generator again after each migration, and let TypeScript point at the queries that no longer fit ([First query](/first-query#when-the-schema-changes)).
 

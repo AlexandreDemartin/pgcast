@@ -85,11 +85,7 @@ describe('insert', () => {
     // a key in one row is a column for all: DEFAULT elsewhere
     expect(db.insert('users', [{}, { mood: 'ok' }]).compile().text)
       .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) RETURNING to_jsonb("users".*) AS result');
-    // an undefined value: DEFAULT by default, NULL with the legacy setting
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(db.insert('users', { mood: undefined }).compile().text)
-      .toBe('INSERT INTO "users" ("mood") VALUES ($1) RETURNING to_jsonb("users".*) AS result');
-    db.setConfig({ undefinedMeansMissing: true });
+    // an undefined value: DEFAULT
     expect(db.insert('users', { mood: undefined }).compile().text)
       .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT) RETURNING to_jsonb("users".*) AS result');
   });
@@ -114,23 +110,10 @@ describe('insert', () => {
   });
 
   it('values: SQLFragment, Parameter with a cast, Default, undefined', () => {
-    // without undefinedMeansMissing, an undefined value is sent as a parameter (NULL)
-    db.setConfig({ undefinedMeansMissing: false });
+    // an undefined value is DEFAULT, as for a key missing from one of several rows
     const q = () => db.insert('accounts', {
       owner_id: 1, balance: sql`1 + 1`, ratio: param('0.5', 'float8'), lifetime_ops: Default, overdraft_limit: undefined,
     }).compile();
-    expect(q()).toMatchInlineSnapshot(`
-      {
-        "text": "INSERT INTO "accounts" ("balance", "lifetime_ops", "overdraft_limit", "owner_id", "ratio") VALUES (1 + 1, DEFAULT, $1, $2, CAST($3 AS "float8")) RETURNING to_jsonb("accounts".*) AS result",
-        "values": [
-          undefined,
-          1,
-          "0.5",
-        ],
-      }
-    `);
-    // with it, DEFAULT, as for a key missing from one of several rows
-    db.setConfig({ undefinedMeansMissing: true });
     expect(q()).toMatchInlineSnapshot(`
       {
         "text": "INSERT INTO "accounts" ("balance", "lifetime_ops", "overdraft_limit", "owner_id", "ratio") VALUES (1 + 1, DEFAULT, DEFAULT, $1, CAST($2 AS "float8")) RETURNING to_jsonb("accounts".*) AS result",
@@ -159,11 +142,10 @@ describe('upsert', () => {
   });
 
   it('several conflict columns and several rows', () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
     expect(db.upsert('products', [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
-    ], ['sku', 'variant']).compile()).toMatchInlineSnapshot(`
+    ], ['sku', 'variant'], { updateColumns: ['sku', 'variant', 'price_cents', 'title'] }).compile()).toMatchInlineSnapshot(`
       {
         "text": "INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant") DO UPDATE SET ("sku", "variant", "price_cents", "title") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "values": [
@@ -771,21 +753,17 @@ describe('upsert', () => {
   it.each([
     ['one row', () => db.upsert('users', { mood: undefined }, 'email')],
     ['several rows', () => db.upsert('users', [{ mood: undefined }, { mood: undefined }], 'email')],
-  ])('with undefinedMeansMissing, only undefined values: no column, throws, %s (#251)', (_, write) => {
+  ])('only undefined values: no column, throws, %s (#251)', (_, write) => {
     expect(write).toThrow(nothingToInsert);
   });
 
-  it('an undefined value is a column without undefinedMeansMissing, and a key in some row with it', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(db.upsert('users', { mood: undefined }, 'email').compile().text).toContain('INSERT INTO "users" ("mood") VALUES ($1) ON CONFLICT');
-    db.setConfig({ undefinedMeansMissing: true });
+  it('an undefined value is a key in some row', () => {
     expect(db.upsert('users', [{ mood: undefined }, { mood: 'ok' }], 'email', { updateColumns: ['mood'] }).compile().text)
       .toContain('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) ON CONFLICT');
   });
 });
 
-describe('upsertRequiresSameKeys', () => {
-  afterEach(resetConfig);
+describe('upsert of rows with different keys', () => {
   const
     rows = [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
@@ -793,7 +771,7 @@ describe('upsertRequiresSameKeys', () => {
     ],
     sameKeys = [{ ...rows[0], title: 'Tee' }, rows[1]];
 
-  it('with it, rows with different keys throw before any query', () => {
+  it('rows with different keys throw before any query', () => {
     expect(() => db.upsert('products', rows, ['sku', 'variant']))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
     expect(() => db.upsert('products', rows, ['sku', 'variant'], { updateValues: { price_cents: 1 } }))
@@ -806,18 +784,14 @@ describe('upsertRequiresSameKeys', () => {
       .toThrow(new Error('rows have different keys: pass updateColumns, or give every row the same keys'));
   });
 
-  it('with it, the same keys, one row, updateColumns or doNothing compile as without it', () => {
-    const queries = () => [
+  it('the same keys, one row, updateColumns or doNothing compile', () => {
+    const queries = [
       db.upsert('products', sameKeys, ['sku', 'variant']),
       db.upsert('products', rows[0], ['sku', 'variant']),
       db.upsert('products', rows, ['sku', 'variant'], { updateColumns: ['title'] }),
       db.upsert('products', rows, ['sku', 'variant'], { updateColumns: db.doNothing }),
     ].map(q => q.compile());
-    db.setConfig({ upsertRequiresSameKeys: false });
-    const without = queries();
-    db.setConfig({ upsertRequiresSameKeys: true });
-    expect(queries()).toEqual(without);
-    expect(without[2]).toMatchInlineSnapshot(`
+    expect(queries[2]).toMatchInlineSnapshot(`
       {
         "text": "INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant") DO UPDATE SET ("title") = ROW(EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "values": [
@@ -842,13 +816,12 @@ const fresh = async () => {
   return { fdb: await import('../../src/db'), emitWarning };
 };
 
-describe('write defaults and legacy settings', () => {
+describe('write defaults', () => {
   afterEach(() => { vi.restoreAllMocks(); });
   const returning = `RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
   const ada = { display_name: 'A', email: 'Ada@Example.com' };
 
-  it.each([{}, { undefinedMeansMissing: false }])('keeps explicit null as a parameter with %j', config => {
-    db.setConfig(config);
+  it('keeps explicit null as a parameter', () => {
     expect(db.insert('users', { ...ada, mood: null }).compile()).toEqual({
       text: 'INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) RETURNING to_jsonb("users".*) AS result',
       values: ['A', ada.email, null],
@@ -914,24 +887,12 @@ describe('write defaults and legacy settings', () => {
     }
   });
 
-  it.each([{}, { upsertRequiresSameKeys: false }, { undefinedMeansMissing: false },
-    { undefinedMeansMissing: false, upsertRequiresSameKeys: false }])('handles missing and undefined batch keys independently with %j', async config => {
+  it('handles missing and undefined batch keys alike, and warns of none', async () => {
     const tee = { sku: 'TEE', variant: 'S', price_cents: 1300 };
     for (const first of [tee, { ...tee, title: undefined }]) {
       const { fdb, emitWarning } = await fresh();
-      fdb.setConfig(config);
       const rows = [first, { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' }];
-      const upsert = () => fdb.upsert('products', rows, ['sku', 'variant']);
-      const boundTitle = 'title' in first && config.undefinedMeansMissing === false;
-      if (!boundTitle && config.upsertRequiresSameKeys !== false) {
-        expect(upsert).toThrow('rows have different keys');
-      } else {
-        const cells = boundTitle ? '($1, $2, $3, $4), ($5, $6, $7, $8)' : '($1, $2, DEFAULT, $3), ($4, $5, $6, $7)';
-        expect(upsert().compile()).toEqual({
-          text: `INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ${cells} ON CONFLICT ("sku", "variant") DO UPDATE SET ("sku", "variant", "price_cents", "title") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
-          values: boundTitle ? [1300, 'TEE', undefined, 'S', 900, 'CAP', 'Cap', ''] : [1300, 'TEE', 'S', 900, 'CAP', 'Cap', ''],
-        });
-      }
+      expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).toThrow('rows have different keys');
       expect(emitWarning).not.toHaveBeenCalled();
     }
     for (const write of [
@@ -941,7 +902,6 @@ describe('write defaults and legacy settings', () => {
       (f: typeof db) => f.upsert('users', ada, 'email', { updateValues: { settings: undefined } }),
     ]) {
       const { fdb, emitWarning } = await fresh();
-      fdb.setConfig(config);
       write(fdb).compile();
       expect(emitWarning).not.toHaveBeenCalled();
     }
@@ -999,7 +959,7 @@ describe('upsert of rows with different keys: only a missing key still set from 
   });
 });
 
-describe('undefinedMeansMissing', () => {
+describe('an undefined value is a missing key', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('insert of several rows: an undefined cell sends DEFAULT, the columns are the union of the keys', () => {
@@ -1050,7 +1010,7 @@ describe('undefinedMeansMissing', () => {
       `);
   });
 
-  it('without an undefined value, or with one in a Whereable: the same SQL with it as without it', () => {
+  it('without an undefined value, or with one in a Whereable: every key is a column, as before', () => {
     // an undefined key of upsert() updateValues changes since #168: see below
     const queries = () => [
       db.insert('users', { email: 'e@x.org', display_name: 'E' }),
@@ -1059,31 +1019,57 @@ describe('undefinedMeansMissing', () => {
       db.update('users', { mood: 'ok' }, { manager_id: undefined }),
       db.deletes('users', { manager_id: undefined }),
     ].map(q => q.compile());
-    db.setConfig({ undefinedMeansMissing: false });
-    const without = queries();
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(queries()).toEqual(without);
+    expect(queries()).toMatchInlineSnapshot(`
+      [
+        {
+          "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            "E",
+            "e@x.org",
+          ],
+        },
+        {
+          "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, $5) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            "A",
+            "a@x.org",
+            "B",
+            "b@x.org",
+            "ok",
+          ],
+        },
+        {
+          "text": "INSERT INTO "users" ("display_name", "email") VALUES (DEFAULT, DEFAULT), ($1, $2) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            "A",
+            "a@x.org",
+          ],
+        },
+        {
+          "text": "UPDATE "users" SET ("mood") = ROW($1) WHERE ("manager_id" = $2) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            "ok",
+            undefined,
+          ],
+        },
+        {
+          "text": "DELETE FROM "users" WHERE ("manager_id" = $1) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            undefined,
+          ],
+        },
+      ]
+    `);
   });
 });
 
-describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () => {
+describe('an undefined key of upsert() updateValues', () => {
   afterEach(() => { vi.restoreAllMocks(); });
   const
     ada = { display_name: 'E', email: 'e@x.org' },
     upsert = (options: any, values: any = ada) => db.upsert('users', values, 'email', options).compile();
 
-  it('with it, adds no column, so the existing value stays; without it, sets it from EXCLUDED', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(upsert({ updateValues: { settings: undefined } })).toMatchInlineSnapshot(`
-      {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "settings") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "values": [
-          "E",
-          "e@x.org",
-        ],
-      }
-    `);
-    db.setConfig({ undefinedMeansMissing: true });
+  it('adds no column, so the existing value stays', () => {
     expect(upsert({ updateValues: { settings: undefined } })).toMatchInlineSnapshot(`
       {
         "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email") = ROW(EXCLUDED."display_name", EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -1095,79 +1081,54 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
     `);
   });
 
-  it('with it, a column inserted but left out of updateColumns: the key adds nothing either', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('a column inserted but left out of updateColumns: the key adds nothing either', () => {
     expect(upsert({ updateColumns: 'display_name', updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }).text)
       .toContain('DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name")');
   });
 
-  it('with it, every key undefined: as without updateValues', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('every key undefined: as without updateValues', () => {
     expect(upsert({ updateValues: { display_name: undefined, settings: undefined } })).toEqual(upsert({}));
   });
 
-  it('with it, nothing left to update: DO NOTHING, as doNothing alone', () => {
+  it('nothing left to update: DO NOTHING, as doNothing alone', () => {
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }))
       .toEqual(upsert({ updateColumns: db.doNothing }));
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
       .toContain('ON CONFLICT ("email") DO NOTHING RETURNING');
   });
 
-  it('with it, beside a value, only the value is updated', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('beside a value, only the value is updated', () => {
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: 'ok' } }).text)
       .toContain('DO UPDATE SET ("mood") = ROW($3)');
-  });
-
-  it('without it, doNothing and an undefined key: the key is set from EXCLUDED, alone or beside a param()', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
-      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings") = ROW(EXCLUDED."settings") RETURNING');
-    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }))
-      .toMatchObject({ values: ['E', 'e@x.org', 'ok'] });
-    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }).text)
-      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings", "mood") = ROW(EXCLUDED."settings", $3) RETURNING');
   });
 
   // updateValues[c] is read as on master, through getters and prototypes: only the column list loses the undefined key
   class Patch { settings = undefined; get mood() { return db.param('ok'); } }
   const patches = () => [new Patch(), Object.assign(Object.create({ mood: db.param('ok') }), { settings: undefined })];
 
-  it('with it, a class instance with a getter: the getter is still read, only the undefined key goes', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('a class instance with a getter: the getter is still read, only the undefined key goes', () => {
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }))
       .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }).text)
       .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
   });
 
-  it('with it, an Object.create() value: the inherited key is still read, only the undefined key goes', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('an Object.create() value: the inherited key is still read, only the undefined key goes', () => {
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }))
       .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }).text)
       .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
   });
 
-  it('without it, a class instance or an Object.create() value: the undefined key is set from EXCLUDED, as on master', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    for (const updateValues of patches()) expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues })).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood", "settings") = ROW(EXCLUDED."display_name", $3, EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
-      values: ['E', 'e@x.org', 'ok'],
-    });
-  });
-
-  it('a column inserted or named in updateColumns is still set from EXCLUDED: the same SQL with it as without it', () => {
+  it('a column inserted or named in updateColumns is still set from EXCLUDED', () => {
     const queries = () => [
       upsert({ updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }),
       upsert({ updateColumns: ['settings'], updateValues: { settings: undefined } }),
       upsert({ updateColumns: 'settings', updateValues: { settings: undefined } }),
     ];
-    db.setConfig({ undefinedMeansMissing: false });
-    const without = queries();
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(queries()).toEqual(without);
-    expect(without[1].text).toContain('DO UPDATE SET ("settings") = ROW(EXCLUDED."settings")');
+    expect(queries()[0].text).toContain('DO UPDATE SET ("display_name", "email", "mood") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."mood")');
+    expect(queries()[1].text).toContain('DO UPDATE SET ("settings") = ROW(EXCLUDED."settings")');
+    expect(queries()[2]).toEqual(queries()[1]);
   });
 
   it('an undefined override still exposes a missing key to the implicit update', () => {
@@ -1249,19 +1210,7 @@ describe('update', () => {
     // `SET () = ROW()` is invalid SQL, so update() throws while it builds the query
     expect(() => db.update('accounts', {}, { id: 1 }))
       .toThrow('nothing to update: an Updatable needs at least one column');
-    // without undefinedMeansMissing, a key whose value is undefined is still a column (see below)
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(db.update('accounts', { ratio: undefined }, { id: 1 }).compile()).toMatchInlineSnapshot(`
-      {
-        "text": "UPDATE "accounts" SET ("ratio") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
-        "values": [
-          undefined,
-          1,
-        ],
-      }
-    `);
-    // with it, only the kept keys count
-    db.setConfig({ undefinedMeansMissing: true });
+    // a key whose value is undefined is none
     expect(() => db.update('accounts', { ratio: undefined, balance: undefined }, { id: 1 }))
       .toThrow('nothing to update: an Updatable needs at least one column');
   });
@@ -1289,21 +1238,8 @@ describe('update', () => {
     }).toEqual({ fragment: { text, values: [10] }, empty: { text, values: [10] } });
   });
 
-  it('an undefined value: set to NULL without undefinedMeansMissing, left out with it', () => {
-    // without it, the key is kept and the column set to NULL
-    db.setConfig({ undefinedMeansMissing: false });
+  it('an undefined value: its key is left out', () => {
     const q = () => db.update('users', { mood: 'ok', manager_id: undefined }, { id: 2 }).compile();
-    expect(q()).toMatchInlineSnapshot(`
-      {
-        "text": "UPDATE "users" SET ("manager_id", "mood") = ROW($1, $2) WHERE ("id" = $3) RETURNING to_jsonb("users".*) AS result",
-        "values": [
-          undefined,
-          "ok",
-          2,
-        ],
-      }
-    `);
-    db.setConfig({ undefinedMeansMissing: true });
     expect(q()).toMatchInlineSnapshot(`
       {
         "text": "UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result",
@@ -2262,28 +2198,25 @@ describe('a null or primitive row in insert(), upsert() and update()', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('a primitive among rows whose undefined values undefinedMeansMissing drops still rejects', async () => {
+  it('a primitive among rows whose undefined values are dropped still rejects', async () => {
     // undefinedAsMissing rebuilds the object rows; a primitive one is left as it is, not made an object of its characters
-    db.setConfig({ undefinedMeansMissing: true });
     const queryable = { query: vi.fn() } as any;
     expect(await outcome(() => db.insert('users', [{ ...row, mood: undefined }, 'ab'] as any), queryable)).toBe(valsMessage('string'));
     expect(await outcome(() => db.upsert('users', [{ ...row, mood: undefined }, 'ab'] as any, 'email'), queryable)).toBe(valsMessage('string'));
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('upsert of a null or undefined row among others compiles as a row of defaults with the key check off', async () => {
+  it('upsert of a null or undefined row among others compiles as a row of defaults, given updateColumns', async () => {
     // since #27, hasOwnProperty.call(null, …) threw a TypeError at the call; the row is read as `{}`, as insert() reads
-    // it, so it misses every key, which is then set from EXCLUDED: the case the key check rejects. DO UPDATE SET
-    // takes the key order of the first completed row, unsorted, as in 6.6.1
+    // it, so it misses every key, which would then be set from EXCLUDED: the case the key check rejects
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ upsertRequiresSameKeys: false });
+    const updateColumns: ('email' | 'display_name')[] = ['email', 'display_name'];
     const upsertSQL = (defaultsFirst: boolean) =>
       `INSERT INTO "users" ("display_name", "email") VALUES ${defaultsFirst ? '(DEFAULT, DEFAULT), ($1, $2)' : '($1, $2), (DEFAULT, DEFAULT)'} ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
-    expect(fdb.upsert('users', [row, null as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
-    expect(fdb.upsert('users', [null as any, row], 'email').compile()).toEqual({ text: upsertSQL(true), values: ['A', 'a@x.org'] });
-    expect(fdb.upsert('users', [row, undefined as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
+    expect(fdb.upsert('users', [row, null as any], 'email', { updateColumns }).compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
+    expect(fdb.upsert('users', [null as any, row], 'email', { updateColumns }).compile()).toEqual({ text: upsertSQL(true), values: ['A', 'a@x.org'] });
+    expect(fdb.upsert('users', [row, undefined as any], 'email', { updateColumns }).compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
     expect(emitWarning).not.toHaveBeenCalled();
-    fdb.setConfig({ upsertRequiresSameKeys: true });
     expect(() => fdb.upsert('users', [row, null as any], 'email'))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
     expect(fdb.upsert('users', [row, null as any], 'email', { updateColumns: ['display_name'] }).compile().text)
@@ -2362,14 +2295,13 @@ describe('a built-in row among several in insert() and upsert()', () => {
     }
   };
 
-  it('rejects run(), with no query sent, beside a plain row, before or after it, with undefinedMeansMissing off and on', async () => {
-    // with undefinedMeansMissing, a row with an undefined value makes undefinedAsMissing rebuild every row
+  it('rejects run(), with no query sent, beside a plain row, before or after it, with an undefined value or none', async () => {
+    // a row with an undefined value makes undefinedAsMissing rebuild every row
     const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {}, expected: Record<string, string> = {};
-    for (const undefinedMeansMissing of [false, true]) {
-      db.setConfig({ undefinedMeansMissing });
-      const plain = undefinedMeansMissing ? { ...row, mood: undefined } : row;
+    for (const withUndefined of [false, true]) {
+      const plain = withUndefined ? { ...row, mood: undefined } : row;
       for (const [name, x] of Object.entries(refused())) for (const [order, values] of [['after', [plain, x]], ['before', [x, plain]]] as const) {
-        const key = `${name} ${order} ${undefinedMeansMissing ? 'undefinedMeansMissing' : ''}`;
+        const key = `${name} ${order} ${withUndefined ? 'undefined' : ''}`;
         outcomes[`insert ${key}`] = await outcome(() => db.insert('users', values as any), queryable);
         outcomes[`upsert ${key}`] = await outcome(() => db.upsert('users', values as any, 'email'), queryable);
         for (const fn of ['insert', 'upsert']) expected[`${fn} ${key}`] = message(order === 'after' ? 'vals' : 'cols', name, x);
@@ -2399,9 +2331,8 @@ describe('a built-in row among several in insert() and upsert()', () => {
     expect(() => db.upsert('users', [new Map() as any, row], 'email').compile()).toThrow(builtinMessage('cols', 'Map'));
   });
 
-  it('with undefinedMeansMissing, a Buffer row with an undefined own key rejects run(), alone and beside a row', async () => {
+  it('a Buffer row with an undefined own key rejects run(), alone and beside a row', async () => {
     // undefinedAsMissing rebuilt it into a plain object of its bytes: master compiled SET ("0") = ROW($1) with 97
-    db.setConfig({ undefinedMeansMissing: true });
     const
       queryable = { query: vi.fn() } as any,
       x = () => Object.assign(Buffer.from('a'), { mood: undefined }) as any,
@@ -2417,9 +2348,8 @@ describe('a built-in row among several in insert() and upsert()', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('with undefinedMeansMissing, an empty Buffer row whose own keys are undefined still throws nothing to update or insert at the call', () => {
+  it('an empty Buffer row whose own keys are undefined still throws nothing to update or insert at the call', () => {
     // as on master, where undefinedAsMissing rebuilt it into `{}`
-    db.setConfig({ undefinedMeansMissing: true });
     const x = () => Object.assign(Buffer.alloc(0), { email: undefined }) as any;
     expect(() => db.update('users', x(), { id: 1 })).toThrow('nothing to update: an Updatable needs at least one column');
     for (const values of [x(), [x()], [x(), x()], [new Date(0), x()]]) {
@@ -2517,33 +2447,27 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
     try { return f(); } finally { delete proto.nickname; }
   };
 
-  it('a key added to Object.prototype is no column, as for one row, with undefinedMeansMissing and upsertRequiresSameKeys off and on', () => {
+  it('a key added to Object.prototype is no column, as for one row', () => {
     // Zapatos 6.6.1 and master listed it with the rows' keys: ("display_name", "email", "nickname"), DEFAULT in each row
-    const compiled: Record<string, unknown> = {}, expected: Record<string, unknown> = {};
-    for (const undefinedMeansMissing of [false, true]) for (const upsertRequiresSameKeys of [false, true]) {
-      db.setConfig({ undefinedMeansMissing, upsertRequiresSameKeys });
-      const config = `${undefinedMeansMissing ? 'undefinedMeansMissing' : ''} ${upsertRequiresSameKeys ? 'upsertRequiresSameKeys' : ''}`;
-      withPrototypeKey(() => {
-        compiled[`insert two ${config}`] = db.insert('users', [a, b]).compile();
-        compiled[`insert one in an array ${config}`] = db.insert('users', [a]).compile();
-        compiled[`insert a key one row has ${config}`] = db.insert('users', [{ ...a, mood: 'happy' }, b]).compile();
-        compiled[`insert an undefined value ${config}`] = db.insert('users', [{ ...a, mood: undefined }, b]).compile();
-        compiled[`insert a null row ${config}`] = db.insert('users', [a, null as any]).compile();
-        compiled[`upsert two ${config}`] = db.upsert('users', [a, b], 'email').compile();
-        compiled[`upsert one in an array ${config}`] = db.upsert('users', [a], 'email').compile();
-      });
-      Object.assign(expected, {
-        [`insert two ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
-        [`insert one in an array ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${returning}`, values: ['A', 'a@x.org'] },
-        [`insert a key one row has ${config}`]: { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'happy', 'B', 'b@x.org'] },
-        [`insert an undefined value ${config}`]: undefinedMeansMissing ?
-          { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] } :
-          { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', undefined, 'B', 'b@x.org'] },  // sent as NULL
-        [`insert a null row ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT)${returning}`, values: ['A', 'a@x.org'] },
-        [`upsert two ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
-        [`upsert one in an array ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org'] },
-      });
-    }
+    const compiled: Record<string, unknown> = {};
+    withPrototypeKey(() => {
+      compiled['insert two'] = db.insert('users', [a, b]).compile();
+      compiled['insert one in an array'] = db.insert('users', [a]).compile();
+      compiled['insert a key one row has'] = db.insert('users', [{ ...a, mood: 'happy' }, b]).compile();
+      compiled['insert an undefined value'] = db.insert('users', [{ ...a, mood: undefined }, b]).compile();
+      compiled['insert a null row'] = db.insert('users', [a, null as any]).compile();
+      compiled['upsert two'] = db.upsert('users', [a, b], 'email').compile();
+      compiled['upsert one in an array'] = db.upsert('users', [a], 'email').compile();
+    });
+    const expected = {
+      'insert two': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+      'insert one in an array': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${returning}`, values: ['A', 'a@x.org'] },
+      'insert a key one row has': { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'happy', 'B', 'b@x.org'] },
+      'insert an undefined value': { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+      'insert a null row': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT)${returning}`, values: ['A', 'a@x.org'] },
+      'upsert two': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+      'upsert one in an array': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org'] },
+    };
     expect(compiled).toEqual(expected);
   });
 
@@ -2597,7 +2521,6 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
   });
 
   it('a Proxy row, with own keys or none, has its traps called as without a key added to Object.prototype', () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
     // master, with the key, skipped the prototype read of a Proxy row with no own key, and read one more own key in upsert()
     const traps = (withKey: boolean) => {
       const counts: Record<string, Record<string, number> | string> = {};
@@ -2626,6 +2549,7 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
       'insert, no own key, alone': { getPrototypeOf: 3, ownKeys: 3 },
       'insert, no own key, alone throws': nothingToInsert,
       'upsert, no own key, after a row': { getPrototypeOf: 3, ownKeys: 3, getOwnPropertyDescriptor: 1 },
+      'upsert, no own key, after a row throws': 'rows have different keys: pass updateColumns, or give every row the same keys',
       'insert, own keys, after a row': { ownKeys: 3, getOwnPropertyDescriptor: 6, get: 6 },
       'upsert, own keys, first': { ownKeys: 3, getOwnPropertyDescriptor: 7, get: 6 },
       'upsert, own keys, alone': { ownKeys: 3, getOwnPropertyDescriptor: 7, get: 6 },
@@ -3186,20 +3110,7 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
     });
   });
 
-  it('without undefinedMeansMissing, beside an undefined value, which pg sends as NULL', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile()).toEqual({
-      text: 'INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), $3) RETURNING to_jsonb("users".*) AS result',
-      values: ['Ada', 'ada@example.com', undefined],
-    });
-    expect(db.update('users', { manager_id: db.count('accounts', all), mood: undefined }, { id: 2 }).compile()).toEqual({
-      text: 'UPDATE "users" SET ("manager_id", "mood") = ROW((SELECT count(*) AS result FROM "accounts"), $1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result',
-      values: [undefined, 2],
-    });
-  });
-
-  it('with undefinedMeansMissing, beside an undefined value', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('beside an undefined value', () => {
     expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile().text)
       .toBe('INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), DEFAULT) RETURNING to_jsonb("users".*) AS result');
     expect(db.update('users', { manager_id: db.count('accounts', all), mood: undefined }, { id: 2 }).compile().text)

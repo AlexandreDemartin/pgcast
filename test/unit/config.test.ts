@@ -2,8 +2,9 @@
 //
 // getConfig() and setConfig() (src/db/config.ts): what they return shares no
 // object with the live config (#245), and they never throw, whatever was stored
-// (#257, #508). No database.
+// (#257, #508); setConfig() refuses a key 8.0 removed (decision 019 § 4). No database.
 
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
 import { resetConfig } from '../helpers/config';
@@ -67,8 +68,6 @@ describe('setConfig()', () => {
     transactionRetryDelay: { minMs: 25, maxMs: 250 },
     castArrayParamsToJson: false,
     castObjectParamsToJson: false,
-    upsertRequiresSameKeys: true,
-    undefinedMeansMissing: true,
     transactionRequiresCommit: true,
     transactionRequiresIdleClient: true,
     transactionRequiresSatisfyingLevel: true,
@@ -82,8 +81,6 @@ describe('setConfig()', () => {
     transactionRetryDelay: { minMs: 0, maxMs: 0 },
     castArrayParamsToJson: true,
     castObjectParamsToJson: true,
-    upsertRequiresSameKeys: false,
-    undefinedMeansMissing: false,
     transactionRequiresCommit: false,
     transactionRequiresIdleClient: false,
     transactionRequiresSatisfyingLevel: false,
@@ -93,13 +90,41 @@ describe('setConfig()', () => {
     topLevelSelectAsRows: true,
   };
 
-  it.each([undefined, null])('resets each write option independently with %s', value => {
-    const legacy = { upsertRequiresSameKeys: false, undefinedMeansMissing: false };
-    expect(db.getConfig()).toMatchObject({ upsertRequiresSameKeys: true, undefinedMeansMissing: true });
-    for (const key of ['undefinedMeansMissing', 'upsertRequiresSameKeys'] as const) {
-      expect(db.setConfig(legacy)).toMatchObject(legacy);
-      expect(db.setConfig({ [key]: value })).toMatchObject({ ...legacy, [key]: true });
-    }
+  // decision 019 § 4: a key 8.0 removed passes as the value 8.0 always behaves as, null or undefined, and is not kept;
+  // any other value throws before the config changes
+  const removed = { undefinedMeansMissing: true, upsertRequiresSameKeys: true };
+  const set = (config: object) => db.setConfig(config as db.NewConfig);
+  const message = (key: string, kept: boolean) => `${key} was removed in 8.0, which always does what ${key}: ${kept} ` +
+    `did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-${key}`;
+
+  describe.each(Object.entries(removed))('the removed key %s', (key, kept) => {
+    it.each([false, 0, '', 'yes', 1, {}])('throws for %j, naming the key, what 8.0 does and its entry, and changes nothing', value => {
+      const before = db.getConfig();
+      expect(() => set({ transactionAttemptsMax: 2, [key]: value })).toThrow(new Error(message(key, kept)));
+      expect(db.getConfig()).toEqual(before);
+      expect(db.getConfig()).not.toHaveProperty(key);
+    });
+
+    it.each([kept, null, undefined])('passes for %j, and getConfig() does not hold it', value => {
+      expect(set({ transactionAttemptsMax: 2, [key]: value })).not.toHaveProperty(key);
+      expect(db.getConfig()).not.toHaveProperty(key);
+      expect(db.getConfig().transactionAttemptsMax).toBe(2);
+    });
+
+    it('reads it from the object given, not from Object.prototype', () => {
+      const proto = Object.prototype as Record<string, unknown>;
+      proto[key] = false;
+      try { expect(() => db.setConfig({ transactionAttemptsMax: 2 })).not.toThrow(); }
+      finally { delete proto[key]; }
+    });
+
+    it.each(['switching.md', 'fr/switching.md'])('links an entry of website/%s', page => {
+      expect(readFileSync(new URL(`../../website/${page}`, import.meta.url), 'utf8')).toContain(`{#from-8-0-${key}}`);
+    });
+  });
+
+  it('keeps a key that was never an option, as before', () => {
+    expect(set({ fooBarRemoved: false })).toHaveProperty('fooBarRemoved', false);
   });
 
   it.each([undefined, null])('sets a key that has a default back to it when given as %s', value => {

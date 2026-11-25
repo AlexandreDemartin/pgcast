@@ -1,5 +1,5 @@
 ---
-english: eac883a0e92d
+english: 8b1ca0771243
 ---
 
 # Template SQL
@@ -323,7 +323,7 @@ C’est ainsi qu’on écrit une condition dans `sql` : chaque valeur doit êtr
 | `Default`, `self`, `all` | lève une erreur |
 | `raw()`, `cols()`, `vals()` | lève une erreur ([`raw()`](#raw)) |
 
-- `null` est aussi un paramètre, et `= NULL` ne correspond à aucune ligne : utilisez [`conditions.isNull`](/fr/conditions#conditions.isNull). De même pour `undefined`, envoyé comme `NULL`, avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ou sans : `{ tagline: undefined }` donne `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, donc aucune ligne : omettre la clé élargirait le filtre.
+- `null` est aussi un paramètre, et `= NULL` ne correspond à aucune ligne : utilisez [`conditions.isNull`](/fr/conditions#conditions.isNull). De même pour `undefined`, envoyé comme `NULL`, car [la règle d’écriture de `undefined`](/fr/insert#undefined-values) ne s’applique pas aux filtres : `{ tagline: undefined }` donne `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, donc aucune ligne : omettre la clé élargirait le filtre.
 - `Default` lève "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->" ; Zapatos 6.6.1 l’envoyait comme `'Symbol(DEFAULT)'`.
 - Les raccourcis prennent le même objet comme `where` ([`select()`](/fr/select#select)).
 
