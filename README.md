@@ -154,3 +154,4 @@ Contributor and agent guidelines: [AGENTS.md](https://github.com/AlexandreDemart
 ## Licence
 
 MIT. Copyright © 2020 - 2025 George MacKerron (Zapatos); fork copyright © 2026 Alexandre Demartin. See [LICENCE](https://github.com/AlexandreDemartin/pgcast/blob/master/LICENCE).
+
