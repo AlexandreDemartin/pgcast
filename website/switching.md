@@ -265,9 +265,7 @@ To find each call:
 
 On 6.x, once a run shows no warning, or each one comes from a call you've checked, turn the options on, once, before the first query:
 
-```ts twoslash
-import * as db from 'zapatos/db';
-// ---cut---
+```ts
 declare module 'zapatos/db' {
   interface ConfigTypes { aggregatesTypedByColumn: true }
 }
@@ -295,6 +293,24 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 ```
 
 :::
+
+Each runtime option below has left `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable or JavaScript, `setConfig()` throws unless its value is the one 8.0 always behaves as, `null` or `undefined`, and the configuration keeps none of them. A program that never set the option sees no change.
+
+### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
+
+8.0 always does what `undefinedMeansMissing: true`, the 7.x default, did: an `undefined` value in `insert()`, `update()` and `upsert()` is a missing key, `DEFAULT` in `insert()` and left out of `update()` and `upsert()` ([An `undefined` value](/insert#undefined-values)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->. Once you delete it, an `undefined` cell is `DEFAULT` in `insert()`, not `NULL`, and `update()` leaves its column as it is; an `update()` left with no column throws "nothing to update…"<!-- message -->.
+- **Find the calls**: `grep -rn undefinedMeansMissing`. A value that is `undefined` only at run time can't be grepped: on 7.x, delete the option first and run your tests.
+- **Before → after**: where `undefined` meant "clear it", give `null`. `db.update('films', { tagline: form.tagline }, { id: 1002 })`<!-- tsc: const form = { tagline: undefined as string | undefined }; … --> becomes `db.update('films', { tagline: form.tagline ?? null }, { id: 1002 })`<!-- tsc: const form = { tagline: undefined as string | undefined }; … -->.
+
+### `upsertRequiresSameKeys` {#from-8-0-upsertRequiresSameKeys}
+
+8.0 always does what `upsertRequiresSameKeys: true`, the 7.x default, did: a batch upsert whose implicit update includes a column missing from a row throws as it is built, unless the conflict target names that column, `updateValues` gives it a defined value, or `updateColumns` says which columns to set ([Rows with different keys](/insert#upsert-different-keys)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `upsertRequiresSameKeys was removed in 8.0, which always does what upsertRequiresSameKeys: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-upsertRequiresSameKeys`<!-- message -->. Once you delete it, such a batch throws "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->, where 7.x with `false` set the missing cell to `DEFAULT` over the stored value.
+- **Find the calls**: `grep -rn upsertRequiresSameKeys`. Each batch that differs throws as it is built, so your tests find it.
+- **Before → after**: give every row each key, with the value you mean: `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'])`<!-- tsc -->. Or pass [`updateColumns`](/insert#upsert-options) naming only the keys every row gives: a key a row lacks still sets that row's stored value to `DEFAULT`, with no error.
 
 ## Migrate from pgcast 6.x to 7.0 {#from-7-0}
 

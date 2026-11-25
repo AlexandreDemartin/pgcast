@@ -54,7 +54,7 @@ Take an `update()` with an `undefined` value:
 
 <<< ./examples/plain/versions_undefined.ts{ts twoslash}
 
-Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column.
+Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)` with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column.
 
 With the 7.0 defaults, `tagline: undefined` alone throws `nothing to update`. The update runs only if it assigns another column, in which case the stored tagline survives.
 
@@ -91,7 +91,7 @@ Throughout 7.x, `aggregatesTypedByColumn: false` in both `db.setConfig()` and `C
 
 Enabling every fix on 6.x, including aggregate types in `ConfigTypes`, prepares you for the new defaults. Even with a clean warning trace, compile the [read-only callbacks and array conditions](/switching#from-7-0) and check the [optional type peers](/install#requirements) on a fresh install. The [migration guide](/switching#regenerate-for-7-0) lists the eleven old settings that go in 8.0 and the two that stay.
 
-Throughout 7.x, `undefinedMeansMissing: false` and `upsertRequiresSameKeys: false` independently restore the 6.x write behaviours without warnings. 8.0 removes both legacy write behaviours. It removes `rejectOnQueryError: false` too. Two legacy values remain, as they say how your `pg` parses: `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
+Throughout 7.x, `undefinedMeansMissing: false` and `upsertRequiresSameKeys: false` independently restore the 6.x write behaviours without warnings. 8.0 removes both legacy write behaviours ([8.0 migration](/switching#from-8-0)). It removes `rejectOnQueryError: false` too. Two legacy values remain, as they say how your `pg` parses: `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
 
 In 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` and `transactionRequiresSatisfyingLevel` also default to `true`. Set any one to `false` to restore its [6.x transaction behaviour](/switching#runtime-migration) without a warning. 8.0 removes these three overrides.
 

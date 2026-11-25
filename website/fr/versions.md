@@ -1,5 +1,5 @@
 ---
-english: 7c47b3348d1e
+english: f2195c3d5db6
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -55,7 +55,7 @@ Prenez un `update()` avec une valeur `undefined` :
 
 <<< ../examples/plain/versions_undefined.ts{ts twoslash}
 
-Zapatos 6.6.1 envoie `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> avec `null`, et le film perd son accroche. C’est peut-être un bug, une clé copiée d’un champ de formulaire jamais rempli ; c’est peut-être aussi la façon dont un projet vide une colonne.
+Zapatos 6.6.1 envoie `SET ("tagline") = ROW($1)` avec `null`, et le film perd son accroche. C’est peut-être un bug, une clé copiée d’un champ de formulaire jamais rempli ; c’est peut-être aussi la façon dont un projet vide une colonne.
 
 Avec les valeurs par défaut de la 7.0, `tagline: undefined` seul lève l’erreur `nothing to update`. La mise à jour ne s’exécute que si elle affecte une autre colonne. Elle conserve alors l’accroche.
 
@@ -92,7 +92,7 @@ La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequi
 
 Activez toutes les corrections en 6.x, y compris le typage des agrégats dans `ConfigTypes`, pour vous préparer aux nouvelles valeurs par défaut. Même sans avertissement, compilez les [callbacks de transactions en lecture seule et les conditions sur tableaux](/fr/switching#from-7-0), puis vérifiez les [peer dependencies facultatives qui fournissent les types](/fr/install#requirements) après une installation neuve. Le [guide de migration](/fr/switching#regenerate-for-7-0) recense les onze anciens réglages qui restent utilisables sans avertissement en 7.x et disparaissent en 8.0, ainsi que les deux qui restent.
 
-Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements. Elle supprime aussi `rejectOnQueryError: false`. Deux anciennes valeurs restent, puisqu’elles disent comment votre `pg` parse : `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
+Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements ([migration vers la 8.0](/fr/switching#from-8-0)). Elle supprime aussi `rejectOnQueryError: false`. Deux anciennes valeurs restent, puisqu’elles disent comment votre `pg` parse : `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
 
 En 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` et `transactionRequiresSatisfyingLevel` valent aussi `true` par défaut. Passez une de ces options à `false` pour rétablir le [comportement correspondant en 6.x](/fr/switching#runtime-migration) sans avertissement. Ces trois réglages disparaissent en 8.0.
 
