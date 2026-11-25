@@ -32,12 +32,13 @@ Closes #n
 - `Closes #n` on the first line; a layer of a stack starts with "Stacked on #m" (skill `pr-shape` § Stacking), then `Closes #n`.
 - **What** and **Why** as bullets; unnamed patterns, never an extract from the corpus (skill `consumer-usage`).
 - The body, like the plan comment, names Zapatos, not its author (skill `pr-shape` § PR title).
+- A reference to another repository's issue that must not post a backlink there ("not posted") goes in backticks: `owner/repo#n` written bare adds one (#943).
 - It ends with the requested "Generated with Claude Code" line.
 
 ## Proofs
 
 - **Each command run**, with the tail of its output in a code block: the issue's **Done when**, at least `lint`, `typecheck`, `test`, `test:types`, `build`. An empty output counts with its exit code (`tsc`), a step that exits 0 whatever is missing asserts on its output (`npm pack --dry-run --json`), and a check whose tests no count shows (`test/types-opt-in`, compiled by `tsc`) is broken once on purpose (#701, #712, #750).
-- **A change of behaviour, a message, a claim or a public type's printed form**: the `git grep` of its old wording and of its siblings' (skill `code-style` § Claims), decision notes included (note 017 kept a hover #924 changed, `ParentColumn<Column`), with what each hit became, as a **Docs swept** line (Epic #836's gap of 2026-11-21).
+- **A change of behaviour, a message, a claim or a public type's printed form**: the `git grep` of its old wording and of its siblings' (skill `code-style` § Claims), decision notes included (note 017 kept a hover #924 changed, `ParentColumn<Column`), with what each hit became, as a **Docs swept** line (Epic #836's gap of 2026-11-21). A decision note that withdraws a promise the docs made greps the site, EN and FR, for that promise in the same PR (`after 8\.0|beyond 8\.0|permanent|and later`: #953 left about 12 site lines saying the opposite); a new option or export greps a sibling's name for every page that lists them (`grep -l topLevelSelectAsRows website website/fr README.md`: `shortcutsUseJson` missed four pages and their twins) (#957).
 - **A bug**: the failing test is committed before the fix (skill `pr-shape` § Commits), with the move that makes it testable before it; the proof gives its name and its failing output at the test commit (SHA). Its expected value is written by hand, and each new assertion is red on its own: [reference.md](reference.md) § Red test of a bug.
 - **A guard or a test that passes on the base** proves something only through a mutant: break only the branch it guards, in a scratch copy (`git worktree add --detach <scratch>/mutant HEAD`; never `git stash`), then record the mutant and its red; each mutant changes one line and is checked to apply; an equivalent one is named in the PR. Mechanics and which mutants a guard needs: [reference.md](reference.md) § Mutants.
 - **`core.ts`**: the compiled SQL before / after (skill `sql-safety`).
