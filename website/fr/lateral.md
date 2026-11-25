@@ -1,5 +1,5 @@
 ---
-english: 34083d198eec
+english: b0f4a0833ae2
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -125,9 +125,9 @@ Chaque clé de `lateral` est jointe à la requête comme une table, `"lateral_<k
 
 - `WHERE "lateral_castSize".result >= $3`<!-- probe: examples/lateral_result.ts --> et `ORDER BY "lateral_castSize".result DESC`<!-- probe: examples/lateral_result.ts --> lisent le nombre de rôles de chaque film.
 - Mettez le nom entre guillemets doubles, comme le fait pgcast : sans eux, Postgres le passe en minuscules, `lateral_castsize`, et refuse la requête (42P01). Un `"` dans une clé est doublé, `"lateral_a""b"`<!-- probe: db.select('films', db.all, { lateral: { 'a"b': db.count('roles', { film_id: db.parent('id') }) } }) -->.
-- `result` est le résultat de la sous-requête : un nombre pour `count()`, du `jsonb` pour les autres. Lisez un champ avec `->>`, comme dans `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
+- `result` est le résultat de la sous-requête : un nombre pour `count()`, du `json` pour les autres. Lisez un champ avec `->>`, comme dans `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
 
-Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : groupez donc par lui également, sinon Postgres refuse la requête (42803). Donnez les deux dans un seul fragment, typé pour que ses colonnes soient vérifiées :
+Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : groupez donc par lui également, sinon Postgres refuse la requête (42803). Un `count()` peut être groupé, comme dans `GROUP BY "lateral_castSize".result`<!-- probe: db.select('films', db.all, { columns: [], extras: { films: db.sql`count(*)::int` }, lateral: { castSize: db.count('roles', { film_id: db.parent('id') }) }, groupBy: db.sql`"lateral_castSize".result` }) -->. Un `select()`, `selectOne()` ou `selectExactlyOne()` imbriqué, non : `json` n’a pas d’opérateur d’égalité (42883), et grouper par son cast, `::jsonb`, laisse le résultat lui-même hors du groupement (42803). Pour compter des lignes pour chaque ligne imbriquée, retournez la requête, avec un `count()` sous chaque studio :
 
 <CastPanel example="lateral_result_group">
 
@@ -135,8 +135,8 @@ Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : 
 
 </CastPanel>
 
-- `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts --> : chaque studio une seule fois, avec son nom et son nombre de films.
-- `db.sql<s.films.SQL>` refuse `${'name'}`, une colonne de `studios`. Un tableau de colonnes ne peut pas contenir le fragment : [`groupBy`](/fr/select#groupby-and-having) prend une colonne, un tableau de colonnes ou un seul fragment.
+- `LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_films" ON true`<!-- probe: examples/lateral_result_group.ts --> : chaque studio une seule fois, avec son nom et son nombre de films, sans `GROUP BY`. Un studio sans film compte 0, là où grouper `films` l’omettait.
+- `films` est un `number`, tel que `count()` le donne : aucun fragment à typer à la main.
 
 ## Nommer la ligne d’un lateral réutilisable {#name-the-row-of-a-reusable-lateral}
 

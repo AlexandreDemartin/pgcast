@@ -120,9 +120,9 @@ Each `lateral` key joins as a table of the query, `"lateral_<key>"`, with one co
 
 - `WHERE "lateral_castSize".result >= $3`<!-- probe: examples/lateral_result.ts --> and `ORDER BY "lateral_castSize".result DESC`<!-- probe: examples/lateral_result.ts --> read each film's count of roles.
 - Quote the name as pgcast does: unquoted, Postgres folds it to `lateral_castsize`, and refuses the query (42P01). A `"` in a key is doubled, `"lateral_a""b"`<!-- probe: db.select('films', db.all, { lateral: { 'a"b': db.count('roles', { film_id: db.parent('id') }) } }) -->.
-- `result` is the subquery's: a number for `count()`, `jsonb` for the others. Read a field with `->>`, as in `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
+- `result` is the subquery's: a number for `count()`, `json` for the others. Read a field with `->>`, as in `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
 
-With a `groupBy`, each lateral's result is in the row too, so group by it as well: Postgres refuses the query otherwise (42803). Give both in one fragment, typed so that its columns are checked:
+With a `groupBy`, each lateral's result is in the row too, so group by it as well: Postgres refuses the query otherwise (42803). A `count()` groups, as in `GROUP BY "lateral_castSize".result`<!-- probe: db.select('films', db.all, { columns: [], extras: { films: db.sql`count(*)::int` }, lateral: { castSize: db.count('roles', { film_id: db.parent('id') }) }, groupBy: db.sql`"lateral_castSize".result` }) -->. A nested `select()`, `selectOne()` or `selectExactlyOne()` doesn't: `json` has no equality operator (42883), and a group by its cast, `::jsonb`, leaves the result itself ungrouped (42803). To count rows for each nested row, turn the query around, with a `count()` under each studio:
 
 <CastPanel example="lateral_result_group">
 
@@ -130,8 +130,8 @@ With a `groupBy`, each lateral's result is in the row too, so group by it as wel
 
 </CastPanel>
 
-- `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts -->: each studio once, with its name and its number of films.
-- `db.sql<s.films.SQL>` refuses `${'name'}`, a column of `studios`. An array of columns can't hold the fragment: [`groupBy`](/select#groupby-and-having) takes a column, an array of columns, or one fragment.
+- `LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_films" ON true`<!-- probe: examples/lateral_result_group.ts -->: each studio once, with its name and its number of films, and no `GROUP BY`. A studio with no film counts 0, where grouping `films` left it out.
+- `films` is a `number`, as `count()` gives it: no fragment to type by hand.
 
 ## Name the row of a reusable lateral
 
