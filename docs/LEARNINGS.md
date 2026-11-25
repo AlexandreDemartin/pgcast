@@ -43,6 +43,10 @@ Candidates for a check, a rule or a skill line.
 - #954 — a ±10 % server-execution difference on a 10,000-row write reversed between runs of one build: a claim of "less" quotes at least two runs, else it says "no more" — branch-reviewer
 - #954 — `test/unit/injection.test.ts` § shortcut options has no `afterEach(resetConfig)`: a test there that calls `setConfig` adds `onTestFinished(resetConfig)` — builder
 - #954 — in French text, write U+00A0 into new text directly; replacing " :" afterwards misses a `:` with no space before it (`check-translations` caught it) — builder
+- #953 — a migration line built on an escape hatch (`updateColumns`, a `catch`) can bring back what the removed check prevented: run its "after" against stored rows, not only its compiled SQL (film 2's title silently became `NULL`; `.catch(() => {})` swallowed a 40001 that `transaction()` retries) — branch-reviewer
+- #953 — `release.yml` only releases a tag on a master commit carrying its version PR: a plan that announces a minor must release it before its first breaking merge, or name a branch — branch-reviewer
+- #953 — `updateColumns: []` compiles to `ON CONFLICT … DO NOTHING`, which leaves alone the conflicting rows that did give the key — builder
+- #953 — a reusable probe left in a review's scratch takes the database URL from the environment, not an argument, so the fix round can rerun it as is — builder
 
 ## Minors kept
 
@@ -56,3 +60,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #939 — `form` — with `shortcutsUseJson` on, `select()`'s aggregate is `json_agg`, but `src/db/shortcuts.ts:937` and `:1485` and `website/runtime-config.md:104` and `:322` (and `fr/`) say `jsonb_agg`: "its aggregate" holds under both options — branch-reviewer
 - #954 — `defect` — `src/db/shortcuts.ts:235` `returning.map(…)` with `shortcutsUseJson` on: past the type, `returning: 'id'` throws a synchronous `TypeError` from `db.insert()`, where off (Zapatos 6.6.1) `mapWithSeparator` makes `.run()` reject with 42703; `mapWithSeparator` would keep the failure where it was, and `select()`'s `columns` does the same on master — branch-reviewer
 - #954 — `form` — `docs/decisions/018-json-output.md:107` misses its link: "so every write that `RETURNING` accepts gives the same values in the scalar subquery, which also takes some of what `RETURNING` refuses (…)" — branch-reviewer
+- #953 — `form` — `docs/decisions/019-one-behaviour.md` § 3 `rejectOnQueryError`: at master `src/generate/cliConfig.ts:63` forces `false`, so every CLI run prints `*** error <seq> ***`; the note could say what the 8.0 CLI prints, that a `"rejectOnQueryError": false` in `zapatosconfig.json` hits § 4's refusal, that `check()` and `tsForConfig()` read the key, and that step 12 drops `:63` with the refusal — branch-reviewer
+- #953 — `form` — note 019 § 4: today every falsy non-null value takes the old path (`?? true`, `src/db/shortcuts.ts:232`, `src/generate/tables.ts:98-101`, `:319`), so the refusal must throw on anything but the kept value, `null` or `undefined`, not only on `false` — branch-reviewer
+- #953 — `form` — note 019 citations: `website/versions.md:59` is `:84`, `website/generator.md:468` is `:463`; `constraintNames`' query (`src/generate/tables.ts:327`) runs once per relation, not "one catalog query more"; `docs/decisions/README.md` row 017 lacks its pointer to 019; the CHANGELOG line "keeps … alone" reads as keeping the options — branch-reviewer

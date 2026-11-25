@@ -5,7 +5,7 @@
 - **In short**:
   - `shortcutsUseJson: true` builds every shortcut's result with `to_json`, `json_agg` and `json_build_object` in place of their `jsonb` twins.
   - `topLevelSelectAsRows: true` compiles a `select()` run on its own to `selectRows()`'s query, one row per result; nested, it keeps its aggregate.
-  - The types do not change. Both are off in 7.x, on by default in 8.0, and `false` stays a permanent choice.
+  - The types do not change. Both are off in 7.x, on by default in 8.0, and `false` stays a permanent choice: superseded by decision [019](./019-one-behaviour.md), where both are 8.0's only behaviour.
 
 ## Context
 
@@ -178,5 +178,7 @@ Client medians in ms, 9 interleaved rounds after 2 warm-ups; timings move about 
 | Native rows and `Selectable` results | the Epic's § Ruled out: 5–10 % for a type change of every result |
 
 ## 7. In 8.0
+
+Superseded by decision [019](./019-one-behaviour.md) § 3: 8.0 removes both options and keeps `true` alone.
 
 Both options become `true` by default; `false` keeps today's SQL, with no warning, after 8.0 too (decision 003 § An explicit old value is kept). Nothing else is removed.
