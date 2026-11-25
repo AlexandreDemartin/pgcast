@@ -9,7 +9,7 @@
 // Inputs are cast to `any`: at run time they may come from untyped data (req.body).
 
 import { runInNewContext } from 'node:vm';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
 import { builtinObjects } from '../helpers/builtinObjects';
@@ -1003,6 +1003,22 @@ describe('shortcut options', () => {
         "unicodeEscaped": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS result",
       }
     `);
+  });
+
+  it('a fragment in columns or returning, past the type, keeps its key a parameter with shortcutsUseJson, as off', () => {
+    onTestFinished(resetConfig);
+    db.setConfig({ shortcutsUseJson: true });
+    const now = sql`now()`;
+    expect(db.select('users', all, { columns: [now] } as any).compile()).toEqual({
+      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, now()) AS result FROM "users") AS "sq_users"`,
+      values: [now],
+    });
+    expect(db.insert('users', { email: 'a', display_name: 'b' }, { returning: [now] } as any).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING json_build_object($3::text, now()) AS result',
+      values: ['b', 'a', now],
+    });
+    expect(db.upsert('users', { email: 'a', display_name: 'b' }, 'email', { returning: [now] } as any).compile().text)
+      .toMatch(/ RETURNING json_build_object\(\$3::text, now\(\), '\$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END\) AS result$/);
   });
 
   it('order.by', () => {
