@@ -27,7 +27,7 @@ describe('the client of a transaction', () => {
     void db.transaction(pool, db.IsolationLevel.ReadCommitted, async c => { expectTypeOf(c).toEqualTypeOf<db.TxnClientForReadCommitted>(); });
   });
 
-  // #177: passed through, it runs at the outer level; transactionRequiresSatisfyingLevel refuses it at run time
+  // #177: passed through, it would run at the outer level; transaction() refuses it at run time
   test('a shortcut takes the client of a level that does not satisfy its own, typed as its own level, as in Zapatos 6.6.1', () => {
     void db.readCommitted(pool, rc => db.serializable(rc, async s => { expectTypeOf(s).toEqualTypeOf<db.TxnClientForSerializable>(); }));
     void db.readCommitted(pool, rc => db.transaction(rc, db.IsolationLevel.Serializable, async s => {
@@ -44,7 +44,7 @@ describe('the client of a transaction', () => {
     void db.repeatableReadRO(pool, c => countBookings(c));
   });
 
-  // The runtime tests check transactionRequiresSatisfyingLevel against this table, pair by pair (test/integration/transaction.test.ts)
+  // The runtime tests check the level refusal against this table, pair by pair (test/integration/transaction.test.ts)
   test('IsolationSatisfying and the runtime table list the same levels in each row', () => {
     type Row<K extends db.IsolationLevel> = (typeof satisfying)[`${K}`][number];
     type Missing = { [K in db.IsolationLevel]: Exclude<Row<K>, `${db.IsolationSatisfying<K>}`> }[db.IsolationLevel];

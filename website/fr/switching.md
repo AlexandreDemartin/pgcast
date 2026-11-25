@@ -1,5 +1,5 @@
 ---
-english: 11fdf082cdd1
+english: e24d3e5a5d16
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -312,6 +312,93 @@ La 8.0 fait toujours ce que faisait `upsertRequiresSameKeys: true`, la valeur pa
 - **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `upsertRequiresSameKeys was removed in 8.0, which always does what upsertRequiresSameKeys: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-upsertRequiresSameKeys`<!-- message -->. Une fois l’option retirée, un tel lot lève "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->, là où la 7.x avec `false` mettait la cellule absente à `DEFAULT` par-dessus la valeur stockée.
 - **Trouver les appels** : `grep -rn upsertRequiresSameKeys`. Chaque lot aux clés différentes lève une erreur à l’appel, donc vos tests le trouvent.
 - **Avant → après** : `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])`<!-- tsc -->, avec `false`, devient soit chaque ligne avec chaque clé et la valeur voulue, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'])`<!-- tsc -->, soit un [`updateColumns`](/fr/insert#upsert-options) qui ne nomme que les clés que toutes les lignes donnent, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'], { updateColumns: ['votes'] })`<!-- tsc -->. Une clé absente d’une ligne met toujours la valeur stockée de cette ligne à `DEFAULT`, sans erreur, comme le faisait `false`.
+
+### `transactionRequiresCommit` {#from-8-0-transactionRequiresCommit}
+
+La 8.0 fait toujours ce que faisait `transactionRequiresCommit: true`, la valeur par défaut de la 7.x : quand le callback de [`transaction()`](/fr/transaction#transaction) intercepte l’erreur d’une requête et se termine, Postgres répond au `COMMIT` par `ROLLBACK`, rien n’est enregistré, et la promesse est rejetée sans retry ([Laisser passer l’erreur](/fr/retries#let-the-error-through)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `transactionRequiresCommit was removed in 8.0, which always does what transactionRequiresCommit: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresCommit`<!-- message -->. Une fois l’option retirée, une telle transaction est rejetée avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->, là où la 7.x avec `false` se résolvait avec la valeur renvoyée par le callback.
+- **Trouver les appels** : `grep -rn transactionRequiresCommit`, puis chaque `catch` autour d’une requête dans un callback de `transaction()`. Chaque `catch` qui intercepte une erreur fait rejeter la promesse, donc vos tests le trouvent dès qu’ils y passent.
+- **Avant → après** : avec `false`, la promesse se résolvait, et ni la réservation ni la note n’étaient enregistrées :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+await db.serializable(pool, async txnClient => {
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(txnClient);
+  try {
+    await db.insert('ratings', { film_id: 1002, stars: 5 }).run(txnClient);
+  } catch { }
+});
+```
+
+Exécutez la requête qui peut échouer dans un [`savepoint()`](/fr/transaction#savepoint), et laissez passer les erreurs 40001 et 40P01, que `transaction()` réessaie. La réservation est enregistrée, avec ou sans la note :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+await db.serializable(pool, async txnClient => {
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(txnClient);
+  await db.savepoint(txnClient, spClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(spClient))
+    .catch((err: unknown) => {
+      if (db.isDatabaseError(err, 'TransactionRollback_SerializationFailure', 'TransactionRollback_DeadlockDetected')) throw err;
+    });
+});
+```
+
+### `transactionRequiresIdleClient` {#from-8-0-transactionRequiresIdleClient}
+
+La 8.0 fait toujours ce que faisait `transactionRequiresIdleClient: true`, la valeur par défaut de la 7.x : avec un client sur lequel vous avez envoyé `BEGIN`, la promesse de [`transaction()`](/fr/transaction#transaction) est rejetée avant l’envoi de son `START TRANSACTION`, et votre transaction reste ouverte pour votre `COMMIT` ou votre `ROLLBACK` ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). pg signale le bloc à partir de pg 8.21 ; avec les versions antérieures, `transaction()` s’exécute comme dans Zapatos 6.6.1.
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `transactionRequiresIdleClient was removed in 8.0, which always does what transactionRequiresIdleClient: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresIdleClient`<!-- message -->. Une fois l’option retirée, un tel appel est rejeté avec "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->, là où la 7.x avec `false` commitait votre transaction, ou l’annulait.
+- **Trouver les appels** : `grep -rn transactionRequiresIdleClient`, puis `grep -rn "'BEGIN"` : chaque client sur lequel vous envoyez `BEGIN` avant de le donner à un raccourci de transaction.
+- **Avant → après** : avec `false`, le `COMMIT` de `readCommitted()`, au niveau propre à la session, commitait la réservation et la note, et le `ROLLBACK` de l’appelant ne trouvait plus de transaction :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
+  await db.readCommitted(client, txnClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(txnClient));
+  await client.query('ROLLBACK');
+} finally {
+  client.release();
+}
+```
+
+Dans votre propre bloc, exécutez ce travail dans un [`savepoint()`](/fr/transaction#savepoint), qui s’exécute au niveau de votre bloc : le `ROLLBACK` de l’appelant annule les deux lignes. Ou ouvrez la transaction avec `db.readCommitted(pool, …)` à la place de votre `BEGIN`, pour ses retries :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
+  await db.savepoint(client, spClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(spClient));
+  await client.query('ROLLBACK');
+} finally {
+  client.release();
+}
+```
+
+### `transactionRequiresSatisfyingLevel` {#from-8-0-transactionRequiresSatisfyingLevel}
+
+La 8.0 fait toujours ce que faisait `transactionRequiresSatisfyingLevel: true`, la valeur par défaut de la 7.x : un appel imbriqué qui reçoit le client d’une transaction à un niveau d’isolation qui ne satisfait pas le sien ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)) est rejeté avant son callback, et la transaction extérieure est annulée, sauf si son callback intercepte l’erreur ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `transactionRequiresSatisfyingLevel was removed in 8.0, which always does what transactionRequiresSatisfyingLevel: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresSatisfyingLevel`<!-- message -->. Une fois l’option retirée, un tel appel est rejeté avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel, là où la 7.x avec `false` exécutait son callback au niveau de la transaction extérieure.
+- **Trouver les appels** : `grep -rn transactionRequiresSatisfyingLevel`, puis chaque raccourci de transaction qui reçoit un client plutôt qu’un pool. TypeScript y accepte le client de n’importe quel niveau : c’est l’erreur, qui nomme les deux niveaux, qui permet à vos tests de trouver chacun d’eux.
+- **Avant → après** : avec `false`, `db.readCommitted(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc --> exécutait son `insert()` en `READ COMMITTED`. Ouvrez la transaction extérieure au niveau dont l’appel imbriqué a besoin : `db.serializable(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc -->.
 
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 

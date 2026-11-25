@@ -206,16 +206,7 @@ describe('transaction() on a pool that is not pg’s', () => {
     }
   });
 
-  it('reads the command of its COMMIT: answered ROLLBACK, with transactionRequiresCommit false it resolves quietly, then releases the client', async () => {
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
-    const pool = otherPool(undefined, 'ROLLBACK');
-    db.setConfig({ transactionRequiresCommit: false });
-    expect(await db.serializable(pool, async () => 'done')).toBe('done');
-    expect(emitWarning).not.toHaveBeenCalled();
-    expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);
-  });
-
-  it('reads the command of its COMMIT: answered ROLLBACK, by default it rejects, then releases the client', async () => {
+  it('reads the command of its COMMIT: answered ROLLBACK, it rejects, then releases the client', async () => {
     const pool = otherPool(undefined, 'ROLLBACK');
     await expect(db.serializable(pool, async () => 'done')).rejects.toThrow(/^the transaction was rolled back, not committed/);
     expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);
