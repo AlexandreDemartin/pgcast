@@ -67,6 +67,17 @@ Candidates for a check, a rule or a skill line.
 - `adapters/pglite`'s `check:browser` fails whenever the checkout path has a space: `test/browser-bundle.mjs` hands Vite `new URL(...).pathname`, which keeps `%20`; `fileURLToPath` fixes it, a symlink with `--preserve-symlinks --preserve-symlinks-main` works around it (#988).
 - In a worktree `.git` is a file: `git commit -F .git/MERGE_MSG` fails; use `git rev-parse --git-path MERGE_MSG` (#988).
 - To check a merge commit, rebuild it with `git merge-tree --write-tree <ours> <theirs>` and diff that tree against the real merge: only the hand-resolved lines show, so a dropped line of the other branch shows at once (#988).
+- Local `docs:build` does not run the docs examples against Postgres: a change of SQL output runs `cd website && npm run docs:examples` too, or CI's `docs` job is the first to see a documented pattern break (#988: `GROUP BY` over a `json` lateral, 42883).
+- One probe script can check Postgres and PGlite: `.compile()` once, then send the same text to a `pg` client and to `open(schema)` from `website/.vitepress/playground/pglite.ts` (#988).
+- After a change of SQL type, grep the docs for the old type's name too, not only the failing example: a page still said a nested result is `jsonb` after round 1 (#988).
+- A type change that drops operators (`jsonb` → `json`: no equality, no ordering) is documented by its cause, "anything that compares or sorts it fails", not by a list of clauses: each list left one out (`GROUP BY` in round 2, then `ORDER BY`, `=`, `IN`) (#988).
+- learning: running the way out before writing it showed that `::jsonb` and `->>` do not fix a `select()` `groupBy` beside a lateral (42803); a way out written from memory would have been wrong.
+- learning: `update()` refuses `db.all` as a filter, so a probe that writes every row needs `db.sql\`TRUE\``.
+- learning: changing a value's type from `jsonb` to `json` does not always fail loudly: `||` with an untyped literal resolves to `anynonarray || text` and returns text; a migration entry for a type change is checked against the old type's operators and against mixing with it (COALESCE, CASE, UNION), not only its functions and comparisons.
+- learning: three rounds on one migration entry came from lists written from memory; the class of a type change is enumerated from `pg_operator`/`pg_proc` once, not case by case.
+- learning: a sweep built from the catalog (`pg_operator` and `pg_proc` filtered on `jsonb`, each in 7.x's shape, 8.0's and the way out, on both engines) closed in about 15 calls a class that three lists written from memory kept missing.
+- learning: the class has a boundary: assigning into a `jsonb` column and the polymorphic `jsonb` builders (`to_jsonb`, `jsonb_agg`, `jsonb_build_object`) are unchanged, so the entry need not list them.
+- learning: an error code named for "an operator that takes only jsonb" is checked with an untyped value on the other side too: `unknown @> json` and `json <@ unknown` resolve against the polymorphic range operators and fail with 42725, which a sweep of typed operands misses.
 
 ## Minors kept
 
@@ -95,3 +106,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `form` `website/select.md:64`, `website/runtime-config.md:258`, `website/performance.md:12`, `CHANGELOG.md` (#988): four figures for the same lateral scenario; keep one, link to it.
 - `form` `src/db/shortcuts.ts:202` (#988): names `$action` for writes, which have none.
 - `defect` `adapters/pglite/test/browser-bundle.mjs` (#988): `new URL(...).pathname` keeps `%20`, so `check:browser` fails in a checkout whose path has a space; use `fileURLToPath`.
+- `form` #988 `website/switching.md` § from-8-0-shortcutsUseJson and `website/select.md:67`: the way out (`::jsonb`, `->>`) does not fix a `groupBy` beside a `lateral` (42803); add `->>` to the 42803 sentence and restore select.md's link to `/lateral#filter-sort-and-group-by-a-lateral`, EN and FR.
+- `defect` #988 `website/switching.md:426` (FR `:427`): an untyped value on the other side of `@>` (nested right) or `<@` (nested left) fails with 42725, not the 42883 the entry names; name it or give no code for operators.
+- `form` #988 `website/switching.md:426`: "`COALESCE`, `CASE` or `UNION`" reads as closed (`GREATEST`, `INTERSECT`, `VALUES`, `ARRAY[…]`, casts give 42846 too; "such as"); `->> 0` on an array of objects keeps `json`'s spacing; the bullet (~120 words) would read better split.
