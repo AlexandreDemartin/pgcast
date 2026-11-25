@@ -15,13 +15,12 @@ const removedOptions: { [key: string]: unknown } = {
 };
 
 /**
- * Throw on a removed option, an own key of `config`, set to anything but the value 8.0 keeps, `null` or `undefined`:
- * called before any query, so a config written for 7.x never switches behaviour without a word.
+ * Throw on a removed option of `config`, own or inherited, as 7.x's `tsForConfig()` read it, set to anything but the
+ * value 8.0 keeps, `null` or `undefined`: called before any query, so a config written for 7.x never switches behaviour without a word.
  */
 export const refuseRemovedOptions = (config: object | null | undefined) => {
   if (config == null) return;  // finaliseConfig(undefined) gives the defaults, as in Zapatos 6.6.1
   for (const key of Object.keys(removedOptions)) {
-    if (!Object.prototype.hasOwnProperty.call(config, key)) continue;
     const value = (config as { [key: string]: unknown })[key], kept = removedOptions[key];
     if (value !== kept && value != null) {
       throw new Error(`${key} was removed in 8.0, which always does what ${key}: ${JSON.stringify(kept)} did; ` +

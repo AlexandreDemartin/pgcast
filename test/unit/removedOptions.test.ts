@@ -34,8 +34,11 @@ describe.each(removed)('%s', (key, kept, written, refused) => {
     expect(config.outDir).toBe('./src');
   });
 
-  it('reads only an own key', () => {
-    expect(() => refuseRemovedOptions(Object.create({ [key]: refused[0] }))).not.toThrow();
+  it('reads an inherited key too, a getter included, as 7.x\'s tsForConfig() did', () => {
+    expect(() => refuseRemovedOptions(Object.create({ [key]: refused[0] }))).toThrow(messageOf(key, written));
+    const getter = Object.create(Object.defineProperty({}, key, { get: () => refused[0] }));
+    expect(() => finaliseConfig(getter)).toThrow(messageOf(key, written));
+    expect(() => refuseRemovedOptions(Object.create({ [key]: kept }))).not.toThrow();
   });
 
   it.each(['website', 'website/fr'])('has its entry in %s/switching.md, which quotes the message', dir => {
