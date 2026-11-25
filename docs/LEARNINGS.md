@@ -47,6 +47,18 @@ Candidates for a check, a rule or a skill line.
 - A test that the CLI exits at once on a closed port says nothing of queries in flight, as every connection fails together: keep one in flight while another fails (a trap that sleeps, or an ACCESS EXCLUSIVE lock held by another session on a table with a column `DEFAULT`, which blocks the columns query) (#986).
 - Removing a read of the caller's config (`suppliedConfig.key`, `{ ...suppliedConfig, key }`) also removes the TypeError it threw on `null` or `undefined`: replay both on master and branch (#986).
 - To stop a run as soon as a query fails, act where it fails, not in a catch around the run: a `finally` that ends a pool, a stream or a server waits for the work in flight first (#986).
+- A `gh issue comment` that times out (502/504) may still have posted: check `gh issue view --json comments` before retrying (#969).
+- Probes that need a changed `src/` go in a detached scratch worktree from the start: auto mode refuses a temporary edit of the checkout (#969).
+- Rewriting failing test literals from captured values trusts the actual value: a helper that extracts a substring and falls back to the full text was silently rewritten to the fallback, and shared helpers (`insertSQL(...)`) were inlined; flag rewrites whose length moves a lot and diff for removed helper calls before committing (#969).
+- A replay compared as a multiset per test, with a fallback per file, survives renamed tests; random statement names and pids are named in Proofs (#969).
+- A one-shot `git grep` for a removed SQL form missed four prose lines that a per-page hit count, EN against FR, found: count per page before committing the English (#988).
+- `node check-prose.mjs`, run from `website/`, checks every docs probe in about 10 s without `docs:build`: the fast loop for SQL text in the docs (#988).
+- When an entry of another class joins a migration section (group B: the 7.x default is not the kept value), reread the section's intro: its general claims ("never set → no change") were written for the entries already there (#988).
+- `bench:runtime` can fail its gate from machine load alone (spreads over 200 %, load ~10 gave +61/+76 % on prepared inserts; a calm rerun −9/+7 %): read the spread column and `uptime` before calling a red gate a regression (#988).
+- A shipped gain with no baseline refresh leaves the gate blind to losing it (a lateral back from 19 to 90 ms passes under +50 % of 63.8; a `null` baseline is never gated): the bench script's refresh rule should cover a measured gain, not only a justified slowdown (#988).
+- `adapters/pglite`'s `check:browser` fails whenever the checkout path has a space: `test/browser-bundle.mjs` hands Vite `new URL(...).pathname`, which keeps `%20`; `fileURLToPath` fixes it, a symlink with `--preserve-symlinks --preserve-symlinks-main` works around it (#988).
+- In a worktree `.git` is a file: `git commit -F .git/MERGE_MSG` fails; use `git rev-parse --git-path MERGE_MSG` (#988).
+- To check a merge commit, rebuild it with `git merge-tree --write-tree <ours> <theirs>` and diff that tree against the real merge: only the hand-resolved lines show, so a dropped line of the other branch shows at once (#988).
 
 ## Minors kept
 
@@ -67,3 +79,9 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/switching.md:407` and FR `:408` (#985): "arithmetic on a sum is TS18047" holds with `strictNullChecks` from TypeScript 4.9; TS2531 on 4.1, compiles with `strict: false`.
 - `form` `website/aggregates.md:3`, `website/select.md:143`, `:311` and FR twins (#985): "By default" / "Par défaut" where 8.0 has no other typing.
 - `form` `CHANGELOG.md:15` (#986): "refused too, as 7.x's `tsForConfig()` read it" does not name the one config that goes from working to refused: `generate()` with an inherited removed key, which 7.x's `finaliseConfig()` spread dropped.
+- `defect` `test/integration/injection.test.ts:994`, `:1000` (#988): `"nul key"` and `"prequotedCloses key"` record a codeless throw as `undefined`, so a refusal for another reason passes too; the comment at `:938` still says a lateral key is a parameter (extended protocol).
+- `defect` `website/switching.md:424` and FR `:425` (#988): `{"balance" : 20.00}` is `json_build_object`'s text, with `columns` or `returning` only; without them `to_json` writes compact text.
+- `form` `src/db/transaction.ts:614` (#988): "its one `jsonb_agg` row" is now `json_agg`.
+- `form` `website/select.md:64`, `website/runtime-config.md:258`, `website/performance.md:12`, `CHANGELOG.md` (#988): four figures for the same lateral scenario; keep one, link to it.
+- `form` `src/db/shortcuts.ts:202` (#988): names `$action` for writes, which have none.
+- `defect` `adapters/pglite/test/browser-bundle.mjs` (#988): `new URL(...).pathname` keeps `%20`, so `check:browser` fails in a checkout whose path has a space; use `fileURLToPath`.
