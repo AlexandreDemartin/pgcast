@@ -17,6 +17,7 @@ description: 'The core.ts sensitive zone: identifier escaping, parameterisation,
 - **A value is a parameter** (`$n`), never concatenated; `raw` is reserved for fixed keywords in the code (`ASC`, `FOR UPDATE`), never for an input.
 - **An identifier comes from the type** (`Table`, `Column`); at run time it may come from an untyped object (`req.body` passed as a `Whereable` or an `Insertable`): compile it as if it were hostile.
 - **Object keys** (`Whereable`, `cols`, `vals`, `extras`, `lateral`) are identifiers: same rule.
+- **Ours, told by a flag**: a branch that tells pgcast's own fragment from a caller's value marks ours with a flag or an argument (`SQLForJSONObject`'s `ours`), never `instanceof SQLFragment`, which a caller's fragment past the type passes too (#954).
 - The `cast` of `param(x, 'type')` and the name of a `lateral` key are interpolated: same rule.
 - **Escaped is not allowed**: a caller's string interpolated in `sql` is a name, and quoting only stops it closing its quotes. In a value's place, `'title'` gives `"title" = "title"`, every row; as a table, it reaches any relation the role can read (`pg_catalog.pg_roles`). A caller's name is checked against a list.
 - **Entry points** are found by grepping `raw(` and interpolations in `src/`, not from the docs of the options: a parameter "used internally" (`aggregate`) is one.

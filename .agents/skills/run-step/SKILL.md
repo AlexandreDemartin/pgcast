@@ -40,7 +40,7 @@ The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in Englis
 - **What**: the expected behaviour, the SQL before / after when it matters · **Why**.
 - **Done when**: the acceptance criteria as checkboxes; it names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…). A check the agents' tools cannot run (a DevTools panel, a test behind a sign-in) names the proof an agent can give and leaves the live check to the owner (#864, #870).
 - **Files**: the targeted paths, the feature's docs page included (skill `pr-shape` § Splitting like Zapatos), its `outline.ts` entry and `examples/plain/` file, and `db.mjs` for a new export, tracked though built (#723, #724, #729).
-- **Notes**: **Risk** (level, lens, blockers), **Class** (note 003), **Read** (skills), **Frozen by** (tests).
+- **Notes**: **Risk** (level, lens, blockers), **Class** (notes 003 and 019), **Read** (skills), **Frozen by** (tests).
 - A figure or a message the issue quotes comes from a run, or the issue asks the builder for it; the builder reruns it and says what it found (68 pages filed, 70 built, #866; a message read from the code was wrong, #873).
 - Public: unnamed patterns (skill `consumer-usage`); Zapatos, not its author (skill `pr-shape` § PR title).
 - An older issue without **Files** or **Risk** (its **Review** gives the level): the orchestrator adds them before the `builder` starts.
