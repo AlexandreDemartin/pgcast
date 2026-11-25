@@ -61,6 +61,8 @@ export const generate = async (suppliedConfig: Config) => {
  * @returns `true` when the files on disk are up to date.
  */
 export const check = async (suppliedConfig: Config) => {
+  // 7.x read a key of it here, before any query; generate() alone takes undefined or null for the defaults
+  if (suppliedConfig == null) throw new TypeError(`check() takes a config object, {} for the defaults, not ${suppliedConfig}`);
   const
     config = finaliseConfig(suppliedConfig),
     log = config.progressListener === true ? console.log :
