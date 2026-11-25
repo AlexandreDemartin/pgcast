@@ -36,7 +36,6 @@ export interface Config {
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
-  aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value; declare false in ConfigTypes for the 6.x types
   shortcutsUseJson?: boolean;  // select() and its kin, and the writes' RETURNING, build their JSON with to_json, json_agg and json_build_object, not their jsonb twins
   topLevelSelectAsRows?: boolean;  // select() run or compiled on its own is selectRows()'s query, one row per result; nested, its aggregate
   queryListener?(query: SQLQuery, txnId?: number): void;
@@ -60,13 +59,13 @@ const defaults: Config = {
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
-  aggregatesTypedByColumn: true,
   shortcutsUseJson: false,  // the only behaviour in 8.0 (decision 019)
   topLevelSelectAsRows: false,  // the only behaviour in 8.0 (decision 019)
 };
 
 let config: Config = { ...defaults };
 
+  aggregatesTypedByColumn: true,  // sum() and avg() give null on an empty set, min() and max() the column's value as pg parses it
 // the runtime keys 8.0 removed (decision 019 § 4), each with the value whose behaviour 8.0 always has, through 8.x:
 // setConfig() takes that value, null or undefined, and keeps none of them, and throws on any other
 const removedOptions: { [key: string]: boolean } = {

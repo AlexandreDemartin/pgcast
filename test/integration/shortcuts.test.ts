@@ -940,8 +940,7 @@ describe('selectRows', () => {
     expect(await run(db.select('users', all, options))).toEqual([2, 1, 0]);
   });
 
-  it.each([{}, { aggregatesTypedByColumn: false }])('each lateral passed through comes as pg parses its column, under %j, where select() reads it from JSON', async config => {
-    db.setConfig(config);
+  it('each lateral passed through comes as pg parses its column, where select() reads it from JSON', async () => {
     const
       p = parent('id'), firstEvent = new Date(2025, 5, 1), at = new Date('2025-06-01T12:00:00Z'),
       // the lateral, what selectRows() gives for users 1, 2 and 3, and what select() gives
@@ -1211,30 +1210,12 @@ describe('count, sum, avg, min, max', () => {
     expect(sent).toEqual([]);
   });
 
-  it('on an empty set, sum / avg / min / max return 0, not null, with aggregatesTypedByColumn false', async () => {
-    db.setConfig({ aggregatesTypedByColumn: false });
-    const none = { id: -1 };
-    expect(await run(db.sum('accounts', none, { columns: ['balance'] }))).toBe(0);
-    expect(await run(db.avg('accounts', none, { columns: ['balance'] }))).toBe(0);
-    expect(await run(db.max('accounts', none, { columns: ['balance'] }))).toBe(0);
-    expect(await run(db.min('events', { kind: 'none' }, { columns: ['occurred_on'] }))).toBe(0);
-  });
-
   it('characterization: an int8 or numeric result beyond 2^53 loses precision', async () => {
     // characterization: 9007199254740993 comes back as 9007199254740992
     expect(await run(db.sum('accounts', { id: 1 }, { columns: ['lifetime_ops'] }))).toBe(9007199254740992);
   });
 
-  it('min / max of a date is a timestamp in ms, of a text NaN, with aggregatesTypedByColumn false', async () => {
-    db.setConfig({ aggregatesTypedByColumn: false });
-    // pg parses the date as local midnight, then Number() gives its epoch ms
-    expect(await run(db.min('events', all, { columns: ['occurred_on'] }))).toBe(new Date(2025, 5, 1).getTime());
-    expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBeNaN();
-    expect(await run(db.max('accounts', all, { columns: ['lifetime_ops'] }))).toBe(9007199254740992);
-  });
-
-  it.each([{}, { aggregatesTypedByColumn: true }])('under %j, sum / avg / min / max return null on an empty set; count stays 0', async config => {
-    db.setConfig(config);
+  it('sum / avg / min / max return null on an empty set; count stays 0', async () => {
     const none = { id: -1 };
     expect(await run(db.sum('accounts', none, { columns: ['balance'] }))).toBeNull();
     expect(await run(db.avg('accounts', none, { columns: ['balance'] }))).toBeNull();
@@ -1246,8 +1227,7 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.avg('accounts', all, { columns: ['ratio'] }))).toBe(0.875);
   });
 
-  it.each([{}, { aggregatesTypedByColumn: true }])('under %j, min / max give the value as pg parses it: a Date, a text, an int8 or numeric as a string', async config => {
-    db.setConfig(config);
+  it('min / max give the value as pg parses it: a Date, a text, an int8 or numeric as a string', async () => {
     expect(await run(db.min('events', all, { columns: ['occurred_on'] }))).toEqual(new Date(2025, 5, 1));
     expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBe('Cyd');
     expect(await run(db.max('accounts', all, { columns: ['lifetime_ops'] }))).toBe('9007199254740993');
@@ -1255,18 +1235,7 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.max('accounts', all, { columns: ['ratio'] }))).toBe(1.25);
   });
 
-  it.each([null, undefined])('a fragment and its copy read the setting at run(), including a reset with %s', async reset => {
-    const first = db.min('events', all, { columns: ['occurred_on'] }), copy = first.copy();
-    db.setConfig({ aggregatesTypedByColumn: false });
-    for (const query of [first, copy]) expect(await run(query)).toBe(new Date(2025, 5, 1).getTime());
-    db.setConfig({ aggregatesTypedByColumn: reset } as unknown as db.NewConfig);
-    for (const query of [first, copy]) expect(await run(query)).toEqual(new Date(2025, 5, 1));
-    for (const options of [{}, { limit: 0 }]) {
-      expect(await eachAggregate({ id: -1 }, options)).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
-    }
-  });
-
-  it('nested in a lateral, min / max come back as JSON, NULL as null, option or not', async () => {
+  it('nested in a lateral, min / max come back as JSON, NULL as null', async () => {
     const query = () => db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
       lateral: {
@@ -1280,11 +1249,9 @@ describe('count, sum, avg, min, max', () => {
       { display_name: 'Cyd', first: '2025-06-01', top: null },
     ];
     expect(await run(query())).toEqual(expected);
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await run(query())).toEqual(expected);
   });
 
-  it('as an extra, min / max come back as JSON, NULL as null, option or not (#262)', async () => {
+  it('as an extra, min / max come back as JSON, NULL as null (#262)', async () => {
     // the types of test/types-opt-in: DateString, string and number (a numeric), or null
     const query = () => db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
@@ -1300,13 +1267,10 @@ describe('count, sum, avg, min, max', () => {
       { display_name: 'Cyd', first: '2025-06-01', name: 'Cyd', top: null },
     ];
     expect(await run(query())).toEqual(expected);
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await run(query())).toEqual(expected);
   });
 
   it('passed through a single lateral, min / max come back as pg parses them from selectOne / selectExactlyOne, as JSON from select', async () => {
     // select() wraps its rows in jsonb_agg(), selectOne() and selectExactlyOne() hand the passed-through column over as it is
-    db.setConfig({ aggregatesTypedByColumn: true });
     const earliest = db.min('events', all, { columns: ['occurred_on'] });
     expect(await run(db.selectOne('users', all, { lateral: earliest }))).toEqual(new Date(2025, 5, 1));
     expect(await run(db.selectOne('users', { id: -1 }, { lateral: earliest }))).toBeUndefined();
@@ -1315,7 +1279,6 @@ describe('count, sum, avg, min, max', () => {
   });
 
   it('passed through a selectOne / selectExactlyOne as an extra, min / max come back as JSON (#262)', async () => {
-    db.setConfig({ aggregatesTypedByColumn: true });
     const earliest = db.min('events', all, { columns: ['occurred_on'] }), top = db.max('accounts', all, { columns: ['balance'] });
     expect(await run(db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 1,
@@ -1327,7 +1290,6 @@ describe('count, sum, avg, min, max', () => {
   });
 
   it('passed through a selectOne / selectExactlyOne nested in a lateral, min / max come back as JSON', async () => {
-    db.setConfig({ aggregatesTypedByColumn: true });
     const earliest = db.min('events', all, { columns: ['occurred_on'] }), top = db.max('accounts', all, { columns: ['balance'] });
     expect(await run(db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 1,
@@ -1362,18 +1324,11 @@ describe('count, sum, avg, min, max', () => {
     };
   };
 
-  it.each(noRow)('%s gives 0, as Number(null) does, with aggregatesTypedByColumn false', async (_name, where, options) => {
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: 0, avg: 0, min: 0, max: 0 });
-  });
-
-  it.each(noRow)('%s gives null by default and with explicit true, and 0 for count', async (_name, where, options) => {
-    expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
-    db.setConfig({ aggregatesTypedByColumn: true });
+  it.each(noRow)('%s gives null, and 0 for count', async (_name, where, options) => {
     expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
   });
 
-  it('nested in a lateral, an aggregate whose query returns no row gives null, option or not', async () => {
+  it('nested in a lateral, an aggregate whose query returns no row gives null', async () => {
     // the subquery is LEFT JOINed, so no row there is a NULL in jsonb_build_object(); unchanged from 6.6.1
     const query = () => db.select('users', { id: 1 }, {
       columns: ['id'],
@@ -1382,8 +1337,6 @@ describe('count, sum, avg, min, max', () => {
         top: db.max('accounts', { owner_id: parent('id') }, { columns: ['balance'], offset: 1 }),
       },
     });
-    expect(await run(query())).toEqual([{ id: 1, n: null, top: null }]);
-    db.setConfig({ aggregatesTypedByColumn: false });
     expect(await run(query())).toEqual([{ id: 1, n: null, top: null }]);
   });
 
@@ -1458,9 +1411,6 @@ describe('count, sum, avg, min, max', () => {
     const noRow = { count: '0', sumInt: null, sumBigint: null, sumNumeric: null, sumFloat8: null, avgInt: null, avgNumeric: null };
     expect(await each(a => db.selectOne('users', { id: 3 }, { lateral: a }))).toEqual(noRow);
     expect(await each(a => db.selectExactlyOne('users', { id: 3 }, { lateral: a }))).toEqual(noRow);
-    // the top-level conversion does not apply to the lateral
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: a }))).toEqual(asPg);
     // under select() and in a lateral map, JSON numbers
     const asJson = { count: 2, sumInt: 2, sumBigint: 9007199254740992, sumNumeric: 1520.5, sumFloat8: 0.5, avgInt: 1, avgNumeric: 760.25 };
     expect(await each(a => db.select('users', { id: 1 }, { lateral: a }))).toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, [v]])));
@@ -1491,11 +1441,10 @@ describe('count, sum, avg, min, max', () => {
 describe('aggregate migration warnings', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it.each([{}, { aggregatesTypedByColumn: true }, { aggregatesTypedByColumn: false }])('runs the former warning cases silently under %j', async config => {
+  it('runs the former warning cases silently', async () => {
     vi.resetModules();
     const warning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
     const fdb = await import('../../src/db');
-    fdb.setConfig(config);
     await fdb.avg('accounts', { id: -1 }, { columns: ['ratio'] }).run(t.client);
     await fdb.sum('accounts', fdb.all, { columns: ['balance'], limit: 0 }).run(t.client);
     await fdb.max('users', fdb.all, { columns: ['display_name'] }).run(t.client);
@@ -1519,17 +1468,16 @@ describe('copy()', () => {
   };
 
   // Zapatos 6.6.1 resolved a copy to the raw rows (`[{ result: '3' }]` for count()), though typed as the shortcut's result (#263)
-  it.each<[string, () => db.SQLFragment<any>, unknown, db.NewConfig?]>([
+  it.each<[string, () => db.SQLFragment<any>, unknown]>([
     ['count', () => db.count('users', all), 3],
     ['count of no row', () => db.count('users', { id: -1 }), 0],
     ['sum', () => db.sum('accounts', all, { columns: ['balance'] }), 1520.5],
     ['avg', () => db.avg('accounts', all, { columns: ['ratio'] }), 0.875],
     ['min', () => db.min('accounts', all, { columns: ['balance'] }), '0.00'],
     ['max', () => db.max('accounts', all, { columns: ['balance'] }), '1500.50'],
-    ['sum of no row, with aggregatesTypedByColumn', () => db.sum('accounts', { id: -1 }, { columns: ['balance'] }), null, { aggregatesTypedByColumn: true }],
-    ['avg, with aggregatesTypedByColumn', () => db.avg('accounts', all, { columns: ['ratio'] }), 0.875, { aggregatesTypedByColumn: true }],
-    ['min of a date, with aggregatesTypedByColumn', () => db.min('events', all, { columns: ['occurred_on'] }), new Date(2025, 5, 1), { aggregatesTypedByColumn: true }],
-    ['max of an int8, with aggregatesTypedByColumn', () => db.max('accounts', all, { columns: ['lifetime_ops'] }), '9007199254740993', { aggregatesTypedByColumn: true }],
+    ['sum of no row', () => db.sum('accounts', { id: -1 }, { columns: ['balance'] }), null],
+    ['min of a date', () => db.min('events', all, { columns: ['occurred_on'] }), new Date(2025, 5, 1)],
+    ['max of an int8', () => db.max('accounts', all, { columns: ['lifetime_ops'] }), '9007199254740993'],
     ['select', () => db.select('users', { id: 3 }, { columns: ['display_name'] }), [{ display_name: 'Cyd' }]],
     ['selectOne', () => db.selectOne('users', { id: 3 }, { columns: ['display_name'] }), { display_name: 'Cyd' }],
     ['selectOne of no row', () => db.selectOne('users', { id: -1 }), undefined],
@@ -1541,8 +1489,7 @@ describe('copy()', () => {
     ['update', () => db.update('users', { mood: 'ok' }, { id: 3 }, { returning: ['display_name'] }), [{ display_name: 'Cyd' }]],
     ['deletes', () => db.deletes('memberships', { user_id: 2 }, { returning: ['org_code'] }), [{ org_code: 'acme-lyon' }]],
     ['truncate', () => db.truncate('extra.articles'), undefined],
-  ])('a copy of %s, run, gives the result of the shortcut', async (_, make, expected, config) => {
-    if (config) db.setConfig(config);
+  ])('a copy of %s, run, gives the result of the shortcut', async (_, make, expected) => {
     expect(await originalAndCopy(make())).toEqual([expected, expected]);
   });
 

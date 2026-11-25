@@ -34,7 +34,7 @@ describe('getConfig() and setConfig()', () => {
     expectTypeOf<keyof db.Config>().toEqualTypeOf<
       | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
       | 'queryListener' | 'resultListener' | 'transactionListener'
-      | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn' | 'topLevelSelectAsRows'
+      | 'selectExactlyOneChecksForSecondRow' | 'topLevelSelectAsRows'
       | 'transactionEventListener' | 'shortcutsUseJson'
     >();
   });
@@ -70,9 +70,18 @@ describe('getConfig() and setConfig()', () => {
     db.getConfig().transactionRequiresIdleClient;
     // @ts-expect-error transactionRequiresSatisfyingLevel is no key of the config getConfig() gives
     db.getConfig().transactionRequiresSatisfyingLevel;
+    // @ts-expect-error aggregatesTypedByColumn is no key of Config from 8.0
+    db.setConfig({ aggregatesTypedByColumn: false });
+    // @ts-expect-error aggregatesTypedByColumn is no key of Config from 8.0, its kept value too
+    db.setConfig({ aggregatesTypedByColumn: true });
+    // @ts-expect-error aggregatesTypedByColumn is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, aggregatesTypedByColumn: false });
+    // @ts-expect-error aggregatesTypedByColumn is no key of the config getConfig() gives
+    db.getConfig().aggregatesTypedByColumn;
     const built = {
       transactionAttemptsMax: 3, undefinedMeansMissing: false, upsertRequiresSameKeys: false,
       transactionRequiresCommit: false, transactionRequiresIdleClient: false, transactionRequiresSatisfyingLevel: false,
+      aggregatesTypedByColumn: false,
     };
     expectTypeOf(db.setConfig).toBeCallableWith(built);  // hence setConfig()'s refusal at run time
   });

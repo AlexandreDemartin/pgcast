@@ -1365,13 +1365,12 @@ const numericAggregate = (
     byColumn = aggregate === 'min' || aggregate === 'max';
 
   if (refusal === undefined) {
-    // Number() makes a NULL 0, a date its epoch ms, a text NaN, and an int8 or numeric string a number;
-    // the option changes no SQL, so it is read at run(), as the type, declared once for the program, says
+    // min() and max() give the column's value as pg parses it, sum() and avg() Number() of an int8 or numeric
+    // string, and both a NULL as null; count() keeps select()'s transform, which reads no row as 0
     if (aggregate !== 'count') {
       query.runResultTransform = (qr) => {
         const result = qr.rows[0]?.result ?? null;  // no row reads as a NULL result, as for count()
-        if (getConfig().aggregatesTypedByColumn ?? true) return byColumn || result === null ? result : Number(result);
-        return Number(result);
+        return byColumn || result === null ? result : Number(result);
       };
     }
     return query;

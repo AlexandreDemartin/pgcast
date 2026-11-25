@@ -69,7 +69,6 @@ describe('setConfig()', () => {
     castArrayParamsToJson: false,
     castObjectParamsToJson: false,
     selectExactlyOneChecksForSecondRow: false,
-    aggregatesTypedByColumn: true,
     shortcutsUseJson: false,
     topLevelSelectAsRows: false,
   };
@@ -79,7 +78,6 @@ describe('setConfig()', () => {
     castArrayParamsToJson: true,
     castObjectParamsToJson: true,
     selectExactlyOneChecksForSecondRow: true,
-    aggregatesTypedByColumn: false,
     shortcutsUseJson: true,
     topLevelSelectAsRows: true,
   };
@@ -89,6 +87,7 @@ describe('setConfig()', () => {
   const removed = {
     undefinedMeansMissing: true, upsertRequiresSameKeys: true,
     transactionRequiresCommit: true, transactionRequiresIdleClient: true, transactionRequiresSatisfyingLevel: true,
+    aggregatesTypedByColumn: true,
   };
   const set = (config: object) => db.setConfig(config as db.NewConfig);
   const message = (key: string, kept: boolean) => `${key} was removed in 8.0, which always does what ${key}: ${kept} ` +
