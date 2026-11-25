@@ -9,6 +9,16 @@ What the agents returned during the chapter and what waits for its end. Written 
 ## Learnings
 
 Candidates for a check, a rule or a skill line.
+- #992 — docs:examples caught what check-prose cannot: a docs example that hand-writes a driver result (`rows: [{ result: … }]`) follows the SQL's shape, and check-prose compares SQL text only; a step that changes the rows a query sends greps `result: \[` across website/examples and the pages (#992).
+- #992 — A test helper that read `q.runResultTransform` and ran `q.compile()` by hand broke under the rows form, the trap the migration entry names for users; going through `q.run()` with a client that rewrites the text keeps such helpers honest (#992).
+- #992 — When a removal makes an opt-in's form the only behaviour, the opt-in's docs section becomes a stub: each exception it listed needs a home in the reference of the member it affects (`sql-template.md` § `runResultTransform`), not only in the migration entry, or the reference turns false unnoticed (#992).
+- #992 — When a shortcut's top-level form differs from its nested form, check each property `copy()` carries (`preparedName`, `runResultTransform`) against that difference: a name kept with another text breaks prepared statements on one connection (#992).
+- #992 — A migration entry's grep finds reads as well as assignments: `runResultTransform(` as well as `runResultTransform =` (#992).
+- #992 — When every fix of a blocking item is docs, its "red test" can only freeze what the branch already does and passes from its own commit: a fix brief names that case instead of asking for red then green (#992).
+- #992 — `npm run docs:translated` takes page names (`-- switching sql-template`); run bare, it throws (#992).
+- #992 — A brief's "master touches only X" goes stale within the round: after merging master, `git diff --stat HEAD^1 HEAD` says what came in (#992).
+- #992 — A sentence that limits a behaviour to one entry point ("a `select()` run on its own") is replayed on every entry point the same mechanism covers: the main query of `withCTEs()` took the same path and the sentence left it out (#992).
+- #992 — The #981 rule (read before and after) applies to each case of an entry's list, not only to the entry: a fix that adds a bullet can give its "after" inline and never reach **Before → after** (#992).
 
 ## Minors kept
 
@@ -40,3 +50,8 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `form` #988 `website/switching.md` § from-8-0-shortcutsUseJson and `website/select.md:67`: the way out (`::jsonb`, `->>`) does not fix a `groupBy` beside a `lateral` (42803); add `->>` to the 42803 sentence and restore select.md's link to `/lateral#filter-sort-and-group-by-a-lateral`, EN and FR.
 - `defect` #988 `website/switching.md:426` (FR `:427`): an untyped value on the other side of `@>` (nested right) or `<@` (nested left) fails with 42725, not the 42883 the entry names; name it or give no code for operators.
 - `form` #988 `website/switching.md:426`: "`COALESCE`, `CASE` or `UNION`" reads as closed (`GREATEST`, `INTERSECT`, `VALUES`, `ARRAY[…]`, casts give 42846 too; "such as"); `->> 0` on an array of objects keeps `json`'s spacing; the bullet (~120 words) would read better split.
+- `form` `website/switching.md:440`, `website/runtime-config.md:264`, their FR twins and `CHANGELOG.md:15` (#992): the 10k-row bench reads 240 in the docs and 242 in the CHANGELOG; the default column gives 242.2 ms, 240.6 is the prepared one: one figure.
+- `defect` `website/runtime-config.md:254` and `fr/:259` (#992): § shortcutsUseJson "and `select()` its array with `json_agg`" is now true only nested or copied.
+- `form` `website/switching.md:453` and `fr/:454` (#992): the prepared copy gets its "after" inline only, where the other cases get a before → after; add `q.copy()` → `q.copy({ preparedName: 'films_agg' })` (or let #993 remove the case).
+- `defect` `website/sql-template.md:571` and `fr/:575` (#992): "A `select()` run on its own" leaves out the main query of `withCTEs()`, which behaves the same; say it as `CHANGELOG.md:15` does.
+- `form` `CHANGELOG.md:15` (#992): eight effects in one sentence joined by semicolons; name them and link the migration entry (skill `concise-docs`).
