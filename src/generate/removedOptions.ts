@@ -16,7 +16,8 @@ const removedOptions: { [key: string]: unknown } = {
  * Throw on a removed option, an own key of `config`, set to anything but the value 8.0 keeps, `null` or `undefined`:
  * called before any query, so a config written for 7.x never switches behaviour without a word.
  */
-export const refuseRemovedOptions = (config: object) => {
+export const refuseRemovedOptions = (config: object | null | undefined) => {
+  if (config == null) return;  // finaliseConfig(undefined) gives the defaults, as in Zapatos 6.6.1
   for (const key of Object.keys(removedOptions)) {
     if (!Object.prototype.hasOwnProperty.call(config, key)) continue;
     const value = (config as { [key: string]: unknown })[key], kept = removedOptions[key];
