@@ -96,7 +96,7 @@ describe('withCTEs', () => {
     for (const [i, options] of [{}, { lateral: db.count('accounts', { owner_id: parent('id') }) }].entries()) {
       const query = db.select('users', all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, ...options } as any).prepared(`pgcast_ctes_rows_${tag}_${i}`);
       expect(await query.run(t.client)).toHaveLength(3);
-      const length = db.withCTEs({ f: query }, sql`SELECT jsonb_array_length(result) AS n FROM f`);
+      const length = db.withCTEs({ f: query }, sql`SELECT json_array_length(result) AS n FROM f`);
       expect(length.compile().name).toBeUndefined();
       expect(await length.run(t.client)).toEqual([{ n: 3 }]);
     }
