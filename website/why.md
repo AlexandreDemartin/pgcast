@@ -90,7 +90,7 @@ The security fixes came first, all of them in 6.6.2 ([Security](/security)):
 
 pgcast 6.x lets projects opt into fixes before they become defaults. In 7.0, six runtime settings and seven generator settings change. The [migration guide](/switching#from-7-0) shows which old settings expire in 8.0 and which remain available for a custom parser.
 
-[`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) and the generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), which never warn, stay off; so does its [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases), until 8.0. Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions](/versions)).
+[`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) and the generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), which never warn, stay off through 7.x, as does its [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases); 8.0 removes the first and keeps the other two alone ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)). Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions](/versions)).
 
 Zapatos 6.6.1 shipped no test suite of its own (its first consumer's tests exercised "most of the code base at least a little"); its CI linted and built. Its roadmap called one "kind of indispensable", one that tests "not just returned values but also inferred types".
 

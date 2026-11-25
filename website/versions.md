@@ -44,9 +44,9 @@ About half of them can't be fixed without changing a result that is valid today 
 
 A fix can still stop a call that only worked through the bug. 6.6.2's escaping fixes are an example: a column name such as `id" AS "x` used to close its quotes and add an alias, and now names a column that doesn't exist. The changelog lists every such call, with what to write instead.
 
-Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) checks for at least one row when run alone; nested, a missing row gives `null`. Zapatos nests it in a `lateral`, where ties can duplicate the parent row with `withTies: true`.
+Two opt-ins stay off through 7.x: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0), which becomes the only behaviour in 8.0. [`selectExactlyOne()`](/select#selectExactlyOne) checks for at least one row when run alone; nested, a missing row gives `null`. Zapatos nests it in a `lateral`, where ties can duplicate the parent row with `withTies: true`.
 
-Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), rejects on a second row when the query is run on its own. It never warns or becomes the default.
+Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), rejects on a second row when the query is run on its own. It never warns, and stays off through 7.x. 8.0 removes it, and `selectExactlyOne()` asks for `LIMIT 1` alone: the key set to `true` throws ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 ## Why an opt-in, not a breaking change
 
@@ -107,7 +107,7 @@ From 7.0, domain columns are typed by context. In raw rows, enum arrays are text
 
 From 6.7 until 7.0, with `rejectOnQueryError` omitted or set to `null` in JSON, `generate()` and `tsForConfig()` sent `PGCAST_DEP006` to an enabled `warningListener` before exiting on a connection or query failure. From 7.0, both functions then reject with the original error, as [`check()`](/generator#export-check) does. The note is retired. In 7.x, set `rejectOnQueryError: false` to keep the CLI's immediate exit with code 1 on a connection or query failure. 8.0 removes the option: `generate()` always rejects, and the CLI prints the error and exits with code 1 itself ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
-[`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), from 6.10, types a domain over `text` by the values its `CHECK` lists. It has no note and stays off in 7.0: a placeholder holding the domain's base type is how Zapatos types a domain, wider than the values but not wrong, as Postgres refuses the rest.
+[`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), from 6.10, types a domain over `text` by the values its `CHECK` lists. It has no note and stays off in 7.0: a placeholder holding the domain's base type is how Zapatos types a domain, wider than the values but not wrong, as Postgres refuses the rest. 8.0 keeps it alone: each such domain's union is declared, and a fresh placeholder names it, while one already on disk keeps its `string`.
 
 [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases) writes each column's value type in `Whereable`, `Insertable` and `Updatable` as an alias of `zapatos/db`, with the same types. It has no note, as there is nothing to migrate, and 8.0 keeps it alone.
 

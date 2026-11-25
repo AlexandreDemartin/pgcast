@@ -30,7 +30,7 @@ For its rows one by one, as [`cursor()`](/transaction#cursor) reads them, the sa
 
 - Each row is one `jsonb` value, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, so dates and times come back as strings and `bigint` as a number: the `JSONSelectable` types say so ([The catalog](/catalog-types)).
 - The rows are gathered into one array, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, around a subquery aliased `"sq_<alias or table>"`, so `ORDER BY` and `LIMIT` apply to the rows. One query, one value back. On large values, many rows or nested laterals, that JSON costs: [Performance](/performance), and [With `shortcutsUseJson`](#shortcutsUseJson).
-  - With [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), a `select()` run or compiled on its own sends the rows themselves, `SELECT to_jsonb("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all)) -->, [`selectRows()`](#selectRows)'s query, and `.run()` gives the same array; nested, it keeps the aggregate.
+  - From 7.3.0, with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), a `select()` run or compiled on its own sends the rows themselves, `SELECT to_jsonb("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all)) -->, [`selectRows()`](#selectRows)'s query, and `.run()` gives the same array; nested, it keeps the aggregate.
 - Inside, the clauses come in this order: `SELECT [DISTINCT …]` · the columns `AS result` · `FROM` the table `[AS alias]` · each `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` or `FETCH FIRST … WITH TIES` · `OFFSET` · each `FOR …` lock.
 - Every value is a parameter (`$1`, `$2`); every name is quoted as Postgres quotes it, any `"` in it doubled. Zapatos 6.6.1 let a name that held a `"` close its quotes; pgcast fixed this ([changelog](/changelog#6.6.2-security)).
 
@@ -61,7 +61,7 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 
 ### With `shortcutsUseJson` {#shortcutsUseJson}
 
-With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), each row and the array are built with `json` functions, in place of their `jsonb` twins. The values and the types are the same, but for a row's key order and a nested result's type, `json`.
+From 7.3.0. With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), each row and the array are built with `json` functions, in place of their `jsonb` twins. The values and the types are the same, but for a row's key order and a nested result's type, `json`.
 
 | Option | SQL with `shortcutsUseJson` |
 |---|---|
@@ -292,7 +292,7 @@ From 6.12.0. The query [`select()`](#select) wraps in `jsonb_agg`, as a fragment
 |---|---|
 | `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
 | `db.select(…)`, the same arguments | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, the same query inside, with the same values |
-| `db.select(…)` with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows) | `selectRows()`'s query, run or compiled on its own; a single `lateral` passed through is converted above it, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
+| `db.select(…)` with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0 | `selectRows()`'s query, run or compiled on its own; a single `lateral` passed through is converted above it, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
 
 A studio's films, read 100 at a time:
 

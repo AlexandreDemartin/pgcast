@@ -1,5 +1,5 @@
 ---
-english: 4708cdc02b57
+english: 7d8864bd8445
 ---
 
 # Écritures
@@ -11,7 +11,7 @@ Ce que partagent toutes les écritures :
 
 - Chacune renvoie un `SQLFragment` : [`.run(pool)`](/fr/sql-template#run) l’envoie, `.compile()` donne son `text` et ses `values` sans rien envoyer.
 - Une valeur est envoyée comme paramètre (`$1`), jamais écrite dans le SQL ; un fragment `sql` est du SQL.
-- Les lignes reviennent via `to_jsonb()`, ou `to_json()` [avec `shortcutsUseJson`](#shortcutsUseJson), comme le `JSONSelectable` d’une table : un `timestamptz` est une chaîne ([Le catalogue](/fr/catalog-types)).
+- Les lignes reviennent via `to_jsonb()`, ou `to_json()` [avec `shortcutsUseJson`](#shortcutsUseJson), à partir de la 7.3.0, comme le `JSONSelectable` d’une table : un `timestamptz` est une chaîne ([Le catalogue](/fr/catalog-types)).
 - Une erreur de Postgres rejette `.run()` avec une `DatabaseError` ([`isDatabaseError()`](/fr/transaction#isDatabaseError)). pgcast lève les erreurs ci-dessous pendant qu’il construit la requête, avant tout envoi.
 
 ## `insert()` {#insert}
@@ -68,7 +68,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 
 ### Avec `shortcutsUseJson` {#shortcutsUseJson}
 
-Avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), le `RETURNING` d’`insert()`, d’`upsert()`, d’`update()` et de `deletes()` est construit avec les fonctions `json`, à la place de leurs équivalents `jsonb`. Les valeurs et les types sont les mêmes, à part l’ordre des clés d’une ligne : les colonnes de la table, puis `extras`, puis `$action`.
+À partir de la 7.3.0. Avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), le `RETURNING` d’`insert()`, d’`upsert()`, d’`update()` et de `deletes()` est construit avec les fonctions `json`, à la place de leurs équivalents `jsonb`. Les valeurs et les types sont les mêmes, à part l’ordre des clés d’une ligne : les colonnes de la table, puis `extras`, puis `$action`.
 
 | Option | SQL avec `shortcutsUseJson` |
 |---|---|

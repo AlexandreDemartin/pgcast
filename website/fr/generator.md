@@ -1,5 +1,5 @@
 ---
-english: 6965bcae7f0b
+english: 4c2f6ca924c4
 ---
 
 # Générateur
@@ -572,7 +572,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 - Deux types de même nom partagent un placeholder ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)) : il ne nomme l’union que tant que le domaine est le seul type de l’exécution à prendre ce nom. Sinon, il contient le texte qu’il aurait avec `false`, le type de base du type de la colonne lue en dernier, par schéma, puis relation, puis colonne, qui peut ne pas être celui de ce domaine : `number`, pour un domaine sur `integer` de ce nom lu par une relation qui vient après celle de ce domaine. L’union est déclarée malgré tout.
 - Avec [`customTypesTransform`](#generate.customTypesTransform) à `'my_type'`, ou à une fonction qui garde le nom, un placeholder de [`unprefixedSchema`](#generate.unprefixedSchema) prend le nom même de l’union, et la nomme sans import : `export type certificate = import('zapatos/schema').certificate;`.
 - Avec [`schemaJSDoc`](#generate.schemaJSDoc), la JSDoc de l’union donne son nom, `Domain in database`, et son `COMMENT ON DOMAIN`.
-- Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus, et le générateur ne lit aucune contrainte de domaine. L’option reste désactivée en 7.0 : un placeholder qui contient le type de base est la façon dont Zapatos type un domaine ([décision 008](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/008-domains-jsonb-validators.md)).
+- Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus, et le générateur ne lit aucune contrainte de domaine. L’option reste désactivée pendant toute la série 7.x : un placeholder qui contient le type de base est la façon dont Zapatos type un domaine ([décision 008](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/008-domains-jsonb-validators.md)). La 8.0 ne garde que ce comportement ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 ### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
 

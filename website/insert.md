@@ -7,7 +7,7 @@ What every write shares:
 
 - It returns a `SQLFragment`: [`.run(pool)`](/sql-template#run) sends it, `.compile()` gives its `text` and `values` without sending anything.
 - A value is sent as a parameter (`$1`), never written into the SQL; a `sql` fragment is SQL.
-- Rows come back through `to_jsonb()`, or `to_json()` [with `shortcutsUseJson`](#shortcutsUseJson), as a table's `JSONSelectable`: a `timestamptz` is a string ([The catalog](/catalog-types)).
+- Rows come back through `to_jsonb()`, or `to_json()` [with `shortcutsUseJson`](#shortcutsUseJson), from 7.3.0, as a table's `JSONSelectable`: a `timestamptz` is a string ([The catalog](/catalog-types)).
 - An error from Postgres rejects `.run()` with a `DatabaseError` ([`isDatabaseError()`](/transaction#isDatabaseError)). The errors below are thrown by pgcast as it builds the query, before anything is sent.
 
 ## `insert()` {#insert}
@@ -64,7 +64,7 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 ### With `shortcutsUseJson` {#shortcutsUseJson}
 
-With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), the `RETURNING` of `insert()`, `upsert()`, `update()` and `deletes()` is built with `json` functions, in place of their `jsonb` twins. The values and the types are the same, but for a row's key order: the table's columns, then `extras`, then `$action`.
+From 7.3.0. With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), the `RETURNING` of `insert()`, `upsert()`, `update()` and `deletes()` is built with `json` functions, in place of their `jsonb` twins. The values and the types are the same, but for a row's key order: the table's columns, then `extras`, then `$action`.
 
 | Option | SQL with `shortcutsUseJson` |
 |---|---|
