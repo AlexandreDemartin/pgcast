@@ -66,7 +66,7 @@ describe('withCTEs', () => {
       .toEqual({ id: 1, account: { owner_id: 1 } });
   });
 
-  it('select() with topLevelSelectAsRows: the main query gives the same array from its rows, a CTE its aggregate', async () => {
+  it('select(): the main query gives the array of its aggregate, a copy\'s, from its rows, a CTE its aggregate', async () => {
     const
       inReportsAsRows = () => db.select('users', { id: sql`${self} IN (SELECT id FROM reports)` }, { columns: ['display_name'], order: { by: 'id', direction: 'ASC' } }),
       queries = () => [
@@ -76,13 +76,11 @@ describe('withCTEs', () => {
         db.withCTEs({ reports }, inReportsAsRows()).copy(),
         db.withCTEs({ reports }, db.select('users', { id: -1 })),
       ],
-      off: unknown[] = [];
-    for (const query of queries()) off.push(await query.run(t.client));
-    db.setConfig({ topLevelSelectAsRows: true });
-    const on: unknown[] = [];
-    for (const query of queries()) on.push(await query.run(t.client));
-    expect(on).toEqual(off);
-    expect(on).toEqual([
+      copied: unknown[] = [], own: unknown[] = [];
+    for (const query of queries()) copied.push(await query.copy().run(t.client));
+    for (const query of queries()) own.push(await query.run(t.client));
+    expect(own).toEqual(copied);
+    expect(own).toEqual([
       [{ display_name: 'Bob' }, { display_name: 'Cyd' }], [{ display_name: 'Bob' }, { display_name: 'Cyd' }],
       [{ result: [{ display_name: 'Bob' }] }], [{ display_name: 'Bob' }, { display_name: 'Cyd' }], [],
     ]);
@@ -90,8 +88,7 @@ describe('withCTEs', () => {
     expect([await prepared.run(t.client), await prepared.run(t.client)]).toEqual([[{ id: 2 }, { id: 3 }], [{ id: 2 }, { id: 3 }]]);
   });
 
-  it('select() with topLevelSelectAsRows, prepared and run on its own, then a CTE: the CTE is its aggregate, unprepared', async () => {
-    db.setConfig({ topLevelSelectAsRows: true });
+  it('select(), prepared and run on its own, then a CTE: the CTE is its aggregate, unprepared', async () => {
     const tag = randomBytes(4).toString('hex');
     for (const [i, options] of [{}, { lateral: db.count('accounts', { owner_id: parent('id') }) }].entries()) {
       const query = db.select('users', all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, ...options } as any).prepared(`pgcast_ctes_rows_${tag}_${i}`);

@@ -1363,16 +1363,16 @@ describe('truncate', () => {
 });
 
 describe('select', () => {
-  it('all rows, or a Whereable: rows aggregated with json_agg in a sub-select', () => {
+  it('all rows, or a Whereable: on its own, one row per result, selectRows()\'s query', () => {
     expect(db.select('users', all).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users"",
+        "text": "SELECT to_json("users".*) AS result FROM "users"",
         "values": [],
       }
     `);
     expect(db.select('users', { mood: 'ok' }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("mood" = $1)) AS "sq_users"",
+        "text": "SELECT to_json("users".*) AS result FROM "users" WHERE ("mood" = $1)",
         "values": [
           "ok",
         ],
@@ -1381,18 +1381,18 @@ describe('select', () => {
   });
 
   it('distinct: true, a column, a list, a fragment, false', () => {
-    expect(db.select('users', all, { distinct: true }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: 'mood' }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("mood") to_json("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: ['mood', 'manager_id'] }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("mood", "manager_id") to_json("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: sql`lower(${'display_name'})` }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON (lower("display_name")) to_json("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: false }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { distinct: true }).compile().text).toMatchInlineSnapshot(`"SELECT DISTINCT to_jsonb("users".*) AS result FROM "users""`);
+    expect(db.select('users', all, { distinct: 'mood' }).compile().text).toMatchInlineSnapshot(`"SELECT DISTINCT ON ("mood") to_json("users".*) AS result FROM "users""`);
+    expect(db.select('users', all, { distinct: ['mood', 'manager_id'] }).compile().text).toMatchInlineSnapshot(`"SELECT DISTINCT ON ("mood", "manager_id") to_json("users".*) AS result FROM "users""`);
+    expect(db.select('users', all, { distinct: sql`lower(${'display_name'})` }).compile().text).toMatchInlineSnapshot(`"SELECT DISTINCT ON (lower("display_name")) to_json("users".*) AS result FROM "users""`);
+    expect(db.select('users', all, { distinct: false }).compile().text).toMatchInlineSnapshot(`"SELECT to_json("users".*) AS result FROM "users""`);
   });
 
   it('order: one spec, a list, nulls, a fragment', () => {
-    expect(db.select('users', all, { order: { by: 'id', direction: 'DESC' } }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "id" DESC) AS "sq_users""`);
+    expect(db.select('users', all, { order: { by: 'id', direction: 'DESC' } }).compile().text).toMatchInlineSnapshot(`"SELECT to_json("users".*) AS result FROM "users" ORDER BY "id" DESC"`);
     expect(db.select('users', all, {
       order: [{ by: 'mood', direction: 'ASC', nulls: 'LAST' }, { by: sql`lower(${'display_name'})`, direction: 'DESC', nulls: 'FIRST' }],
-    }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "mood" ASC NULLS LAST, lower("display_name") DESC NULLS FIRST) AS "sq_users""`);
+    }).compile().text).toMatchInlineSnapshot(`"SELECT to_json("users".*) AS result FROM "users" ORDER BY "mood" ASC NULLS LAST, lower("display_name") DESC NULLS FIRST"`);
   });
 
   it('order: a bad direction or nulls throws', () => {
@@ -1405,7 +1405,7 @@ describe('select', () => {
   it('limit, offset, withTies', () => {
     expect(db.select('users', all, { limit: 2, offset: 1 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"",
+        "text": "SELECT to_json("users".*) AS result FROM "users" LIMIT $1 OFFSET $2",
         "values": [
           2,
           1,
@@ -1415,7 +1415,7 @@ describe('select', () => {
     expect(db.select('users', all, { order: { by: 'mood', direction: 'ASC' }, limit: 1, withTies: true, offset: 0 }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "mood" ASC FETCH FIRST $1 ROWS WITH TIES OFFSET $2) AS "sq_users"",
+          "text": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "mood" ASC FETCH FIRST $1 ROWS WITH TIES OFFSET $2",
           "values": [
             1,
             0,
@@ -1423,7 +1423,7 @@ describe('select', () => {
         }
       `);
     // characterization: withTies without limit is ignored
-    expect(db.select('users', all, { withTies: true }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { withTies: true }).compile().text).toMatchInlineSnapshot(`"SELECT to_json("users".*) AS result FROM "users""`);
   });
 
   it('columns and extras', () => {
@@ -1432,7 +1432,7 @@ describe('select', () => {
       extras: { reports: sql`(SELECT count(*) FROM ${'users'} AS "r" WHERE "r".${'manager_id'} = ${'users'}.${'id'})`, mail: 'email' },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "display_name", $3::text, (SELECT count(*) FROM "users" AS "r" WHERE "r"."manager_id" = "users"."id"), $4::text, "email") AS result FROM "users") AS "sq_users"",
+        "text": "SELECT json_build_object($1::text, "id", $2::text, "display_name", $3::text, (SELECT count(*) FROM "users" AS "r" WHERE "r"."manager_id" = "users"."id"), $4::text, "email") AS result FROM "users"",
         "values": [
           "id",
           "display_name",
@@ -1528,7 +1528,7 @@ describe('select', () => {
       columns: ['owner_id'], extras: { n: sql`count(*)` }, groupBy: 'owner_id', having: sql`count(*) > ${param(1)}`,
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "owner_id", $2::text, count(*)) AS result FROM "accounts" GROUP BY "owner_id" HAVING count(*) > $3) AS "sq_accounts"",
+        "text": "SELECT json_build_object($1::text, "owner_id", $2::text, count(*)) AS result FROM "accounts" GROUP BY "owner_id" HAVING count(*) > $3",
         "values": [
           "owner_id",
           "n",
@@ -1539,13 +1539,13 @@ describe('select', () => {
     expect(db.select('accounts', all, { groupBy: ['owner_id', 'id'], having: { owner_id: 1 } }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" GROUP BY "owner_id", "id" HAVING ("owner_id" = $1)) AS "sq_accounts"",
+          "text": "SELECT to_json("accounts".*) AS result FROM "accounts" GROUP BY "owner_id", "id" HAVING ("owner_id" = $1)",
           "values": [
             1,
           ],
         }
       `);
-    expect(db.select('accounts', all, { groupBy: sql`${'owner_id'}` }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" GROUP BY "owner_id") AS "sq_accounts""`);
+    expect(db.select('accounts', all, { groupBy: sql`${'owner_id'}` }).compile().text).toMatchInlineSnapshot(`"SELECT to_json("accounts".*) AS result FROM "accounts" GROUP BY "owner_id""`);
   });
 
   it('lateral as an object: one LEFT JOIN LATERAL per key, keys sorted', () => {
@@ -1556,7 +1556,7 @@ describe('select', () => {
       },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_accountCount".result AS "accountCount", "lateral_accounts".result AS "accounts" FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_accountCount" ON true LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true) AS "row_users") AS "sq_users"",
+        "text": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_accountCount".result AS "accountCount", "lateral_accounts".result AS "accounts" FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_accountCount" ON true LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true) AS "row_users"",
         "values": [],
       }
     `);
@@ -1566,7 +1566,7 @@ describe('select', () => {
     expect(db.select('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true) AS "sq_users"",
+          "text": "SELECT to_json(result) AS result FROM (SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true) AS "sq_users"",
           "values": [],
         }
       `);
@@ -1595,7 +1595,7 @@ describe('select', () => {
       },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_u".*) AS result FROM (SELECT "u".*, "lateral_reports".result AS "reports" FROM "users" AS "u" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_r".*) AS result FROM (SELECT "r".*, "lateral_accounts".result AS "accounts" FROM "users" AS "r" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "r"."id")) AS "sq_accounts") AS "lateral_accounts" ON true WHERE ("manager_id" = "u"."id")) AS "row_r") AS "sq_r") AS "lateral_reports" ON true WHERE ("id" = $2)) AS "row_u") AS "sq_u"",
+        "text": "SELECT to_json("row_u".*) AS result FROM (SELECT "u".*, "lateral_reports".result AS "reports" FROM "users" AS "u" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_r".*) AS result FROM (SELECT "r".*, "lateral_accounts".result AS "accounts" FROM "users" AS "r" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "r"."id")) AS "sq_accounts") AS "lateral_accounts" ON true WHERE ("manager_id" = "u"."id")) AS "row_r") AS "sq_r") AS "lateral_reports" ON true WHERE ("id" = $2)) AS "row_u"",
         "values": [
           "id",
           1,
@@ -1605,12 +1605,12 @@ describe('select', () => {
   });
 
   it('lock: one, a list, of, wait', () => {
-    expect(db.select('users', all, { lock: { for: 'UPDATE' } }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE) AS "sq_users""`);
+    expect(db.select('users', all, { lock: { for: 'UPDATE' } }).compile().text).toMatchInlineSnapshot(`"SELECT to_json("users".*) AS result FROM "users" FOR UPDATE"`);
     expect(db.select('users', all, { alias: 'u', lock: [
       { for: 'NO KEY UPDATE', of: 'u', wait: 'NOWAIT' },
       { for: 'SHARE', of: ['u'], wait: 'SKIP LOCKED' },
       { for: 'KEY SHARE' },
-    ] }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("u".*) AS result FROM "users" AS "u" FOR NO KEY UPDATE OF "u" NOWAIT FOR SHARE OF "u" SKIP LOCKED FOR KEY SHARE) AS "sq_u""`);
+    ] }).compile().text).toMatchInlineSnapshot(`"SELECT to_json("u".*) AS result FROM "users" AS "u" FOR NO KEY UPDATE OF "u" NOWAIT FOR SHARE OF "u" SKIP LOCKED FOR KEY SHARE"`);
   });
 
   /** An `order` or `lock` item whose keys are getters that log each read; `key` answers `first`, then `later`. */
@@ -1626,7 +1626,7 @@ describe('select', () => {
     try { result = db.select('users', all, { [option]: item } as any).compile(); } catch (err) { result = `throws: ${(err as Error).message}`; }
     return { result, log };
   };
-  const ordered = (clause: string) => ({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
+  const ordered = (clause: string) => ({ text: `SELECT to_json("users".*) AS result FROM "users"${clause}`, values: [] });
 
   // a getter may answer anew on each read: each key goes into the SQL, or the message, as its one read was checked;
   // Zapatos 6.6.1 read direction and nulls again for raw(), pgcast 6.6.2 to 6.8.0 for, wait, direction and nulls (#586)
@@ -1709,7 +1709,7 @@ describe('selectOne, selectExactlyOne', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     const manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm' });
     expect(db.select('users', all, { columns: ['id'], lateral: { manager } }).compile()).toEqual({
-      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_manager".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_json("m".*) AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $3) AS "lateral_manager" ON true) AS "sq_users"`,
+      text: `SELECT json_build_object($1::text, "id", $2::text, "lateral_manager".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_json("m".*) AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $3) AS "lateral_manager" ON true`,
       values: ['id', 'manager', 1],
     });
     expect(db.selectOne('users', all, { lateral: manager }).compile().values).toEqual([1, 1]);
@@ -1736,7 +1736,7 @@ describe('selectOne, selectExactlyOne', () => {
       byOwner = { columns: ['id'], order: { by: 'owner_id', direction: 'ASC' }, withTies: true } as const,
       topText = 'SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "owner_id" ASC FETCH FIRST $3 ROWS WITH TIES',
       inLateral = (account: db.SQLFragment<any>) => db.select('users', all, { columns: ['id'], lateral: { account } }).compile(),
-      lateralText = `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_account".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT json_build_object($3::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "users"."id") ORDER BY "owner_id" ASC FETCH FIRST $4 ROWS WITH TIES) AS "lateral_account" ON true) AS "sq_users"`;
+      lateralText = `SELECT json_build_object($1::text, "id", $2::text, "lateral_account".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT json_build_object($3::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "users"."id") ORDER BY "owner_id" ASC FETCH FIRST $4 ROWS WITH TIES) AS "lateral_account" ON true`;
 
     it('selectOne, at top level and in a lateral', () => {
       expect(db.selectOne('accounts', { owner_id: 1 }, byOwner).compile()).toEqual({ text: topText, values: ['id', 1, 1] });
@@ -1760,7 +1760,7 @@ describe('selectOne, selectExactlyOne', () => {
       n = db.count('accounts', { owner_id: parent('id') }),
       manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm', columns: ['display_name'] });
     expect(db.select('users', all, { columns: ['id'], lateral: { n, manager } }).compile()).toEqual({
-      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_manager".result, $3::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT json_build_object($4::text, "display_name") AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $5) AS "lateral_manager" ON true LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true) AS "sq_users"`,
+      text: `SELECT json_build_object($1::text, "id", $2::text, "lateral_manager".result, $3::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT json_build_object($4::text, "display_name") AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $5) AS "lateral_manager" ON true LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true`,
       values: ['id', 'manager', 'n', 'display_name', 1],
     });
     expect(db.selectOne('users', { id: 2 }, { lateral: n }).compile()).toEqual({
@@ -1809,7 +1809,8 @@ describe('selectRows', () => {
     `);
   });
 
-  // each select() text is `SELECT coalesce(json_agg(result), '[]') AS result FROM (` + selectRows()'s + `) AS "sq_<alias>"`
+  // each select() copy's text, as it compiles nested, is `SELECT coalesce(json_agg(result), '[]') AS result FROM (` +
+  // selectRows()'s + `) AS "sq_<alias>"`
   const cases: [string, Parameters<typeof db.select>[0], any, any?][] = [
     ['db.all', 'users', all],
     ['a Whereable', 'users', { mood: 'ok', manager_id: 1 }],
@@ -1833,13 +1834,13 @@ describe('selectRows', () => {
   const aggregated = (rows: db.SQLQuery, alias: string) =>
     ({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (${rows.text}) AS "sq_${alias.replace(/"/g, '""')}"`, values: rows.values });
 
-  it.each(cases)('%s: select() sends the same query, in json_agg', (_, table, where, options) => {
-    expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
+  it.each(cases)('%s: a copy of select() sends the same query, in json_agg', (_, table, where, options) => {
+    expect(db.select(table, where, options).copy().compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
   });
 
-  it.each(cases)('%s, with selectExactlyOneChecksForSecondRow: select() sends the same query, in json_agg', (_, table, where, options) => {
+  it.each(cases)('%s, with selectExactlyOneChecksForSecondRow: a copy of select() sends the same query, in json_agg', (_, table, where, options) => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
+    expect(db.select(table, where, options).copy().compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
   });
 
   it('gives one result per row, [] for none, and so does a copy', () => {
@@ -1864,30 +1865,16 @@ describe('selectRows', () => {
     expect(Object.keys(db.SelectResultMode)).toEqual(['0', '1', '2', '3', 'Many', 'One', 'ExactlyOne', 'Numeric']);
   });
 
-  describe('select() with topLevelSelectAsRows (note 018 § 3)', () => {
+  describe('select() at the top level: selectRows()\'s query (note 018 § 3, decision 019 § 3)', () => {
     const
-      asRows = () => db.setConfig({ topLevelSelectAsRows: true }),
-      // what `build()` compiles to without the option, then with it
-      offAndOn = (build: () => db.SQLFragment<any, any>) => {
-        const off = build().compile();
-        asRows();
-        return [off, build().compile()];
-      },
       passthrough = { lateral: db.count('accounts', { owner_id: parent('id') }) as any },  // selectRows()'s type refuses a lateral typed number (#749)
       passthroughRows = 'SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true';
 
     it.each(cases.filter(([name]) => name !== 'a lateral passed through'))('%s: compiled on its own, select() sends selectRows()\'s query', (_, table, where, options) => {
-      asRows();
       expect(db.select(table, where, options).compile()).toEqual(db.selectRows(table, where, options).compile());
     });
 
-    it.each(cases)('%s, with topLevelSelectAsRows: false: select() sends the same query, in json_agg', (_, table, where, options) => {
-      db.setConfig({ topLevelSelectAsRows: false });
-      expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
-    });
-
     it('the rows query, with no json_agg', () => {
-      asRows();
       expect(db.select('accounts', { owner_id: 1 }, { order: { by: 'id', direction: 'ASC' } }).compile()).toEqual({
         text: 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) ORDER BY "id" ASC',
         values: [1],
@@ -1896,12 +1883,10 @@ describe('selectRows', () => {
 
     it('a single lateral passed through is converted to JSON above the same rows query, as json_agg() converts it', () => {
       expect(db.selectRows('users', all, passthrough).compile().text).toBe(passthroughRows);
-      asRows();
       expect(db.select('users', all, passthrough).compile()).toEqual({ text: `SELECT to_json(result) AS result FROM (${passthroughRows}) AS "sq_users"`, values: [] });
     });
 
     it('a lateral map: the parent gives its rows, each lateral select() its json_agg', () => {
-      asRows();
       expect(db.select('users', all, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } }).compile()).toEqual({
         text: `SELECT json_build_object($1::text, "id", $2::text, "lateral_accounts".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true`,
         values: ['id', 'accounts'],
@@ -1909,22 +1894,20 @@ describe('selectRows', () => {
     });
 
     it('nested, it keeps its json_agg: a lateral, a lateral passed through, extras, a sql template', () => {
-      const accounts = () => db.select('accounts', { owner_id: parent('id') });
-      for (const build of [
-        () => db.selectOne('users', { id: 1 }, { lateral: { accounts: accounts() } }),
-        () => db.selectOne('users', { id: 1 }, { lateral: accounts() }),
-        () => db.selectOne('users', { id: 1 }, { extras: { accounts: db.select('accounts', { owner_id: 1 }) } }),
-        () => sql`SELECT (${db.select('accounts', { owner_id: 1 })}) AS accounts`,
-      ]) {
-        const [off, on] = offAndOn(build);
-        expect(on).toEqual(off);
-        expect(on.text).toContain(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE`);
-        db.setConfig({ topLevelSelectAsRows: false });
-      }
+      const
+        accounts = () => db.select('accounts', { owner_id: parent('id') }),
+        aggregate = (where: string) => `(SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = ${where})) AS "sq_accounts")`;
+      expect(db.selectOne('users', { id: 1 }, { lateral: { accounts: accounts() } }).compile().text)
+        .toContain(`LEFT JOIN LATERAL ${aggregate('"users"."id"')} AS "lateral_accounts" ON true`);
+      expect(db.selectOne('users', { id: 1 }, { lateral: accounts() }).compile().text)
+        .toContain(`LEFT JOIN LATERAL ${aggregate('"users"."id"')} AS "lateral_passthru" ON true`);
+      expect(db.selectOne('users', { id: 1 }, { extras: { accounts: db.select('accounts', { owner_id: 1 }) } }).compile().text)
+        .toContain(`, ${aggregate('$1')} AS "accounts" FROM "users"`);
+      expect(sql`SELECT (${db.select('accounts', { owner_id: 1 })}) AS accounts`.compile())
+        .toEqual({ text: `SELECT (${aggregate('$1').slice(1, -1)}) AS accounts`, values: [1] });
     });
 
     it('a copy compiles as nested, with its json_agg, and keeps the aggregate\'s runResultTransform', () => {
-      asRows();
       const q = db.select('accounts', { owner_id: 1 }), qr = (results: unknown[]) => ({ rows: results.map(result => ({ result })) }) as any;
       expect(q.copy().compile()).toEqual({
         text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)) AS "sq_accounts"`,
@@ -1937,7 +1920,6 @@ describe('selectRows', () => {
     });
 
     it('prepared(), noop and parentTable set on the query go with the rows form', () => {
-      asRows();
       const text = 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)';
       expect(db.select('accounts', { owner_id: 1 }).prepared('accounts_rows').compile()).toEqual({ text, values: [1], name: 'accounts_rows' });
       const q = db.select('accounts', { owner_id: 1 });
@@ -1949,7 +1931,6 @@ describe('selectRows', () => {
     });
 
     it('compiled on its own first, its name and noop stay off its nested forms: a CTE, a copy', () => {
-      asRows();
       for (const options of [{}, passthrough]) {
         const
           aggregate = db.select('users', all, options).copy().compile(),
@@ -1963,33 +1944,16 @@ describe('selectRows', () => {
       }
     });
 
-    it('is read when select() is called, not when the query is compiled', () => {
-      const off = db.select('accounts', all);
-      asRows();
-      const on = db.select('accounts', all);
-      db.setConfig({ topLevelSelectAsRows: false });
-      expect([off.compile().text, on.compile().text]).toEqual([
-        `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts") AS "sq_accounts"`,
-        'SELECT to_json("accounts".*) AS result FROM "accounts"',
-      ]);
-    });
-
     it('leaves selectRows(), selectOne(), selectExactlyOne(), count() and the other aggregates as they are', () => {
-      for (const build of [
-        () => db.selectRows('accounts', { owner_id: 1 }),
-        () => db.selectOne('accounts', { owner_id: 1 }),
-        () => db.selectExactlyOne('accounts', { owner_id: 1 }),
-        () => db.count('accounts', { owner_id: 1 }),
-        () => db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }),
-      ]) {
-        const [off, on] = offAndOn(build);
-        expect(on).toEqual(off);
-        db.setConfig({ topLevelSelectAsRows: false });
-      }
+      expect(db.selectRows('accounts', { owner_id: 1 }).compile().text).toBe('SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)');
+      expect(db.selectOne('accounts', { owner_id: 1 }).compile()).toEqual({ text: 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) LIMIT $2', values: [1, 1] });
+      expect(db.selectExactlyOne('accounts', { owner_id: 1 }).compile()).toEqual({ text: 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) LIMIT $2', values: [1, 1] });
+      expect(db.count('accounts', { owner_id: 1 }).compile().text).toBe('SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = $1)');
+      expect(db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }).compile().text).toBe('SELECT sum("balance") AS result FROM "accounts" WHERE ("owner_id" = $1)');
     });
 
     it('with selectExactlyOneChecksForSecondRow too, each keeps its own top-level form', () => {
-      db.setConfig({ topLevelSelectAsRows: true, selectExactlyOneChecksForSecondRow: true });
+      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
       expect(db.select('accounts', { owner_id: 1 }).compile().text).toBe('SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)');
       expect(db.selectExactlyOne('accounts', { owner_id: 1 }).compile().values).toEqual([1, 2]);
     });
@@ -2581,7 +2545,7 @@ describe('lateral: null, or a lateral key whose query is null or undefined', () 
   it('lateral: undefined and an object of queries compile as before', () => {
     expect(db.select('users', all, { lateral: undefined }).compile()).toEqual(db.select('users', all).compile());
     expect(db.select('users', all, { lateral: { n: db.count('accounts', all) } }).compile().text)
-      .toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_n".result AS "n" FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "row_users") AS "sq_users"`);
+      .toBe(`SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_n".result AS "n" FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "row_users"`);
   });
 });
 
@@ -2697,7 +2661,7 @@ describe('null as options, or as an options key', () => {
     expect(db.insert('users', [], { returning: no, extras: no }).compile()).toEqual(db.insert('users', []).compile());
     // sent as a parameter: Postgres reads LIMIT NULL as no limit, OFFSET NULL as none
     expect(db.select('users', all, { limit: no, offset: no }).compile()).toEqual({
-      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"`,
+      text: `SELECT to_json("users".*) AS result FROM "users" LIMIT $1 OFFSET $2`,
       values: [null, null],
     });
   });
@@ -2710,7 +2674,6 @@ describe('a shortcut option added to Object.prototype by something else is no op
   const
     row = { email: 'e@x.org', display_name: 'E' },
     upsertReturning = ` RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result`,
-    selectMany = (inner: string) => `SELECT coalesce(json_agg(result), '[]') AS result FROM (${inner}) AS "sq_users"`,
     plain = { text: 'SELECT to_json("users".*) AS result FROM "users"', values: [] },
     tied = { text: 'SELECT to_json("users".*) AS result FROM "users" ORDER BY "email" ASC LIMIT $1', values: [1] };
 
@@ -2780,7 +2743,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
 
   it.each(selectKeys)('select(): %s', key => {
     const expected = key === 'withTies' ? tied : plain;
-    expect(compiledWithKey(key, o => db.select('users', all, o))).toEqual({ text: selectMany(expected.text), values: expected.values });
+    expect(compiledWithKey(key, o => db.select('users', all, o))).toEqual({ text: expected.text, values: expected.values });
   });
 
   // limit is left out: the copy selectOne() and selectExactlyOne() read their options from owns `limit: 1`
@@ -2812,7 +2775,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
     ['of', 'users', { lock: { for: 'UPDATE' } }, ' FOR UPDATE'],
   ])('select(): an item\'s %s', (key, v, options, clause) => {
     expect(withPrototypeKey(key, v, () => db.select('users', all, options as any).compile()))
-      .toEqual({ text: selectMany(`${plain.text}${clause}`), values: [] });
+      .toEqual({ text: `${plain.text}${clause}`, values: [] });
   });
 
   it.each([
@@ -2837,7 +2800,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
 
   // the reads that refuse a value with no meaning, before the query: what Object.prototype holds is no value there either
   it.each([
-    ['select(): lateral null', 'lateral', () => null, () => db.select('users', all), selectMany(plain.text)],
+    ['select(): lateral null', 'lateral', () => null, () => db.select('users', all), plain.text],
     ['count(): two columns', 'columns', () => ['email', 'display_name'], () => db.count('users', all), 'SELECT count(*) AS result FROM "users"'],
     ['count(): a lateral query', 'lateral', () => db.selectOne('accounts', all), () => db.count('users', all), 'SELECT count(*) AS result FROM "users"'],
   ])('%s', (_, key, v, build, text) => {
@@ -2875,7 +2838,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
     return { selected, upserted, options, order, lock, writes, reads, ownReads: ownReads.n, locked, ordered };
   };
   const readAsBefore = {
-    selected: { text: selectMany(`${plain.text} ORDER BY "email" ASC FOR UPDATE`), values: [] },
+    selected: { text: `${plain.text} ORDER BY "email" ASC FOR UPDATE`, values: [] },
     upserted: {
       text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING json_build_object($3::text, "email", \'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
       values: ['E', 'e@x.org', 'email'],
@@ -2888,8 +2851,8 @@ describe('a shortcut option added to Object.prototype by something else is no op
     writes: { 'get:noNullUpdateColumns': 1, 'get:updateColumns': 1, 'get:updateValues': 1, 'get:returning': 1, 'get:extras': 1, 'get:reportAction': 1 },
     reads: 3,
     ownReads: 3,
-    locked: selectMany(`${plain.text} FOR SHARE`),
-    ordered: selectMany(`${plain.text} ORDER BY "email" DESC`),
+    locked: `${plain.text} FOR SHARE`,
+    ordered: `${plain.text} ORDER BY "email" DESC`,
   };
 
   it('a Proxy and a getter are read as before, as often and through the same traps', () => {
@@ -2925,9 +2888,9 @@ describe('a shortcut option added to Object.prototype by something else is no op
     ['upsert(): a column of updateValues', 'mood', () => param('X'), () => db.upsert('users', { email: 'e@x.org', mood: 'ok' }, 'email', { updateValues: {} }),
       { text: 'INSERT INTO "users" ("email", "mood") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", EXCLUDED."mood")' + upsertReturning, values: ['e@x.org', 'ok'] }, 1],
     ['select(): order', 'order', () => ({ by: 'email', direction: 'DESC' }), () => db.select('users', all, {}),
-      { text: selectMany(plain.text), values: [] }, 2],
+      { text: plain.text, values: [] }, 2],
     ['select(): an order item\'s nulls', 'nulls', () => 'FIRST', () => db.select('users', all, { order: { by: 'email', direction: 'ASC' } }),
-      { text: selectMany(`${plain.text} ORDER BY "email" ASC`), values: [] }, 1],
+      { text: `${plain.text} ORDER BY "email" ASC`, values: [] }, 1],
   ])('a getter on Object.prototype is no option either: %s', (_, key, make, build, compiled, reads) => {
     expect({
       get: withPrototypeGetter(key, make, () => build().compile()),
@@ -2946,11 +2909,11 @@ describe('a shortcut option added to Object.prototype by something else is no op
 
   // NaN is not `===` itself, yet the NaN read is the one Object.prototype holds; the caller's own NaN is still read
   it.each([
-    ['select(): limit', 'limit', () => db.select('users', all, {}), { text: selectMany(plain.text), values: [] }],
-    ['select(): offset', 'offset', () => db.select('users', all, {}), { text: selectMany(plain.text), values: [] }],
+    ['select(): limit', 'limit', () => db.select('users', all, {}), { text: plain.text, values: [] }],
+    ['select(): offset', 'offset', () => db.select('users', all, {}), { text: plain.text, values: [] }],
     ['upsert(): a column of updateValues', 'mood', () => db.upsert('users', { email: 'e@x.org', mood: 'ok' }, 'email', { updateValues: {} }),
       { text: 'INSERT INTO "users" ("email", "mood") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", EXCLUDED."mood")' + upsertReturning, values: ['e@x.org', 'ok'] }],
-    ['select(): an own limit', 'limit', () => db.select('users', all, { limit: NaN }), { text: selectMany(`${plain.text} LIMIT $1`), values: [NaN] }],
+    ['select(): an own limit', 'limit', () => db.select('users', all, { limit: NaN }), { text: `${plain.text} LIMIT $1`, values: [NaN] }],
   ])('a NaN on Object.prototype is no option either: %s', (_, key, build, compiled) => {
     expect(withPrototypeKey(key, NaN, () => build().compile())).toEqual(compiled);
   });
@@ -3005,8 +2968,8 @@ describe('a shortcut option added to Object.prototype by something else is no op
     exactlyOne: db.selectExactlyOne('users', all, Object.create({ columns: ['email'] })).compile().text,
   });
   const prototypeOptionsRead = {
-    selected: selectMany('SELECT json_build_object($1::text, "email") AS result FROM "users"'),
-    created: selectMany('SELECT json_build_object($1::text, "email") AS result FROM "users"'),
+    selected: 'SELECT json_build_object($1::text, "email") AS result FROM "users"',
+    created: 'SELECT json_build_object($1::text, "email") AS result FROM "users"',
     upserted: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_json("users".*) AS result',
     one: `${plain.text} LIMIT $1`,
     exactlyOne: `${plain.text} LIMIT $1`,

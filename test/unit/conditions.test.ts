@@ -771,7 +771,7 @@ describe('conditions', () => {
           ],
         },
         "select": {
-          "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "products" WHERE (("search" @@ websearch_to_tsquery(CAST($2 AS "regconfig"), $3)))) AS "sq_products"",
+          "text": "SELECT json_build_object($1::text, "id") AS result FROM "products" WHERE (("search" @@ websearch_to_tsquery(CAST($2 AS "regconfig"), $3)))",
           "values": [
             "id",
             "simple",
@@ -1503,7 +1503,7 @@ describe('exists() and isInSelect()', () => {
   const { exists, isInSelect } = dc;
   const where = (condition: db.SQL) => {
     const { text, values } = db.select('users', condition as any, { columns: ['display_name'] }).compile();
-    return { where: /^SELECT coalesce\(json_agg\(result\), '\[\]'\) AS result FROM \(SELECT json_build_object\(\$1::text, "display_name"\) AS result FROM "users" WHERE (.*)\) AS "sq_users"$/.exec(text)?.[1] ?? text, values };
+    return { where: /^SELECT json_build_object\(\$1::text, "display_name"\) AS result FROM "users" WHERE (.*)$/.exec(text)?.[1] ?? text, values };
   };
   const thrown = (build: () => db.SQL) => {
     try { where(build()); return 'compiled'; } catch (err) { return (err as Error).message; }

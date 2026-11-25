@@ -1,5 +1,5 @@
 ---
-english: cf57982f830f
+english: e760e353646b
 ---
 
 # Le catalogue
@@ -121,7 +121,7 @@ Dans une session dont le `TimeZone` est `UTC`, le premier est le `Date` `2030-03
 
 ## Pourquoi les raccourcis renvoient du JSON {#why-the-shortcuts-return-json}
 
-Chaque raccourci est une seule requête, et Postgres construit lui-même son résultat : chaque ligne comme une valeur JSON, avec `to_json()` ou `json_build_object()`, chaque `lateral` imbriqué dedans, et pour `select()` les lignes réunies en un tableau avec `json_agg()`.
+Chaque raccourci est une seule requête, et Postgres construit lui-même son résultat : chaque ligne comme une valeur JSON, avec `to_json()` ou `json_build_object()`, chaque `lateral` imbriqué dedans, et pour `select()` imbriqué, les lignes réunies en un tableau avec `json_agg()` ; seul, `select()` envoie une ligne par résultat, que `.run()` réunit.
 
 C’est ainsi que `select()` ramène des films avec leur distribution déjà en place, en un aller-retour, sans rien à assembler en JavaScript ensuite.
 

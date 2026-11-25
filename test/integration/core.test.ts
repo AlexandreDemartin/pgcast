@@ -812,8 +812,7 @@ describe('range strings', () => {
 
     const where = db.select('transfers', { batch_sizes: 'empty', value_days: c.eq('empty') }, { columns: ['note'] });
     expect(where.compile()).toEqual({
-      text: 'SELECT coalesce(json_agg(result), \'[]\') AS result FROM (SELECT json_build_object($1::text, "note") AS result '
-        + 'FROM "transfers" WHERE ("batch_sizes" = $2 AND ("value_days" = $3))) AS "sq_transfers"',
+      text: 'SELECT json_build_object($1::text, "note") AS result FROM "transfers" WHERE ("batch_sizes" = $2 AND ("value_days" = $3))',
       values: ['note', 'empty', 'empty'],
     });
     expect(await where.run(t.client)).toEqual([{ note: 'empty ranges' }]);
@@ -839,8 +838,7 @@ describe('range strings', () => {
 
     const where = db.select('transfers', { fee_band: '[1,Infinity)', value_days: c.eq('[2026-01-01,infinity)') }, { columns: ['note'] });
     expect(where.compile()).toEqual({
-      text: 'SELECT coalesce(json_agg(result), \'[]\') AS result FROM (SELECT json_build_object($1::text, "note") AS result '
-        + 'FROM "transfers" WHERE ("fee_band" = $2 AND ("value_days" = $3))) AS "sq_transfers"',
+      text: 'SELECT json_build_object($1::text, "note") AS result FROM "transfers" WHERE ("fee_band" = $2 AND ("value_days" = $3))',
       values: ['note', '[1,Infinity)', '[2026-01-01,infinity)'],
     });
     expect(await where.run(t.client)).toEqual([{ note: 'band 1' }]);

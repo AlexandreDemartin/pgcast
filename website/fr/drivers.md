@@ -1,5 +1,5 @@
 ---
-english: 99d077f7cac6
+english: 02cfc04aa082
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -171,7 +171,7 @@ import * as db from 'zapatos/db';
 const answering = (rows: object[]) => ({ query: async () => ({ rows }) });
 
 const films = await db.select('films', db.all, { columns: ['title'] })
-  .run(answering([{ result: [{ title: 'Tidewater' }] }]));
+  .run(answering([{ result: { title: 'Tidewater' } }]));
 ```
 
 Des lignes typées d’après le schéma, et ce qu’un fake ne vérifie pas : [Simuler un résultat typé d’après le schéma](/fr/testing#fake-a-result-typed-from-the-schema).

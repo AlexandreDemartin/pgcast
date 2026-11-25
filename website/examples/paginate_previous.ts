@@ -3,10 +3,10 @@ import type * as s from 'zapatos/schema';
 import type pg from 'pg';
 declare const pool: pg.Pool;  // at build, cast.data.ts passes a pool that records the query
 // Page 2 as the reader asks for it, run on a pool that gives back its rows, so that the build records only the page before
-const rowsOfPage2 = { query: async () => ({ rows: [{ result: [
-  { id: 1001, title: 'A Lantern for Edith', release_year: 1991 },
-  { id: 1000, title: 'The Salt Orchard', release_year: 1974 },
-] }] }) } as unknown as pg.Pool;
+const rowsOfPage2 = { query: async () => ({ rows: [
+  { result: { id: 1001, title: 'A Lantern for Edith', release_year: 1991 } },
+  { result: { id: 1000, title: 'The Salt Orchard', release_year: 1974 } },
+] }) } as unknown as pg.Pool;
 const page = await db.select('films', db.all, {
   columns: ['id', 'title', 'release_year'],
   order: [

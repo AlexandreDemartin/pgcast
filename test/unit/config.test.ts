@@ -69,7 +69,6 @@ describe('setConfig()', () => {
     castArrayParamsToJson: false,
     castObjectParamsToJson: false,
     selectExactlyOneChecksForSecondRow: false,
-    topLevelSelectAsRows: false,
   };
   const changed = {
     transactionAttemptsMax: 2,
@@ -77,7 +76,6 @@ describe('setConfig()', () => {
     castArrayParamsToJson: true,
     castObjectParamsToJson: true,
     selectExactlyOneChecksForSecondRow: true,
-    topLevelSelectAsRows: true,
   };
 
   // decision 019 § 4: a key 8.0 removed passes as the value 8.0 always behaves as, null or undefined, and is not kept;
@@ -85,7 +83,7 @@ describe('setConfig()', () => {
   const removed = {
     undefinedMeansMissing: true, upsertRequiresSameKeys: true,
     transactionRequiresCommit: true, transactionRequiresIdleClient: true, transactionRequiresSatisfyingLevel: true,
-    aggregatesTypedByColumn: true, shortcutsUseJson: true,
+    aggregatesTypedByColumn: true, shortcutsUseJson: true, topLevelSelectAsRows: true,
   };
   const set = (config: object) => db.setConfig(config as db.NewConfig);
   const message = (key: string, kept: boolean) => `${key} was removed in 8.0, which always does what ${key}: ${kept} ` +

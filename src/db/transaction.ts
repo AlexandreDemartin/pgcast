@@ -611,7 +611,7 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  * no row, then `CLOSE pgcast_cursor_<n>`.
  *
  * - `query.runResultTransform` receives each non-empty `FETCH` result, including
- *   its command tag. A `select()` reads its one `jsonb_agg` row in one batch.
+ *   its command tag. A `select()` keeps its `json_agg`, as nested: one row, one batch.
  * - A plain select reads the snapshot visible at `DECLARE`. Under `READ COMMITTED`,
  *   [a locking select](https://pgcast.dev/cursors#work-inside-the-loop) with
  *   `FOR UPDATE` can fetch a newer version of a row. A transaction retry

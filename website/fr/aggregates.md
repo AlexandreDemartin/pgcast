@@ -1,5 +1,5 @@
 ---
-english: ae28c9b17975
+english: d62dc5c605eb
 ---
 
 # Agrégats
@@ -158,7 +158,7 @@ const firstShow = await db.min('screenings', db.all, {
 - Le SQL est le même dans les deux cas : `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: db.min('screenings', db.all, { columns: ['starts_at'] }) -->.
 - `min()` et `max()` donnent un `bigint` ou un `numeric` sous forme de chaîne avec le parseur par défaut de `pg`. Sous une clé de `lateral`, le parseur JSON de la requête extérieure lit le nombre et peut conserver les grandes valeurs sous forme de chaînes.
 - `count()` n’est pas typé par colonne : `0` au premier niveau, et `null` imbriqué dans un `lateral` ou comme valeur d’`extras` quand sa requête ne renvoie aucune ligne.
-- Passé comme unique `lateral`, l’agrégat est typé comme au premier niveau par `selectOne()` et `selectExactlyOne()`, qui rendent sa colonne telle quelle, et comme imbriqué par `select()`, qui enveloppe ses lignes dans `json_agg()`. Ce `selectOne()` ou ce `selectExactlyOne()`, imbriqué à son tour, est typé comme imbriqué.
+- Passé comme unique `lateral`, l’agrégat est typé comme au premier niveau par `selectOne()` et `selectExactlyOne()`, qui rendent sa colonne telle quelle, et comme imbriqué par `select()`, qui le convertit en JSON, avec `to_json()` seul et `json_agg()` imbriqué. Ce `selectOne()` ou ce `selectExactlyOne()`, imbriqué à son tour, est typé comme imbriqué.
 - `.copy()` renvoie un simple `SQLFragment`. Dans `extras` ou sous une clé de `lateral`, imbriquez le fragment d’origine de `min()` ou de `max()`. La copie d’un agrégat sur une colonne de type date conserve le type du résultat direct, `Date | null`. En JSON, Postgres renvoie les dates non nulles sous forme de chaînes.
 
 ## Types {#types}

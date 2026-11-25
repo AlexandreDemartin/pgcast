@@ -1108,10 +1108,10 @@ describe('db.all', () => {
         "count": "SELECT count(*) AS result FROM "users"",
         "exists": "((EXISTS (SELECT 1 FROM "accounts")))",
         "isInSelect": "(("id" IN (SELECT "owner_id" FROM "accounts")))",
-        "lateral": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "sq_users"",
+        "lateral": "SELECT json_build_object($1::text, "id", $2::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true",
         "noNullUpdateColumns": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(CASE WHEN EXCLUDED."email" IS NULL THEN "users"."email" ELSE EXCLUDED."email" END, CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
-        "select": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
-        "selectDefault": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
+        "select": "SELECT json_build_object($1::text, "id") AS result FROM "users"",
+        "selectDefault": "SELECT json_build_object($1::text, "id") AS result FROM "users"",
         "selectOne": "SELECT json_build_object($1::text, "id") AS result FROM "users" LIMIT $2",
         "sum": "SELECT sum("balance") AS result FROM "accounts"",
       }
@@ -1408,7 +1408,7 @@ describe('run() on a client that isn\'t pg\'s (#695)', () => {
 
   it('sends a select() with a lateral as compile() gives it, and resolves to its result', async () => {
     const
-      { client, sent } = recording([{ result: [{ id: 1, accounts: [] }] }]),
+      { client, sent } = recording([{ result: { id: 1, accounts: [] } }]),
       query = db.select('users', { id: 1 }, { lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } });
     expect(await query.run(client)).toEqual([{ id: 1, accounts: [] }]);
     expect(sent).toEqual([query.compile()]);

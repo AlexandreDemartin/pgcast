@@ -977,22 +977,22 @@ describe('selectRows', () => {
     expect((await t.client.query(sql`SELECT count(*)::int AS n FROM (${db.selectRows('users', all)}) AS u`.compile())).rows).toEqual([{ n: 3 }]);
   });
 
-  describe('select() with topLevelSelectAsRows (note 018 § 3)', () => {
-    /** What run() of `build()` gives without the option, then with it, and the texts the second sent. */
-    const offAndOn = async (build: () => db.SQLFragment<any, any>) => {
-      const off = await run(build()), texts: string[] = [];
-      db.setConfig({ topLevelSelectAsRows: true, queryListener: q => { texts.push(q.text); } });
-      const on = await run(build());
+  describe('select() at the top level: selectRows()\'s query (note 018 § 3)', () => {
+    /** What run() of a copy of `build()` gives, its aggregate as nested, then of `build()` itself, and the texts the second sent. */
+    const copiedAndOwn = async (build: () => db.SQLFragment<any, any>) => {
+      const copied = await run(build().copy()), texts: string[] = [];
+      db.setConfig({ queryListener: q => { texts.push(q.text); } });
+      const own = await run(build());
       resetConfig();
-      return { off, on, texts };
+      return { copied, own, texts };
     };
 
     it.each(cases)('%s: run() gives the same array, from one row per result', async (_, table, where, options) => {
       const
-        { off, on, texts } = await offAndOn(() => db.select(table, where, options)),
+        { copied, own, texts } = await copiedAndOwn(() => db.select(table, where, options)),
         sorted = (r: unknown[]) => options?.order ? r : [...r].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-      expect(sorted(on)).toEqual(sorted(off));
-      expect(on.length > 0).toBe(where?.id !== -1);
+      expect(sorted(own)).toEqual(sorted(copied));
+      expect(own.length > 0).toBe(where?.id !== -1);
       expect(texts).toEqual([db.selectRows(table, where, options).compile().text
         .replace(/^SELECT "lateral_passthru"\.result AS .*$/s, rows => `SELECT to_json(result) AS result FROM (${rows}) AS "sq_users"`)]);
     });
@@ -1006,8 +1006,8 @@ describe('selectRows', () => {
         db.min('events', all, { columns: ['occurred_on'] }),
         sql`SELECT ${param(new Date('2025-06-01T12:00:00Z'))}::timestamptz AS result`,
       ]) {
-        const { off, on } = await offAndOn(() => db.select('users', all, { lateral: lateral as any, order: byId }));
-        expect(on).toEqual(off);
+        const { copied, own } = await copiedAndOwn(() => db.select('users', all, { lateral: lateral as any, order: byId }));
+        expect(own).toEqual(copied);
       }
     });
 
@@ -1015,19 +1015,19 @@ describe('selectRows', () => {
       // around the end of summer time in Paris, a later instant can read as an earlier local time
       await t.client.query(`SET LOCAL TimeZone = 'Europe/Paris'`);
       await t.client.query(`UPDATE memberships SET since = CASE user_id WHEN 1 THEN timestamptz '2024-10-27 00:30:00+00' ELSE timestamptz '2024-10-27 01:10:00+00' END`);
-      const latest = await offAndOn(() => db.select('users', all, {
+      const latest = await copiedAndOwn(() => db.select('users', all, {
         lateral: db.max('memberships', { user_id: parent('id') }, { columns: ['since'] }) as any,
         order: { by: sql`result`, direction: 'ASC', nulls: 'LAST' },
       }));
-      expect(latest.off).toEqual(['2024-10-27T02:30:00+02:00', '2024-10-27T02:10:00+01:00', null]);
-      expect(latest.on).toEqual(latest.off);
-      const counts = await offAndOn(() => db.select('users', all, {
+      expect(latest.copied).toEqual(['2024-10-27T02:30:00+02:00', '2024-10-27T02:10:00+01:00', null]);
+      expect(latest.own).toEqual(latest.copied);
+      const counts = await copiedAndOwn(() => db.select('users', all, {
         distinct: true,
         lateral: db.count('accounts', { owner_id: parent('id') }) as any,
         order: { by: sql`"lateral_passthru".result`, direction: 'DESC' },
       }));
-      expect(counts.off).toEqual([2, 1, 0]);
-      expect(counts.on).toEqual(counts.off);
+      expect(counts.copied).toEqual([2, 1, 0]);
+      expect(counts.own).toEqual(counts.copied);
     });
 
     it('nested, it keeps its aggregate: a lateral, a lateral passed through, extras, a sql template', async () => {
@@ -1039,14 +1039,13 @@ describe('selectRows', () => {
         () => db.selectOne('users', { id: 1 }, { columns: ['id'], extras: { accounts: db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }) } }),
         () => sql`SELECT (${db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId })}) AS accounts`,
       ]) {
-        const { off, on } = await offAndOn(build);
-        expect(on).toEqual(off);
+        const { copied, own } = await copiedAndOwn(build);
+        expect(own).toEqual(copied);
       }
-      expect((await offAndOn(() => db.selectOne('users', { id: 1 }, { lateral: accounts() }))).on).toEqual([{ id: 1 }, { id: 2 }]);
+      expect((await copiedAndOwn(() => db.selectOne('users', { id: 1 }, { lateral: accounts() }))).own).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it('a copy runs its aggregate, and gives the same array', async () => {
-      db.setConfig({ topLevelSelectAsRows: true });
       const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId });
       expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
       expect(await run(q.copy())).toEqual([{ id: 1 }, { id: 2 }]);
@@ -1055,7 +1054,7 @@ describe('selectRows', () => {
 
     it('prepared(), noop and the listeners go with the rows form', async () => {
       const sent: string[] = [], results: unknown[] = [];
-      db.setConfig({ topLevelSelectAsRows: true, queryListener: q => { sent.push(q.text); }, resultListener: r => { results.push(r); } });
+      db.setConfig({ queryListener: q => { sent.push(q.text); }, resultListener: r => { results.push(r); } });
       const prepared = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_as_rows');
       expect([await run(prepared), await run(prepared)]).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 1 }, { id: 2 }]]);
       expect(results).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 1 }, { id: 2 }]]);
@@ -1068,11 +1067,38 @@ describe('selectRows', () => {
         `${i >= 2 ? `/* marked no-op: won't hit DB unless forced -> */ ` : ''}SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "id" ASC`));
     });
 
-    it('cursor() reads it as before, as its one aggregate row', async () => {
+    it('a prepared copy keeps the name, not the text: on one connection the second to run throws, a copy named apart runs', async () => {
+      const unique = (name: string) => `Prepared statements must be unique - '${name}' was used for a different statement`;
+      const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_rows_first');
+      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
+      await expect(run(q.copy())).rejects.toThrow(unique('accounts_rows_first'));
+      expect(await run(q.copy({ preparedName: 'accounts_agg_apart' }))).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
+      const copiedFirst = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_agg_first');
+      expect(await run(copiedFirst.copy())).toEqual([{ id: 1 }, { id: 2 }]);
+      await expect(run(copiedFirst)).rejects.toThrow(unique('accounts_agg_first'));
+    });
+
+    it('a runner of your own that pairs its compile() and runResultTransform gets the first result alone, where the rows give the array', async () => {
+      const
+        q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }),
+        none = db.select('accounts', { owner_id: -1 });
+      expect(q.runResultTransform(await t.client.query(q.compile()))).toEqual({ id: 1 });
+      expect(none.runResultTransform(await t.client.query(none.compile()))).toBeUndefined();
+      expect((await t.client.query(q.compile())).rows.map(r => r.result)).toEqual([{ id: 1 }, { id: 2 }]);
+      expect((await t.client.query(none.compile())).rows.map(r => r.result)).toEqual([]);
+    });
+
+    it('a runResultTransform you set applies to its copies only: run on its own, it transforms its rows with its own', async () => {
+      const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId });
+      q.runResultTransform = () => 'mine';
+      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await run(q.copy())).toBe('mine');
+    });
+
+    it('cursor() reads its one aggregate row, as nested', async () => {
       const read = async () => { const all: unknown[] = []; for await (const batch of db.cursor(t.client, db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }), { batchSize: 1 })) all.push(batch); return all; };
-      const off = await read();
-      db.setConfig({ topLevelSelectAsRows: true });
-      expect([off, await read()]).toEqual([[[{ id: 1 }, { id: 2 }]], [[{ id: 1 }, { id: 2 }]]]);
+      expect(await read()).toEqual([[{ id: 1 }, { id: 2 }]]);
     });
   });
 });

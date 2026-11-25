@@ -170,7 +170,7 @@ import * as db from 'zapatos/db';
 const answering = (rows: object[]) => ({ query: async () => ({ rows }) });
 
 const films = await db.select('films', db.all, { columns: ['title'] })
-  .run(answering([{ result: [{ title: 'Tidewater' }] }]));
+  .run(answering([{ result: { title: 'Tidewater' } }]));
 ```
 
 Rows typed from the schema, and what a fake does not check: [Fake a result typed from the schema](/testing#fake-a-result-typed-from-the-schema).

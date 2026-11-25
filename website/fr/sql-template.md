@@ -1,5 +1,5 @@
 ---
-english: d757ebeac442
+english: 0a7a3a571f4b
 ---
 
 # Template SQL
@@ -572,7 +572,7 @@ Appliqué par `run()` à ce que renvoie `pg`. `qr` est typé `pg.QueryResult`, m
 
 </CastPanel>
 
-Il ne s’applique qu’au `run()` de ce fragment : pas quand il est imbriqué dans un autre, ni donné à `lateral` ou à `extras`.
+Il ne s’applique qu’au `run()` de ce fragment : pas quand il est imbriqué dans un autre, ni donné à `lateral` ou à `extras`. Un [`select()`](/fr/select#select) exécuté seul compile et transforme sa requête des lignes avec sa propre transformation, si bien que son `.run()` donne le tableau quoi que vous assigniez : celle que vous définissez ne s’applique qu’à ses copies, qui exécutent l’agrégat ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)).
 
 ### `prepared()` {#prepared}
 
@@ -596,7 +596,7 @@ fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?,
 
 Un nouveau fragment sur les mêmes littéraux et expressions. Il garde `runResultTransform`, `parentTable`, `preparedName`, `noop` et `noopResult`, sauf ceux que donne `override`. Un raccourci copié se résout donc en ce que donne le raccourci, comme le dit son type : `count('films', all).copy().run(pool)` donne `4` sur le schéma de la doc, là où Zapatos 6.6.1 donnait à la copie la transformation par défaut, donc les lignes : `[{ result: '4' }]`.
 
-Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de `selectExactlyOne()` garde `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). La promesse d’une copie exécutée seule est rejetée en l’absence de lignes. Avec la vérification et `withTies` activés, une deuxième ligne ex æquo entraîne aussi le rejet de la promesse. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent. Une copie de `select()` garde son `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all).copy()) -->, même avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows).
+Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de `selectExactlyOne()` garde `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). La promesse d’une copie exécutée seule est rejetée en l’absence de lignes. Avec la vérification et `withTies` activés, une deuxième ligne ex æquo entraîne aussi le rejet de la promesse. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent. Une copie de `select()` garde son `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', db.all).copy() -->, là où le `select()` exécuté seul envoie une ligne par résultat ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)). Une copie d’un `select()` préparé garde donc son nom, pas son texte : donnez son propre nom à la copie, `q.copy({ preparedName: 'films_agg' })`<!-- tsc: (q => …)(db.select('films', db.all).prepared('films_p')) -->, sinon, sur une même connexion, `pg` rejette celle des deux qui s’exécute en second, comme [plus haut](#prepared).
 
 ## `withCTEs()` {#withCTEs}
 
@@ -612,7 +612,7 @@ withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<an
 - **Le résultat** : une [`copy()`](#copy) de `query`, de son type. Il se résout en ce que donne `query`, imbriqué dans un `lateral` ou dans `extras` aussi, et s’écrit entre parenthèses comme valeur d’`extras` ou d’`insert()` là où `query` l’est.
 - **Sans effet** : un `insert()` ou un `upsert()` sans ligne, comme requête ou comme CTE, s’écrit `SELECT NULL::json AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) --> (`NULL::jsonb` pendant toute la 7.x), une requête sans ligne sur n’importe quelle table, et le résultat n’est pas sans effet : ses CTE s’exécutent donc ; comme requête, il se résout en `[]`.
 - **`selectExactlyOne()`** : avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), le résultat demande toujours une deuxième ligne (par défaut `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`). Si la requête en trouve une, sa promesse est rejetée, comme pour le raccourci exécuté seul. Imbriquée, elle demande une ligne et, avec `withTies: true`, les éventuelles lignes ex æquo.
-- **`select()`** : à partir de la 7.3.0, avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), le résultat reste sa requête des lignes, `SELECT to_json("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.select('films', db.all))) --> après le `WITH`, et donne le même tableau. Comme CTE ou imbriqué, il garde son `json_agg`.
+- **`select()`** : le résultat reste sa requête des lignes, `SELECT to_json("films".*) AS result FROM "films"`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.select('films', db.all)) --> après le `WITH`, et donne le même tableau. Comme CTE ou imbriqué, il garde son `json_agg`.
 - **Un seul `WITH`** : la requête ne peut pas commencer par son propre `WITH`, un résultat de `withCTEs()` ou un fragment `sql`, ni être un [`truncate()`](/fr/insert#truncate) : Postgres refuse le texte (42601). Mettez toutes les CTE dans un seul appel.
 - **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, `{}` compris, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat. Sur une liste construite à l’exécution, un même nom couvrirait un texte par liste : donnez à chaque texte son propre nom, ou ne préparez pas la requête.
 

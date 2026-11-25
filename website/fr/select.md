@@ -1,5 +1,5 @@
 ---
-english: decc86a9fcb5
+english: 91b8d17d4170
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -22,7 +22,7 @@ Construit un seul `SELECT` des lignes de `table` qui correspondent à `where`. R
 - `options` : les [options](#options) ci-dessous, toutes facultatives.
 - `mode` et `aggregate` : ce que passent `selectOne()`, `count()` et les autres ; voir [`SelectResultMode`](#SelectResultMode).
 
-Pour ses lignes une à une, comme les lit [`cursor()`](/fr/transaction#cursor), la même requête sans `json_agg` : [`selectRows()`](#selectRows).
+Pour ses lignes une à une, comme les lit [`cursor()`](/fr/transaction#cursor), sa requête comme fragment autonome : [`selectRows()`](#selectRows).
 
 <CastPanel example="select">
 
@@ -33,8 +33,9 @@ Pour ses lignes une à une, comme les lit [`cursor()`](/fr/transaction#cursor), 
 ### Le SQL qu’il écrit {#the-sql-it-writes}
 
 - Chaque ligne est une seule valeur `json`, `to_json("films".*)`<!-- probe: examples/select.ts -->, donc les dates et les heures reviennent en chaînes et un `bigint` en nombre : les types `JSONSelectable` le disent ([Le catalogue](/fr/catalog-types)).
-- Les lignes sont rassemblées en un seul tableau, `coalesce(json_agg(result), '[]')`<!-- probe: examples/select.ts -->, autour d’une sous-requête d’alias `"sq_<alias or table>"`, pour que `ORDER BY` et `LIMIT` s’appliquent aux lignes. Une requête, une valeur en retour. Sur de grandes valeurs, de nombreuses lignes ou des laterals imbriqués, ce JSON coûte : [Performance](/fr/performance), et [Le JSON construit](#json-functions).
-  - À partir de la 7.3.0, avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), un `select()` exécuté ou compilé seul envoie les lignes elles-mêmes, `SELECT to_json("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all)) -->, la requête de [`selectRows()`](#selectRows), et `.run()` donne le même tableau ; imbriqué, il garde l’agrégat.
+- Exécuté ou compilé seul, ou comme requête principale de [`withCTEs()`](/fr/sql-template#withCTEs), il envoie une ligne par résultat, la requête de [`selectRows()`](#selectRows), `SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/select.ts -->, et `.run()` les rassemble en un seul tableau, `[]` quand aucune ligne ne correspond. Pendant toute la 7.x, il envoyait par défaut une seule valeur `json_agg` ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)).
+  - Imbriqué dans un `lateral`, des `extras`, un template `sql` ou une CTE, copié avec [`.copy()`](/fr/sql-template#copy), et dans [`cursor()`](/fr/transaction#cursor), il est lu par sa requête parente comme une seule valeur : les lignes sont rassemblées en un seul tableau, `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', { studio_id: 1000 }).copy() -->, autour d’une sous-requête d’alias `"sq_<alias or table>"`, pour que `ORDER BY` et `LIMIT` s’appliquent aux lignes.
+  - Sur de grandes valeurs, de nombreuses lignes ou des laterals imbriqués, ce JSON coûte : [Performance](/fr/performance), et [Le JSON construit](#json-functions).
 - À l’intérieur, les clauses viennent dans cet ordre : `SELECT [DISTINCT …]` · les colonnes `AS result` · `FROM` la table `[AS alias]` · chaque `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` ou `FETCH FIRST … WITH TIES` · `OFFSET` · chaque verrou `FOR …`.
 - Chaque valeur est un paramètre (`$1`, `$2`) ; chaque nom est mis entre guillemets comme le fait Postgres, et tout `"` qu’il contient est doublé. Zapatos 6.6.1 laissait un nom contenant un `"` fermer ses guillemets ; pgcast l’a corrigé ([changelog](/fr/changelog#6.6.2-security)).
 
@@ -74,7 +75,7 @@ Le SQL de chaque ligne du tableau est ce que compile la bibliothèque construite
 |---|---|
 | `columns`, avec ou sans `extras` et `lateral` | un seul `json_build_object($1::text, "title", $2::text, upper("title"))`<!-- probe: db.select('films', db.all, { columns: ['title'], extras: { upper: db.sql`upper(${'title'})` } }) -->, dont les clés sont des paramètres |
 | `extras` ou `lateral`, à côté de toutes les colonnes | `to_json("row_films".*)`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> de la ligne avec ses clés en alias, `"lateral_cast".result AS "cast"`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) -->, dans une sous-requête `AS "row_films"`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> |
-| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: db.select('films', db.all, { distinct: true }) -->, car `json` n’a pas d’égalité, sous `json_agg` ; sur un `select()`, un `selectOne()` ou un `selectExactlyOne()` transmis, `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) }) --> |
+| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: db.select('films', db.all, { distinct: true }) -->, car `json` n’a pas d’égalité, si bien que le `result` de chaque ligne est en `jsonb` ; sur un `select()`, un `selectOne()` ou un `selectExactlyOne()` transmis, `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) }) --> |
 
 - À côté de toutes les colonnes, chaque clé est un identifiant, chaque `"` doublé. Une clé vide, avec un NUL ou de plus de 63 octets en UTF-8, que Postgres refuserait ou tronquerait, lève une erreur à la compilation : passez `columns`, dont les clés restent des paramètres.
 - Dans ce cas, un `order.by` ou un `distinct` en chaîne est écrit après la table, `ORDER BY "films"."title" ASC`<!-- probe: db.select('films', db.all, { order: { by: 'title', direction: 'ASC' }, extras: { upper: db.sql`upper(${'title'})` } }) -->, sauf s’il contient un `.` : un nom seul correspondrait aussi à une clé du même nom (42702). Ainsi `by: 'result'` désigne la colonne de la table. Un fragment `sql` est écrit tel quel : un nom seul identique à une clé y échoue donc avec 42702, `` by: db.sql`${'title'}` `` à côté de `extras: { title: … }`, de même dans `distinct` ou à côté d’une clé de `lateral`. Qualifiez-le, `` db.sql`${'films'}.${'title'}` ``.
@@ -84,7 +85,7 @@ Le SQL de chaque ligne du tableau est ce que compile la bibliothèque construite
 
 <!-- probe: db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } }) -->
 ```sql
-SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_films".*) AS result FROM (SELECT "films".*, "lateral_cast".result AS "cast" FROM "films" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "character") AS result FROM "roles" WHERE ("film_id" = "films"."id")) AS "sq_roles") AS "lateral_cast" ON true WHERE ("studio_id" = $2) ORDER BY "films"."title" ASC) AS "row_films") AS "sq_films"
+SELECT to_json("row_films".*) AS result FROM (SELECT "films".*, "lateral_cast".result AS "cast" FROM "films" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "character") AS result FROM "roles" WHERE ("film_id" = "films"."id")) AS "sq_roles") AS "lateral_cast" ON true WHERE ("studio_id" = $2) ORDER BY "films"."title" ASC) AS "row_films"
 -- ["character", 1000]
 ```
 
@@ -145,7 +146,7 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
 
 - **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`, ou `null` quand sa requête ne renvoie aucune ligne ([`count()`](/fr/aggregates#count)). Un `count()` dont le `groupBy` donne plusieurs groupes fait revenir la ligne parente une fois par groupe sous un `select()` extérieur ; sous `selectOne()` ou `selectExactlyOne()`, une seule fois, avec le compte de l’un des groupes, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
 - **Une seule sous-requête** : son résultat est transmis à la place de chaque ligne. `columns` et `extras` n’ont alors rien à quoi s’ajouter, et le type les refuse, avec `strictNullChecks` activé.
-  - Quand vous appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou [`selectRows()`](#selectRows), `pg` lit la colonne `result` transmise avec le parseur configuré pour son type. Un `select()` extérieur renvoie les valeurs dans un tableau JSON. Un template `sql` garde son annotation de type de résultat dans les deux cas.
+  - Quand vous appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou [`selectRows()`](#selectRows), `pg` lit la colonne `result` transmise avec le parseur configuré pour son type. Un `select()` extérieur convertit chaque valeur en JSON, `to_json(result)`, et les renvoie dans un tableau. Un template `sql` garde son annotation de type de résultat dans les deux cas.
   - Par défaut, quand [`count()`](/fr/aggregates#count) compte deux lignes, `pg` renvoie la chaîne `"2"`. Il lit aussi les résultats de type `bigint` ou `numeric` de `sum()` et `avg()` comme des chaînes. Avec `Number` comme parseur d’`int8`, le même compte donne `2`. `count()` est typé `number`. Par défaut, `sum()` et `avg()` sont typés `number | null`.
   - N’appliquez `Number()` qu’à une chaîne. Un agrégat dont la requête ne renvoie aucune ligne donne `null`, tout comme `sum()` et `avg()` quand aucune ligne ne correspond. Sans ligne parente, `selectOne()` donne `undefined`.
   - Avec les signatures typées par colonne, supposons que l’unique `lateral` de `selectOne()` ou de `selectExactlyOne()` puisse être soit le minimum d’une date, soit un compte. Si vous imbriquez la requête sous une clé, la date est une chaîne JSON typée `Date`. Si vous passez la requête à `selectRows()`, TypeScript accepte aussi le cas du compte, que le parseur par défaut de `pg` renvoie sous forme de chaîne.
@@ -167,7 +168,7 @@ Pour obtenir une chaîne avec chacun des raccourcis, convertissez l’horodatage
 
 <!-- probe: db.select('studios', { id: 1000 }, { lateral: db.sql`SELECT to_jsonb(now()) AS result` }) -->
 ```sql
-SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "studios" LEFT JOIN LATERAL (SELECT to_jsonb(now()) AS result) AS "lateral_passthru" ON true WHERE ("id" = $1)) AS "sq_studios"
+SELECT to_json(result) AS result FROM (SELECT "lateral_passthru".result AS result FROM "studios" LEFT JOIN LATERAL (SELECT to_jsonb(now()) AS result) AS "lateral_passthru" ON true WHERE ("id" = $1)) AS "sq_studios"
 -- [1000]
 ```
 
@@ -292,15 +293,15 @@ Sa `query` est le [`SQLFragment`](/fr/sql-template#SQLFragment) exécuté ou, po
 db.selectRows(table, where, options?)
 ```
 
-À partir de la 6.12.0. Ce raccourci fournit comme fragment autonome la requête que [`select()`](#select) enveloppe dans `json_agg`, avec une ligne par résultat. Ce fragment s’utilise avec [`cursor()`](/fr/transaction#cursor), qui exécute le fragment reçu tel quel et lit donc le tableau entier d’un `select()` comme une seule ligne.
+À partir de la 6.12.0. Ce raccourci fournit comme fragment autonome la requête que [`select()`](#select) envoie seul, et enveloppe dans `json_agg` une fois imbriqué, avec une ligne par résultat. Ce fragment s’utilise avec [`cursor()`](/fr/transaction#cursor), qui exécute le fragment reçu tel quel et lit donc le tableau entier d’un `select()` comme une seule ligne.
 
 Le raccourci prend la `table`, le `where` et les [options](#options) de `select()`. `.run(pool)` renvoie un tableau avec un élément par ligne de résultat, ou `[]` quand aucune ligne ne correspond.
 
 | Appel | SQL |
 |---|---|
 | `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
-| `db.select(…)`, avec les mêmes arguments | `SELECT coalesce(json_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, la même requête à l’intérieur, avec les mêmes valeurs |
-| `db.select(…)` avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), à partir de la 7.3.0 | la requête de `selectRows()`, exécutée ou compilée seule ; un `lateral` transmis tel quel, seul, est converti au-dessus d’elle, `SELECT to_json(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
+| `db.select(…)`, avec les mêmes arguments | la même requête, exécutée ou compilée seule ; un `lateral` transmis tel quel, seul, est converti au-dessus d’elle, `SELECT to_json(result) AS result FROM (…) AS "sq_studios"`<!-- probe: db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) }) -->, pour qu’un `count()` reste un nombre, là où `selectRows()` donne la chaîne que `pg` parse |
+| `db.select(…)` imbriqué, ou sa [`.copy()`](/fr/sql-template#copy) | `SELECT coalesce(json_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }).copy() -->, la même requête à l’intérieur, avec les mêmes valeurs |
 
 Les films d’un studio, lus 100 à la fois :
 

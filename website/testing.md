@@ -145,7 +145,7 @@ With `strict` off, `columns` leaves the type at the table's full `JSONSelectable
 
 | Query | Shortcut or query result type ([7.0 defaults](/aggregates#typed-by-column)) | Raw `rows` from the fake |
 |---|---|---|
-| [`select()`](/select#select) | [`FullSelectReturnTypeForTable`](/select#FullSelectReturnTypeForTable)`<T, C, L, E, M>`, `M` the mode | `[{ result }]`, the whole array in one row; `[{ result: [] }]` for none, as Postgres sends it (`[]` gives `undefined`) |
+| [`select()`](/select#select) | [`FullSelectReturnTypeForTable`](/select#FullSelectReturnTypeForTable)`<T, C, L, E, M>`, `M` the mode | `[{ result }, …]`, one row per result; `[]` for none, as Postgres sends it ([8.0 migration](/switching#from-8-0-topLevelSelectAsRows)) |
 | [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) | the same | `[{ result }]`; `[]` for none: `undefined` from `selectOne()`, a [`NotExactlyOneError`](/select#NotExactlyOneError) from `selectExactlyOne()` |
 | [`count()`](/aggregates#count) | `number` | `[{ result: '2' }]` |
 | [`sum()`](/aggregates#sum), [`avg()`](/aggregates#avg) | `number \| null` | `[{ result: '2.5' }]` or `[{ result: null }]` |

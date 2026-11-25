@@ -111,7 +111,7 @@ From 6.7 until 7.0, with `rejectOnQueryError` omitted or set to `null` in JSON, 
 
 [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases), from 7.2.0, writes each column's value type in `Whereable`, `Insertable` and `Updatable` as an alias of `zapatos/db`, with the same types. It has no note, as there is nothing to migrate, and stays off through 7.x. From 8.0.0, the option is removed and the generator always writes the aliases ([8.0 migration](/switching#from-8-0-valuesTypedAsAliases)).
 
-[`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0, sends a `select()` run on its own as one row per result, with the same values. It never warns, and 8.0 keeps it alone: code that runs `.compile()`'s text itself reads `rows.map(r => r.result)`.
+[`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0, sends a `select()` run on its own as one row per result, with the same values. It never warns, and 8.0 removes the key and keeps the rows alone: code that runs `.compile()`'s text itself reads `rows.map(r => r.result)` ([8.0 migration](/switching#from-8-0-topLevelSelectAsRows)).
 
 [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), from 7.3.0, builds the JSON of `select()` and its kin, and of the writes' `RETURNING`, with `json` functions, with the same values but for a row's key order and a nested result's type. It never warns, and 8.0 removes the key and keeps `json` alone ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
