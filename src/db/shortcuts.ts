@@ -399,12 +399,11 @@ export class Constraint<T extends Table> { constructor(public value: UniqueIndex
  * A missing constraint gives 42704. A constraint with no arbiter index, such
  * as a `CHECK` sharing a bare index's name, gives 42809.
  *
- * By default the generator lists the table's valid, non-deferrable unique and
+ * The generator lists the table's valid, non-deferrable unique and
  * primary-key constraints usable with `DO UPDATE`. A partitioned table's union
  * follows the parent constraint. Postgres checks the receiving partition's index,
  * so a deferrable key there can raise 55000. A deferrable parent key is omitted
- * even when the partitions' keys are immediate. In 7.x, generating with
- * `uniqueIndexConstraintsOnly: false` also admits names Postgres refuses.
+ * even when the partitions' keys are immediate.
  */
 export function constraint<T extends Table>(x: UniqueIndexForTable<T>) { return new Constraint<T>(x); }
 

@@ -45,14 +45,6 @@ describe('cliConfig()', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays the arbiter setting by key in %s', name => {
-    write(name, '{"uniqueIndexConstraintsOnly":false}');
-    expect(cliConfig('{}', dir).uniqueIndexConstraintsOnly).toBe(false);
-    expect(cliConfig('{"uniqueIndexConstraintsOnly":null}', dir).uniqueIndexConstraintsOnly).toBeNull();
-    write(name, '{"uniqueIndexConstraintsOnly":true}');
-    expect(cliConfig('{"uniqueIndexConstraintsOnly":false}', dir).uniqueIndexConstraintsOnly).toBe(false);
-  });
-
   it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays constraintNames by key in %s', name => {
     write(name, '{"constraintNames":true}');
     expect(cliConfig('{}', dir).constraintNames).toBe(true);
@@ -62,8 +54,8 @@ describe('cliConfig()', () => {
     expect(cliConfig('{"constraintNames":true}', dir).constraintNames).toBe(true);
   });
 
-  it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays domain and parser settings by key in %s', name => {
-    for (const key of ['domainsTypedByContext', 'enumArraysTypedAsText', 'intervalsTypedAsObjects']) {
+  it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays the parser settings by key in %s', name => {
+    for (const key of ['enumArraysTypedAsText', 'intervalsTypedAsObjects']) {
       const setting = (value: boolean | null) => JSON.stringify({ [key]: value });
       expect(cliConfig(setting(false), dir)).toEqual({ [key]: false, ...exits });
       write(name, JSON.stringify({ [key]: true, schemaJSDoc: false }));
