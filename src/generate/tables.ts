@@ -11,6 +11,7 @@ import { tsTypeForPgType } from './pgTypes';
 import type { EnumData } from './enums';
 import { enumOrdersForSchema } from './enumOrder';
 import { domainRootsInDatabase } from './domainRoots';
+import { refuseRemovedOptions } from './removedOptions';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 import { jsdocText, stringLiteral, tsIdentifier } from './quote';
@@ -90,6 +91,7 @@ export const definitionForRelationInSchema = async (
     relation: string; index: number; type: string; byType: Record<string, { type: string; imports: string | null }>;
   }> = Object.create(null),
 ) => {
+  refuseRemovedOptions(config);  // given a config finaliseConfig() never saw, too
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
     otherSchemas = [...new Set<string>(rows.map(row => row.udtSchema))].filter(schema => schema !== schemaName),
