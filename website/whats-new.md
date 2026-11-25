@@ -45,7 +45,7 @@ What pgcast adds to Zapatos 6.6.1, one line each: the version it came in, and a 
 | [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions): a domain over `text` whose `CHECK` lists its values, typed as their union, opt-in | 6.10.0 |
 | [`moduleNames`](/generator#generate.moduleNames) and `pgcastconfig.json`: imports from `pgcast/db`, and no file named after Zapatos | 6.7.0 |
 | [`SchemaRules`](/generator#SchemaRules) and [`ColumnOptions`](/generator#ColumnOptions), exported from `zapatos/generate`, so that a package's declarations can name them | 6.9.0 |
-| [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases): each column's value type in `Whereable`, `Insertable` and `Updatable` named by an alias of `zapatos/db`, the same types in a smaller file, opt-in | 7.2.0 |
+| [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases): each column's value type in `Whereable`, `Insertable` and `Updatable` named by an alias of `zapatos/db`, the same types in a smaller file, opt-in through 7.x, always from 8.0.0 | 7.2.0 |
 
 ## Drivers and adapters
 

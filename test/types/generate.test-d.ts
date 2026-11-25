@@ -131,3 +131,28 @@ describe('the removed option rejectOnQueryError', () => {
     expectTypeOf(check).toBeCallableWith(legacy);
   });
 });
+
+describe('the removed option valuesTypedAsAliases', () => {
+  test('is no key of the config', () => {
+    expectTypeOf<'valuesTypedAsAliases' extends keyof OptionalConfig ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<'valuesTypedAsAliases' extends keyof CompleteConfig ? true : false>().toEqualTypeOf<false>();
+  });
+
+  test('fails to compile in a literal, old value or kept, alone or beside a kept key', () => {
+    // @ts-expect-error TS2353: removed in 8.0
+    void generate({ valuesTypedAsAliases: false });
+    // @ts-expect-error TS2353: removed in 8.0, even with the value 8.0 keeps
+    void generate({ outDir: './src', valuesTypedAsAliases: true });
+    // @ts-expect-error TS2353: removed in 8.0
+    void check({ outDir: './src', valuesTypedAsAliases: false });
+    // @ts-expect-error TS2353: removed in 8.0
+    const config: Config = { outDir: './src', valuesTypedAsAliases: false };
+    void config;
+  });
+
+  test('compiles in a variable with other keys, as any extra key does', () => {
+    const legacy = { outDir: './src', valuesTypedAsAliases: false };
+    expectTypeOf(generate).toBeCallableWith(legacy);
+    expectTypeOf(check).toBeCallableWith(legacy);
+  });
+});

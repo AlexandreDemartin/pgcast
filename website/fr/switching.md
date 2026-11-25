@@ -1,5 +1,5 @@
 ---
-english: 3fd3283ee5ca
+english: 825d21078e66
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -473,6 +473,16 @@ La 8.0 fait toujours ce que faisait `rejectOnQueryError: true`, la valeur par d�
 - **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `rejectOnQueryError was removed in 8.0, which always does what rejectOnQueryError: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-rejectOnQueryError`, et la CLI aussi quand son fichier de configuration ou son argument JSON la contient, alors que la 7.x l’y ignorait. Une fois l’option retirée, une requête qui échoue rejette la promesse, là où la 7.x avec `false` affichait l’erreur et arrêtait le processus. Si l’erreur n’est pas interceptée, Node l’affiche sur la sortie d’erreur et quitte avec le code 1 ; interceptée, votre programme continue. Sans la clé, la CLI affiche l’erreur et quitte comme en 7.x.
 - **Trouver les appels** : `grep -rn rejectOnQueryError` dans vos fichiers de configuration et vos scripts ; chaque `false` lève aussi une erreur dès le démarrage du générateur, avant la première requête.
 - **Avant → après** : `await generate({ …, rejectOnQueryError: false })` devient `await generate({ … }).catch(e => { console.error(e); process.exit(1); })` ; dans un fichier de configuration, retirez `"rejectOnQueryError": false`.
+
+### `valuesTypedAsAliases` {#from-8-0-valuesTypedAsAliases}
+
+**Tout programme voit ce changement.**
+
+La 8.0 fait toujours ce que faisait `valuesTypedAsAliases: true`, un opt-in de la 7.2.0 : la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), là où la 7.x écrivait par défaut son union en entier sur chaque ligne ([`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases)). Les types sont les mêmes : chaque appel qui compilait compile encore, et chaque appel refusé l’est encore. Le SQL des requêtes ne change pas.
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `valuesTypedAsAliases was removed in 8.0, which always does what valuesTypedAsAliases: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-valuesTypedAsAliases`. Sans la clé, la prochaine génération réécrit chaque ligne de valeur de `schema.d.ts`, un fichier plus petit. Le survol d’un éditeur et une erreur nomment l’alias avec TypeScript 5.9, `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`, là où la 7.x listait l’union ; TypeScript 4.1 affiche encore l’union. Compilé avec un `zapatos/db` antérieur à la 7.2.0, après un retour en arrière, le schéma échoue sur chaque ligne de valeur (TS2694), et sous `skipLibCheck` ces valeurs sont `any` : régénérez avec la version que vous installez.
+- **Trouver les appels** : `grep -rn valuesTypedAsAliases` dans vos fichiers de configuration et vos scripts. Pour un outil ou un test qui lit `schema.d.ts` comme du texte, `grep -rnF 'db.Parameter<' zapatos/schema.d.ts` trouve les lignes écrites par la 7.x, aucune une fois le schéma régénéré. Un test qui fige le message d’une erreur TypeScript sur la valeur d’une colonne : le texte attendu nomme désormais l’alias.
+- **Avant → après** : dans `schema.d.ts`, `release_year?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, …>;` devient `release_year?: db.WhereableValue<number>;`. Un type à vous qui écrivait cette union en entier peut la nommer : `db.WhereableValue<number>`. Dans un fichier de configuration, retirez `"valuesTypedAsAliases": false`.
 
 ## Passer de pgcast 6.x à la 7.0 {#from-7-0}
 

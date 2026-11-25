@@ -1,8 +1,0 @@
-{
-  // The type tests of ../types, compiled by tsc against the schema the generator's valuesTypedAsAliases writes
-  // (../__snapshots__/codegen/valuesTypedAsAliases.d.ts, frozen by test/integration/codegen.test.ts) in place of
-  // ../generated/zapatos/schema.d.ts, with the same placeholders: the same types give the same results.
-  "extends": "../types/tsconfig.json",
-  "include": ["../generated/zapatos/custom/**/*", "../__snapshots__/codegen/valuesTypedAsAliases.d.ts", "../types/**/*"],
-  "exclude": ["../generated/zapatos/custom/PgPreferences.d.ts"]
-}
