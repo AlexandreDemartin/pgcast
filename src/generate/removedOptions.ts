@@ -10,6 +10,8 @@ Released under the MIT licence: see LICENCE file
 const removedOptions: { [key: string]: unknown } = {
   typeEnumsAcrossSchemas: true,
   enumOrder: 'declared',
+  uniqueIndexConstraintsOnly: true,
+  domainsTypedByContext: true,
 };
 
 /**

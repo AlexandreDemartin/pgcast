@@ -1,5 +1,5 @@
 ---
-english: 2b81f96f41ac
+english: ffbab99d3170
 ---
 
 # Types de valeurs
@@ -26,7 +26,7 @@ Les types que le schéma généré donne aux valeurs que JSON ou `pg` rendent so
 - Dans un `Selectable`, `int8[]` donne `Int8String[]`. Dans une ligne brute, un [tableau d’enums](/fr/generator#generate.enumArraysTypedAsText) est représenté par du texte par défaut.
 - Avec l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur, `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans un `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - Les raccourcis renvoient des `JSONSelectable`. Un `Selectable` est ce que `pg` renvoie pour un simple `SELECT` de la ligne.
-- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). Avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type vient du placeholder, sauf dans les lignes brutes pour un [domaine portant directement sur un tableau d’enums](/fr/switching#domain-and-parser-types). Dans ce cas, `enumArraysTypedAsText: false` suffit à rétablir le type du placeholder. Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
+- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). En 7.x, avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type venait du placeholder ; la 8.0 retire cette option. Dans les lignes brutes, pour un [domaine portant directement sur un tableau d’enums](/fr/switching#domain-and-parser-types), `enumArraysTypedAsText: false` rétablit le type du placeholder. Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
 - Un `interval` donne un [`PostgresInterval`](#PostgresInterval) dans `Selectable`, une `string` en JSON et `string | PostgresInterval` dans une écriture. Avec [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects), les cinq interfaces utilisent `string`.
 
 Chaque type vérifie la forme d’une chaîne, pas sa valeur : `'2030-13-45'` est un `DateString`.
@@ -46,7 +46,7 @@ type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-L’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur utilise ce type pour les colonnes de type domaine dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable`, ainsi que dans `Selectable` pour un domaine imbriqué ou un tableau de domaines. Tant que le placeholder `Custom` correspond exactement à `Generated`, le type qu’y a écrit le générateur, le résultat est `InContext`, le type de base du domaine dans ce contexte. Sinon, le résultat est `Custom`, comme avec `domainsTypedByContext: false`.
+Le générateur utilise ce type pour les colonnes d’un domaine [typé selon le contexte](/fr/generator#generate.domainsTypedByContext) dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable`, ainsi que dans `Selectable` pour un domaine imbriqué ou un tableau de domaines. Tant que le placeholder `Custom` correspond exactement à `Generated`, le type qu’y a écrit le générateur, le résultat est `InContext`, le type de base du domaine dans ce contexte. Sinon, le résultat est `Custom`, dans tous les contextes.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` est `number` : un placeholder laissé tel que généré.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.

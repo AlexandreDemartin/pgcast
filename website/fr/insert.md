@@ -1,5 +1,5 @@
 ---
-english: 1dfdbab3f4f4
+english: 80fb6f8594d8
 ---
 
 # Écritures
@@ -189,7 +189,7 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_pkey'))
 db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_key'));
 ```
 
-Par défaut, `constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la vérification de types de la 6.x. Postgres applique toujours les mêmes règles.
+`constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablissait la vérification de types de la 6.x, sous les mêmes règles de Postgres ; la 8.0 retire cette option.
 
 Postgres cherche la contrainte sur la table cible, même si une autre table a une contrainte du même nom. Si la contrainte est absente, Postgres renvoie 42704. Si aucun index de la contrainte ne peut servir d’arbitre, Postgres renvoie 42809, par exemple pour une contrainte `CHECK` qui porte le même nom qu’un index sans contrainte.
 

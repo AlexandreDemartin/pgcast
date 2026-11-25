@@ -78,10 +78,11 @@ export const definitionForRelationInSchema = async (
   columnsTypedByEnumName?: string[],  // never filled from 8.0.0: kept so that the parameters after it keep their place
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
-  uniqueIndexesNotArbiters?: string[],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
-  domainsNotByContext?: string[],  // an 'out' parameter too: what domainsTypedByContext would change
+  // never filled from 8.0.0, as domainsNotByContext and domainsUnderDomains: kept so that the parameters after them keep their place
+  uniqueIndexesNotArbiters?: string[],
+  domainsNotByContext?: string[],
   domainRoots: () => Promise<DomainRoots> = () => domainRootsInDatabase(queryFn),
-  domainsUnderDomains?: string[],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
+  domainsUnderDomains?: string[],
   // Direct callers can still collect the columns the 6.x parser notes named when the setting was omitted.
   enumArraysNotAsText?: [column: string, customType: string | null][],
   intervalsAsText?: string[],
@@ -98,7 +99,6 @@ export const definitionForRelationInSchema = async (
     otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
     enumArraysAsText = config.enumArraysTypedAsText ?? true,
-    domainsByContext = config.domainsTypedByContext ?? true,
     valuesAsAliases = config.valuesTypedAsAliases ?? false,
     inlineIn = (schema: string) => schema !== schemaName,
     // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
@@ -141,11 +141,11 @@ export const definitionForRelationInSchema = async (
       updatableType = tsTypeForPgType(udtName, typeEnums, 'Updatable', udtConfig, inlineEnums);
 
     // an interval, an array of one or a domain over either, whose placeholder holds what pg returns, as generated; under
-    // another domain, or in an array of a domain, only where domainsTypedByContext types it by its base type, read as
-    // below: an array of a domain over interval[] is then no type it knows
+    // another domain, or in an array of a domain, only where it is typed by its base type, read as below: an array of
+    // a domain over interval[] is then no type it knows
     const base = intervalsAsText && rootOf(row);
     if (intervalsAsText && config.intervalsTypedAsObjects == null &&  // left out, or null from JSON: false is a choice, a parser of your own
-      (isInterval({ schema: udtSchema, name: udtName }) || domainsByContext &&
+      (isInterval({ schema: udtSchema, name: udtName }) ||
         isInterval(base && { schema: base.schema, name: (base.isArray ? '_' : '') + base.name }))) {
       const type = domainName !== null ? `${domainSchema}.${domainName}` : udtName === 'interval' ? udtName :
         udtName === '_interval' ? 'interval[]' : `${udtSchema}.${udtName.slice(1)}[]`;
@@ -232,8 +232,8 @@ export const definitionForRelationInSchema = async (
       origins[qualifiedType] = customType;
 
       // a domain over int8, numeric, bytea, money or a date: as generated, its placeholder holds what pg returns, though
-      // a write takes more and, except for money, the shortcuts' JSON gives another type; with domainsTypedByContext,
-      // each context takes its own type while the placeholder still holds exactly what the generator wrote
+      // a write takes more and, except for money, the shortcuts' JSON gives another type: so each context takes its own
+      // type while the placeholder still holds exactly what the generator wrote
       // (db.DomainInContext), and the placeholder's otherwise. A domain over a domain, or an array of a domain, has an
       // `any` placeholder: all five take the type of the base type under its domains, but an array's Selectable, a
       // string, since pg returns an array of a type it does not know as its text
@@ -249,14 +249,9 @@ export const definitionForRelationInSchema = async (
         underDomains = rootTypes && rootTypes[1] !== 'any' ? rootTypes : undefined,
         byContext = domainName !== null && selectableType !== 'any' &&
           [JSONSelectableType, whereableType, insertableType, updatableType].some(type => type !== selectableType),
-        typedByContext = (byContext || underDomains !== undefined) && domainsByContext,
+        typedByContext = byContext || underDomains !== undefined,
         inContext = (type: string) => typedByContext ? `db.DomainInContext<${placeholder}, ${selectableType}, ${type}>` : placeholder;
 
-      if (byContext && !typedByContext) domainsNotByContext?.push(`${schemaName}.${rel.name}.${column} (${domainSchema}.${domainName})`);
-      if (domainsUnderDomains && underDomains && !typedByContext) {
-        const type = domainName === null ? `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`;
-        domainsUnderDomains.push(`${schemaName}.${rel.name}.${column} (${type})`);
-      }
       const generated = selectableType;
       [selectableType, JSONSelectableType, whereableType, insertableType, updatableType] = underDomains?.map(inContext) ??
         [placeholder, ...[JSONSelectableType, whereableType, insertableType, updatableType].map(inContext)];
@@ -311,12 +306,7 @@ export const definitionForRelationInSchema = async (
         ORDER BY i.indexname`,
       values: [rel.name, schemaName]
     }),
-    constraintsOnly = config.uniqueIndexConstraintsOnly ?? true,
-    uniqueIndexes = result.rows.filter(ui => ui.isArbiter || !constraintsOnly);
-
-  if (uniqueIndexesNotArbiters && !constraintsOnly) {
-    uniqueIndexesNotArbiters.push(...result.rows.filter(ui => !ui.isArbiter).map(ui => `${schemaName}.${rel.name}.${ui.indexname}`));
-  }
+    uniqueIndexes = result.rows.filter(ui => ui.isArbiter);
 
   let constraintDef = '';
   if (config.constraintNames === true) {

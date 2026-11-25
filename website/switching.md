@@ -431,6 +431,22 @@ try {
 - **Find the calls**: `grep -rn enumOrder` over your config files and scripts, then `grep -rnE 'every\.\w+\['` for code that reads a label by its position; `tsc` finds a tuple of every label written in alphabetical order.
 - **Before → after**: delete `"enumOrder": "alphabetical"`. A label read by its position, `type Lead = s.every.crew_job[0]`<!-- tsc: import type * as s from 'zapatos/schema'; … -->, `'cinematographer'` through 7.x with `"alphabetical"`, becomes that label written out, `type Lead = 'cinematographer'`<!-- tsc -->. A tuple of every label, `const jobs: s.every.crew_job = ['cinematographer', 'composer', 'director', 'editor', 'writer']`, takes the declared order, `const jobs: s.every.crew_job = ['director', 'writer', 'editor', 'cinematographer', 'composer']`<!-- tsc: import type * as s from 'zapatos/schema'; … -->.
 
+### `uniqueIndexConstraintsOnly` {#from-8-0-uniqueIndexConstraintsOnly}
+
+8.0 always does what `uniqueIndexConstraintsOnly: true`, the 7.x default, did: a relation's `UniqueIndex`, the names [`constraint()`](/insert#constraint) takes, lists only its non-deferrable `UNIQUE` and `PRIMARY KEY` constraints backed by valid, non-exclusion indexes ([`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, the generator throws `uniqueIndexConstraintsOnly was removed in 8.0, which always does what uniqueIndexConstraintsOnly: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-uniqueIndexConstraintsOnly`. Once you delete it and regenerate, the other unique indexes leave `UniqueIndex`: in the generator's example, the deferrable `festival_entries_slot_key` and the bare index `festival_entries_live_idx`. A `constraint()` naming one no longer compiles (TS2345); Postgres refused both with `DO UPDATE` anyway (55000, 42704). The `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()` stays empty.
+- **Find the calls**: `grep -rn uniqueIndexConstraintsOnly` over your config files and scripts, then regenerate and run `tsc`: each `constraint()` naming a name that left fails to compile. A `Record` literal typed with a union that became `never` still compiles with the old key ([Named conflict targets in 7.0](#named-conflict-targets)): `grep -rn UniqueIndex` lists those, and `grep -rn uniqueIndexesNotArbiters` the out-parameter's readers.
+- **Before → after**: delete `"uniqueIndexConstraintsOnly": false`. A type that read every unique index from `UniqueIndex`, such as `Record<s.festival_entries.UniqueIndex, string>`, reads them from `Constraint` with [`constraintNames: true`](/generator#generate.constraintNames): `Partial<Record<s.festival_entries.Constraint, string>>`, whose names include `festival_entries_live_idx`. A named `DO NOTHING` on a `WITHOUT OVERLAPS` key, which Postgres 18 takes and `UniqueIndex` leaves out, becomes an explicit [`sql`](/sql-template) statement with `ON CONFLICT ON CONSTRAINT … DO NOTHING`.
+
+### `domainsTypedByContext` {#from-8-0-domainsTypedByContext}
+
+8.0 always does what `domainsTypedByContext: true`, the 7.x default, did: a domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, is typed by context, as its base type is, while its placeholder holds what the generator wrote for it; a domain over a domain, or an array of a domain, takes the types of its innermost domain's base type ([`domainsTypedByContext`](/generator#generate.domainsTypedByContext)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, the generator throws `domainsTypedByContext was removed in 8.0, which always does what domainsTypedByContext: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-domainsTypedByContext`. Once you delete it and regenerate, in the generator's example, `seat_bookings.ticket` is a `number` in a shortcut's row with the default JSON parser, and `insert()` takes `ticket: 1`, which 7.x with `false` refused (TS2769). `vip_ticket` and `tickets`, `any` through 7.x with `false`, take their root's types: `insert()` refuses `vip_ticket: 'abc'` (TS2769). The `domainsNotByContext` and `domainsUnderDomains` out-parameters of `definitionForRelationInSchema()` stay empty.
+- **Find the calls**: `grep -rn domainsTypedByContext` over your config files and scripts, then regenerate and run `tsc`: each read of a shortcut's row that expects the placeholder's string, and each write the root's type refuses, fails to compile. `grep -rnE 'domainsNotByContext|domainsUnderDomains'` lists the out-parameters' readers.
+- **Before → after**: delete `"domainsTypedByContext": false`. To keep a column typed by its placeholder in all five interfaces, as `false` did, edit the placeholder to another type than the generated one, such as `export type PgTicket_no = number | db.Int8String` ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)), or `unknown` for a domain over a domain: one edited to `any` counts as left as generated.
+
 ## Migrate from pgcast 6.x to 7.0 {#from-7-0}
 
 On 6.x, [trace the warnings](#read-the-warnings) and [enable the fixes](#turn-on-the-opt-ins) first. Keep your existing package alias when installing 7.x. Choose the command that matches your imports.
@@ -539,7 +555,7 @@ On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColum
 
 On a partitioned table, the union follows the parent index. A deferrable parent key drops out even when an immediate partition key lets the named upsert work with `{ reportAction: 'suppress' }`. Use explicit SQL or set `uniqueIndexConstraintsOnly: false` through 7.x. With an immediate parent and a deferrable partition key, the name compiles but Postgres can raise 55000.
 
-This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
+Through 7.x, this setting restored the 6.x union without a migration note, and it alone filled the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`; 8.0 removes it and leaves the out-parameter empty ([`uniqueIndexConstraintsOnly`](#from-8-0-uniqueIndexConstraintsOnly)).
 
 ### Domains, enum arrays and intervals in 7.0 {#domain-and-parser-types}
 
@@ -549,13 +565,13 @@ For callers of `definitionForRelationInSchema()`, the four optional arrays still
 
 | Out-parameter | When it collects a column |
 |---|---|
-| `domainsNotByContext` | `domainsTypedByContext: false`, for a known domain base whose type differs by context |
-| `domainsUnderDomains` | The same setting, for a nested domain or array of domains with a known root |
+| `domainsNotByContext` | `domainsTypedByContext: false`, for a known domain base whose type differs by context, through 7.x; empty from 8.0 |
+| `domainsUnderDomains` | The same setting, for a nested domain or array of domains with a known root, through 7.x; empty from 8.0 |
 | `enumArraysNotAsText` | `enumArraysTypedAsText` omitted or `null`, for a recognised enum array, including a direct domain over one |
-| `intervalsAsText` | `intervalsTypedAsObjects` omitted or `null`, for an interval, its array or a direct domain over either. A resolved interval or interval-array root also counts when `domainsTypedByContext` is on (the 7.0 default). |
+| `intervalsAsText` | `intervalsTypedAsObjects` omitted or `null`, for an interval, its array or a direct domain over either. A resolved interval or interval-array root also counts when `domainsTypedByContext` is on (the 7.0 default, and from 8.0 always). |
 
 - With [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), a `bigint` domain gives a number in shortcut JSON with the default parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` before calling `.padStart()`.
-- A nested domain with an `any` placeholder takes its innermost base type. An array of `bigint` domains narrows from `any` to `number[]` in default shortcut JSON. If rows contain null elements or multiple dimensions, check the shape before using an element. Include those shapes and the raw `string` in the array placeholder, or use `domainsTypedByContext: false` through 7.x. This override goes in 8.0.
+- A nested domain with an `any` placeholder takes its innermost base type. An array of `bigint` domains narrows from `any` to `number[]` in default shortcut JSON. If rows contain null elements or multiple dimensions, check the shape before using an element. Include those shapes and the raw `string` in the array placeholder, or use `domainsTypedByContext: false` through 7.x; 8.0 removes it ([`domainsTypedByContext`](#from-8-0-domainsTypedByContext)).
 - With [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), a `sql` row holds the array's text. To call `.map()` or write the labels back, use the array returned by a shortcut. Keep `false` if your `pg` parser returns the label array.
 - With the 7.0 default, an `isInSelect()` subquery `sub` selecting `c_enum_array` compares as the raw `string` type. TypeScript now rejects `{ c_enum_array: sub }` and accepts a text column that Postgres rejects (42883). Set `enumArraysTypedAsText: false` or write an explicit `sql` condition.
 - With [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), a `sql` row holds a `PostgresInterval`. Read its fields or write the object back directly. Shortcut JSON keeps the text. Keep `false` if your parser returns interval text. Both parser settings remain available beyond 8.0.

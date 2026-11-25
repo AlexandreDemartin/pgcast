@@ -185,7 +185,7 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_pkey'))
 db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_key'));
 ```
 
-By default, `constraint()` takes the `UNIQUE` and `PRIMARY KEY` constraints usable with `DO UPDATE`. For an ordinary unique index on `code`, pass the column `'code'` as the `conflictTarget`. Postgres refuses a deferrable constraint (55000), a constraint whose index is still invalid (42P10), and, from Postgres 18, a `WITHOUT OVERLAPS` key with `DO UPDATE` (42809). In 7.x, [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restores the 6.x type check. Postgres still applies the same rules.
+`constraint()` takes the `UNIQUE` and `PRIMARY KEY` constraints usable with `DO UPDATE`. For an ordinary unique index on `code`, pass the column `'code'` as the `conflictTarget`. Postgres refuses a deferrable constraint (55000), a constraint whose index is still invalid (42P10), and, from Postgres 18, a `WITHOUT OVERLAPS` key with `DO UPDATE` (42809). Through 7.x, [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restored the 6.x type check, under the same rules from Postgres; 8.0 removes it.
 
 Postgres looks up the name on the target table, even if another table shares it. A missing constraint gives 42704. A constraint with no arbiter index, such as a `CHECK` sharing a bare index's name, gives 42809.
 

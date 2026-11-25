@@ -33,6 +33,10 @@ Candidates for a check, a rule or a skill line.
 - When a key is removed, `<!-- tsc -->` marks on old CHANGELOG lines that set it stop compiling: `git grep -nE 'transactionRequires[A-Za-z]*: [a-z]*[^`]*`<!-- (tsc|probe)'`, with the removed key (#983).
 - Removing an option can leave data that records the old behaviour with no test asserting it any more (the 6.6.1 `old` data of the block cases): keep it only as the record behind a docs table, and say so (#983).
 - `@ts-expect-error` proves that an error is there, not which one: when a criterion, a doc or a migration entry names a code (TS2353, not TS2559 for a weak type), compile the line once without the directive (#983).
+- `leak-check.sh` reads a PR, not an issue: a plan comment posted on an issue is not covered (its GraphQL call fails on an issue number and still prints `clean`); check the issue thread with the same pattern after posting (#973).
+- `git diff -- 'website/*.md'` matches `website/fr/` too, as the pathspec `*` crosses `/`: `-- website ':!website/fr'` gives the English pages alone (#984).
+- A replay of `tsForConfig()` compares `customTypeSourceFiles` with sorted keys: their order follows query completion (#984).
+- A PR that removes an option greps `.agents/` and `AGENTS.md` for the key too, not only `website`, `README.md` and `tools`: a skill kept citing a removed option as its rule's example (`git grep -n <key> -- .agents AGENTS.md`, #984).
 
 ## Minors kept
 
@@ -47,3 +51,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/runtime-config.md:462` and FR `:467` (#983): "8.0 removes all but `aggregatesTypedByColumn`", but 019 § 3 removes it too; #968 rewrites the sentence to name what 8.0 removed.
 - `defect` `website/switching.md:357` and FR `:358` (#983): `grep -rn "'BEGIN"` misses `"BEGIN"`, `` sql`BEGIN` ``, lowercase `begin` and `START TRANSACTION`; `grep -rniE "[\"'\`](begin|start transaction)"`.
 - `form` `docs/CHARACTERISATION-REPORT.md:56` R10 and `:73` R22 (#983): "fixed" twice in one cell; one status per version, as R8 and R9.
+- `defect` `website/switching.md:424` and FR (#984): the `uniqueIndexConstraintsOnly` entry gives after code for a `WITHOUT OVERLAPS` key under `DO NOTHING`, not for a deferrable parent key on a partitioned table with immediate partition keys (TS2345 after regenerating); point to the same explicit `sql` statement.
+- `form` `.agents/skills/codegen-output/SKILL.md:16` (#984): the rule's only example, `domainsTypedByContext`, is a removed key.
+- `form` `src/db/utils.ts:17` (#984): a short line mid-paragraph in the rewrapped JSDoc.

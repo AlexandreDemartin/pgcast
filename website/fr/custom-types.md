@@ -1,5 +1,5 @@
 ---
-english: 06a7ea8e0df3
+english: b3b82dad15e1
 description: "Un type que le générateur ne sait pas traduire, comme point, et chaque domaine vous arrivent en placeholder dans zapatos/custom, que vous remplissez vous-même."
 ---
 
@@ -119,7 +119,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Typer un domaine {#type-a-domain}
 
-Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`, ou l’union de ses valeurs ([plus bas](#a-domain-of-values)). Ce même type est utilisé dans les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte et que [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé (par défaut depuis la 7.0, [plus bas](#when-a-placeholder-does-not-compile)). Le placeholder d’un domaine imbriqué ou d’un tableau de domaines contient `any`. Avec cette option, la colonne suit le type de base du domaine au dernier niveau d’imbrication. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui convient aux cinq interfaces :
+Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`, ou l’union de ses valeurs ([plus bas](#a-domain-of-values)). Ce même type est utilisé dans les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type [typé selon le contexte](/fr/generator#generate.domainsTypedByContext) (depuis la 7.0, [plus bas](#when-a-placeholder-does-not-compile)). Le placeholder d’un domaine imbriqué ou d’un tableau de domaines contient `any`, et la colonne suit le type de base du domaine au dernier niveau d’imbrication. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui convient aux cinq interfaces :
 
 ::: code-group
 
@@ -270,9 +270,9 @@ Le placeholder d’un domaine contient le nom TypeScript de son type de base, et
 - Avec [`customTypesTransform`](/fr/generator#generate.customTypesTransform) à `'my_type'`, ou à une fonction qui garde le nom, un placeholder qui prend le nom du schéma de son domaine, `tone` pour un domaine `tone.tone` sur l’enum `tone.mood`, importe l’espace de noms de ce schéma, `import type { tone }`. Quand `zapatos/schema` déclare aussi un type nommé `tone`, un enum ou une union d’[`unprefixedSchema`](/fr/generator#generate.unprefixedSchema), ou l’un des siens, comme `Table` ou `Selectable`, cet import l’apporte en plus, TS2440 (`Import declaration conflicts with local declaration of 'tone'.`) : le placeholder nomme alors le type sans import, `export type tone = import('zapatos/schema').tone.mood;`. pgcast de la 6.7.0 à la 6.10.0 écrivait l’import : écrivez ce type dans un placeholder écrit auparavant, ou supprimez-le et relancez la génération ([#661](https://github.com/AlexandreDemartin/pgcast/issues/661)).
 - Depuis la 7.0, si une table utilise un domaine qui repose sur un enum d’un autre schéma, le générateur écrit les labels de l’enum dans le placeholder de ce domaine à sa première génération, pourvu qu’aucun autre type ne porte le même nom de placeholder. En 7.x, avec [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas), chaque table cherchait l’enum dans son propre schéma : si deux tables trouvaient des enums différents, importez celui sur lequel repose le domaine ; si une table ne trouvait aucun enum de ce nom, le placeholder recevait `any`, sauf si [un autre type partage ce placeholder](https://github.com/AlexandreDemartin/pgcast/issues/42). Zapatos 6.6.1 écrivait le nom de l’enum ou `any` selon [la table lue en dernier](https://github.com/AlexandreDemartin/pgcast/issues/455). Pour mettre à jour un placeholder existant, suivez le [guide de migration](/fr/switching).
 
-Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que renvoie `pg`. Depuis la 7.0, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) donne le type `number` à la valeur renvoyée par [`select()`](/fr/select#select) avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. [`insert()`](/fr/insert#insert) accepte `number | Int8String | bigint`.
+Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que renvoie `pg`. Depuis la 7.0, le générateur le [type selon le contexte](/fr/generator#generate.domainsTypedByContext), ce qui donne le type `number` à la valeur renvoyée par [`select()`](/fr/select#select) avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. [`insert()`](/fr/insert#insert) accepte `number | Int8String | bigint`.
 
-Avec `domainsTypedByContext: false`, les cinq interfaces utilisent le type du placeholder de ce domaine. Si vous gardez ce réglage en 7.x, vous pouvez y déclarer les deux représentations :
+Pour que les cinq interfaces utilisent plutôt le type du placeholder, comme avec `domainsTypedByContext: false` en 7.x, modifiez le placeholder ; vous pouvez y déclarer les deux représentations :
 
 ::: code-group
 
@@ -285,8 +285,8 @@ declare module 'zapatos/custom' {
 
 :::
 
-- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` ou `money` est dans le même cas : son placeholder contient ce que renvoie `pg`, moins que ce qu’accepte une écriture et, sauf pour `money`, autre chose que ce que renvoient les raccourcis, et l’option le type aussi selon le contexte.
-- Un placeholder modifié, comme celui-ci, garde son type dans les cinq interfaces, même avec l’option.
+- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` ou `money` est dans le même cas : son placeholder contient ce que renvoie `pg`, moins que ce qu’accepte une écriture et, sauf pour `money`, autre chose que ce que renvoient les raccourcis, et le générateur le type aussi selon le contexte.
+- Un placeholder modifié, comme celui-ci, garde son type dans les cinq interfaces.
 - Au-delà de `Number.MAX_SAFE_INTEGER`, le nombre perd ses derniers chiffres, comme pour tout `bigint` : `9007199254740993` revient en `9007199254740992` ([`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers)).
 
 ## Voir aussi {#see-also}
