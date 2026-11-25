@@ -1,5 +1,5 @@
 ---
-english: f669f68ef01f
+english: 2ee51e80f536
 ---
 
 # Générateur
@@ -140,7 +140,7 @@ await generate({
 - Si la connexion ou une requête échoue, la promesse est rejetée avant toute écriture. Vous pouvez intercepter l’erreur d’origine de `pg` ou régler [`rejectOnQueryError: false`](#generate.rejectOnQueryError) pour que le processus s’arrête comme en 6.x.
 - Sur les autres erreurs, la promesse est rejetée : une écriture qui échoue (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` quand `outDir` est un fichier), une [règle](#generate.schemas) mal formée.
 - À l’exécution, une clé qu’il ne connaît pas est ignorée : un ancien `srcMode`, un `outdir` mal orthographié. En TypeScript, un littéral objet qui en contient une ne compile pas (TS2353, ou TS2561 avec une suggestion pour un nom proche comme `outdir`).
-- Une clé que la 8.0 a retirée, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) ou [`enumOrder`](#generate.enumOrder), ne compile pas non plus (TS2353). Donnée quand même, depuis une variable, un fichier de configuration ou l’argument JSON de la CLI, la promesse de `generate()` ou de `check()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Erreur : `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
+- Une clé que la 8.0 a retirée, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) ou [`enumOrder`](#generate.enumOrder), ne compile pas non plus (TS2353). Donnée quand même, depuis une variable, un fichier de configuration ou l’argument JSON de la CLI, `finaliseConfig()` lève une erreur, la promesse de `generate()`, de `check()`, de `tsForConfig()` ou de `definitionForRelationInSchema()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Erreur : `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
 - `zapatos/generate` exporte aussi `Config` et les fonctions qui composent `generate()` (`tsForConfig()`, `definitionForRelationInSchema()` et d’autres). À partir de la 8.0.0, `definitionForRelationInSchema()` laisse vide son tableau `columnsTypedByEnumName` ; en 7.x, seul `typeEnumsAcrossSchemas: false` le remplissait. `tsTypeForPgType()` traduit un nom de type dans un contexte donné. Pour un tableau d’enums, elle donne donc un type tableau. `definitionForRelationInSchema()` applique `enumArraysTypedAsText` aux lignes brutes. Voir les [paramètres de sortie de cette fonction](/fr/switching#domain-and-parser-types).
 
 ## Les options {#options}
