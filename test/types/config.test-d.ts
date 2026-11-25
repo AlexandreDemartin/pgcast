@@ -35,7 +35,7 @@ describe('getConfig() and setConfig()', () => {
       | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
       | 'queryListener' | 'resultListener' | 'transactionListener'
       | 'selectExactlyOneChecksForSecondRow' | 'topLevelSelectAsRows'
-      | 'transactionEventListener' | 'shortcutsUseJson'
+      | 'transactionEventListener'
     >();
   });
 
@@ -78,10 +78,18 @@ describe('getConfig() and setConfig()', () => {
     db.setConfig({ transactionAttemptsMax: 3, aggregatesTypedByColumn: false });
     // @ts-expect-error aggregatesTypedByColumn is no key of the config getConfig() gives
     db.getConfig().aggregatesTypedByColumn;
+    // @ts-expect-error shortcutsUseJson is no key of Config from 8.0
+    db.setConfig({ shortcutsUseJson: false });
+    // @ts-expect-error shortcutsUseJson is no key of Config from 8.0, its kept value too
+    db.setConfig({ shortcutsUseJson: true });
+    // @ts-expect-error shortcutsUseJson is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, shortcutsUseJson: false });
+    // @ts-expect-error shortcutsUseJson is no key of the config getConfig() gives
+    db.getConfig().shortcutsUseJson;
     const built = {
       transactionAttemptsMax: 3, undefinedMeansMissing: false, upsertRequiresSameKeys: false,
       transactionRequiresCommit: false, transactionRequiresIdleClient: false, transactionRequiresSatisfyingLevel: false,
-      aggregatesTypedByColumn: false,
+      aggregatesTypedByColumn: false, shortcutsUseJson: false,
     };
     expectTypeOf(db.setConfig).toBeCallableWith(built);  // hence setConfig()'s refusal at run time
   });
@@ -89,13 +97,6 @@ describe('getConfig() and setConfig()', () => {
   test('ConfigTypes is no type of zapatos/db from 8.0: naming it is TS2694', () => {
     // @ts-expect-error ConfigTypes went with aggregatesTypedByColumn, its only key
     expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
-  });
-
-  test('shortcutsUseJson is an optional boolean, so a Config written for Zapatos 6.6.1 still compiles', () => {
-    expectTypeOf<db.Config['shortcutsUseJson']>().toEqualTypeOf<boolean | undefined>();
-    db.setConfig({ shortcutsUseJson: true });
-    // @ts-expect-error the option is a boolean
-    db.setConfig({ shortcutsUseJson: 'json' });
   });
 });
 
