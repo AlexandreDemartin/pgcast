@@ -24,7 +24,7 @@ const sql = postgres(process.env.DATABASE_URL!);
 const pool = asPool(sql);
 
 const titles = await db.select('films', { release_year: 1999 }, { columns: ['title'] }).run(pool);
-// SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "title") AS result
+// SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "title") AS result
 // FROM "films" WHERE ("release_year" = $2)) AS "sq_films"   -- values: ['title', 1999]
 
 const screenings = await db.sql<s.screenings.SQL, s.screenings.Selectable[]>`
