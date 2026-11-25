@@ -4375,6 +4375,15 @@ describe('the CLI with --check (#556)', () => {
       expect((await checked(config)).result).toBe(false);
     });
 
+    // as 7.x, which read a key of it before any query, where generate() takes either for the defaults
+    it.each([undefined, null])('rejects given %s with a TypeError, before any query', async config => {
+      vi.stubEnv('PGHOST', '127.0.0.1');  // where the defaults' pool would connect
+      vi.stubEnv('PGPORT', '1');
+      const query = vi.spyOn(pg.Pool.prototype, 'query');
+      await expect(checkFiles(config as unknown as Config)).rejects.toBeInstanceOf(TypeError);
+      expect(query).not.toHaveBeenCalled();
+    });
+
     it('resolves to true when the files are up to date, with one line through progressListener', async () => {
       await generated();
       expect(await checked()).toEqual({ result: true, progress: [upToDate], warnings: [], printed: [] });
