@@ -48,7 +48,7 @@ Each shortcut writes one query, and its reference shows that SQL. Zapatos's docs
 
 The panel is what you get in your own code: [`.compile()`](/sql-template#compile) gives the same `text` and `values`, and sends nothing. Every value is a parameter, the JSON keys included; every table and column name is quoted.
 
-The nesting is Postgres's own work, `jsonb_agg`<!-- probe: examples/why_studio.ts --> in a `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts -->: the studio and its films come back as one JSON value, in one round trip, with no rows to stitch together in JavaScript.
+The nesting is Postgres's own work, `json_agg`<!-- probe: examples/why_studio.ts --> in a `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts -->: the studio and its films come back as one JSON value, in one round trip, with no rows to stitch together in JavaScript.
 
 TypeScript knows the one column asked for, the films beneath it, and `undefined` when no studio has that `id`: that takes `strict`, as [First query](/first-query#set-up-the-project) sets it.
 
@@ -77,7 +77,7 @@ pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1
 | Path | When | What changes for you | Example |
 |---|---|---|---|
 | Fix | a security hole; or Postgres or the type already refused the call; or the result contradicts the function's name, type or docs | the call does what it says, or throws an error that says what to do, before any query | [`update()`](/insert#update) with no columns throws `nothing to update: an Updatable needs at least one column`<!-- message -->, where Postgres refused `SET () = ROW()` |
-| Opt-in | the result is valid, and code may rely on it | nothing until you turn the option on; the old path warns once per process | in 6.x, `undefinedMeansMissing` treated undefined write values as missing keys. This became the default in 7.0 |
+| Opt-in | the result is valid, and code may rely on it | nothing until you turn the option on; the old path warns once per process | in 6.x, `undefinedMeansMissing` treated undefined write values as missing keys. This became the default in 7.0, and the only behaviour in 8.0 |
 | Document | Postgres works that way, it was meant, or the type can't see a value known only at run time | nothing: the docs say so | [`isNotIn()`](/conditions#conditions.isNotIn) with a `NULL` in its list matches no row, as Postgres reads `NOT IN` |
 
 </div>
@@ -88,9 +88,9 @@ The security fixes came first, all of them in 6.6.2 ([Security](/security)):
 - a plain value in [`upsert()`](/insert#upsert)'s `updateValues` is a parameter;
 - the keywords of a lock, `truncate()` or an isolation level, and the name of an aggregate, are checked before any query.
 
-pgcast 6.x lets projects opt into fixes before they become defaults. In 7.0, six runtime settings and seven generator settings change. The [migration guide](/switching#from-7-0) shows which old settings expire in 8.0 and which remain available for a custom parser or the CLI's exit behaviour.
+pgcast 6.x lets projects opt into fixes before they become defaults. In 7.0, six runtime settings and seven generator settings change. The [migration guide](/switching#from-7-0) shows which old settings expire in 8.0 and which remain available for a custom parser.
 
-[`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) and the generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), which never warn, stay off; so does its [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases), until 8.0. Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions](/versions)).
+[`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) and the generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), which never warn, stay off through 7.x, as does its [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases); 8.0 removes the first and keeps the other two alone ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)). Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions](/versions)).
 
 Zapatos 6.6.1 shipped no test suite of its own (its first consumer's tests exercised "most of the code base at least a little"); its CI linted and built. Its roadmap called one "kind of indispensable", one that tests "not just returned values but also inferred types".
 

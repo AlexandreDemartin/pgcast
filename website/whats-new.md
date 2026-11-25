@@ -10,6 +10,8 @@ What pgcast adds to Zapatos 6.6.1, one line each: the version it came in, and a 
 | [`withCTEs()`](/sql-template#withCTEs): CTEs before a shortcut, its result type kept | 6.11.0 |
 | [`selectRows()`](/select#selectRows): the query of `select()` as a fragment, one row per result, for a [cursor](/cursors) | 6.12.0 |
 | [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow): `selectExactlyOne()` throws on a second row, opt-in | 6.7.0 |
+| [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows): `select()` run on its own sends one row per result, the same array, opt-in | 7.3.0 |
+| [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson): `select()` and its kin, and the writes' `RETURNING`, build their JSON with `json` functions, the same values, opt-in through 7.x, always from 8.0.0 | 7.3.0 |
 | [`ReturningTypeForTable`](/insert#ReturningTypeForTable) and [`UpsertReturnableForTable`](/insert#UpsertReturnableForTable), exported: the row a write returns, to type a fake result | 6.7.0 |
 | [`UpsertOptions`](/insert#UpsertOptions) and [`OrderSpecForTable`](/select#OrderSpecForTable), exported, so that a package's declarations can name them | 6.9.0 |
 
@@ -43,7 +45,7 @@ What pgcast adds to Zapatos 6.6.1, one line each: the version it came in, and a 
 | [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions): a domain over `text` whose `CHECK` lists its values, typed as their union, opt-in | 6.10.0 |
 | [`moduleNames`](/generator#generate.moduleNames) and `pgcastconfig.json`: imports from `pgcast/db`, and no file named after Zapatos | 6.7.0 |
 | [`SchemaRules`](/generator#SchemaRules) and [`ColumnOptions`](/generator#ColumnOptions), exported from `zapatos/generate`, so that a package's declarations can name them | 6.9.0 |
-| [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases): each column's value type in `Whereable`, `Insertable` and `Updatable` named by an alias of `zapatos/db`, the same types in a smaller file, opt-in | 7.2.0 |
+| [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases): each column's value type in `Whereable`, `Insertable` and `Updatable` named by an alias of `zapatos/db`, the same types in a smaller file, opt-in through 7.x, always from 8.0.0 | 7.2.0 |
 
 ## Drivers and adapters
 

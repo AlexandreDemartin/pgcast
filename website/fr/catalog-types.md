@@ -1,5 +1,5 @@
 ---
-english: d0484ad6e894
+english: cf57982f830f
 ---
 
 # Le catalogue
@@ -35,7 +35,7 @@ Quand vous lancez `npx pgcast`, le générateur pose à ces tables quelques ques
 | avec [`constraintNames`](/fr/generator#generate.constraintNames), pour chaque relation, les noms des clés primaires, des contraintes uniques, des clés étrangères, des contraintes `CHECK` et d’exclusion, ainsi que des index uniques | `pg_constraint` et les index uniques ci-dessus | le type `Constraint` de la relation |
 | avec [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), chaque domaine sur `text`, son `CHECK` et son `COMMENT ON DOMAIN` | `pg_type`, `pg_constraint`, `pg_description` | l’union des valeurs que liste le `CHECK`, et le tuple `every.<name>` |
 
-Avec les réglages par défaut de la 7.0, le générateur lit chaque enum dans son propre schéma. Le premier label de `every.crew_job` est `director`, comme dans la déclaration `CREATE TYPE crew_job`. Voir [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder).
+Le générateur lit chaque enum dans son propre schéma, et le premier label de `every.crew_job` est `director`, comme dans la déclaration `CREATE TYPE crew_job` : ce sont les réglages par défaut de la 7.0, et le seul comportement à partir de la 8.0. Voir [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder).
 
 Pour voir les requêtes elles-mêmes, réglez [`debugListener`](/fr/generator#generate.debugListener). Un domaine, comme `seat_label`, et un type que le générateur ne sait pas traduire, comme `point`, reçoivent chacun un placeholder dans `zapatos/custom/`, à vous de le remplir ([Types personnalisés](/fr/custom-types)).
 
@@ -71,9 +71,9 @@ Une vue matérialisée ne garde aucun `NOT NULL`, pas même celui d’un domaine
 
 Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos : une nullabilité que la base ne déclare pas serait une supposition, et une supposition est la seule chose qu’un type généré ne doit pas être. Certaines lacunes de ce que lit le générateur sont connues, et décrites ici telles qu’elles sont aujourd’hui :
 
-- `UniqueIndex` liste les contraintes utilisables avec `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la liste de tous les index uniques de la relation.
+- `UniqueIndex` liste les contraintes utilisables avec `ON CONFLICT ON CONSTRAINT … DO UPDATE`. En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablissait la liste de tous les index uniques de la relation ; la 8.0 retire cette option, et [`constraintNames`](/fr/generator#generate.constraintNames) les liste dans `Constraint`.
 - Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, suit son type de base dans chaque contexte tant que son placeholder contient le type généré.
-- Un domaine imbriqué ou un tableau de domaines suit le type de base du domaine au dernier niveau d’imbrication si le générateur reconnaît ce type. [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext) rétablit le type du placeholder dans les cinq interfaces.
+- Un domaine imbriqué ou un tableau de domaines suit le type de base du domaine au dernier niveau d’imbrication si le générateur reconnaît ce type. En 7.x, [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext) rétablissait le type du placeholder dans les cinq interfaces ; la 8.0 retire cette option.
 - La contrainte `NOT NULL` de la colonne s’applique au tableau lui-même. Même si les éléments ont pour type un domaine `NOT NULL`, une affectation au-delà de la fin, comme `a[3] = 3` sur `{1}`, enregistre `{1,NULL,3}`. Comme Zapatos 6.6.1, pgcast type `int4[] NOT NULL` en `number[]`, mais `pg` lit `{1,NULL}` comme `[1, null]`.
 - Un tableau d’enums est représenté par du texte dans `Selectable` et par un tableau de labels dans le JSON des raccourcis. [`enumArraysTypedAsText: false`](/fr/generator#generate.enumArraysTypedAsText) convient à un parser qui renvoie un tableau.
 - Un domaine sur `text` dont le `CHECK` liste les valeurs, `CHECK (VALUE IN ('U', 'PG', '12'))`, est une `string`, le type de son placeholder tel que généré, sauf si [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) est activé.
@@ -111,7 +111,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-Le domaine `seat_label` est une chaîne dans les cinq interfaces. Pour un domaine sur `bigint`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) conserve la chaîne de `pg` dans `Selectable` et donne un nombre dans `JSONSelectable` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. Si vous modifiez le type du placeholder, la colonne prend ce type dans les cinq interfaces.
+Le domaine `seat_label` est une chaîne dans les cinq interfaces. Pour un domaine sur `bigint`, le générateur [type selon le contexte](/fr/generator#generate.domainsTypedByContext) : il conserve la chaîne de `pg` dans `Selectable` et donne un nombre dans `JSONSelectable` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. Si vous modifiez le type du placeholder, la colonne prend ce type dans les cinq interfaces.
 
 La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 
@@ -121,13 +121,13 @@ Dans une session dont le `TimeZone` est `UTC`, le premier est le `Date` `2030-03
 
 ## Pourquoi les raccourcis renvoient du JSON {#why-the-shortcuts-return-json}
 
-Chaque raccourci est une seule requête, et Postgres construit lui-même son résultat : chaque ligne comme une valeur JSON, avec `to_jsonb()` ou `jsonb_build_object()`, chaque `lateral` imbriqué dedans, et pour `select()` les lignes réunies en un tableau avec `jsonb_agg()`.
+Chaque raccourci est une seule requête, et Postgres construit lui-même son résultat : chaque ligne comme une valeur JSON, avec `to_json()` ou `json_build_object()`, chaque `lateral` imbriqué dedans, et pour `select()` les lignes réunies en un tableau avec `json_agg()`.
 
 C’est ainsi que `select()` ramène des films avec leur distribution déjà en place, en un aller-retour, sans rien à assembler en JavaScript ensuite.
 
 Le prix, c’est que chaque valeur voyage en JSON, et que JSON n’a ni dates, ni octets, et qu’une seule sorte de nombre. `JSONSelectable` dit ce qui arrive à la place :
 
-- une date ou une heure, comme la chaîne ISO 8601 qu’écrit `to_jsonb()` ; un `timestamptz` avec le décalage de la session, `+00:00` en `UTC` et `+05:30` en `Asia/Kolkata` ;
+- une date ou une heure, comme la chaîne ISO 8601 qu’écrit `to_json()` ; un `timestamptz` avec le décalage de la session, `+00:00` en `UTC` et `+05:30` en `Asia/Kolkata` ;
 - un `bytea`, comme sa chaîne hexadécimale (avec le `bytea_output` par défaut), `'\xdeadbeef'`, là où `pg` donne un `Buffer` ;
 - un `int8` ou un `numeric`, comme nombre JSON, là où `pg` donne une chaîne. Un grand nombre perd en précision quand `JSON.parse()` le lit : l’`int8` `9007199254740993` arrive comme `9007199254740992`. Le générateur avertit quand un schéma a de telles colonnes, et [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) les type pour un parseur qui les garde entiers.
 
@@ -168,7 +168,7 @@ Le générateur est celui de Zapatos 6.6.1, son canary de version toujours à 10
 
 Les changements qu’apporte pgcast sont dans le runtime, pas dans les types générés. [`raw()`](/fr/sql-template#raw), [`cols()`](/fr/sql-template#cols) et [`vals()`](/fr/sql-template#vals) ne passent plus la vérification de types comme valeur d’un `Whereable`, d’un `Insertable` ou d’un `Updatable`, là où 6.6.1 les prenait pour un `Parameter`, un objet de même forme (`{ value }`).
 
-En 7.0, les écritures traitent par défaut une valeur `undefined` comme une clé absente. Voir [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ([Une valeur `undefined`](/fr/insert#undefined-values)). Avec `typeEnumsAcrossSchemas: false` et `enumOrder: 'alphabetical'`, le générateur cherche les enums dans le schéma de la relation et trie leurs labels par ordre alphabétique, comme dans pgcast 6.x ([Versions](/fr/versions)).
+À partir de la 7.0, les écritures traitent une valeur `undefined` comme une clé absente, et, à partir de la 8.0, sans exception. Voir [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ([Une valeur `undefined`](/fr/insert#undefined-values)). En 7.x, `typeEnumsAcrossSchemas: false` et `enumOrder: 'alphabetical'` faisaient chercher les enums dans le schéma de la relation et trier leurs labels par ordre alphabétique, comme dans pgcast 6.x ; la 8.0 retire les deux ([Versions](/fr/versions)).
 
 Ce que pgcast refuse, c’est une seconde source de vérité : une classe modèle, un schéma écrit en TypeScript, un type déclaré à côté de la table qu’il décrit. La base a le dernier mot, et le prix est une habitude : relancez le générateur après chaque migration, et laissez TypeScript vous signaler les requêtes qui ne collent plus ([Première requête](/fr/first-query#when-the-schema-changes)).
 

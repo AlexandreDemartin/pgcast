@@ -212,7 +212,8 @@ let checked = 0;
 for (const page of pages)
   checked += await check(page, readFileSync(new URL(page, import.meta.url), 'utf8').split('\n'), problems);
 
-// Install instructions follow the package major. The two migration routes target specific majors.
+// Install instructions follow the package major. Each migration route targets its own major: 6 to swap the package,
+// N in the section `{#from-N-0}`.
 const
   { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')),
   major = version.split('.')[0];
@@ -221,7 +222,7 @@ for (const file of [...pages, '../README.md']) {
   let target = major;
   readFileSync(new URL(file, import.meta.url), 'utf8').split('\n').forEach((line, i) => {
     if ((file === 'switching.md' || file === 'fr/switching.md') && line.startsWith('## '))
-      target = line.endsWith('{#swap-the-package}') ? '6' : line.endsWith('{#from-7-0}') ? '7' : major;
+      target = line.endsWith('{#swap-the-package}') ? '6' : line.match(/\{#from-(\d+)-0\}$/)?.[1] ?? major;
     for (const [range, n] of line.matchAll(/@pgcast\/pgcast@\^(\d+)/g)) {
       pinned++;
       if (n !== target) problems.push(`${file}:${i + 1}: ${range} targets major ${n}, expected ${target}`);

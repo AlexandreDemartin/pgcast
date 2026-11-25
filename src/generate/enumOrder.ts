@@ -5,22 +5,12 @@ Released under the MIT licence: see LICENCE file
 */
 
 import type * as pg from 'pg';
-import type { CompleteConfig } from './config';
 import type { EnumData } from './enums';
 
 // kept out of zapatos/generate's exports, like quote.ts
 
-type EnumOrder = NonNullable<CompleteConfig['enumOrder']>;
-export type EnumOrders = Record<EnumOrder, EnumData>;
-
-/** Accept `'declared'` or `'alphabetical'`, defaulting to `'declared'` when `enumOrder` is absent or `null`. Any other value throws. */
-export const enumOrderOf = (config: CompleteConfig): EnumOrder => {
-  const order = config.enumOrder ?? 'declared';
-  if (order !== 'alphabetical' && order !== 'declared') {
-    throw new Error(`enumOrder must be 'declared' (the default) or 'alphabetical', not '${order}'`);
-  }
-  return order;
-};
+/** The labels of each enum in alphabetical order, as `enumDataForSchema()` gives them, and in their declared order, as the generator writes them. */
+export type EnumOrders = { alphabetical: EnumData; declared: EnumData };
 
 /**
  * Read the enums of a schema in one query: the labels of each in alphabetical order, as Postgres sorts them,

@@ -45,6 +45,7 @@ COMMIT
 - If a chunk fails, [`readCommitted()`](/transaction#readCommitted) sends `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> and rejects with its error: no tag is left in. A deadlock (40P01) runs the chunks again first ([Retries](/retries)).
 - On the pool, without the transaction, each chunk commits as it goes: the chunks before the one that failed stay.
 - `upsert()` splits the same way.
+- Or send every row as one parameter, with no parameter limit, in a `sql` template: `json_populate_recordset(null::"tags", CAST($1 AS "json"))`<!-- probe: db.sql`INSERT INTO ${'tags'} (${db.cols(['film_id', 'tag'])}) SELECT ${db.cols(['film_id', 'tag'])} FROM json_populate_recordset(null::${'tags'}, ${db.param([], true)})` --> reads [`param(tags, true)`](/sql-template#param) with the table's row type. A missing key or `undefined` gives `NULL` there, not `DEFAULT`, and each value goes through `JSON.stringify`: a `Date` in UTC, a `Buffer` as its JSON object.
 
 ## Skip the rows already there
 
@@ -124,7 +125,7 @@ Each row comes back whole by default, and from an upsert with its `$action`. For
 
 </CastPanel>
 
-- [`returning: ['seat']`](/insert#insert-options) sends `jsonb_build_object($8::text, "seat")`<!-- probe: examples/batches_returning.ts --> in place of `to_jsonb("seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
+- [`returning: ['seat']`](/insert#insert-options) sends `json_build_object($8::text, "seat", '$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: examples/batches_returning.ts --> in place of `to_json("row_seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
 - `$action` tells the new rows from the updated ones: `newSeats` is `['F8']` when F7 was already booked.
 - [`reportAction: 'suppress'`](/insert#upsert-options) leaves `$action` out of the SQL and of the type, for a batch that doesn't need it.
 - Both narrow the type only with `strictNullChecks` on ([Options](/insert#insert-options)).

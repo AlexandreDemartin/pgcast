@@ -96,7 +96,6 @@ describe('insert', () => {
 
   // the type takes a readonly array (#683): the rows are read, never written, so a frozen array runs as any other
   it('a frozen array of rows, with different keys and an undefined value, is inserted and left as it was (#683)', async () => {
-    db.setConfig({ undefinedMeansMissing: true });
     const rows = Object.freeze([Object.freeze({ email: 'a@x.org', display_name: 'A' }), Object.freeze({ email: 'b@x.org', display_name: 'B', mood: undefined })]);
     const inserted = await run(db.insert('users', rows, { returning: ['email', 'mood'] }));
     expect(sortBy(inserted, 'email')).toEqual([{ email: 'a@x.org', mood: null }, { email: 'b@x.org', mood: null }]);
@@ -140,20 +139,7 @@ describe('insert', () => {
     expect(await run(db.selectExactlyOne('accounts', { id: account.id }, { columns: ['balance'] }))).toEqual({ balance: 0 });
   });
 
-  it('an undefined value inserts NULL without undefinedMeansMissing, the column DEFAULT with it', async () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    // accounts.balance is NOT NULL DEFAULT 0, yet `balance: undefined` sends NULL
-    expect(await fails(db.insert('accounts', { owner_id: 1, balance: undefined }))).toMatchInlineSnapshot(`
-      {
-        "code": "23502",
-        "message": "null value in column "balance" of relation "accounts" violates not-null constraint",
-      }
-    `);
-    const row = await run(db.insert('accounts', { owner_id: 1, ratio: undefined, lifetime_ops: Default }, {
-      returning: ['ratio', 'lifetime_ops'],
-    }));
-    expect(row).toEqual({ ratio: null, lifetime_ops: 0 });
-    db.setConfig({ undefinedMeansMissing: true });
+  it('an undefined value in one of several rows inserts the column DEFAULT', async () => {
     expect(sortBy(await run(db.insert('accounts', [{ owner_id: 1, balance: undefined }, { owner_id: 1, balance: 5 }], {
       returning: ['balance'],
     })), 'balance')).toEqual([{ balance: 0 }, { balance: 5 }]);
@@ -229,16 +215,6 @@ describe('upsert', () => {
     `);
   });
 
-  it('in several rows, a key missing from one row overwrites with DEFAULT on UPDATE, without upsertRequiresSameKeys', async () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
-    // The missing key is filled with DEFAULT, then `SET title = EXCLUDED.title` erases the title
-    const [, tee] = sortBy(await run(db.upsert('products', [
-      { sku: 'TEE', variant: 'S', price_cents: 1300 },
-      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
-    ], ['sku', 'variant'], { returning: ['sku', 'title'] })), 'sku');
-    expect(tee).toEqual({ sku: 'TEE', title: null, $action: 'UPDATE' });
-  });
-
   it.each([
     [{ updateColumns: 'price_cents' }, 'T-shirt small'],
     [{ updateValues: { title: 'Tee' } }, 'Tee'],
@@ -254,7 +230,7 @@ describe('upsert', () => {
       .toEqual([{ title, price_cents: 1300 }]);
   });
 
-  it('with upsertRequiresSameKeys, new rows without their serial id among existing rows run, and nothing is overwritten', async () => {
+  it('new rows without their serial id among existing rows run, and nothing is overwritten', async () => {
     const { id } = await run(db.selectExactlyOne('products', { sku: 'TEE', variant: 'S' }, { columns: ['id'] }));
     const [cap, tee] = sortBy(await run(db.upsert('products', [
       { id, sku: 'TEE', variant: 'S', price_cents: 1300 },
@@ -265,33 +241,26 @@ describe('upsert', () => {
     expect(cap).not.toMatchObject({ id });
   });
 
-  it('an undefined value: set from EXCLUDED as NULL without undefinedMeansMissing, left as it is with it', async () => {
+  it('an undefined value: the column is left as it is', async () => {
     const tee = { sku: 'TEE', variant: 'S', price_cents: 1400, title: undefined };
     expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
       .toEqual({ title: 'T-shirt small', price_cents: 1400, $action: 'UPDATE' });
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
-      .toEqual({ title: null, price_cents: 1400, $action: 'UPDATE' });
   });
 
-  it('an undefined key of updateValues: the column DEFAULT without undefinedMeansMissing, left as it is with it', async () => {
+  it('an undefined key of updateValues: the column is left as it is', async () => {
     const ada = { email: 'Ada@Example.com', display_name: 'Ada' };
     expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
       .toEqual({ settings: { theme: 'dark' }, $action: 'UPDATE' });
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
-      .toEqual({ settings: {}, $action: 'UPDATE' });
   });
 
-  it('with undefinedMeansMissing, an undefined key of updateValues that leaves nothing to update: DO NOTHING', async () => {
+  it('an undefined key of updateValues that leaves nothing to update: DO NOTHING', async () => {
     // so no row back on conflict, and the row is unchanged
     expect(await run(db.upsert('users', { email: 'Ada@Example.com', display_name: 'Ada' }, 'email',
       { updateColumns: db.doNothing, updateValues: { settings: undefined } }))).toBeUndefined();
     expect(await scalar(`SELECT settings AS v FROM users WHERE email = 'Ada@Example.com'`)).toEqual({ theme: 'dark' });
   });
 
-  it.each([{}, { undefinedMeansMissing: false }])('stores SQL NULL for explicit null on each write path with %j', async config => {
-    db.setConfig(config);
+  it('stores SQL NULL for explicit null on each write path', async () => {
     const ada = { display_name: 'A', email: 'Ada@Example.com' };
     expect((await run(db.insert('users', { ...ada, email: 'new@example.com', mood: null }))).mood).toBeNull();
     for (const write of [
@@ -305,18 +274,13 @@ describe('upsert', () => {
     }
   });
 
-  it.each([{}, { upsertRequiresSameKeys: false }, { undefinedMeansMissing: false },
-    { undefinedMeansMissing: false, upsertRequiresSameKeys: false }])('checks the stored title with %j', async config => {
-    db.setConfig(config);
+  it('refuses a missing or an undefined title, and keeps the stored one', async () => {
     const tee = { sku: 'TEE', variant: 'S', price_cents: 1300 };
     for (const first of [tee, { ...tee, title: undefined }]) {
       await t.client.query("UPDATE products SET title = 'T-shirt small' WHERE sku = 'TEE' AND variant = 'S'");
       const rows = [first, { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' }];
-      const write = () => db.upsert('products', rows, ['sku', 'variant']);
-      const refuses = config.upsertRequiresSameKeys !== false && (!('title' in first) || config.undefinedMeansMissing !== false);
-      if (refuses) expect(write).toThrow('rows have different keys');
-      else await run(write());
-      expect(await scalar("SELECT title AS v FROM products WHERE sku = 'TEE' AND variant = 'S'")).toBe(refuses ? 'T-shirt small' : null);
+      expect(() => db.upsert('products', rows, ['sku', 'variant'])).toThrow('rows have different keys');
+      expect(await scalar("SELECT title AS v FROM products WHERE sku = 'TEE' AND variant = 'S'")).toBe('T-shirt small');
     }
   });
 
@@ -474,7 +438,7 @@ describe('upsert', () => {
     // Zapatos 6.6.1 sent `() VALUES () ON CONFLICT`, which .run() rejected with 42601
     expect((await pgError(t.client, () => run(sql`INSERT INTO ${'users'} () VALUES () ON CONFLICT (${'email'}) DO NOTHING`))).code).toBe('42601');
     expect(() => db.upsert('users', {}, 'email')).toThrow(nothingToInsert);
-    // with undefinedMeansMissing, an undefined key is left out, so no column is left
+    // an undefined key is left out, so no column is left
     expect(() => db.upsert('users', { mood: undefined }, 'email')).toThrow(nothingToInsert);
     expect(await run(db.select('users', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
@@ -506,7 +470,7 @@ describe('upsert', () => {
       const id = await loginId(), version = await scalar(`SELECT current_setting('server_version') AS v`);
       const conflict = db.upsert('events', row(id), ['id', 'occurred_on']);
       expect(conflict.compile().text).toBe(
-        `INSERT INTO "events" ("id", "kind", "occurred_on") VALUES ($1, $2, $3) ON CONFLICT ("id", "occurred_on") DO UPDATE SET ("id", "occurred_on", "kind") = ROW(EXCLUDED."id", EXCLUDED."occurred_on", EXCLUDED."kind") RETURNING to_jsonb("events".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`);
+        `INSERT INTO "events" ("id", "kind", "occurred_on") VALUES ($1, $2, $3) ON CONFLICT ("id", "occurred_on") DO UPDATE SET ("id", "occurred_on", "kind") = ROW(EXCLUDED."id", EXCLUDED."occurred_on", EXCLUDED."kind") RETURNING (SELECT to_json("row_events".*) FROM (SELECT "events".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_events") AS result`);
       const writes = {
         'one conflict': conflict,
         'one new': db.upsert('events', row(1000), ['id', 'occurred_on']),
@@ -585,20 +549,7 @@ describe('update', () => {
     expect(await run(db.select('accounts', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
 
-  it('an undefined value sets the column to NULL without undefinedMeansMissing, leaves it with it', async () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    // Bob loses his manager; on a NOT NULL column the update fails
-    expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 2 }, { returning: ['mood', 'manager_id'] })))
-      .toEqual([{ mood: 'sad', manager_id: null }]);
-    expect(await fails(db.update('users', { display_name: undefined }, { id: 2 }))).toMatchInlineSnapshot(`
-      {
-        "code": "23502",
-        "message": "null value in column "display_name" of relation "users" violates not-null constraint",
-      }
-    `);
-  });
-
-  it('with undefinedMeansMissing, an undefined value leaves its column', async () => {
+  it('an undefined value leaves its column', async () => {
     expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 3 }, { returning: ['mood', 'manager_id'] })))
       .toEqual([{ mood: 'sad', manager_id: 1 }]);
     expect(await run(db.update('users', { mood: 'ok', display_name: undefined }, { id: 2 }, { returning: ['display_name'] })))
@@ -730,7 +681,7 @@ describe('select', () => {
     expect(Object.keys(await run(db.insert('users', row, { returning: cols })))).toEqual(['id', 'display_name']);
   });
 
-  it('characterization: a full row comes through to_jsonb, int8 beyond 2^53 included', async () => {
+  it('characterization: a full row comes through to_json, int8 beyond 2^53 included', async () => {
     // characterization: lifetime_ops 9007199254740993 comes back as the JSON number 9007199254740992
     expect(await run(db.selectOne('accounts', { id: 1 }))).toMatchInlineSnapshot({ opened_on: expect.any(String) }, `
       {
@@ -834,7 +785,7 @@ describe('select', () => {
   });
 
   describe('a shortcut as an extras value, a scalar subquery (#262)', () => {
-    // 6.6.1 wrote it bare, `jsonb_build_object($2::text, SELECT …)`, which Postgres refuses (42601)
+    // 6.6.1 wrote it bare, `json_build_object($2::text, SELECT …)`, which Postgres refuses (42601)
     const
       owner = sql`${'owner_id'} = ${'users'}.${'id'}`,
       ordered = { columns: ['balance'], order: { by: 'balance', direction: 'ASC' } } as const,
@@ -989,8 +940,7 @@ describe('selectRows', () => {
     expect(await run(db.select('users', all, options))).toEqual([2, 1, 0]);
   });
 
-  it.each([{}, { aggregatesTypedByColumn: false }])('each lateral passed through comes as pg parses its column, under %j, where select() reads it from JSON', async config => {
-    db.setConfig(config);
+  it('each lateral passed through comes as pg parses its column, where select() reads it from JSON', async () => {
     const
       p = parent('id'), firstEvent = new Date(2025, 5, 1), at = new Date('2025-06-01T12:00:00Z'),
       // the lateral, what selectRows() gives for users 1, 2 and 3, and what select() gives
@@ -1025,6 +975,105 @@ describe('selectRows', () => {
 
   it('nested in a sql template, it is a set of rows', async () => {
     expect((await t.client.query(sql`SELECT count(*)::int AS n FROM (${db.selectRows('users', all)}) AS u`.compile())).rows).toEqual([{ n: 3 }]);
+  });
+
+  describe('select() with topLevelSelectAsRows (note 018 § 3)', () => {
+    /** What run() of `build()` gives without the option, then with it, and the texts the second sent. */
+    const offAndOn = async (build: () => db.SQLFragment<any, any>) => {
+      const off = await run(build()), texts: string[] = [];
+      db.setConfig({ topLevelSelectAsRows: true, queryListener: q => { texts.push(q.text); } });
+      const on = await run(build());
+      resetConfig();
+      return { off, on, texts };
+    };
+
+    it.each(cases)('%s: run() gives the same array, from one row per result', async (_, table, where, options) => {
+      const
+        { off, on, texts } = await offAndOn(() => db.select(table, where, options)),
+        sorted = (r: unknown[]) => options?.order ? r : [...r].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      expect(sorted(on)).toEqual(sorted(off));
+      expect(on.length > 0).toBe(where?.id !== -1);
+      expect(texts).toEqual([db.selectRows(table, where, options).compile().text
+        .replace(/^SELECT "lateral_passthru"\.result AS .*$/s, rows => `SELECT to_json(result) AS result FROM (${rows}) AS "sq_users"`)]);
+    });
+
+    it('each lateral passed through keeps the value select() reads from JSON', async () => {
+      const p = parent('id');
+      for (const lateral of [
+        db.count('accounts', { owner_id: p }),
+        db.sum('accounts', { owner_id: p }, { columns: ['balance'] }),
+        db.max('accounts', { owner_id: p }, { columns: ['lifetime_ops'] }),
+        db.min('events', all, { columns: ['occurred_on'] }),
+        sql`SELECT ${param(new Date('2025-06-01T12:00:00Z'))}::timestamptz AS result`,
+      ]) {
+        const { off, on } = await offAndOn(() => db.select('users', all, { lateral: lateral as any, order: byId }));
+        expect(on).toEqual(off);
+      }
+    });
+
+    it('a lateral passed through is ordered and made distinct by its raw value, as in the aggregate', async () => {
+      // around the end of summer time in Paris, a later instant can read as an earlier local time
+      await t.client.query(`SET LOCAL TimeZone = 'Europe/Paris'`);
+      await t.client.query(`UPDATE memberships SET since = CASE user_id WHEN 1 THEN timestamptz '2024-10-27 00:30:00+00' ELSE timestamptz '2024-10-27 01:10:00+00' END`);
+      const latest = await offAndOn(() => db.select('users', all, {
+        lateral: db.max('memberships', { user_id: parent('id') }, { columns: ['since'] }) as any,
+        order: { by: sql`result`, direction: 'ASC', nulls: 'LAST' },
+      }));
+      expect(latest.off).toEqual(['2024-10-27T02:30:00+02:00', '2024-10-27T02:10:00+01:00', null]);
+      expect(latest.on).toEqual(latest.off);
+      const counts = await offAndOn(() => db.select('users', all, {
+        distinct: true,
+        lateral: db.count('accounts', { owner_id: parent('id') }) as any,
+        order: { by: sql`"lateral_passthru".result`, direction: 'DESC' },
+      }));
+      expect(counts.off).toEqual([2, 1, 0]);
+      expect(counts.on).toEqual(counts.off);
+    });
+
+    it('nested, it keeps its aggregate: a lateral, a lateral passed through, extras, a sql template', async () => {
+      const accounts = () => db.select('accounts', { owner_id: parent('id') }, { columns: ['id'], order: byId });
+      for (const build of [
+        () => db.selectOne('users', { id: 1 }, { columns: ['id'], lateral: { accounts: accounts() } }),
+        () => db.select('users', all, { columns: ['id'], lateral: { accounts: accounts() }, order: byId }),
+        () => db.selectOne('users', { id: 1 }, { lateral: accounts() }),
+        () => db.selectOne('users', { id: 1 }, { columns: ['id'], extras: { accounts: db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }) } }),
+        () => sql`SELECT (${db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId })}) AS accounts`,
+      ]) {
+        const { off, on } = await offAndOn(build);
+        expect(on).toEqual(off);
+      }
+      expect((await offAndOn(() => db.selectOne('users', { id: 1 }, { lateral: accounts() }))).on).toEqual([{ id: 1 }, { id: 2 }]);
+    });
+
+    it('a copy runs its aggregate, and gives the same array', async () => {
+      db.setConfig({ topLevelSelectAsRows: true });
+      const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId });
+      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await run(q.copy())).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await run(db.select('accounts', { owner_id: -1 }).copy())).toEqual([]);
+    });
+
+    it('prepared(), noop and the listeners go with the rows form', async () => {
+      const sent: string[] = [], results: unknown[] = [];
+      db.setConfig({ topLevelSelectAsRows: true, queryListener: q => { sent.push(q.text); }, resultListener: r => { results.push(r); } });
+      const prepared = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_as_rows');
+      expect([await run(prepared), await run(prepared)]).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 1 }, { id: 2 }]]);
+      expect(results).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 1 }, { id: 2 }]]);
+      const skipped = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId });
+      skipped.noop = true;
+      skipped.noopResult = 'not run';
+      expect(await run(skipped)).toBe('not run');
+      expect(await skipped.run(t.client, true)).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(sent).toEqual(Array(4).fill(0).map((_, i) =>
+        `${i >= 2 ? `/* marked no-op: won't hit DB unless forced -> */ ` : ''}SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "id" ASC`));
+    });
+
+    it('cursor() reads it as before, as its one aggregate row', async () => {
+      const read = async () => { const all: unknown[] = []; for await (const batch of db.cursor(t.client, db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }), { batchSize: 1 })) all.push(batch); return all; };
+      const off = await read();
+      db.setConfig({ topLevelSelectAsRows: true });
+      expect([off, await read()]).toEqual([[[{ id: 1 }, { id: 2 }]], [[{ id: 1 }, { id: 2 }]]]);
+    });
   });
 });
 
@@ -1161,30 +1210,12 @@ describe('count, sum, avg, min, max', () => {
     expect(sent).toEqual([]);
   });
 
-  it('on an empty set, sum / avg / min / max return 0, not null, with aggregatesTypedByColumn false', async () => {
-    db.setConfig({ aggregatesTypedByColumn: false });
-    const none = { id: -1 };
-    expect(await run(db.sum('accounts', none, { columns: ['balance'] }))).toBe(0);
-    expect(await run(db.avg('accounts', none, { columns: ['balance'] }))).toBe(0);
-    expect(await run(db.max('accounts', none, { columns: ['balance'] }))).toBe(0);
-    expect(await run(db.min('events', { kind: 'none' }, { columns: ['occurred_on'] }))).toBe(0);
-  });
-
   it('characterization: an int8 or numeric result beyond 2^53 loses precision', async () => {
     // characterization: 9007199254740993 comes back as 9007199254740992
     expect(await run(db.sum('accounts', { id: 1 }, { columns: ['lifetime_ops'] }))).toBe(9007199254740992);
   });
 
-  it('min / max of a date is a timestamp in ms, of a text NaN, with aggregatesTypedByColumn false', async () => {
-    db.setConfig({ aggregatesTypedByColumn: false });
-    // pg parses the date as local midnight, then Number() gives its epoch ms
-    expect(await run(db.min('events', all, { columns: ['occurred_on'] }))).toBe(new Date(2025, 5, 1).getTime());
-    expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBeNaN();
-    expect(await run(db.max('accounts', all, { columns: ['lifetime_ops'] }))).toBe(9007199254740992);
-  });
-
-  it.each([{}, { aggregatesTypedByColumn: true }])('under %j, sum / avg / min / max return null on an empty set; count stays 0', async config => {
-    db.setConfig(config);
+  it('sum / avg / min / max return null on an empty set; count stays 0', async () => {
     const none = { id: -1 };
     expect(await run(db.sum('accounts', none, { columns: ['balance'] }))).toBeNull();
     expect(await run(db.avg('accounts', none, { columns: ['balance'] }))).toBeNull();
@@ -1196,8 +1227,7 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.avg('accounts', all, { columns: ['ratio'] }))).toBe(0.875);
   });
 
-  it.each([{}, { aggregatesTypedByColumn: true }])('under %j, min / max give the value as pg parses it: a Date, a text, an int8 or numeric as a string', async config => {
-    db.setConfig(config);
+  it('min / max give the value as pg parses it: a Date, a text, an int8 or numeric as a string', async () => {
     expect(await run(db.min('events', all, { columns: ['occurred_on'] }))).toEqual(new Date(2025, 5, 1));
     expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBe('Cyd');
     expect(await run(db.max('accounts', all, { columns: ['lifetime_ops'] }))).toBe('9007199254740993');
@@ -1205,18 +1235,7 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.max('accounts', all, { columns: ['ratio'] }))).toBe(1.25);
   });
 
-  it.each([null, undefined])('a fragment and its copy read the setting at run(), including a reset with %s', async reset => {
-    const first = db.min('events', all, { columns: ['occurred_on'] }), copy = first.copy();
-    db.setConfig({ aggregatesTypedByColumn: false });
-    for (const query of [first, copy]) expect(await run(query)).toBe(new Date(2025, 5, 1).getTime());
-    db.setConfig({ aggregatesTypedByColumn: reset } as unknown as db.NewConfig);
-    for (const query of [first, copy]) expect(await run(query)).toEqual(new Date(2025, 5, 1));
-    for (const options of [{}, { limit: 0 }]) {
-      expect(await eachAggregate({ id: -1 }, options)).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
-    }
-  });
-
-  it('nested in a lateral, min / max come back as JSON, NULL as null, option or not', async () => {
+  it('nested in a lateral, min / max come back as JSON, NULL as null', async () => {
     const query = () => db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
       lateral: {
@@ -1230,11 +1249,9 @@ describe('count, sum, avg, min, max', () => {
       { display_name: 'Cyd', first: '2025-06-01', top: null },
     ];
     expect(await run(query())).toEqual(expected);
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await run(query())).toEqual(expected);
   });
 
-  it('as an extra, min / max come back as JSON, NULL as null, option or not (#262)', async () => {
+  it('as an extra, min / max come back as JSON, NULL as null (#262)', async () => {
     // the types of test/types-opt-in: DateString, string and number (a numeric), or null
     const query = () => db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
@@ -1250,13 +1267,10 @@ describe('count, sum, avg, min, max', () => {
       { display_name: 'Cyd', first: '2025-06-01', name: 'Cyd', top: null },
     ];
     expect(await run(query())).toEqual(expected);
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await run(query())).toEqual(expected);
   });
 
   it('passed through a single lateral, min / max come back as pg parses them from selectOne / selectExactlyOne, as JSON from select', async () => {
-    // select() wraps its rows in jsonb_agg(), selectOne() and selectExactlyOne() hand the passed-through column over as it is
-    db.setConfig({ aggregatesTypedByColumn: true });
+    // select() wraps its rows in json_agg(), selectOne() and selectExactlyOne() hand the passed-through column over as it is
     const earliest = db.min('events', all, { columns: ['occurred_on'] });
     expect(await run(db.selectOne('users', all, { lateral: earliest }))).toEqual(new Date(2025, 5, 1));
     expect(await run(db.selectOne('users', { id: -1 }, { lateral: earliest }))).toBeUndefined();
@@ -1265,7 +1279,6 @@ describe('count, sum, avg, min, max', () => {
   });
 
   it('passed through a selectOne / selectExactlyOne as an extra, min / max come back as JSON (#262)', async () => {
-    db.setConfig({ aggregatesTypedByColumn: true });
     const earliest = db.min('events', all, { columns: ['occurred_on'] }), top = db.max('accounts', all, { columns: ['balance'] });
     expect(await run(db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 1,
@@ -1277,7 +1290,6 @@ describe('count, sum, avg, min, max', () => {
   });
 
   it('passed through a selectOne / selectExactlyOne nested in a lateral, min / max come back as JSON', async () => {
-    db.setConfig({ aggregatesTypedByColumn: true });
     const earliest = db.min('events', all, { columns: ['occurred_on'] }), top = db.max('accounts', all, { columns: ['balance'] });
     expect(await run(db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 1,
@@ -1312,19 +1324,12 @@ describe('count, sum, avg, min, max', () => {
     };
   };
 
-  it.each(noRow)('%s gives 0, as Number(null) does, with aggregatesTypedByColumn false', async (_name, where, options) => {
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: 0, avg: 0, min: 0, max: 0 });
-  });
-
-  it.each(noRow)('%s gives null by default and with explicit true, and 0 for count', async (_name, where, options) => {
-    expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
-    db.setConfig({ aggregatesTypedByColumn: true });
+  it.each(noRow)('%s gives null, and 0 for count', async (_name, where, options) => {
     expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
   });
 
-  it('nested in a lateral, an aggregate whose query returns no row gives null, option or not', async () => {
-    // the subquery is LEFT JOINed, so no row there is a NULL in jsonb_build_object(); unchanged from 6.6.1
+  it('nested in a lateral, an aggregate whose query returns no row gives null', async () => {
+    // the subquery is LEFT JOINed, so no row there is a NULL in json_build_object(); unchanged from 6.6.1
     const query = () => db.select('users', { id: 1 }, {
       columns: ['id'],
       lateral: {
@@ -1332,8 +1337,6 @@ describe('count, sum, avg, min, max', () => {
         top: db.max('accounts', { owner_id: parent('id') }, { columns: ['balance'], offset: 1 }),
       },
     });
-    expect(await run(query())).toEqual([{ id: 1, n: null, top: null }]);
-    db.setConfig({ aggregatesTypedByColumn: false });
     expect(await run(query())).toEqual([{ id: 1, n: null, top: null }]);
   });
 
@@ -1408,9 +1411,6 @@ describe('count, sum, avg, min, max', () => {
     const noRow = { count: '0', sumInt: null, sumBigint: null, sumNumeric: null, sumFloat8: null, avgInt: null, avgNumeric: null };
     expect(await each(a => db.selectOne('users', { id: 3 }, { lateral: a }))).toEqual(noRow);
     expect(await each(a => db.selectExactlyOne('users', { id: 3 }, { lateral: a }))).toEqual(noRow);
-    // the top-level conversion does not apply to the lateral
-    db.setConfig({ aggregatesTypedByColumn: false });
-    expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: a }))).toEqual(asPg);
     // under select() and in a lateral map, JSON numbers
     const asJson = { count: 2, sumInt: 2, sumBigint: 9007199254740992, sumNumeric: 1520.5, sumFloat8: 0.5, avgInt: 1, avgNumeric: 760.25 };
     expect(await each(a => db.select('users', { id: 1 }, { lateral: a }))).toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, [v]])));
@@ -1441,11 +1441,10 @@ describe('count, sum, avg, min, max', () => {
 describe('aggregate migration warnings', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it.each([{}, { aggregatesTypedByColumn: true }, { aggregatesTypedByColumn: false }])('runs the former warning cases silently under %j', async config => {
+  it('runs the former warning cases silently', async () => {
     vi.resetModules();
     const warning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
     const fdb = await import('../../src/db');
-    fdb.setConfig(config);
     await fdb.avg('accounts', { id: -1 }, { columns: ['ratio'] }).run(t.client);
     await fdb.sum('accounts', fdb.all, { columns: ['balance'], limit: 0 }).run(t.client);
     await fdb.max('users', fdb.all, { columns: ['display_name'] }).run(t.client);
@@ -1469,17 +1468,16 @@ describe('copy()', () => {
   };
 
   // Zapatos 6.6.1 resolved a copy to the raw rows (`[{ result: '3' }]` for count()), though typed as the shortcut's result (#263)
-  it.each<[string, () => db.SQLFragment<any>, unknown, db.NewConfig?]>([
+  it.each<[string, () => db.SQLFragment<any>, unknown]>([
     ['count', () => db.count('users', all), 3],
     ['count of no row', () => db.count('users', { id: -1 }), 0],
     ['sum', () => db.sum('accounts', all, { columns: ['balance'] }), 1520.5],
     ['avg', () => db.avg('accounts', all, { columns: ['ratio'] }), 0.875],
     ['min', () => db.min('accounts', all, { columns: ['balance'] }), '0.00'],
     ['max', () => db.max('accounts', all, { columns: ['balance'] }), '1500.50'],
-    ['sum of no row, with aggregatesTypedByColumn', () => db.sum('accounts', { id: -1 }, { columns: ['balance'] }), null, { aggregatesTypedByColumn: true }],
-    ['avg, with aggregatesTypedByColumn', () => db.avg('accounts', all, { columns: ['ratio'] }), 0.875, { aggregatesTypedByColumn: true }],
-    ['min of a date, with aggregatesTypedByColumn', () => db.min('events', all, { columns: ['occurred_on'] }), new Date(2025, 5, 1), { aggregatesTypedByColumn: true }],
-    ['max of an int8, with aggregatesTypedByColumn', () => db.max('accounts', all, { columns: ['lifetime_ops'] }), '9007199254740993', { aggregatesTypedByColumn: true }],
+    ['sum of no row', () => db.sum('accounts', { id: -1 }, { columns: ['balance'] }), null],
+    ['min of a date', () => db.min('events', all, { columns: ['occurred_on'] }), new Date(2025, 5, 1)],
+    ['max of an int8', () => db.max('accounts', all, { columns: ['lifetime_ops'] }), '9007199254740993'],
     ['select', () => db.select('users', { id: 3 }, { columns: ['display_name'] }), [{ display_name: 'Cyd' }]],
     ['selectOne', () => db.selectOne('users', { id: 3 }, { columns: ['display_name'] }), { display_name: 'Cyd' }],
     ['selectOne of no row', () => db.selectOne('users', { id: -1 }), undefined],
@@ -1491,8 +1489,7 @@ describe('copy()', () => {
     ['update', () => db.update('users', { mood: 'ok' }, { id: 3 }, { returning: ['display_name'] }), [{ display_name: 'Cyd' }]],
     ['deletes', () => db.deletes('memberships', { user_id: 2 }, { returning: ['org_code'] }), [{ org_code: 'acme-lyon' }]],
     ['truncate', () => db.truncate('extra.articles'), undefined],
-  ])('a copy of %s, run, gives the result of the shortcut', async (_, make, expected, config) => {
-    if (config) db.setConfig(config);
+  ])('a copy of %s, run, gives the result of the shortcut', async (_, make, expected) => {
     expect(await originalAndCopy(make())).toEqual([expected, expected]);
   });
 
@@ -1521,34 +1518,27 @@ describe('copy()', () => {
 describe('a null row among others in upsert()', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('inserts a row of defaults when the key check is off', async () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
+  it('inserts a row of defaults, given updateColumns', async () => {
     // since #27 it threw a TypeError at the call; the null row is read as `{}`, as insert() reads it (#341)
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
-    const rows = await db.upsert('extra.type_zoo', [{ c_text: 'x' }, null as any], 'id', { returning: ['c_text'] }).run(t.client);
+    const rows = await db.upsert('extra.type_zoo', [{ c_text: 'x' }, null as any], 'id', { updateColumns: ['c_text'], returning: ['c_text'] }).run(t.client);
     expect(rows).toEqual([{ c_text: 'x', $action: 'INSERT' }, { c_text: null, $action: 'INSERT' }]);
     expect(emitWarning).not.toHaveBeenCalled();
   });
 });
 
 describe('a key added to Object.prototype beside several upsert() rows', () => {
-  it('is no column: the existing value is kept on conflict, with upsertRequiresSameKeys off and on', async () => {
+  it('is no column: the existing value is kept on conflict', async () => {
     // master inserted it as DEFAULT and set it from EXCLUDED, so Bob's mood went from 'ok' to NULL; with
     // upsertRequiresSameKeys it threw "rows have different keys"
-    const stored: Record<string, unknown> = {}, proto = Object.prototype as any;
-    for (const upsertRequiresSameKeys of [false, true]) {
-      db.setConfig({ upsertRequiresSameKeys });
-      await t.client.query('SAVEPOINT prototype_key');
-      proto.mood = 'sad';
-      try {
-        await run(db.upsert('users', [{ email: 'bob@example.com', display_name: 'Bob 2' }, { email: 'dee@example.com', display_name: 'Dee' }], 'email'));
-      } finally { delete proto.mood; }
-      stored[`upsertRequiresSameKeys ${upsertRequiresSameKeys}`] = (await t.client.query(
-        `SELECT email, display_name, mood FROM users WHERE email IN ('bob@example.com', 'dee@example.com') ORDER BY email`)).rows;
-      await t.client.query('ROLLBACK TO SAVEPOINT prototype_key');
-    }
-    const kept = [{ email: 'bob@example.com', display_name: 'Bob 2', mood: 'ok' }, { email: 'dee@example.com', display_name: 'Dee', mood: null }];
-    expect(stored).toEqual({ 'upsertRequiresSameKeys false': kept, 'upsertRequiresSameKeys true': kept });
+    const proto = Object.prototype as any;
+    proto.mood = 'sad';
+    try {
+      await run(db.upsert('users', [{ email: 'bob@example.com', display_name: 'Bob 2' }, { email: 'dee@example.com', display_name: 'Dee' }], 'email'));
+    } finally { delete proto.mood; }
+    expect((await t.client.query(
+      `SELECT email, display_name, mood FROM users WHERE email IN ('bob@example.com', 'dee@example.com') ORDER BY email`)).rows)
+      .toEqual([{ email: 'bob@example.com', display_name: 'Bob 2', mood: 'ok' }, { email: 'dee@example.com', display_name: 'Dee', mood: null }]);
   });
 });
 
@@ -1598,8 +1588,8 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
       c_int8: 3, c_numeric: 1520.5, c_float8: 0.875, c_varchar: 'Ada', c_int4: maxId,
       c_jsonb: [{ balance: 20 }, { balance: 1500.5 }],
       c_json: { balance: 20 },
-      // a text column takes the JSON's text
-      c_text: '{"balance": 20.00}',
+      // a text column takes the JSON's text, as json_build_object() writes it
+      c_text: '{"balance" : 20.00}',
       // no row gives NULL: selectExactlyOne() does not throw there
       c_jsonb_domain: null,
     });

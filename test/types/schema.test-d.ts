@@ -142,10 +142,10 @@ describe('PostgresInterval, the type intervalsTypedAsObjects writes', () => {
   });
 });
 
-describe('WhereableValue, InsertableValue and UpdatableValue, the types valuesTypedAsAliases writes', () => {
+describe('WhereableValue, InsertableValue and UpdatableValue, the types the generator writes', () => {
   type Update<V> = V | db.Parameter<V> | db.SQLFragment | db.SQLFragment<any, V | db.Parameter<V> | db.SQLFragment>;
 
-  test('each is the union the generator writes out otherwise', () => {
+  test('each is the union 7.x wrote out on each line by default', () => {
     expectTypeOf<db.WhereableValue<number>>().toEqualTypeOf<Where<number>>();
     expectTypeOf<db.WhereableValue<number | db.Int8String>>().toEqualTypeOf<Where<number | db.Int8String>>();
     expectTypeOf<db.InsertableValue<number>>().toEqualTypeOf<number | db.Parameter<number> | db.SQLFragment<any>>();
@@ -172,7 +172,7 @@ describe('WhereableValue, InsertableValue and UpdatableValue, the types valuesTy
   });
 });
 
-describe('DomainInContext, the type domainsTypedByContext writes', () => {
+describe('DomainInContext, the type the generator writes for a domain typed by context', () => {
   test('a placeholder that holds what the generator wrote takes the type of the context', () => {
     expectTypeOf<db.DomainInContext<db.Int8String, db.Int8String, number>>().toEqualTypeOf<number>();
     expectTypeOf<db.DomainInContext<Date, Date, db.DateString | Date>>().toEqualTypeOf<db.DateString | Date>();

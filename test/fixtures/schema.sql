@@ -33,7 +33,7 @@ CREATE TYPE extra.status AS ENUM ('draft', 'published', 'archived');
 CREATE DOMAIN public.email AS ext.citext CHECK (VALUE LIKE '%_@_%');
 CREATE DOMAIN public.positive_int AS integer CHECK (VALUE > 0);
 CREATE DOMAIN public.tag_list AS text[] DEFAULT '{}';
-CREATE DOMAIN public.ticket_no AS bigint;  -- typed by context with domainsTypedByContext
+CREATE DOMAIN public.ticket_no AS bigint;  -- typed by context
 CREATE DOMAIN public.preferences AS jsonb;  -- its placeholder narrowed in test/types
 
 CREATE TYPE public.address AS (street text, city text, zip varchar(10));

@@ -56,7 +56,7 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
       }
       export interface Insertable {
         /**
@@ -64,7 +64,7 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id: number | db.Parameter<number> | db.SQLFragment<any>;
+        id: db.InsertableValue<number>;
       }
       export interface Updatable {
         /**
@@ -72,7 +72,7 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+        id?: db.UpdatableValue<number>;
       }
       export type UniqueIndex = 'class_pkey';
       export type Column = keyof Selectable;
@@ -149,19 +149,19 @@ declare module 'zapatos/schema' {
         * - `text` in database
         * - Nullable, default: `'*\/'::text`
         */
-        "*/"?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        "*/"?: db.WhereableValue<string>;
         /**
         * **edge.odd table.class**
         * - `text` in database
         * - Nullable, no default
         */
-        class?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        class?: db.WhereableValue<string>;
         /**
         * **edge.odd table.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
         /**
         * **edge.odd table.light**
         *
@@ -169,7 +169,7 @@ declare module 'zapatos/schema' {
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light?: traffic_light | db.Parameter<traffic_light> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, traffic_light | db.Parameter<traffic_light> | db.SQLFragment | db.ParentColumn>;
+        light?: db.WhereableValue<traffic_light>;
       }
       export interface Insertable {
         /**
@@ -177,19 +177,19 @@ declare module 'zapatos/schema' {
         * - `text` in database
         * - Nullable, default: `'*\/'::text`
         */
-        "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        "*/"?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **edge.odd table.class**
         * - `text` in database
         * - Nullable, no default
         */
-        class?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        class?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **edge.odd table.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id: number | db.Parameter<number> | db.SQLFragment<any>;
+        id: db.InsertableValue<number>;
         /**
         * **edge.odd table.light**
         *
@@ -197,7 +197,7 @@ declare module 'zapatos/schema' {
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light?: traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment<any>;
+        light?: db.InsertableValue<traffic_light, null | db.DefaultType>;
       }
       export interface Updatable {
         /**
@@ -205,19 +205,19 @@ declare module 'zapatos/schema' {
         * - `text` in database
         * - Nullable, default: `'*\/'::text`
         */
-        "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        "*/"?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **edge.odd table.class**
         * - `text` in database
         * - Nullable, no default
         */
-        class?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        class?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **edge.odd table.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+        id?: db.UpdatableValue<number>;
         /**
         * **edge.odd table.light**
         *
@@ -225,7 +225,7 @@ declare module 'zapatos/schema' {
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light?: traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment>;
+        light?: db.UpdatableValue<traffic_light, null | db.DefaultType>;
       }
       export type UniqueIndex = 'odd table_pkey';
       export type Column = keyof Selectable;

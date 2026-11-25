@@ -394,8 +394,7 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf(db.min).toEqualTypeOf<db.ColumnAggregateSignatures>();
   });
 
-  test('an empty ConfigTypes gives the column type at top level and its JSON type under a key', () => {
-    expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
+  test('min and max give the column type at top level and its JSON type under a key', () => {
     const first = db.min('events', db.all, { columns: ['occurred_on'] });
     expectTypeOf(first.run(pool)).resolves.toEqualTypeOf<Date | null>();
     expectTypeOf(first.run(pool)).resolves.not.toBeAny();
@@ -1050,84 +1049,6 @@ describe('upsert', () => {
     db.upsert(every, everyRow, everyColumn, { updateValues: { c_timetz: db.param('12:00:00+00') } });
     db.upsert(every, everyRow, everyColumn, { updateValues: { c_int8_domain: db.param('1') } });
     db.upsert(every, [everyRow], everyColumn, { updateValues: { mood: db.param('sad') } });
-  });
-
-  test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {
-    db.setConfig({ upsertRequiresSameKeys: true });
-    expectTypeOf(db.getConfig().upsertRequiresSameKeys).toEqualTypeOf<boolean | undefined>();
-    expectTypeOf<db.NewConfig['upsertRequiresSameKeys']>().toEqualTypeOf<boolean | undefined>();
-    // a Config written for 6.6.1, without the key, still compiles
-    const c: db.Config = {
-      transactionAttemptsMax: 5,
-      transactionRetryDelay: { minMs: 25, maxMs: 250 },
-      castArrayParamsToJson: false,
-      castObjectParamsToJson: false,
-    };
-    // @ts-expect-error a boolean, not a string
-    const d: db.Config = { ...c, upsertRequiresSameKeys: 'yes' };
-    void d;
-    // @ts-expect-error a boolean, not a string
-    db.setConfig({ upsertRequiresSameKeys: 'yes' });
-  });
-});
-
-describe('undefinedMeansMissing', () => {
-  test('an optional boolean of Config and setConfig', () => {
-    db.setConfig({ undefinedMeansMissing: true });
-    expectTypeOf(db.getConfig().undefinedMeansMissing).toEqualTypeOf<boolean | undefined>();
-    expectTypeOf<db.NewConfig['undefinedMeansMissing']>().toEqualTypeOf<boolean | undefined>();
-    // a Config written for 6.6.1, without the key, still compiles
-    const c: db.Config = {
-      transactionAttemptsMax: 5,
-      transactionRetryDelay: { minMs: 25, maxMs: 250 },
-      castArrayParamsToJson: false,
-      castObjectParamsToJson: false,
-    };
-    // @ts-expect-error a boolean, not a string
-    const d: db.Config = { ...c, undefinedMeansMissing: 'yes' };
-    void d;
-    // @ts-expect-error a boolean, not a string
-    db.setConfig({ undefinedMeansMissing: 'yes' });
-  });
-});
-
-describe('transactionRequiresCommit', () => {
-  test('an optional boolean of Config and setConfig', () => {
-    db.setConfig({ transactionRequiresCommit: true });
-    expectTypeOf(db.getConfig().transactionRequiresCommit).toEqualTypeOf<boolean | undefined>();
-    expectTypeOf<db.NewConfig['transactionRequiresCommit']>().toEqualTypeOf<boolean | undefined>();
-    // a Config written for 6.6.1, without the key, still compiles
-    const c: db.Config = {
-      transactionAttemptsMax: 5,
-      transactionRetryDelay: { minMs: 25, maxMs: 250 },
-      castArrayParamsToJson: false,
-      castObjectParamsToJson: false,
-    };
-    // @ts-expect-error a boolean, not a string
-    const d: db.Config = { ...c, transactionRequiresCommit: 'yes' };
-    void d;
-    // @ts-expect-error a boolean, not a string
-    db.setConfig({ transactionRequiresCommit: 'yes' });
-  });
-});
-
-describe('transactionRequiresIdleClient', () => {
-  test('an optional boolean of Config and setConfig', () => {
-    db.setConfig({ transactionRequiresIdleClient: true });
-    expectTypeOf(db.getConfig().transactionRequiresIdleClient).toEqualTypeOf<boolean | undefined>();
-    expectTypeOf<db.NewConfig['transactionRequiresIdleClient']>().toEqualTypeOf<boolean | undefined>();
-    // a Config written for 6.6.1, without the key, still compiles
-    const c: db.Config = {
-      transactionAttemptsMax: 5,
-      transactionRetryDelay: { minMs: 25, maxMs: 250 },
-      castArrayParamsToJson: false,
-      castObjectParamsToJson: false,
-    };
-    // @ts-expect-error a boolean, not a string
-    const d: db.Config = { ...c, transactionRequiresIdleClient: 'yes' };
-    void d;
-    // @ts-expect-error a boolean, not a string
-    db.setConfig({ transactionRequiresIdleClient: 'yes' });
   });
 });
 

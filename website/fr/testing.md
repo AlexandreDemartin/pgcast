@@ -1,5 +1,5 @@
 ---
-english: 696530c7520b
+english: 04d7d4809170
 description: "Trois façons de tester vos requêtes pgcast : contre un vrai Postgres, test annulé ; sur la requête compilée ; sur un faux résultat typé d’après le schéma."
 ---
 
@@ -69,10 +69,7 @@ Un id se lit donc, il ne s’écrit jamais en dur ; et un nom préparé désign
 
 ### Donner le pool au code qui commite {#give-code-that-commits-the-pool}
 
-À partir de pg 8.21, la promesse de [`transaction()`](/fr/transaction#your-own-begin) est rejetée si, après la requête vide, le client du test signale encore le bloc ouvert par son propre `BEGIN`. Les seeds restent dans la transaction du test jusqu’à son `ROLLBACK`. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), `serializable()` envoie `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) --> et peut mettre fin à la transaction du test :
-
-- Si le test n’a encore lancé aucune requête, ou au niveau propre à la session (`readCommitted()`, sur un serveur par défaut), son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commite la transaction du test, lignes comprises.
-- À un autre niveau, après n’importe quelle requête, seeds du test compris, Postgres refuse avec 25001 (« <span lang="en">SET TRANSACTION ISOLATION LEVEL must be called before any query</span> ») : son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> annule les seeds, et l’appel est rejeté.
+À partir de pg 8.21, la promesse de [`transaction()`](/fr/transaction#your-own-begin) est rejetée si, après la requête vide, le client du test signale encore le bloc ouvert par son propre `BEGIN`. Les seeds restent dans la transaction du test jusqu’à son `ROLLBACK`. Pendant toute la 7.x, [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient) pouvait mettre fin à la transaction du test ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) ; la 8.0 supprime l’option.
 
 Passez le pool au code qui commite, puis supprimez les données qu’il a enregistrées.
 

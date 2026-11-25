@@ -13,7 +13,7 @@ A review leaves one comment per round on the PR. The reviewer stays read-only an
 
 | Label | For |
 |---|---|
-| `issue (blocking)` | bug, injection, breaking change, wrong or too wide type, SQL different from the one announced, a **Done when** criterion not met, missing test on a risk, a PR that mixes two subjects |
+| `issue (blocking)` | bug, injection, a breaking change outside the major's decided list or without its migration entry (skill `backward-compat`), wrong or too wide type, SQL different from the one announced, a **Done when** criterion not met, missing test on a risk, a PR that mixes two subjects |
 | `suggestion (non-blocking)` | a better way, not needed to merge |
 | `nitpick (non-blocking)` | naming, JSDoc, form |
 | `question (non-blocking)` | a doubt with no concrete scenario yet |

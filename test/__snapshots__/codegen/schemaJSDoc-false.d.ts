@@ -54,40 +54,40 @@ declare module 'zapatos/schema' {
       scores: number[];
     }
     export interface Whereable {
-      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
-      flags?: boolean[] | db.Parameter<boolean[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, boolean[] | db.Parameter<boolean[]> | db.SQLFragment | db.ParentColumn>;
-      grid?: number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn>;
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
-      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
-      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
-      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPositive_int | db.Parameter<c.PgPositive_int> | db.SQLFragment | db.ParentColumn>;
-      owner_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
-      ratio?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
-      scores?: number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn>;
+      balance?: db.WhereableValue<(number | db.NumericString)>;
+      flags?: db.WhereableValue<boolean[]>;
+      grid?: db.WhereableValue<number[]>;
+      id?: db.WhereableValue<(number | db.Int8String | bigint)>;
+      lifetime_ops?: db.WhereableValue<(number | db.Int8String | bigint)>;
+      opened_on?: db.WhereableValue<(db.DateString | Date)>;
+      overdraft_limit?: db.WhereableValue<c.PgPositive_int>;
+      owner_id?: db.WhereableValue<number>;
+      ratio?: db.WhereableValue<number>;
+      scores?: db.WhereableValue<number[]>;
     }
     export interface Insertable {
-      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment<any>;
-      flags?: boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment<any>;
-      grid?: number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment<any>;
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
-      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
-      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment<any>;
-      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment<any>;
-      owner_id: number | db.Parameter<number> | db.SQLFragment<any>;
-      ratio?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
-      scores?: number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment<any>;
+      balance?: db.InsertableValue<(number | db.NumericString), db.DefaultType>;
+      flags?: db.InsertableValue<boolean[], null | db.DefaultType>;
+      grid?: db.InsertableValue<number[], null | db.DefaultType>;
+      id?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
+      lifetime_ops?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
+      opened_on?: db.InsertableValue<(db.DateString | Date), db.DefaultType>;
+      overdraft_limit?: db.InsertableValue<c.PgPositive_int, null | db.DefaultType>;
+      owner_id: db.InsertableValue<number>;
+      ratio?: db.InsertableValue<number, null | db.DefaultType>;
+      scores?: db.InsertableValue<number[], db.DefaultType>;
     }
     export interface Updatable {
-      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment>;
-      flags?: boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment>;
-      grid?: number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment>;
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
-      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
-      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment>;
-      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment>;
-      owner_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
-      ratio?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
-      scores?: number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment>;
+      balance?: db.UpdatableValue<(number | db.NumericString), db.DefaultType>;
+      flags?: db.UpdatableValue<boolean[], null | db.DefaultType>;
+      grid?: db.UpdatableValue<number[], null | db.DefaultType>;
+      id?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
+      lifetime_ops?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
+      opened_on?: db.UpdatableValue<(db.DateString | Date), db.DefaultType>;
+      overdraft_limit?: db.UpdatableValue<c.PgPositive_int, null | db.DefaultType>;
+      owner_id?: db.UpdatableValue<number>;
+      ratio?: db.UpdatableValue<number, null | db.DefaultType>;
+      scores?: db.UpdatableValue<number[], db.DefaultType>;
     }
     export type UniqueIndex = 'accounts_pkey';
     export type Column = keyof Selectable;
@@ -121,35 +121,35 @@ declare module 'zapatos/schema' {
       tags: c.PgTag_list | null;
     }
     export interface Whereable {
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn>;
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn>;
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
-      manager_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
-      mood?: mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn>;
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn>;
+      created_at?: db.WhereableValue<(db.TimestampTzString | Date)>;
+      display_name?: db.WhereableValue<string>;
+      email?: db.WhereableValue<c.PgEmail>;
+      home?: db.WhereableValue<c.PgAddress>;
+      id?: db.WhereableValue<number>;
+      manager_id?: db.WhereableValue<number>;
+      mood?: db.WhereableValue<mood>;
+      settings?: db.WhereableValue<db.JSONValue>;
+      tags?: db.WhereableValue<c.PgTag_list>;
     }
     export interface Insertable {
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
-      display_name: string | db.Parameter<string> | db.SQLFragment<any>;
-      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment<any>;
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment<any>;
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment<any>;
+      created_at?: db.InsertableValue<(db.TimestampTzString | Date), db.DefaultType>;
+      display_name: db.InsertableValue<string>;
+      email: db.InsertableValue<c.PgEmail>;
+      home?: db.InsertableValue<c.PgAddress, null | db.DefaultType>;
+      manager_id?: db.InsertableValue<number, null | db.DefaultType>;
+      mood?: db.InsertableValue<mood, null | db.DefaultType>;
+      settings?: db.InsertableValue<db.JSONValue, db.DefaultType>;
+      tags?: db.InsertableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export interface Updatable {
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment>;
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment>;
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment>;
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment>;
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment>;
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment>;
+      created_at?: db.UpdatableValue<(db.TimestampTzString | Date), db.DefaultType>;
+      display_name?: db.UpdatableValue<string>;
+      email?: db.UpdatableValue<c.PgEmail>;
+      home?: db.UpdatableValue<c.PgAddress, null | db.DefaultType>;
+      manager_id?: db.UpdatableValue<number, null | db.DefaultType>;
+      mood?: db.UpdatableValue<mood, null | db.DefaultType>;
+      settings?: db.UpdatableValue<db.JSONValue, db.DefaultType>;
+      tags?: db.UpdatableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export type UniqueIndex = 'users_email_key' | 'users_pkey';
     export type Column = keyof Selectable;

@@ -24,7 +24,7 @@ const sql = postgres(process.env.DATABASE_URL!);
 const pool = asPool(sql);
 
 const titles = await db.select('films', { release_year: 1999 }, { columns: ['title'] }).run(pool);
-// SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "title") AS result
+// SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "title") AS result
 // FROM "films" WHERE ("release_year" = $2)) AS "sq_films"   -- values: ['title', 1999]
 
 const screenings = await db.sql<s.screenings.SQL, s.screenings.Selectable[]>`
@@ -86,7 +86,7 @@ It sends each parameter with type `unknown`, including `NULL`. Postgres infers t
 - **A column, value or row `transform`** (`postgres.camel`) makes `asPool()` throw: pgcast reads the columns under the names Postgres gives them, and their values with `pg`'s parsers. Give pgcast a `postgres()` of its own.
 - **A connection killed inside `transaction()`** (`pg_terminate_backend()`), on postgres.js 3.4 with `max: 1`: the next `transaction()` waits forever (3.4.0, 3.4.1, 3.4.5, 3.4.7) or the process crashes with an uncaught `TypeError` (the other 3.4 releases; `sql.begin()` crashes too, except on 3.4.6). These are postgres.js's own `reserve()` and `begin()`; 4.x recovers.
 - **`pg.types.setTypeParser()`** changes the adapter's parsing too when npm installs one `pg-types` for both.
-- **A nested transaction** takes the outer callback's client without a cast from pgcast 6.12.0 (#702). In 7.x its callback gets that client only if the marked outer level satisfies the request or `transactionRequiresSatisfyingLevel` is off.
+- **A nested transaction** takes the outer callback's client without a cast from pgcast 6.12.0 (#702). Its callback gets that client only if the marked outer level satisfies the request; through 7.x, also with `transactionRequiresSatisfyingLevel` off, which 8.0 removes.
 
 ## Development
 

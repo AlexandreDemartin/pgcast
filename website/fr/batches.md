@@ -1,5 +1,5 @@
 ---
-english: 879316085090
+english: 711994b3e840
 description: "Écrivez beaucoup de lignes d’un coup : découpez-les sous la limite de paramètres, ignorez celles déjà là, additionnez des comptes, ne récupérez que l’utile."
 ---
 
@@ -46,6 +46,7 @@ COMMIT
 - Si un chunk échoue, [`readCommitted()`](/fr/transaction#readCommitted) envoie `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> et est rejetée avec son erreur : aucun tag n’est conservé. Un deadlock (40P01) relance d’abord les chunks ([Retries](/fr/retries)).
 - Sur le pool, sans la transaction, chaque chunk est commité au fur et à mesure : les chunks passés avant celui qui a échoué restent en base.
 - Pour `upsert()`, le découpage est le même.
+- Ou envoyez toutes les lignes en un seul paramètre, sans limite de paramètres, dans un template `sql` : `json_populate_recordset(null::"tags", CAST($1 AS "json"))`<!-- probe: db.sql`INSERT INTO ${'tags'} (${db.cols(['film_id', 'tag'])}) SELECT ${db.cols(['film_id', 'tag'])} FROM json_populate_recordset(null::${'tags'}, ${db.param([], true)})` --> lit [`param(tags, true)`](/fr/sql-template#param) avec le type de ligne de la table. Une clé absente ou `undefined` y donne `NULL`, pas `DEFAULT`, et chaque valeur passe par `JSON.stringify` : une `Date` en UTC, un `Buffer` comme son objet JSON.
 
 ## Ignorer les lignes déjà présentes {#skip-the-rows-already-there}
 
@@ -125,7 +126,7 @@ Par défaut, chaque ligne revient entière, avec son `$action` pour un upsert. P
 
 </CastPanel>
 
-- [`returning: ['seat']`](/fr/insert#insert-options) envoie `jsonb_build_object($8::text, "seat")`<!-- probe: examples/batches_returning.ts --> au lieu de `to_jsonb("seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
+- [`returning: ['seat']`](/fr/insert#insert-options) envoie `json_build_object($8::text, "seat", '$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: examples/batches_returning.ts --> au lieu de `to_json("row_seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
 - `$action` distingue les nouvelles lignes des lignes mises à jour : `newSeats` vaut `['F8']` quand F7 était déjà réservé.
 - [`reportAction: 'suppress'`](/fr/insert#upsert-options) retire `$action` du SQL et du type, pour un batch qui n’en a pas besoin.
 - Tous deux n’affinent le type qu’avec `strictNullChecks` activé ([Options](/fr/insert#insert-options)).

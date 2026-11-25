@@ -31,7 +31,7 @@ When you run `npx pgcast`, the generator asks those tables a handful of question
 | with [`constraintNames`](/generator#generate.constraintNames), each relation's primary key, unique, foreign key, check and exclusion constraint names, and its unique index names | `pg_constraint` and the unique indexes above | the relation's `Constraint` type |
 | with [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), each domain over `text`, its `CHECK` and its `COMMENT ON DOMAIN` | `pg_type`, `pg_constraint`, `pg_description` | the union of the values the `CHECK` lists, and the tuple `every.<name>` |
 
-With the 7.0 defaults, the generator reads each enum in its own schema and the first label of `every.crew_job` is `director`, as in `CREATE TYPE crew_job`. See [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder).
+The generator reads each enum in its own schema, and the first label of `every.crew_job` is `director`, as in `CREATE TYPE crew_job`: the 7.0 defaults, and from 8.0 the only behaviour. See [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder).
 
 To watch the queries themselves, set [`debugListener`](/generator#generate.debugListener). A domain, such as `seat_label`, and a type the generator has no mapping for, such as `point`, each get a placeholder in `zapatos/custom/`, yours to fill in ([Custom types](/custom-types)).
 
@@ -67,9 +67,9 @@ A materialised view keeps no `NOT NULL` at all, not even a domain's, so its colu
 
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
-- `UniqueIndex` lists constraints usable with `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restores all of the relation's unique indexes.
+- `UniqueIndex` lists constraints usable with `ON CONFLICT ON CONSTRAINT … DO UPDATE`. Through 7.x, [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restored all of the relation's unique indexes; 8.0 removes it, and [`constraintNames`](/generator#generate.constraintNames) lists them in `Constraint`.
 - A domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, follows its base type in each context while its placeholder holds the generated type.
-- A nested domain or an array of domains follows the innermost domain's base type if the generator recognises it. [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) restores the placeholder type in all five interfaces.
+- A nested domain or an array of domains follows the innermost domain's base type if the generator recognises it. Through 7.x, [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) restored the placeholder type in all five interfaces; 8.0 removes it.
 - A column's `NOT NULL` applies to the array itself. Even with a `NOT NULL` domain as the element type, an assignment past the end, such as `a[3] = 3` on `{1}`, stores `{1,NULL,3}`. As in Zapatos 6.6.1, pgcast types `int4[] NOT NULL` as `number[]`, but `pg` reads `{1,NULL}` as `[1, null]`.
 - An enum array is text in `Selectable` and a label array in shortcut JSON. [`enumArraysTypedAsText: false`](/generator#generate.enumArraysTypedAsText) suits a parser that returns an array.
 - A domain over `text` whose `CHECK` lists its values, `CHECK (VALUE IN ('U', 'PG', '12'))`, is a `string`, its placeholder's type as generated, unless [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) is on.
@@ -107,7 +107,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-The `seat_label` domain is a string in all five interfaces. For a domain over `bigint`, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) keeps the string from `pg` in `Selectable` and gives a number in `JSONSelectable` with the default JSON parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` first. Editing the placeholder to another type gives the column that type in all five interfaces.
+The `seat_label` domain is a string in all five interfaces. For a domain over `bigint`, the generator [types by context](/generator#generate.domainsTypedByContext): it keeps the string from `pg` in `Selectable` and gives a number in `JSONSelectable` with the default JSON parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` first. Editing the placeholder to another type gives the column that type in all five interfaces.
 
 The same row, asked for twice, shows the first two side by side:
 
@@ -117,13 +117,13 @@ In a session whose `TimeZone` is `UTC`, the first is the `Date` `2030-03-01T19:3
 
 ## Why the shortcuts return JSON
 
-Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_jsonb()` or `jsonb_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `jsonb_agg()`.
+Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_json()` or `json_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `json_agg()`.
 
 That's how `select()` brings back films with their cast already in place, in one round trip, with nothing to assemble in JavaScript afterwards.
 
 The price is that every value travels as JSON, and JSON has no dates, no bytes and one kind of number. `JSONSelectable` says what arrives instead:
 
-- a date or a time, as the ISO 8601 string `to_jsonb()` writes; a `timestamptz` with the session's offset, `+00:00` in `UTC` and `+05:30` in `Asia/Kolkata`;
+- a date or a time, as the ISO 8601 string `to_json()` writes; a `timestamptz` with the session's offset, `+00:00` in `UTC` and `+05:30` in `Asia/Kolkata`;
 - a `bytea`, as its hex string (with the default `bytea_output`), `'\xdeadbeef'`, where `pg` gives a `Buffer`;
 - an `int8` or a `numeric`, as a JSON number, where `pg` gives a string. A large one loses precision as `JSON.parse()` reads it: the `int8` `9007199254740993` arrives as `9007199254740992`. The generator warns when a schema has such columns, and [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) types them for a parser that keeps them whole.
 
@@ -164,7 +164,7 @@ The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersi
 
 What pgcast changes on the way in is in the run-time library, not in the generated types. [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`).
 
-In 7.0, writes treat an `undefined` value as a missing key by default. See [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). With `typeEnumsAcrossSchemas: false` and `enumOrder: 'alphabetical'`, the generator looks up enums in the relation's schema and sorts their labels alphabetically, as in pgcast 6.x ([Versions](/versions)).
+From 7.0, writes treat an `undefined` value as a missing key, and from 8.0 always. See [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Through 7.x, `typeEnumsAcrossSchemas: false` and `enumOrder: 'alphabetical'` looked up enums in the relation's schema and sorted their labels alphabetically, as in pgcast 6.x; 8.0 removes both ([Versions](/versions)).
 
 What pgcast refuses is a second source of truth: a model class, a schema written in TypeScript, a type declared beside the table it describes. The database has the last word, and the cost is a habit: run the generator again after each migration, and let TypeScript point at the queries that no longer fit ([First query](/first-query#when-the-schema-changes)).
 

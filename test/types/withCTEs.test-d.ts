@@ -2,7 +2,7 @@
 //
 // Types of withCTEs() (src/db/shortcuts.ts) on the fixture schema: the main query's own type, so its result,
 // whatever the CTEs, a map built at run time included; refused: a CTE or a main query that is no fragment.
-// With aggregatesTypedByColumn declared: ../types-opt-in/aggregates.test-d.ts.
+// An aggregate under withCTEs(): ./aggregates.test-d.ts.
 
 import { describe, expectTypeOf, test } from 'vitest';
 import * as db from 'zapatos/db';

@@ -9,4 +9,4 @@ const [row] = await db.sql<s.screenings.SQL, s.screenings.Selectable[]>`
 const json = await db.selectExactlyOne('screenings', { id: 1000 }).run(pool);
 
 row.starts_at;   // a Date: pg parsed the timestamptz
-json.starts_at;  // a string: to_jsonb() wrote it
+json.starts_at;  // a string: to_json() wrote it

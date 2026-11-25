@@ -1,5 +1,5 @@
 ---
-english: 9015c0ec1937
+english: 6a0ea425e3cf
 description: "À la fin de cette page, vous aurez généré les types d’une base, demandé des films et ajouté un film, avec sous les yeux le SQL et le type de chaque requête."
 ---
 
@@ -150,7 +150,7 @@ Demandez un film par son titre avec `selectOne()`, puis exécutez-le sur le pool
 
 </CastPanel>
 
-Le titre est parti à Postgres en paramètre, `("title" = $1)`<!-- probe: examples/first-query.ts -->, jamais collé dans le SQL. La ligne revient en JSON (`to_jsonb`<!-- probe: examples/first-query.ts -->), son type est donc `films.JSONSelectable`, et `undefined` si aucun film n’a ce titre. TypeScript ne vous laisse pas l’oublier :
+Le titre est parti à Postgres en paramètre, `("title" = $1)`<!-- probe: examples/first-query.ts -->, jamais collé dans le SQL. La ligne revient en JSON (`to_json`<!-- probe: examples/first-query.ts -->), son type est donc `films.JSONSelectable`, et `undefined` si aucun film n’a ce titre. TypeScript ne vous laisse pas l’oublier :
 
 ```ts twoslash
 // @errors: 18048
@@ -185,7 +185,7 @@ Exécutez-le, et après `1974` il affiche :
 
 ```txt
 {
-  text: 'SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("title" = $1) LIMIT $2',
+  text: 'SELECT to_json("films".*) AS result FROM "films" WHERE ("title" = $1) LIMIT $2',
   values: [ 'The Salt Orchard', 1 ]
 }
 ```
@@ -200,7 +200,7 @@ Exécutez-le, et après `1974` il affiche :
 
 </CastPanel>
 
-Chaque nom de colonne apparaît deux fois dans `jsonb_build_object($1::text, "title", …)`<!-- probe: examples/first-query-columns.ts --> : comme valeur, `$1`, la clé de l’objet JSON, et entre guillemets, `"title"`, la colonne qu’il lit.
+Chaque nom de colonne apparaît deux fois dans `json_build_object($1::text, "title", …)`<!-- probe: examples/first-query-columns.ts --> : comme valeur, `$1`, la clé de l’objet JSON, et entre guillemets, `"title"`, la colonne qu’il lit.
 
 Le type suit la requête : deux colonnes demandées, deux dans le type. Omettez `columns` et vous recevez toutes les colonnes, `films.JSONSelectable[]`. Affichez-les :
 
@@ -289,8 +289,8 @@ const row: s.films.Insertable = {
 };
 ```
 
-::: tip Par défaut en 7.0
-Une clé absente ou une cellule `undefined` utilise la valeur par défaut de la colonne. Avec `undefinedMeansMissing: false`, seule la clé absente garde ce comportement : une cellule `undefined` passe `undefined` en paramètre, ce que `pg` envoie comme `NULL`. Omettre la seule clé lève l’erreur `nothing to insert`. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
+::: tip À partir de la 7.0
+Une clé absente ou une cellule `undefined` utilise la valeur par défaut de la colonne. Pendant toute la 7.x, avec `undefinedMeansMissing: false`, seule la clé absente gardait ce comportement : une cellule `undefined` passait `undefined` en paramètre, ce que `pg` envoyait comme `NULL` ; la 8.0 supprime l’option. Omettre la seule clé lève l’erreur `nothing to insert`. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

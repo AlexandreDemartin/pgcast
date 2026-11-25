@@ -17,6 +17,7 @@ description: 'The core.ts sensitive zone: identifier escaping, parameterisation,
 - **A value is a parameter** (`$n`), never concatenated; `raw` is reserved for fixed keywords in the code (`ASC`, `FOR UPDATE`), never for an input.
 - **An identifier comes from the type** (`Table`, `Column`); at run time it may come from an untyped object (`req.body` passed as a `Whereable` or an `Insertable`): compile it as if it were hostile.
 - **Object keys** (`Whereable`, `cols`, `vals`, `extras`, `lateral`) are identifiers: same rule.
+- **Ours, told by a flag**: a branch that tells pgcast's own fragment from a caller's value marks ours with a flag or an argument (`SQLForJSONObject`'s `ours`), never `instanceof SQLFragment`, which a caller's fragment past the type passes too (#954).
 - The `cast` of `param(x, 'type')` and the name of a `lateral` key are interpolated: same rule.
 - **Escaped is not allowed**: a caller's string interpolated in `sql` is a name, and quoting only stops it closing its quotes. In a value's place, `'title'` gives `"title" = "title"`, every row; as a table, it reaches any relation the role can read (`pg_catalog.pg_roles`). A caller's name is checked against a list.
 - **Entry points** are found by grepping `raw(` and interpolations in `src/`, not from the docs of the options: a parameter "used internally" (`aggregate`) is one.
@@ -41,5 +42,6 @@ Each change adds, in `test/unit/injection.test.ts`:
 - splices across two occurrences of one name (a literal opened in one, closed in the other), and an alias list plus a clause after the last;
 - control characters made visible before an inline snapshot: Vitest writes a NUL raw and turns `\r\n` into `\n`;
 - each shape `compileExpression` takes in an identifier slot (string, fragment, array, Whereable), each character a check's class excludes (`[^"\0]`), and payloads that close every parenthesis they open. A second statement runs only with no parameter, which a `lateral` map and `extras` add and a single `lateral` does not: check `compile().values.length` per shape (#607, #610).
+- a test moved or rewritten "with the same SQL" (from a removed option to `updateColumns`): each test's compiled text replayed against master's, compared as a multiset per test with a fallback per file, so renamed tests survive, random statement names and pids named in **Proofs**. The matrix compares its rows with each other, never with master: a lost hostile `EXCLUDED."…"` failed nothing (#981, #969).
 
 "Nothing ran" is proved by the error naming the whole payload as one identifier, a read before the rollback, or `pool.connect` mocked to reject. Not by a read through another connection, a test placed last, a thrown error (`pg` answers a multi-statement query with an array, after the second statement ran), nor by SQLSTATE codes without the compiled text.

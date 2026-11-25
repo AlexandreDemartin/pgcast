@@ -9,6 +9,7 @@ The proofs of skill `plan-and-proofs` that serve a minority of steps; [SKILL.md]
 - Each new assertion is red on its own: in one `it`, the first old failure hides the rest, and a loop over rows stops at its first red row, so each row is shown red alone (#601). A red run counts by its failing test names: a parse error gives "no tests" (#558); a red test also passes `typecheck` (#572).
 - A bug with no local red: a fix to a workflow alone (`ci.yml`) replays its step locally, with what it expects read from `ci.yml` itself, red before the fix and green after; a test red on CI alone is fixed from its failure message, then proved by a loop of runs before and after (10, then 30) and, where it can be, a delay injected at the racing point (a watch test counted stdout lines before the rewrite's line arrived, #847).
 - A review item whose expected fix only documents the head's behaviour is red against master's runtime (#558).
+- A docs fact the page leaves out, which the JSDoc and tests state, has no check to fail on: its red step is a scratch probe, quoted in the PR (#985).
 - A test that freezes a route a `CHANGELOG.md` line names (`upsert()` `updateValues`, `lateral`) runs red against the base's runtime.
 
 ## Mutants

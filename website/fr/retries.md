@@ -1,5 +1,5 @@
 ---
-english: 5638bfc6b396
+english: 1e6de3583f97
 description: "Réservez des places sous SERIALIZABLE, pour que deux requêtes HTTP simultanées n’enfreignent pas une règle, et laissez pgcast relancer la transaction refusée."
 ---
 
@@ -54,7 +54,7 @@ Si ce travail passe dans le callback, une réservation réessayée envoie deux e
 
 pgcast ne réessaie que si l’erreur lui parvient. Après une erreur de requête, les requêtes ordinaires échouent avec 25P02 (`current transaction is aborted, commands ignored until end of transaction block`) jusqu’au rollback. Si le callback se termine normalement, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->.
 
-Si Postgres répond à ce `COMMIT` par `ROLLBACK`, la promesse est rejetée sans retry et rien n’est enregistré. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Une nouvelle erreur 40001 au `COMMIT` peut encore déclencher un retry.
+Si Postgres répond à ce `COMMIT` par `ROLLBACK`, la promesse est rejetée sans retry et rien n’est enregistré. Pendant toute la 7.x, avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résolvait avec la valeur renvoyée par le callback. Une nouvelle erreur 40001 au `COMMIT` peut encore déclencher un retry.
 
 Si vous en interceptez une à l’intérieur, relancez-la.
 
@@ -95,7 +95,7 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-Un paramètre de type [`db.Queryable`](/fr/sql-template#Queryable) accepte ce client. L’appel ci-dessous compile, puis sa promesse est rejetée avant que le callback de réservation soit appelé. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), la réservation s’exécuterait en `READ COMMITTED`.
+Un paramètre de type [`db.Queryable`](/fr/sql-template#Queryable) accepte ce client. L’appel ci-dessous compile, puis sa promesse est rejetée avant que le callback de réservation soit appelé. Pendant toute la 7.x, avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), la réservation s’exécutait en `READ COMMITTED`.
 
 <<< ../examples/plain/retries_lower_level.ts{ts twoslash}
 

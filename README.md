@@ -41,21 +41,24 @@ It uses the `zapatos/*` names. Installed under the `pgcast` alias, with `moduleN
 The SQL it runs, in one round trip:
 
 ```sql
-SELECT coalesce(jsonb_agg(result), '[]') AS result
+SELECT coalesce(json_agg(result), '[]') AS result
 FROM (
-  SELECT to_jsonb("films".*) || jsonb_build_object($1::text, "lateral_cast".result) AS result
-  FROM "films"
-  LEFT JOIN LATERAL (
-    SELECT coalesce(jsonb_agg(result), '[]') AS result
-    FROM (
-      SELECT to_jsonb("roles".*) AS result
-      FROM "roles"
-      WHERE ("film_id" = "films"."id")
-      ORDER BY "billing" ASC
-    ) AS "sq_roles"
-  ) AS "lateral_cast" ON true
+  SELECT to_json("row_films".*) AS result
+  FROM (
+    SELECT "films".*, "lateral_cast".result AS "cast"
+    FROM "films"
+    LEFT JOIN LATERAL (
+      SELECT coalesce(json_agg(result), '[]') AS result
+      FROM (
+        SELECT to_json("roles".*) AS result
+        FROM "roles"
+        WHERE ("film_id" = "films"."id")
+        ORDER BY "billing" ASC
+      ) AS "sq_roles"
+    ) AS "lateral_cast" ON true
+  ) AS "row_films"
 ) AS "sq_films"
--- values: ["cast"]
+-- values: []
 ```
 
 The type you get, with no annotation (`s` is `zapatos/schema`, the generated module):
@@ -80,7 +83,7 @@ What pgcast adds, one line each, with its version: [What's new](https://pgcast.d
 
 - **Security.** From 6.6.2, a string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](https://pgcast.dev/changelog#6.6.2-security). Later releases closed more holes that Zapatos 6.6.1 shares, each with its advisory: [fixes by release](https://pgcast.dev/security#fixes-by-release).
 - **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns, and a result that contradicts the function's name, type or docs changes, such as `not()`, which now negates its whole condition: each is listed under `Fixed` in the [changelog](https://pgcast.dev/changelog).
-- **Opt-ins**, for surprises that code may rely on. Each is off by default in the release that brings it. In 6.x, the old path emits a `DeprecationWarning` once per process, with a code to search for, or, for a generator option, a note through `warningListener` ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)). None warns for `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in for good, nor for the generator's `valuesTypedAsAliases`, from 7.2.0, whose types are the same.
+- **Opt-ins**, for surprises that code may rely on. Each is off by default in the release that brings it. In 6.x, the old path emits a `DeprecationWarning` once per process, with a code to search for, or, for a generator option, a note through `warningListener` ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)). None warns for `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in through 7.x, nor for the generator's `valuesTypedAsAliases`, from 7.2.0, whose types are the same, nor for `topLevelSelectAsRows` and `shortcutsUseJson`, from 7.3.0, whose values are the same.
 
 | Option | Warning in 6.x | Introduced |
 |---|---|---|
@@ -99,17 +102,20 @@ What pgcast adds, one line each, with its version: [What's new](https://pgcast.d
 | `enumArraysTypedAsText` (generator): an array of an enum is a `string` in `Selectable`, the text `pg` returns from a `sql` query, `'{writer,editor}'` ([generator](https://pgcast.dev/generator#generate.enumArraysTypedAsText)), rather than an array; `false` keeps the array, for a parser set with `pg.types.setTypeParser` | a note through `warningListener`, the key left out | 6.7.0 |
 | `intervalsTypedAsObjects` (generator): an `interval` is typed in `Selectable` as `pg`'s default type parser returns it, a `db.PostgresInterval`, which a write takes back ([generator](https://pgcast.dev/generator#generate.intervalsTypedAsObjects)), rather than as its text; `false` keeps the text, for a type parser of your own | a note through `warningListener` | 6.7.0 |
 | `domainsTypedAsUnions` (generator): a domain over `text` whose `CHECK` lists its values, `CHECK (VALUE IN ('U', 'PG'))`, is declared as their union, which a new placeholder names ([generator](https://pgcast.dev/generator#generate.domainsTypedAsUnions)), rather than typed by a placeholder that holds `string`; one already on disk stays yours | none | 6.10.0 |
-| `valuesTypedAsAliases` (generator): each column's value type in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, `db.WhereableValue<number>`, with the same types ([generator](https://pgcast.dev/generator#generate.valuesTypedAsAliases)), rather than spelling out its union; the default in 8.0 | none | 7.2.0 |
+| `valuesTypedAsAliases` (generator): each column's value type in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, `db.WhereableValue<number>`, with the same types ([generator](https://pgcast.dev/generator#generate.valuesTypedAsAliases)), rather than spelling out its union; the only behaviour in 8.0 | none | 7.2.0 |
+| [`topLevelSelectAsRows`](https://pgcast.dev/runtime-config#Config.topLevelSelectAsRows): a `select()` run or compiled on its own sends `selectRows()`'s query, one row per result, rather than one `json_agg` value; nested, it keeps the aggregate; the only behaviour in 8.0 | none | 7.3.0 |
+| [`shortcutsUseJson`](https://pgcast.dev/runtime-config#Config.shortcutsUseJson), through 7.x: `select()` and its kin, and the `RETURNING` of the writes, build their JSON with `to_json`, `json_build_object` and `json_agg` rather than their `jsonb` twins, with the same values but for a row's key order, a nested result's type, `json`, and a `float8` `-0`, which stays `-0`; the only behaviour in 8.0 | none | 7.3.0 |
 
 Everything else: the [changelog](https://pgcast.dev/changelog); what the characterisation of 6.6.1 found: [its report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md).
 
 ## Versions
 
 - pgcast continues Zapatos's version numbers: 6.6.2 follows Zapatos 6.6.1.
+- Compatibility is best effort: a minor or a patch keeps what working code relies on, bar the fixes of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md); a major may change behaviour, SQL text or types when that buys better performance or typing, and comes with a migration guide in English and French. The types stay derived from the database ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
-- **7.0** switches the opt-in defaults of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in for good; the [migration guide](https://pgcast.dev/switching#from-7-0) also covers changes without a 6.x warning.
+- **7.0** switches the opt-in defaults of decision 003, except `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in through 7.x; the [migration guide](https://pgcast.dev/switching#from-7-0) also covers changes without a 6.x warning.
   In 7.x, set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently to keep the corresponding 6.x write behaviour without a warning. The three transaction checks also default to `true`. Set any one to `false` for its 6.x behaviour without a warning through 7.x.
-- **8.0** removes the old paths, except those of `selectExactlyOneChecksForSecondRow` and `domainsTypedAsUnions`, and three old values asked for by choice, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` ([Versions](https://pgcast.dev/versions#_7-0-and-8-0)). It also turns on the generator's [`valuesTypedAsAliases`](https://pgcast.dev/generator#generate.valuesTypedAsAliases), the same types in a smaller file; `false` stays.
+- **8.0** keeps one behaviour per option, the best ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)): it removes the 7.x old values, `rejectOnQueryError: false` included, and makes [`shortcutsUseJson`](https://pgcast.dev/switching#from-8-0-shortcutsUseJson), [`topLevelSelectAsRows`](https://pgcast.dev/runtime-config#Config.topLevelSelectAsRows) and the generator's [`valuesTypedAsAliases`](https://pgcast.dev/generator#generate.valuesTypedAsAliases) and `domainsTypedAsUnions` the only behaviour; `selectExactlyOneChecksForSecondRow` goes, `selectExactlyOne()` always `LIMIT 1`. A removed key throws, unless set to the value 8.0 always behaves as, `null` or `undefined` ([8.0 migration](https://pgcast.dev/switching#from-8-0)). `enumArraysTypedAsText` and `intervalsTypedAsObjects` stay, as they say how your `pg` parses, and so does the generator's addition `constraintNames`, off by default.
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
 
 ## Documentation
@@ -130,6 +136,8 @@ The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin
 8. Done: [Publish the fixes made since 7.1.0](https://github.com/AlexandreDemartin/pgcast/issues/875).
 9. Done: [Show what pgcast can do in its docs](https://github.com/AlexandreDemartin/pgcast/issues/891).
 10. Done: [Keep type-checking cheap on large schemas](https://github.com/AlexandreDemartin/pgcast/issues/919).
+11. Done: [Make large and nested reads and writes cheap, with the same types](https://github.com/AlexandreDemartin/pgcast/issues/942).
+12. [Ship 8.0 with one behaviour per option, the best](https://github.com/AlexandreDemartin/pgcast/issues/963).
 
 ## Relationship with Zapatos
 

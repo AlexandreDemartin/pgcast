@@ -1,5 +1,5 @@
 ---
-english: 905b32e4428a
+english: fa8eccf7f99f
 ---
 
 # Nouveautés
@@ -14,6 +14,8 @@ Ce que pgcast ajoute à Zapatos 6.6.1, une ligne par ajout : la version qui l�
 | [`withCTEs()`](/fr/sql-template#withCTEs) : des CTE avant un raccourci, dont le type du résultat est conservé | 6.11.0 |
 | [`selectRows()`](/fr/select#selectRows) : la requête de `select()` comme fragment, une ligne par résultat, pour un [curseur](/fr/cursors) | 6.12.0 |
 | [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) : `selectExactlyOne()` lève une erreur sur une deuxième ligne, en opt-in | 6.7.0 |
+| [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) : `select()` exécuté seul envoie une ligne par résultat, le même tableau, en opt-in | 7.3.0 |
+| [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson) : `select()` et ses semblables, et le `RETURNING` des écritures, construisent leur JSON avec les fonctions `json`, les mêmes valeurs, en opt-in pendant toute la 7.x, toujours à partir de la 8.0.0 | 7.3.0 |
 | [`ReturningTypeForTable`](/fr/insert#ReturningTypeForTable) et [`UpsertReturnableForTable`](/fr/insert#UpsertReturnableForTable), exportés : la ligne que renvoie une écriture, pour typer un faux résultat | 6.7.0 |
 | [`UpsertOptions`](/fr/insert#UpsertOptions) et [`OrderSpecForTable`](/fr/select#OrderSpecForTable), exportés, pour que les déclarations d’un paquet puissent les nommer | 6.9.0 |
 
@@ -47,7 +49,7 @@ Ce que pgcast ajoute à Zapatos 6.6.1, une ligne par ajout : la version qui l�
 | [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) : un domaine sur `text` dont le `CHECK` liste les valeurs, typé comme leur union, en opt-in | 6.10.0 |
 | [`moduleNames`](/fr/generator#generate.moduleNames) et `pgcastconfig.json` : des imports depuis `pgcast/db`, et aucun fichier au nom de Zapatos | 6.7.0 |
 | [`SchemaRules`](/fr/generator#SchemaRules) et [`ColumnOptions`](/fr/generator#ColumnOptions), exportés depuis `zapatos/generate`, pour que les déclarations d’un paquet puissent les nommer | 6.9.0 |
-| [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) : le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nommé par un alias de `zapatos/db`, les mêmes types dans un fichier plus petit, en opt-in | 7.2.0 |
+| [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) : le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nommé par un alias de `zapatos/db`, les mêmes types dans un fichier plus petit, en opt-in jusqu’à la 7.x, toujours à partir de la 8.0.0 | 7.2.0 |
 
 ## Drivers et adaptateurs {#drivers-and-adapters}
 

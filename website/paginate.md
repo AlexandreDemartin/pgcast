@@ -140,7 +140,7 @@ The screenings, soonest first, on `starts_at` then `id`. Here `last` is page 1's
 - Not as a `Date`, which keeps milliseconds and drops the rest. Take two screenings in one millisecond, at 18:00:00.000100 and 18:00:00.000900: as a `Date`, both are 18:00:00.000. In this `ASC` order, the page after the first gives the first again; in a `DESC` order, the page after the second skips the first.
 - A query of your own in the [`sql`](/sql-template#sql) template gets `starts_at` from `pg` as a `Date`: take the cursor from a shortcut's row, which has the string.
 - Comparing on `date_trunc('milliseconds', starts_at)` also works with a `Date`, but needs the same expression in the `order`, and an index on it to start at the last row. That index needs the zone, `date_trunc('milliseconds', starts_at, 'UTC')`: on the two-argument form, Postgres refuses it (42P17). The string needs none of this: an index on `(starts_at, id)` serves the comparison as it is.
-- Check a cursor's string before the query, as `decodeCursor()` checks the integers ([below](#send-the-cursor-to-the-client)): Postgres refuses one it can't read as a time (22007). The form `to_jsonb()` writes is `/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?[+-]\d\d:\d\d$/`.
+- Check a cursor's string before the query, as `decodeCursor()` checks the integers ([below](#send-the-cursor-to-the-client)): Postgres refuses one it can't read as a time (22007). The form `to_json()` writes is `/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?[+-]\d\d:\d\d$/`.
 
 ### Send the cursor to the client
 

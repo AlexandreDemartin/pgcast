@@ -21,7 +21,7 @@ What it does, in one sentence, then its parameters as a list: `table`, a table o
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| `columns: ['character']` | `jsonb_build_object($1::text, "character")` in place of `to_jsonb("roles".*)` | `Pick<roles.JSONSelectable, 'character'>` |
+| `columns: ['character']` | `json_build_object($1::text, "character")` in place of `to_json("roles".*)` | `Pick<roles.JSONSelectable, 'character'>` |
 | `order: { by: 'billing', direction: 'ASC' }` | `ORDER BY "billing" ASC` | none |
 | `limit: 10` | `LIMIT $2` | none |
 

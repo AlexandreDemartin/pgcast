@@ -1,5 +1,5 @@
 ---
-english: 6d1a8292be5c
+english: 02da0f254db9
 description: "Comprendre ce qui a échoué dans une requête et y répondre : une place déjà réservée, une séance qui n’existe pas, une option mal donnée par votre code."
 ---
 
@@ -90,7 +90,7 @@ Le SQL de chaque `INSERT` : [`insert()`](/fr/insert#insert). Un échec de séri
 ::: warning Écritures perdues
 Après une erreur de base de données, les requêtes ordinaires échouent avec 25P02 (`InvalidTransactionState_InFailedSqlTransaction`) jusqu’au rollback. Si le callback intercepte l’erreur et se termine normalement, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->.
 
-Si Postgres répond à ce `COMMIT` par `ROLLBACK`, la promesse est rejetée sans retry. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résout avec la valeur renvoyée par le callback. Dans les deux cas, les écritures sont perdues ([Erreurs](/fr/transaction#errors)).
+Si Postgres répond à ce `COMMIT` par `ROLLBACK`, la promesse est rejetée sans retry, et les écritures sont perdues. Pendant toute la 7.x, avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), elle se résolvait avec la valeur renvoyée par le callback, les écritures perdues elles aussi ([Erreurs](/fr/transaction#errors)).
 
 Pour une place qui peut être prise, demandez à Postgres de ne pas refuser : [`upsert()` avec `doNothing`](/fr/insert#doNothing) écrit `ON CONFLICT ON CONSTRAINT "seat_bookings_pkey" DO NOTHING`<!-- probe: db.upsert('seat_bookings', { screening_id: 1001, seat: 'H2', customer: 'Wren Abernathy' }, db.constraint('seat_bookings_pkey'), { updateColumns: db.doNothing }) --> et donne `undefined` pour une place prise, sans erreur, et la transaction continue.
 :::

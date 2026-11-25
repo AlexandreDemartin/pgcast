@@ -5,7 +5,7 @@
 - **In short**:
   - `valuesTypedAsAliases: true` writes each column's value in `Whereable`, `Insertable` and `Updatable` as an alias exported by `zapatos/db`, in place of the union written out on each line.
   - Three aliases: `WhereableValue<T>`, `InsertableValue<T, Extra>` and `UpdatableValue<T, Extra>`. `Extra` is `null | db.DefaultType` for a nullable column and `db.DefaultType` for one with a default.
-  - The types are the same; off, the output is unchanged. It becomes the default in 8.0, and `false` stays a choice.
+  - The types are the same; off, the output is unchanged. It becomes the default in 8.0, and `false` stays a choice: superseded by decision [019](./019-one-behaviour.md), where it is 8.0's only behaviour.
 
 ## Context
 
@@ -67,5 +67,5 @@ The same program on a schema of 3 tables takes 188–194 MB: the schema's own sh
 ## 5. The default at the next major
 
 - **In 7.x**: off by default, with no note when off. The types are the same, so a project has nothing to migrate.
-- **In 8.0**: on by default. `valuesTypedAsAliases: false` stays a permanent choice, for a tool that reads the written-out text.
+- **In 8.0**: on by default. `valuesTypedAsAliases: false` stays a permanent choice, for a tool that reads the written-out text. Superseded by decision [019](./019-one-behaviour.md) § 3: 8.0 removes the option and writes the aliases alone.
 - **No canary change**: the default output does not change, and the generator and `zapatos/db` ship in one package. An aliased output compiled against an older `zapatos/db`, after a downgrade with no new run, gives TS2694 on each line; under `skipLibCheck`, which also skips the canary, those values are `any`. An older version needs a new run, as going back to Zapatos does (`switching.md` § Go back).

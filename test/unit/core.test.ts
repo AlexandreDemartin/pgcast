@@ -1108,11 +1108,11 @@ describe('db.all', () => {
         "count": "SELECT count(*) AS result FROM "users"",
         "exists": "((EXISTS (SELECT 1 FROM "accounts")))",
         "isInSelect": "(("id" IN (SELECT "owner_id" FROM "accounts")))",
-        "lateral": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "sq_users"",
-        "noNullUpdateColumns": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(CASE WHEN EXCLUDED."email" IS NULL THEN "users"."email" ELSE EXCLUDED."email" END, CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "select": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
-        "selectDefault": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
-        "selectOne": "SELECT jsonb_build_object($1::text, "id") AS result FROM "users" LIMIT $2",
+        "lateral": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "sq_users"",
+        "noNullUpdateColumns": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(CASE WHEN EXCLUDED."email" IS NULL THEN "users"."email" ELSE EXCLUDED."email" END, CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
+        "select": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
+        "selectDefault": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
+        "selectOne": "SELECT json_build_object($1::text, "id") AS result FROM "users" LIMIT $2",
         "sum": "SELECT sum("balance") AS result FROM "accounts"",
       }
     `);
@@ -1420,7 +1420,7 @@ describe('run() on a client that isn\'t pg\'s (#695)', () => {
       query = db.insert('users', [{ email: 'a@example.com', display_name: 'Ada' }, { email: 'g@example.com', display_name: 'Grace' }]);
     expect(await query.run(client)).toEqual([{ id: 1 }, { id: 2 }]);
     expect(sent).toEqual([{
-      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4) RETURNING to_jsonb("users".*) AS result',
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4) RETURNING to_json("users".*) AS result',
       values: ['Ada', 'a@example.com', 'Grace', 'g@example.com'],
     }]);
   });

@@ -98,7 +98,7 @@ beforeAll(() => {
       types: ['node'], paths: { 'zapatos/db': [path.join(virtual, 'db')] },
     }, files);
 
-  // A ConfigTypes augmentation applies to the whole program. Compile each declaration on its own.
+  // An augmentation of ConfigTypes, which 8.0 removed, applies to the whole program. Compile each one on its own.
   const aggregate = path.join(consumer, 'aggregate.ts');
   for (const setting of ['any', 'never', 'boolean', 'true', 'false']) {
     files.set(aggregate, `import * as db from 'zapatos/db';
@@ -206,9 +206,8 @@ describe('the documented limits', () => {
   });
 });
 
-describe('aggregate signatures declared in ConfigTypes', () => {
-  it.each(['any', 'never', 'boolean', 'true', 'false'])('a date minimum with %s', setting => {
-    const type = setting === 'false' ? 'number' : 'Date | null';
-    expect(aggregateResults.get(setting)).toContain(`first: Promise<${type}>`);
+describe('an augmentation of ConfigTypes left from 7.x', () => {
+  it.each(['any', 'never', 'boolean', 'true', 'false'])('compiles and reads nothing: a date minimum with %s is typed by column', setting => {
+    expect(aggregateResults.get(setting)).toContain('first: Promise<Date | null>');
   });
 });

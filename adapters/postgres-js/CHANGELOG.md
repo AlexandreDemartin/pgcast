@@ -4,6 +4,9 @@ All notable changes to `@pgcast/adapter-postgres-js` are documented here. Format
 
 ## [Unreleased]
 
+### Changed
+- The README's note on a nested transaction says that pgcast 8.0 removes `transactionRequiresSatisfyingLevel`, so the level check always runs.
+
 ## [0.1.2] - 2026-11-22
 
 ### Changed

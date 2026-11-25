@@ -53,7 +53,7 @@ Moved into the callback, a retried booking sends two confirmation emails, and pu
 
 pgcast retries only what reaches it. After a query error, ordinary queries fail with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`) until rollback. If the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->.
 
-If Postgres answers that `COMMIT` with `ROLLBACK`, the promise rejects without a retry and nothing is saved. With [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit), it resolves with the callback result. A fresh 40001 at `COMMIT` can still trigger a retry.
+If Postgres answers that `COMMIT` with `ROLLBACK`, the promise rejects without a retry and nothing is saved. Through 7.x, [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit) resolved with the callback result. A fresh 40001 at `COMMIT` can still trigger a retry.
 
 If you catch one inside, rethrow it.
 
@@ -94,7 +94,7 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-A [`db.Queryable`](/sql-template#Queryable) parameter accepts this client. The call below compiles, then rejects before the booking callback. With [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel), the booking would run at `READ COMMITTED`.
+A [`db.Queryable`](/sql-template#Queryable) parameter accepts this client. The call below compiles, then rejects before the booking callback. Through 7.x, with [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel), the booking ran at `READ COMMITTED`.
 
 <<< ./examples/plain/retries_lower_level.ts{ts twoslash}
 

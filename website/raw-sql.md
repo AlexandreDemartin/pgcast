@@ -346,7 +346,7 @@ A write shortcut can be a CTE too. It runs, and the main query sees each table a
 
 - `tagsBefore` is `0` on the docs schema: the tag is there once the statement has run. To read the inserted rows, read the CTE, ``db.sql`SELECT result FROM added` ``, each row as JSON in `result`, as the shortcut returns it.
 - Postgres runs a data-modifying CTE only at the top level. Nested, in a `lateral` for one, it is refused (0A000).
-- An `insert()` or `upsert()` of no row, as the main query or as a CTE, is written `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, which no table refuses: the CTEs run, and the main query resolves to `[]`.
+- An `insert()` or `upsert()` of no row, as the main query or as a CTE, is written `SELECT NULL::json AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, which no table refuses: the CTEs run, and the main query resolves to `[]`.
 
 Nested, `withCTEs()` goes where its query would: in parentheses as an `extras` or `insert()` value, as a subquery in a `lateral`.
 

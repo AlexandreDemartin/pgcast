@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
-// A library's functions that return an aggregate, with aggregatesTypedByColumn declared in ConfigTypes:
+// A library's functions that return an aggregate, typed by column:
 // this program emits declarations (tsconfig.json), as a package built with `declaration: true` does, so
 // every type these functions return must have a name a .d.ts can write (TS4023 otherwise).
 

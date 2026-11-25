@@ -11,12 +11,12 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 - The number of the step's issue and the decisions taken for it. You read it with `gh issue view <n> --repo AlexandreDemartin/pgcast`, and only it: **Files**, and in its **Notes**, **Risk** and **Read**.
 - Or "plan checked", to resume a `high` step after its plan.
-- Or, to fix: the PR, its branch and the blocking items of the review comment (`file:line`, expected fix); a non-blocking one is not fixed.
+- Or, to fix: the PR, its branch and the blocking items of the review comment (`file:line`, expected fix); a non-blocking one is not fixed. A fix rereads `origin/master` before each item: an open PR may have landed it meanwhile (#960).
 
 ## Where to work
 
 - In the main checkout, on the step's branch; a worktree only if the orchestrator asks (skill `run-step` § Ritual rules). It then needs `src/.env` copied or linked from the main checkout (ignored by git), then `npm ci` and `npm run build`, and `cd website && npm ci` before a `docs:*` script: the root's `npm ci` does not install it, `docs:translated` exists only there, and the site reads the root's build (TS2694 otherwise) (#262, #301, #495, #893). Each Edit path starts with the worktree's: one edit landed in the main checkout (#906).
-- Test database: `TEST_DATABASE_URL` from `src/.env`, never printed: test it as a boolean (auto mode refuses a command that could print it); a child process gets it through the environment, never as an argument, which an `execFileSync` error prints (#67). The tests create and drop their own databases; never touch the server's other databases.
+- Test database: `TEST_DATABASE_URL` from `src/.env`, never printed: test it as a boolean (auto mode refuses a command that could print it); a child process gets it through the environment, never as an argument, which an `execFileSync` error prints (#67); `node --env-file=src/.env` hands it to a probe (#957). The tests create and drop their own databases; never touch the server's other databases.
 - A probe database is named `pgcast_test_${process.pid}_<agent>_<tag>`, in lowercase (an unquoted `CREATE DATABASE` folds case, #698), by its own script: any `npm test` drops a `pgcast_test_*` whose pid is gone, and two agents with one name share rows. One long-lived process creates, uses and drops it, with `client.on('error')` (another suite's `WITH (FORCE)` ends it), its output to a file: a `| head` kills it before its `finally` (#519, #560, #598, #632).
 - Scratch files go in the folder the brief names, never in `test/` or the checkout.
 
@@ -31,7 +31,7 @@ Explore, plan, code, commit.
 - A stop point (`AGENTS.md` § Stop points) that the orchestrator has not settled: **stop** and report it.
 - No new dependency, even a dev one, without the user's agreement.
 - A choice that nothing writes down: skill `decision-philosophy`; it goes under **Decided alone** in the PR.
-- Docs: `CHANGELOG.md`, the npm package's (a docs-site change goes in `website/README.md`, #870), the docs touched and, for an Rn finding, its line in `docs/CHARACTERISATION-REPORT.md` ("**fixed**, PR #n"); nothing else.
+- Docs: `CHANGELOG.md`, the npm package's (a docs-site change goes in `website/README.md`, #870), the docs touched and, for an Rn finding, its line in `docs/CHARACTERISATION-REPORT.md` ("**fixed**, PR #n", committed once the PR is open, never a placeholder, #982); nothing else. A test renamed or removed: `git grep -F` its old name in the report's **Test that pins it** cells, which `check:agents` does not read (#981).
 
 ## Verify
 
@@ -46,7 +46,7 @@ Explore, plan, code, commit.
 - Layer of a stack, only if the orchestrator asks (skill `pr-shape` § Stacking): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
 - Small, atomic commits (skill `pr-shape` § Commits), staged by path, never `git commit -am` with two changes in progress (#709); two changes in one file go apart by `git apply --cached --unidiff-zero` of one hunk of `git diff -U0` (at the default context, two changes within six lines share a hunk), as `git add -p` is interactive here and a pushed mixed commit cannot be amended (#874, #886); each ends with the requested `Co-Authored-By` line.
 - Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`). To retry, run `git push` alone again, then compare `git rev-parse HEAD` with `git ls-remote origin <branch>`: a loop or a pipe hides the exit code, and in a worktree the sandbox refuses compound `git` commands.
-- Another revision is read with `git show "<ref>:<path>"` or a detached worktree; never `git checkout <ref>`, `git stash` or `git checkout -- <file>` in your checkout, which move `HEAD` or drop uncommitted edits.
+- Another revision is read with `git show "<ref>:<path>"` or a detached worktree, and so is a probe that needs a changed `src/`, from the start: auto mode refuses a temporary edit of the checkout (#969); never `git checkout <ref>`, `git stash` or `git checkout -- <file>` in your checkout, which move `HEAD` or drop uncommitted edits.
 
 ## The PR
 
@@ -64,7 +64,7 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 
 - `AGENTS.md` § Local environment (npm 10 and `npm install`); the lib's `tsc` uses the dummy schema `src/typings/zapatos/schema.ts`, the tests the fixture's generated schema (skill `type-tests`).
 - French pages hold U+00A0 (`website/README.md` § Typography): a scripted find-and-replace matches it, normalises first or anchors on the line's start; a conflict keeps its own text, never retyped (checked by byte); `docs:translated` runs once the page is checked, never chained after the edit, and again in each commit that changes the English page, whose hash its mark follows (#262, #484, #575, #632, #667, #741).
-- `docs:build` takes about three minutes, over the shell's 120 s default: run it in the background, its exit code appended to its log and read there (a background task reports its last command's exit, so `cmd; echo exit $?` reported 0 for a failed build, #901), or with a 300 s timeout. Stop a background process by its PID: auto mode refuses a compound command that starts with `pkill` (#854, #865).
+- `docs:build` takes three to six minutes, over the shell's 120 s default: run it in the background, its exit code appended to its log and read there (a background task reports its last command's exit, so `cmd; echo exit $?` reported 0 for a failed build, #901), or with a 600 s timeout. Stop a background process by its PID: auto mode refuses a compound command that starts with `pkill` (#854, #865).
 - The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier), `'==='`, a heredoc (`<<'EOF'`, or its backticks run) and a glob (`--include='*.ts'`, or "no matches found" zeroes a count); `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`, and BSD `sed` no `\|` (`sed -E`): check that a scripted edit changed its file (#516, #521, #680).
 
 ## Hand-over

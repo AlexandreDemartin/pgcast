@@ -149,7 +149,7 @@ Ask for a film by its title with `selectOne()`, then `.run()` it on the pool:
 
 </CastPanel>
 
-The title went to Postgres as a parameter, `("title" = $1)`<!-- probe: examples/first-query.ts -->, never pasted into the SQL. The row comes back as JSON (`to_jsonb`<!-- probe: examples/first-query.ts -->), so its type is `films.JSONSelectable`, and `undefined` if no film has that title. TypeScript won't let you forget it:
+The title went to Postgres as a parameter, `("title" = $1)`<!-- probe: examples/first-query.ts -->, never pasted into the SQL. The row comes back as JSON (`to_json`<!-- probe: examples/first-query.ts -->), so its type is `films.JSONSelectable`, and `undefined` if no film has that title. TypeScript won't let you forget it:
 
 ```ts twoslash
 // @errors: 18048
@@ -184,7 +184,7 @@ Run it, and after `1974` it prints:
 
 ```txt
 {
-  text: 'SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("title" = $1) LIMIT $2',
+  text: 'SELECT to_json("films".*) AS result FROM "films" WHERE ("title" = $1) LIMIT $2',
   values: [ 'The Salt Orchard', 1 ]
 }
 ```
@@ -199,7 +199,7 @@ Run it, and after `1974` it prints:
 
 </CastPanel>
 
-Each column name shows up twice in `jsonb_build_object($1::text, "title", …)`<!-- probe: examples/first-query-columns.ts -->: as a value, `$1`, the key of the JSON object, and quoted, `"title"`, the column it reads.
+Each column name shows up twice in `json_build_object($1::text, "title", …)`<!-- probe: examples/first-query-columns.ts -->: as a value, `$1`, the key of the JSON object, and quoted, `"title"`, the column it reads.
 
 The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Print them:
 
@@ -288,8 +288,8 @@ const row: s.films.Insertable = {
 };
 ```
 
-::: tip Default in 7.0
-An omitted key or an undefined cell uses the column default. With `undefinedMeansMissing: false`, an omitted key still uses the default, but an undefined cell binds `undefined`, which `pg` sends as SQL `NULL`. Omitting the only key throws `nothing to insert`. Give `null` to store SQL `NULL` in a nullable column ([Write values](/insert#undefined-values)).
+::: tip From 7.0
+An omitted key or an undefined cell uses the column default. Through 7.x, with `undefinedMeansMissing: false`, an omitted key still used the default, but an undefined cell bound `undefined`, which `pg` sent as SQL `NULL`; 8.0 removes the option. Omitting the only key throws `nothing to insert`. Give `null` to store SQL `NULL` in a nullable column ([Write values](/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

@@ -991,13 +991,13 @@ describe('without parameters (simple protocol)', () => {
         "mixedEscaped key": "3 rows",
         "mixedEscaped table": "0A000",
         "nul alias": "08P01",
-        "nul key": "08P01",
+        "nul key": undefined,
         "nul table": "08P01",
         "prequoted alias": "3 rows",
         "prequoted key": "3 rows",
         "prequoted table": "42P01",
         "prequotedCloses alias": "3 rows",
-        "prequotedCloses key": "3 rows",
+        "prequotedCloses key": undefined,
         "prequotedCloses table": "42P01",
         "prequotedEmpty alias": "3 rows",
         "prequotedEmpty key": "3 rows",
@@ -1153,12 +1153,12 @@ describe('without parameters (simple protocol)', () => {
     `);
   });
 
-  it('a pre-quoted alias that closes its quotes stays one alias, in FROM and to_jsonb() alike', async () => {
-    // 6.6.1, and master before this fix: written as is in `to_jsonb(<alias>.*)` and `FROM "users" AS <alias>`
+  it('a pre-quoted alias that closes its quotes stays one alias, in FROM and to_json() alike', async () => {
+    // 6.6.1, and master before this fix: written as is in `to_json(<alias>.*)` and `FROM "users" AS <alias>`
     const alias = `"u"; ${update}; --"`;
     const q = db.select('users', all, { alias, order: { by: 'id', direction: 'ASC' } } as any);
     const { text, values } = q.compile();
-    expect(text).toContain(`to_jsonb("""u""; ${update}; --""".*)`);
+    expect(text).toContain(`to_json("""u""; ${update}; --""".*)`);
     expect(text).toContain(`FROM "users" AS """u""; ${update}; --"""`);
     expect(values).toEqual([]);
     expect((await q.run(t.client)).map(u => u.id)).toEqual([1, 2, 3]);
@@ -1185,7 +1185,7 @@ describe('without parameters (simple protocol)', () => {
       [{ order: { by: 'id', direction: 'ASC', get nulls() { return nulls(); } } }, ' ORDER BY "id" ASC NULLS FIRST'],
     ] as const) {
       const q = db.select('users', all, options as any);
-      expect(q.compile()).toEqual({ text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
+      expect(q.compile()).toEqual({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
       expect((await q.run(t.client)).map(u => u.id).sort()).toEqual([1, 2, 3]);
       expect(await adaName()).toBe('Ada');
     }
@@ -1736,5 +1736,103 @@ describe('exists() and isInSelect()', () => {
     expect(q.compile().values).toEqual([`x'; ${update}; --`]);
     expect(await q.run(t.client)).toEqual([]);
     expect(await adaName()).toBe('Ada');
+  });
+});
+
+describe('an extras or lateral key, and an alias, beside every column', () => {
+  // compiled text: test/unit/injection.test.ts; with no parameter, so through the simple protocol, which would run a
+  // second statement; the key must come back as given, as the one key it is
+  const
+    shortUpdate = `UPDATE users SET display_name='i'`,
+    payloads = {
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b', backslash: 'a\\b',
+      dot: 'a.b', newline: 'a\nb', escaped: 'a""b', film: 'année 🎬', dollarQuote: '$$a$$',
+      // under 63 bytes, which a key may not pass
+      closes: `x" FROM "users"; ${shortUpdate}; --`, closesParen: `x") AS "row_users"; ${shortUpdate};--`, longest: 'k'.repeat(63),
+    },
+    keyBack = (build: (key: string) => db.SQLFragment<any[], any>) => async (key: string) => {
+      const q = build(key);
+      expect(q.compile().values, key).toEqual([]);
+      const rows = await q.run(t.client);
+      return rows.length === 1 && Object.keys(rows[0]).includes(key) ? rows[0][key] : rows;
+    };
+
+  afterEach(resetConfig);
+
+  it('an extras key and a lateral key come back as given, and nothing else runs', async () => {
+    const
+      extras = keyBack(key => db.selectRows('users', sql`"id" = 1`, { extras: { [key]: sql`'v'` } } as any)),
+      lateral = keyBack(key => db.selectRows('users', sql`"id" = 1`, { lateral: { [key]: db.count('accounts', { owner_id: db.parent('id') }) } } as any)),
+      outcomes: Record<string, unknown> = {};
+    for (const [name, key] of Object.entries(payloads)) outcomes[name] = [await extras(key), await lateral(key), await adaName()];
+    expect(outcomes).toEqual(Object.fromEntries(Object.keys(payloads).map(name => [name, ['v', 2, 'Ada']])));
+  });
+
+  it('an alias stays one alias in "row_<alias>", and nothing else runs', async () => {
+    const rows = (q: db.SQLFragment<any[]>) => ({ run: async (client: pg.ClientBase) => `${(await q.run(client)).length} rows` });
+    // a dotted alias is split on `.` in `FROM "users" AS "a"."b"`, 42601
+    expect(await identifierOutcomes(payloads, input => ({
+      alias: rows(db.select('users', all, { alias: input, extras: { e: sql`1` } } as any)),
+    }))).toMatchInlineSnapshot(`
+      {
+        "backslash alias": "3 rows",
+        "closes alias": "3 rows",
+        "closesParen alias": "3 rows",
+        "comment alias": "3 rows",
+        "dashes alias": "3 rows",
+        "dollar alias": "3 rows",
+        "dollarQuote alias": "3 rows",
+        "dot alias": "42601",
+        "dquote alias": "3 rows",
+        "escaped alias": "3 rows",
+        "film alias": "3 rows",
+        "longest alias": "3 rows",
+        "newline alias": "3 rows",
+        "semicolon alias": "3 rows",
+        "squote alias": "3 rows",
+      }
+    `);
+  });
+});
+
+describe('an extras key in a write\'s RETURNING beside every column', () => {
+  // compiled text: test/unit/injection.test.ts; every value a fragment, so with no parameter, through the simple
+  // protocol, which would run a second statement; the key must come back as given, as the one key it is
+  const
+    shortUpdate = `UPDATE users SET display_name='i'`,
+    payloads = {
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b', backslash: 'a\\b',
+      dot: 'a.b', newline: 'a\nb', escaped: 'a""b', film: 'année 🎬', dollarQuote: '$$a$$', action: '$action',
+      // under 63 bytes, which a key may not pass
+      closes: `x" FROM "orgs"; ${shortUpdate}; --`, closesParen: `x")"r")a; ${shortUpdate};--`, longest: 'k'.repeat(63),
+    },
+    org = { country: sql`'DE'`, code: sql`'k'`, name: sql`'K'` },
+    // each write, savepointed, so that each sees the fixture's rows
+    writes = {
+      insert: (extras: object) => db.insert('orgs', org as any, { extras } as any),
+      upsert: (extras: object) => db.upsert('orgs', { ...org, country: sql`'FR'`, code: sql`'acme'` } as any, ['country', 'code'], { extras } as any),
+      update: (extras: object) => db.update('orgs', { name: sql`'N'` } as any, sql`"code" = 'acme'`, { extras } as any),
+      deletes: (extras: object) => db.deletes('memberships', sql`"user_id" = 2`, { extras } as any),
+    };
+
+  afterEach(resetConfig);
+
+  it('comes back as given in each write, and nothing else runs', async () => {
+    const outcomes: Record<string, unknown[]> = {};
+    for (const [name, key] of Object.entries(payloads)) {
+      outcomes[name] = [];
+      for (const write of Object.values(writes)) {
+        const q = write({ [key]: sql`'v'` });
+        expect(q.compile().values, key).toEqual([]);
+        await t.client.query('SAVEPOINT write');
+        const result = await q.run(t.client), row = Array.isArray(result) ? result[0] : result;
+        await t.client.query('ROLLBACK TO SAVEPOINT write');
+        // upsert()'s own $action is written last, and wins
+        outcomes[name].push(Object.keys(row).includes(key) ? row[key] : row);
+      }
+      outcomes[name].push(await adaName());
+    }
+    expect(outcomes).toEqual(Object.fromEntries(Object.keys(payloads).map(name =>
+      [name, name === 'action' ? ['v', 'UPDATE', 'v', 'v', 'Ada'] : ['v', 'v', 'v', 'v', 'Ada']])));
   });
 });

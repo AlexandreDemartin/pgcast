@@ -22,7 +22,7 @@ The types the generated schema gives values that JSON or `pg` hand back as strin
 - In a `Selectable`, `int8[]` gives `Int8String[]`. A raw [enum array](/generator#generate.enumArraysTypedAsText) is text by default.
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
-- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder, except in raw rows for a [direct domain over an enum array](/switching#domain-and-parser-types). There, `enumArraysTypedAsText: false` alone restores the placeholder. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
+- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). Through 7.x, [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) used the placeholder; 8.0 removes it. In raw rows, for a [direct domain over an enum array](/switching#domain-and-parser-types), `enumArraysTypedAsText: false` restores the placeholder. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
 - An `interval` gives a [`PostgresInterval`](#PostgresInterval) in `Selectable`, a `string` in JSON and `string | PostgresInterval` in a write. With [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects), all five interfaces use `string`.
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.
@@ -42,7 +42,7 @@ type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-The type that the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) writes for a column of a domain, in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`, and in `Selectable` too for a domain over a domain or an array of a domain: `InContext`, its base type's type there, while the placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, as with `domainsTypedByContext: false`.
+The type that the generator writes for a column of a domain [typed by context](/generator#generate.domainsTypedByContext), in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`, and in `Selectable` too for a domain over a domain or an array of a domain: `InContext`, its base type's type there, while the placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, in every context.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` is `number`: a placeholder left as generated.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` is `number | db.Int8String`: an edited placeholder keeps its type, in every context.
@@ -56,7 +56,7 @@ type WhereableValue<T> =
   T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>
 ```
 
-From 7.2.0. The value a `Whereable` takes for a column of type `T`, which the generator's [`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases) writes in place of this union: `db.WhereableValue<number>` for `films.release_year`.
+From 7.2.0. The value a `Whereable` takes for a column of type `T`. From 8.0.0, the generator writes it in place of this union ([`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases)): `db.WhereableValue<number>` for `films.release_year`.
 
 ## `InsertableValue` {#InsertableValue}
 
@@ -64,7 +64,7 @@ From 7.2.0. The value a `Whereable` takes for a column of type `T`, which the ge
 type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>
 ```
 
-From 7.2.0. The value an `Insertable` takes for a column of type `T`, written by `valuesTypedAsAliases` too. `Extra` is `null | DefaultType` for a nullable column, `DefaultType` for one with a default: `db.InsertableValue<string, null | db.DefaultType>` for `films.tagline`.
+From 7.2.0. The value an `Insertable` takes for a column of type `T`, which the generator writes too. `Extra` is `null | DefaultType` for a nullable column, `DefaultType` for one with a default: `db.InsertableValue<string, null | db.DefaultType>` for `films.tagline`.
 
 ## `UpdatableValue` {#UpdatableValue}
 
@@ -141,7 +141,7 @@ A `numeric` as `pg` returns it, a string that keeps its digits: `'1.10'`.
 db.enableCustomJSONParsingForLargeNumbers(pg: typeof import('pg')): void
 ```
 
-Makes `pg` parse `json` and `jsonb` values with [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), which gives a number as a string when a `number` would change it. Each shortcut except the aggregates returns `jsonb`, so it applies to their results.
+Makes `pg` parse `json` and `jsonb` values with [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), which gives a number as a string when a `number` would change it. Each shortcut except the aggregates returns `json`, so it applies to their results.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -158,7 +158,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | a `numeric` past `Number.MAX_VALUE` | `Infinity` | its digits, as a string |
 
-- Direct [`count()`](/aggregates#count), `sum()` and `avg()` convert non-null values with `Number()`. Direct `min()` and `max()` use the pg value by default and `Number()` with runtime `aggregatesTypedByColumn: false`. Under a lateral key the outer JSON parser applies, so enabling it preserves large numbers there.
+- Direct [`count()`](/aggregates#count), `sum()` and `avg()` convert non-null values with `Number()`. Direct `min()` and `max()` use the pg value, where `aggregatesTypedByColumn: false` applied `Number()` through 7.x. Under a lateral key the outer JSON parser applies, so enabling it preserves large numbers there.
 - It sets the type parsers of the `pg` module you give, so every pool and client of that module, from then on, pgcast's queries or not.
 - It does not change the types: the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) does.
 - An `int8` or `numeric` column outside JSON is a string already, by `pg`'s own parser.
@@ -217,7 +217,7 @@ const word = bytes.toString();  // 'Larkspur'
 
 ## Dates and times {#dates-and-times}
 
-A date or time in a `JSONSelectable` is the string `to_jsonb()` writes, ISO 8601. A `timestamptz` carries the session's `TimeZone` offset: `'2030-03-01T19:30:00+00:00'` in `UTC`, `'2030-03-02T01:00:00+05:30'` in `Asia/Kolkata`.
+A date or time in a `JSONSelectable` is the string `to_json()` writes, ISO 8601. A `timestamptz` carries the session's `TimeZone` offset: `'2030-03-01T19:30:00+00:00'` in `UTC`, `'2030-03-02T01:00:00+05:30'` in `Asia/Kolkata`.
 
 <CastPanel example="toDate">
 

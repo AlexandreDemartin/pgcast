@@ -1,5 +1,5 @@
 ---
-english: 4284bfc44cbd
+english: 825d21078e66
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -266,9 +266,7 @@ Pour trouver chaque appel :
 
 En 6.x, quand une exécution se termine sans avertissement ou que vous avez vérifié chaque appel signalé, activez les options une seule fois, avant la première requête :
 
-```ts twoslash
-import * as db from 'zapatos/db';
-// ---cut---
+```ts
 declare module 'zapatos/db' {
   interface ConfigTypes { aggregatesTypedByColumn: true }
 }
@@ -280,6 +278,211 @@ db.setConfig({
 ```
 
 En 6.x, lancez `npx zapatos` pour repérer les options du générateur qui modifieraient le schéma généré. Le générateur transmet ses notes de migration via `warningListener`.
+
+## Passer de pgcast 7.x à la 8.0 {#from-8-0}
+
+La 8.0.0 n’est pas encore publiée : cette section recense ses changements au fur et à mesure. D’ici sa sortie, la 7.x est la version à installer ([migration vers la 7.0](#from-7-0)). Une fois la 8.0.0 publiée, conservez l’alias du paquet et choisissez la commande qui correspond à vos imports.
+
+::: code-group
+
+```sh [zapatos/db]
+npm install zapatos@npm:@pgcast/pgcast@^8
+```
+
+```sh [pgcast/db]
+npm install pgcast@npm:@pgcast/pgcast@^8
+```
+
+:::
+
+Chaque option ci-dessous a quitté `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable, du JavaScript, `pgcastconfig.json`, `zapatosconfig.json` ou l’argument JSON de la CLI, une option d’exécution fait lever une erreur à `setConfig()`, et une option du générateur fait rejeter la promesse de `generate()` et de `check()`, et arrêter la CLI, avant la première requête et sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`, que la configuration écarte alors. Un programme ou une configuration qui n’a jamais donné l’option ne voit aucun changement, sauf si son entrée commence par **Tout programme voit ce changement** : la 8.0 change alors la valeur par défaut de la 7.x.
+
+### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
+
+La 8.0 fait toujours ce que faisait `undefinedMeansMissing: true`, la valeur par défaut de la 7.x : une valeur `undefined` dans `insert()`, `update()` et `upsert()` est une clé absente, `DEFAULT` dans `insert()` et omise dans `update()` et `upsert()` ([Une valeur `undefined`](/fr/insert#undefined-values)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->. Une fois l’option retirée, une cellule `undefined` vaut `DEFAULT` dans `insert()`, et non `NULL`, et `update()` laisse sa colonne telle quelle ; un `update()` à qui il ne reste aucune colonne lève "nothing to update…"<!-- message -->.
+- **Trouver les appels** : `grep -rn undefinedMeansMissing`. Une valeur qui n’est `undefined` qu’à l’exécution échappe à `grep` : en 7.x, retirez d’abord l’option et lancez vos tests.
+- **Avant → après** : là où `undefined` voulait dire « effacer », donnez `null`. `db.update('films', { tagline: form.tagline }, { id: 1002 })`<!-- tsc: const form = { tagline: undefined as string | undefined }; … --> devient `db.update('films', { tagline: form.tagline ?? null }, { id: 1002 })`<!-- tsc: const form = { tagline: undefined as string | undefined }; … -->.
+
+### `upsertRequiresSameKeys` {#from-8-0-upsertRequiresSameKeys}
+
+La 8.0 fait toujours ce que faisait `upsertRequiresSameKeys: true`, la valeur par défaut de la 7.x : un upsert de plusieurs lignes dont la mise à jour implicite inclut une colonne absente d’une ligne lève une erreur à l’appel, sauf si la cible du conflit nomme cette colonne, si `updateValues` lui donne une valeur définie ou si `updateColumns` dit quelles colonnes mettre à jour ([Lignes aux clés différentes](/fr/insert#upsert-different-keys)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `upsertRequiresSameKeys was removed in 8.0, which always does what upsertRequiresSameKeys: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-upsertRequiresSameKeys`<!-- message -->. Une fois l’option retirée, un tel lot lève "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->, là où la 7.x avec `false` mettait la cellule absente à `DEFAULT` par-dessus la valeur stockée.
+- **Trouver les appels** : `grep -rn upsertRequiresSameKeys`. Chaque lot aux clés différentes lève une erreur à l’appel, donc vos tests le trouvent.
+- **Avant → après** : `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])`<!-- tsc -->, avec `false`, devient soit chaque ligne avec chaque clé et la valeur voulue, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'])`<!-- tsc -->, soit un [`updateColumns`](/fr/insert#upsert-options) qui ne nomme que les clés que toutes les lignes donnent, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'], { updateColumns: ['votes'] })`<!-- tsc -->. Une clé absente d’une ligne met toujours la valeur stockée de cette ligne à `DEFAULT`, sans erreur, comme le faisait `false`.
+
+### `transactionRequiresCommit` {#from-8-0-transactionRequiresCommit}
+
+La 8.0 fait toujours ce que faisait `transactionRequiresCommit: true`, la valeur par défaut de la 7.x : quand le callback de [`transaction()`](/fr/transaction#transaction) intercepte l’erreur d’une requête et se termine, Postgres répond au `COMMIT` par `ROLLBACK`, rien n’est enregistré, et la promesse est rejetée sans retry ([Laisser passer l’erreur](/fr/retries#let-the-error-through)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `transactionRequiresCommit was removed in 8.0, which always does what transactionRequiresCommit: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresCommit`<!-- message -->. Une fois l’option retirée, une telle transaction est rejetée avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->, là où la 7.x avec `false` se résolvait avec la valeur renvoyée par le callback.
+- **Trouver les appels** : `grep -rn transactionRequiresCommit`, puis chaque `catch` autour d’une requête dans un callback de `transaction()`. Chaque `catch` qui intercepte une erreur fait rejeter la promesse, donc vos tests le trouvent dès qu’ils y passent.
+- **Avant → après** : avec `false`, la promesse se résolvait, et ni la réservation ni la note n’étaient enregistrées :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+await db.serializable(pool, async txnClient => {
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(txnClient);
+  try {
+    await db.insert('ratings', { film_id: 1002, stars: 5 }).run(txnClient);
+  } catch { }
+});
+```
+
+Exécutez la requête qui peut échouer dans un [`savepoint()`](/fr/transaction#savepoint), et laissez passer les erreurs 40001 et 40P01, que `transaction()` réessaie. La réservation est enregistrée, avec ou sans la note :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+await db.serializable(pool, async txnClient => {
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(txnClient);
+  await db.savepoint(txnClient, spClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(spClient))
+    .catch((err: unknown) => {
+      if (db.isDatabaseError(err, 'TransactionRollback_SerializationFailure', 'TransactionRollback_DeadlockDetected')) throw err;
+    });
+});
+```
+
+### `transactionRequiresIdleClient` {#from-8-0-transactionRequiresIdleClient}
+
+La 8.0 fait toujours ce que faisait `transactionRequiresIdleClient: true`, la valeur par défaut de la 7.x : avec un client sur lequel vous avez envoyé `BEGIN`, la promesse de [`transaction()`](/fr/transaction#transaction) est rejetée avant l’envoi de son `START TRANSACTION`, et votre transaction reste ouverte pour votre `COMMIT` ou votre `ROLLBACK` ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). pg signale le bloc à partir de pg 8.21 ; avec les versions antérieures, `transaction()` s’exécute comme dans Zapatos 6.6.1.
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `transactionRequiresIdleClient was removed in 8.0, which always does what transactionRequiresIdleClient: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresIdleClient`<!-- message -->. Une fois l’option retirée, un tel appel est rejeté avec "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->, là où la 7.x avec `false` commitait votre transaction, ou l’annulait.
+- **Trouver les appels** : `grep -rn transactionRequiresIdleClient`, puis `grep -rn "'BEGIN"` : chaque client sur lequel vous envoyez `BEGIN` avant de le donner à un raccourci de transaction.
+- **Avant → après** : avec `false`, le `COMMIT` de `readCommitted()`, au niveau propre à la session, commitait la réservation et la note, et le `ROLLBACK` de l’appelant ne trouvait plus de transaction :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
+  await db.readCommitted(client, txnClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(txnClient));
+  await client.query('ROLLBACK');
+} finally {
+  client.release();
+}
+```
+
+Dans votre propre bloc, exécutez ce travail dans un [`savepoint()`](/fr/transaction#savepoint), qui s’exécute au niveau de votre bloc : le `ROLLBACK` de l’appelant annule les deux lignes. Ou ouvrez la transaction avec `db.readCommitted(pool, …)` à la place de votre `BEGIN`, pour ses retries :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
+  await db.savepoint(client, spClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(spClient));
+  await client.query('ROLLBACK');
+} finally {
+  client.release();
+}
+```
+
+### `transactionRequiresSatisfyingLevel` {#from-8-0-transactionRequiresSatisfyingLevel}
+
+La 8.0 fait toujours ce que faisait `transactionRequiresSatisfyingLevel: true`, la valeur par défaut de la 7.x : un appel imbriqué qui reçoit le client d’une transaction à un niveau d’isolation qui ne satisfait pas le sien ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)) est rejeté avant son callback, et la transaction extérieure est annulée, sauf si son callback intercepte l’erreur ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `transactionRequiresSatisfyingLevel was removed in 8.0, which always does what transactionRequiresSatisfyingLevel: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresSatisfyingLevel`<!-- message -->. Une fois l’option retirée, un tel appel est rejeté avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel, là où la 7.x avec `false` exécutait son callback au niveau de la transaction extérieure.
+- **Trouver les appels** : `grep -rn transactionRequiresSatisfyingLevel`, puis chaque raccourci de transaction qui reçoit un client plutôt qu’un pool. TypeScript y accepte le client de n’importe quel niveau : c’est l’erreur, qui nomme les deux niveaux, qui permet à vos tests de trouver chacun d’eux.
+- **Avant → après** : avec `false`, `db.readCommitted(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc --> exécutait son `insert()` en `READ COMMITTED`. Ouvrez la transaction extérieure au niveau dont l’appel imbriqué a besoin : `db.serializable(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc -->.
+
+### `aggregatesTypedByColumn` {#from-8-0-aggregatesTypedByColumn}
+
+La 8.0 fait toujours ce que faisait `aggregatesTypedByColumn: true`, la valeur par défaut de la 7.x : [`sum()`](/fr/aggregates#sum), [`avg()`](/fr/aggregates#avg), [`min()`](/fr/aggregates#min) et [`max()`](/fr/aggregates#max) donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit, là où `false` en donnait `Number()` ([Typé par colonne](/fr/aggregates#typed-by-column)). Le SQL et `count()` ne changent pas.
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `aggregatesTypedByColumn was removed in 8.0, which always does what aggregatesTypedByColumn: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-aggregatesTypedByColumn`<!-- message -->. Une fois l’option retirée, un `sum()` sur un ensemble vide donne `null` là où la 7.x avec `false` donnait `0`, un `min()` d’un `timestamptz` un `Date` là où elle donnait des millisecondes, et un `max()` d’un `text` le texte là où elle donnait `NaN`.
+- **Trouver les appels** : `grep -rn aggregatesTypedByColumn`. Puis `tsc` : quoi que contienne un [`ConfigTypes`](#from-8-0-ConfigTypes) resté de la 7.x, les quatre agrégats sont typés par colonne, donc un calcul sur une somme donne TS18047, et une date minimale passée à un `number` TS2322.
+- **Avant → après** : avec `false`, `const total = await db.sum('films', db.all, { columns: ['runtime_minutes'] }).run(pool)`<!-- tsc --> donnait `0` sur un ensemble vide. Pour obtenir le même `number` : `const total = (await db.sum('films', db.all, { columns: ['runtime_minutes'] }).run(pool)) ?? 0`<!-- tsc -->.
+
+### `ConfigTypes` {#from-8-0-ConfigTypes}
+
+La 8.0 supprime l’interface `ConfigTypes` avec `aggregatesTypedByColumn`, la seule clé qu’elle lisait : les agrégats sont typés par colonne, comme une interface `ConfigTypes` vide les typait en 7.x.
+
+- **Ce que vous voyez** : une déclaration `declare module 'zapatos/db' { interface ConfigTypes { … } }` restée de la 7.x compile toujours et ne change aucun type, `aggregatesTypedByColumn: false` compris. Une fois la déclaration retirée, nommer `db.ConfigTypes` donne TS2694.
+- **Trouver les appels** : `grep -rn ConfigTypes`.
+- **Avant → après** : supprimez la déclaration, et le fichier s’il ne contenait rien d’autre. Si elle contenait `false`, lisez d’abord [`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn).
+
+### `shortcutsUseJson` {#from-8-0-shortcutsUseJson}
+
+**Tout programme voit ce changement.**
+
+La 8.0 fait toujours ce que faisait `shortcutsUseJson: true` : [`select()`](/fr/select#json-functions) et ses semblables, et le `RETURNING` des [écritures](/fr/insert#json-functions), construisent leur JSON avec `to_json`, `json_build_object` et `json_agg`, là où la valeur par défaut de la 7.x, `false`, utilisait leurs équivalents `jsonb`. Les valeurs sont les mêmes, et un `lateral` de 20 films sous chacun de 1000 studios prend un tiers du temps ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `shortcutsUseJson was removed in 8.0, which always does what shortcutsUseJson: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-shortcutsUseJson`<!-- message -->. Une fois l’option retirée, un code écrit pour `false` voit :
+  - les clés d’une ligne dans l’ordre de la table, puis `extras`, puis les clés de `lateral` ou `$action`, là où `jsonb` mettait d’abord les clés les plus courtes : `Object.keys()` et `JSON.stringify()` d’une ligne le montrent. Une colonne `json` garde ses clés telles qu’elles sont stockées, et un `-0` de type `float8` reste `-0`.
+  - un résultat imbriqué, ou le `result` d’une écriture lu depuis une CTE, en `json`, si bien que ce qui n’accepte que du `jsonb` échoue ou change dessus : une fonction ou un opérateur `jsonb`, comme `@>` ou `?`, échoue avec 42883, `COALESCE`, `CASE` ou `UNION` à côté d’une valeur `jsonb` avec 42846, et `||` à côté d’un littéral ou d’un paramètre non typé concatène du texte, sans erreur. Son cast, `::jsonb`, rend le résultat de la 7.x. Comme `json` n’a ni égalité ni ordre, tout ce qui le compare ou le trie, par exemple `=`, `IN`, `DISTINCT`, `UNION`, `GROUP BY` ou `ORDER BY`, échoue aussi avec 42883 : comparez ou triez plutôt son cast, `::jsonb`, ou un champ, `->>` ; `->` et `->>` fonctionnent toujours. Un résultat converti en `text` ou stocké dans une colonne `text` garde le texte de `json`, `{"balance" : 20.00}` là où `jsonb` écrivait `{"balance": 20.00}`.
+  - un parseur de type réglé pour `jsonb` (3802) seul, qui ne s’applique plus : réglez-le aussi pour `json` (114), comme le fait [`enableCustomJSONParsingForLargeNumbers()`](/fr/value-types#enableCustomJSONParsingForLargeNumbers).
+  - à côté de toutes les colonnes, chaque clé d’`extras` ou de `lateral` devenue un alias de colonne, et non plus un paramètre. Une clé vide, qui contient un NUL ou qui dépasse 63 octets en UTF-8, lève une erreur à la compilation, donc `.run()` est rejetée avant toute requête : passez `columns`, ou le `returning` d’une écriture, dont les clés restent des paramètres. Un nom seul, dans un fragment `sql` de `order.by` ou de `distinct`, qui égale une telle clé est ambigu, 42702.
+  - à côté de toutes les colonnes, les `extras` d’une écriture exécutés dans une sous-requête sur sa ligne, qui en accepte certains que `RETURNING` refusait : `count(*)` y donne 1, là où la 7.x échouait avec 42803.
+  - avec `columns` ou `returning`, les colonnes, les clés d’`extras` et de `lateral` et `$action` réunis dans un seul `json_build_object()` : au-delà de 50 clés, une erreur est levée à la compilation, là où chaque partie en avait 50 pour elle.
+  - le tableau de `select()`, qui peut atteindre le 1 Go d’une valeur, là où `jsonb_agg` s’arrêtait à 256 Mo (54000).
+  - le texte SQL : `to_json`, `json_agg`, `json_build_object` et `NULL::json` à la place de `to_jsonb`, `jsonb_agg`, `jsonb_build_object` et `NULL::jsonb`. `distinct: true` garde `SELECT DISTINCT to_jsonb(…)`, car `json` n’a pas d’égalité.
+- **Trouver les appels** : `grep -rn shortcutsUseJson` ; `grep -rnE 'jsonb_\w+\('`, `||`, `@>` et `?`, `COALESCE`, `CASE` et `UNION`, et toute comparaison ou tout tri, autour d’un raccourci imbriqué ou d’une écriture dans une CTE ; `grep -rn 'setTypeParser(3802'` ; les fragments `order` et `distinct` à côté d’`extras` ou de `lateral` ; un `groupBy` à côté d’un `lateral` ; et les tests qui comparent le texte SQL ou le `JSON.stringify()` des lignes.
+- **Avant → après** : `` db.sql`SELECT jsonb_array_length((${db.select('films', db.all)}))` ``<!-- tsc -->, que Postgres refuse maintenant (42883), devient `` db.sql`SELECT jsonb_array_length((${db.select('films', db.all)})::jsonb)` ``<!-- tsc -->. À côté de `extras: { title: … }`, `` order: { by: db.sql`${'title'}`, direction: 'ASC' } ``, ambigu (42702), devient `` order: { by: db.sql`${'films'}.${'title'}`, direction: 'ASC' } ``<!-- tsc: db.select('films', db.all, { extras: { title: db.sql`upper(${'title'})` }, … }) -->. À côté de `lateral: { studio: db.selectExactlyOne('studios', …) }`, `` groupBy: db.sql`${'studio_id'}, "lateral_studio".result` ``<!-- tsc: db.select('films', db.all, { columns: ['studio_id'], extras: { films: db.sql`count(*)::int` }, lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, … }) --> échoue (42883), de même qu’un groupement par `"lateral_studio".result::jsonb` (42803) : retournez la requête, avec un `count()` sous chaque studio, `` db.select('studios', db.all, { columns: ['id', 'name'], lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc --> ([Jointures](/fr/lateral#filter-sort-and-group-by-a-lateral)).
+
+### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
+
+La 8.0 fait toujours ce que faisait `typeEnumsAcrossSchemas: true`, la valeur par défaut de la 7.x : un enum d’un autre schéma est cherché dans son propre schéma et écrit par ses labels ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`. Une fois l’option retirée et les types régénérés, une colonne d’un enum d’un autre schéma prend les labels de cet enum : dans l’exemple du générateur, écrire `'director'` dans `prints.keeper` ne compile plus, et plus aucune colonne n’utilise les placeholders `any` comme `PgPrint_format` (leurs fichiers restent).
+- **Trouver les appels** : `grep -rn typeEnumsAcrossSchemas` dans vos fichiers de configuration et vos scripts, puis régénérez les types et lancez `tsc` : chaque écriture d’un label que l’enum de l’autre schéma n’a pas ne compile plus. L’import d’un placeholder qu’aucune colonne n’utilise compile toujours, puisque son fichier reste : `grep -rnE "(zapatos|pgcast)/custom"` les liste.
+- **Avant → après** : retirez `"typeEnumsAcrossSchemas": false` de `pgcastconfig.json`, ou `typeEnumsAcrossSchemas: false` de la configuration passée à `generate()`. Ensuite, `import type { PgPrint_format } from 'zapatos/custom'` devient `import type { prints } from 'zapatos/schema'`, et `PgPrint_format` devient `prints.Selectable['format']`, `('nitrate' | 'safety' | 'digital')`. `db.update('prints', { keeper: 'director' }, { id: 1 })`, qui compilait avec `public.crew_job` et que Postgres refusait, prend un label d’`archive.crew_job` : `db.update('prints', { keeper: 'archivist' }, { id: 1 })`.
+
+### `enumOrder` {#from-8-0-enumOrder}
+
+La 8.0 fait toujours ce que faisait `enumOrder: "declared"`, la valeur par défaut de la 7.x : les labels d’un enum suivent leur ordre de déclaration, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()` ([`enumOrder`](/fr/generator#generate.enumOrder)).
+
+- **Ce que vous voyez** : avec `"alphabetical"`, ou toute valeur autre que `"declared"`, `null` et `undefined`, le générateur lève `enumOrder was removed in 8.0, which always does what enumOrder: "declared" did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-enumOrder`. Une fois l’option retirée et les types régénérés, seul `every.<name>` change, puisqu’une union est le même type dans n’importe quel ordre : `every.crew_job[0]` vaut `'director'`, et non `'cinematographer'`.
+- **Trouver les appels** : `grep -rn enumOrder` dans vos fichiers de configuration et vos scripts, puis `grep -rnE 'every\.\w+\['` pour le code qui lit un label par sa position ; `tsc` trouve un tuple de tous les labels écrit dans l’ordre alphabétique.
+- **Avant → après** : retirez `"enumOrder": "alphabetical"`. Un label lu par sa position, `type Lead = s.every.crew_job[0]`<!-- tsc: import type * as s from 'zapatos/schema'; … -->, `'cinematographer'` en 7.x avec `"alphabetical"`, devient ce label écrit tel quel, `type Lead = 'cinematographer'`<!-- tsc -->. Un tuple de tous les labels, `const jobs: s.every.crew_job = ['cinematographer', 'composer', 'director', 'editor', 'writer']`, prend l’ordre de déclaration, `const jobs: s.every.crew_job = ['director', 'writer', 'editor', 'cinematographer', 'composer']`<!-- tsc: import type * as s from 'zapatos/schema'; … -->.
+
+### `uniqueIndexConstraintsOnly` {#from-8-0-uniqueIndexConstraintsOnly}
+
+La 8.0 fait toujours ce que faisait `uniqueIndexConstraintsOnly: true`, la valeur par défaut de la 7.x : le `UniqueIndex` d’une relation, les noms qu’accepte [`constraint()`](/fr/insert#constraint), ne liste que ses contraintes `UNIQUE` et `PRIMARY KEY` non différables qui s’appuient sur un index valide autre qu’un index d’exclusion ([`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `uniqueIndexConstraintsOnly was removed in 8.0, which always does what uniqueIndexConstraintsOnly: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-uniqueIndexConstraintsOnly`. Une fois l’option retirée et les types régénérés, les autres index uniques quittent `UniqueIndex` : dans l’exemple du générateur, la contrainte différable `festival_entries_slot_key` et l’index seul `festival_entries_live_idx`. Un `constraint()` qui nomme l’un d’eux ne compile plus (TS2345) ; Postgres les refusait déjà tous deux avec `DO UPDATE` (55000, 42704). Le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()` reste vide.
+- **Trouver les appels** : `grep -rn uniqueIndexConstraintsOnly` dans vos fichiers de configuration et vos scripts, puis régénérez les types et lancez `tsc` : chaque `constraint()` qui nomme un nom sorti de la liste ne compile plus. Un objet littéral `Record` typé par une union devenue `never` compile toujours avec l’ancienne clé ([Cibles de conflit nommées en 7.0](#named-conflict-targets)) : `grep -rn UniqueIndex` les liste, et `grep -rn uniqueIndexesNotArbiters` le code qui lit le paramètre de sortie.
+- **Avant → après** : retirez `"uniqueIndexConstraintsOnly": false`. Un type qui lisait tous les index uniques dans `UniqueIndex`, comme `Record<s.festival_entries.UniqueIndex, string>`, les lit dans `Constraint` avec [`constraintNames: true`](/fr/generator#generate.constraintNames) : `Partial<Record<s.festival_entries.Constraint, string>>`, dont les noms comprennent `festival_entries_live_idx`. Un `DO NOTHING` nommé sur une clé `WITHOUT OVERLAPS`, que Postgres 18 accepte et que `UniqueIndex` laisse de côté, devient une requête [`sql`](/fr/sql-template) explicite avec `ON CONFLICT ON CONSTRAINT … DO NOTHING`.
+
+### `domainsTypedByContext` {#from-8-0-domainsTypedByContext}
+
+La 8.0 fait toujours ce que faisait `domainsTypedByContext: true`, la valeur par défaut de la 7.x : un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, est typé selon le contexte, comme son type de base, tant que son placeholder contient ce que le générateur y a écrit ; un domaine sur un domaine, ou un tableau d’un domaine, prend les types du type de base de son domaine le plus intérieur ([`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `domainsTypedByContext was removed in 8.0, which always does what domainsTypedByContext: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-domainsTypedByContext`. Une fois l’option retirée et les types régénérés, dans l’exemple du générateur, `seat_bookings.ticket` est un `number` dans une ligne d’un raccourci avec le parser JSON par défaut, et `insert()` accepte `ticket: 1`, que la 7.x refusait avec `false` (TS2769). `vip_ticket` et `tickets`, `any` en 7.x avec `false`, prennent les types de leur type de base : `insert()` refuse `vip_ticket: 'abc'` (TS2769). Les paramètres de sortie `domainsNotByContext` et `domainsUnderDomains` de `definitionForRelationInSchema()` restent vides.
+- **Trouver les appels** : `grep -rn domainsTypedByContext` dans vos fichiers de configuration et vos scripts, puis régénérez les types et lancez `tsc` : chaque lecture d’une ligne d’un raccourci qui attend la chaîne du placeholder, et chaque écriture que refuse le type de base, ne compile plus. `grep -rnE 'domainsNotByContext|domainsUnderDomains'` liste le code qui lit les paramètres de sortie.
+- **Avant → après** : retirez `"domainsTypedByContext": false`. Pour qu’une colonne garde le type de son placeholder dans les cinq interfaces, comme avec `false`, donnez au placeholder un autre type que celui généré, comme `export type PgTicket_no = number | db.Int8String` ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)), ou `unknown` pour un domaine sur un domaine : un placeholder modifié en `any` compte comme laissé tel que généré.
+
+### `rejectOnQueryError` {#from-8-0-rejectOnQueryError}
+
+La 8.0 fait toujours ce que faisait `rejectOnQueryError: true`, la valeur par défaut de la 7.x : en cas d’échec de connexion ou de requête, la promesse de `generate()`, de `tsForConfig()` ou de `check()` est rejetée avec l’erreur d’origine, avant toute écriture de fichier ([`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError)). La CLI l’affiche comme en 7.x, `*** error <n> ***` et l’erreur sur la sortie standard, et quitte avec le code 1, avec ou sans `--check` ([CLI](/fr/generator#cli)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `rejectOnQueryError was removed in 8.0, which always does what rejectOnQueryError: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-rejectOnQueryError`, et la CLI aussi quand son fichier de configuration ou son argument JSON la contient, alors que la 7.x l’y ignorait. Une fois l’option retirée, une requête qui échoue rejette la promesse, là où la 7.x avec `false` affichait l’erreur et arrêtait le processus. Si l’erreur n’est pas interceptée, Node l’affiche sur la sortie d’erreur et quitte avec le code 1 ; interceptée, votre programme continue. Sans la clé, la CLI affiche l’erreur et quitte comme en 7.x.
+- **Trouver les appels** : `grep -rn rejectOnQueryError` dans vos fichiers de configuration et vos scripts ; chaque `false` lève aussi une erreur dès le démarrage du générateur, avant la première requête.
+- **Avant → après** : `await generate({ …, rejectOnQueryError: false })` devient `await generate({ … }).catch(e => { console.error(e); process.exit(1); })` ; dans un fichier de configuration, retirez `"rejectOnQueryError": false`.
+
+### `valuesTypedAsAliases` {#from-8-0-valuesTypedAsAliases}
+
+**Tout programme voit ce changement.**
+
+La 8.0 fait toujours ce que faisait `valuesTypedAsAliases: true`, un opt-in de la 7.2.0 : la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), là où la 7.x écrivait par défaut son union en entier sur chaque ligne ([`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases)). Les types sont les mêmes : chaque appel qui compilait compile encore, et chaque appel refusé l’est encore. Le SQL des requêtes ne change pas.
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `valuesTypedAsAliases was removed in 8.0, which always does what valuesTypedAsAliases: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-valuesTypedAsAliases`. Sans la clé, la prochaine génération réécrit chaque ligne de valeur de `schema.d.ts`, un fichier plus petit. Le survol d’un éditeur et une erreur nomment l’alias avec TypeScript 5.9, `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`, là où la 7.x listait l’union ; TypeScript 4.1 affiche encore l’union. Compilé avec un `zapatos/db` antérieur à la 7.2.0, après un retour en arrière, le schéma échoue sur chaque ligne de valeur (TS2694), et sous `skipLibCheck` ces valeurs sont `any` : régénérez avec la version que vous installez.
+- **Trouver les appels** : `grep -rn valuesTypedAsAliases` dans vos fichiers de configuration et vos scripts. Pour un outil ou un test qui lit `schema.d.ts` comme du texte, `grep -rnF 'db.Parameter<' zapatos/schema.d.ts` trouve les lignes écrites par la 7.x, aucune une fois le schéma régénéré. Un test qui fige le message d’une erreur TypeScript sur la valeur d’une colonne : le texte attendu nomme désormais l’alias.
+- **Avant → après** : dans `schema.d.ts`, `release_year?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, …>;` devient `release_year?: db.WhereableValue<number>;`. Un type à vous qui écrivait cette union en entier peut la nommer : `db.WhereableValue<number>`. Dans un fichier de configuration, retirez `"valuesTypedAsAliases": false`.
 
 ## Passer de pgcast 6.x à la 7.0 {#from-7-0}
 
@@ -318,11 +521,9 @@ Les six options ci-dessous valent désormais `true` par défaut. Pour conserver 
 
 </CastPanel>
 
-Pour conserver les résultats numériques d’un appel direct à un agrégat pendant la 7.x, indiquez le littéral `false` aux deux endroits. Complétez la déclaration du module que vous importez (`pgcast/db` si vous utilisez ce nom).
+Pendant toute la 7.x, conserver les résultats numériques d’un appel direct à un agrégat demandait le littéral `false` aux deux endroits, dans le module que vous importez (`pgcast/db` si vous utilisez ce nom) ; la 8.0 supprime les deux ([`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn), [`ConfigTypes`](#from-8-0-ConfigTypes)).
 
-```ts twoslash
-import * as db from 'zapatos/db';
-
+```ts
 declare module 'zapatos/db' {
   interface ConfigTypes { aggregatesTypedByColumn: false }
 }
@@ -351,7 +552,7 @@ Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.condi
 
 ### Régénérer et compiler {#regenerate-for-7-0}
 
-Régénérez le schéma dès que vous changez de version du générateur ou d’option de sortie. Lancez `npx pgcast`, puis examinez le diff du schéma généré. Les quatre premiers anciens réglages du tableau restent disponibles sans avertissement en 7.x et disparaissent en 8.0. Les trois derniers sont permanents.
+Régénérez le schéma dès que vous changez de version du générateur ou d’option de sortie. Lancez `npx pgcast`, puis examinez le diff du schéma généré. Les quatre premiers anciens réglages du tableau, et le dernier, restent disponibles sans avertissement en 7.x et disparaissent en 8.0 ; les deux choix de parser restent.
 
 | Valeur par défaut en 7.0 | Ce qui change pour votre code | Ancien réglage |
 |---|---|---|
@@ -361,9 +562,9 @@ Régénérez le schéma dès que vous changez de version du générateur ou d’
 | [`domainsTypedByContext: true`](/fr/generator#generate.domainsTypedByContext) | Avec le placeholder généré et les parseurs par défaut, un domaine sur `bigint` donne une chaîne dans une ligne brute et un nombre dans le JSON d’un raccourci. Il accepte un `bigint` à l’écriture. [Types des domaines](#domain-and-parser-types). | `false` |
 | [`enumArraysTypedAsText: true`](/fr/generator#generate.enumArraysTypedAsText) | Dans une ligne brute, un tableau d’enums est du texte, par exemple `'{writer,editor}'`. Utilisez le tableau du raccourci pour appeler `.map()`, ou choisissez `false` si votre parser renvoie un tableau. | `false` (permanent) |
 | [`intervalsTypedAsObjects: true`](/fr/generator#generate.intervalsTypedAsObjects) | Dans une ligne brute, un intervalle possède la méthode `toPostgres()`. Le JSON d’un raccourci conserve le texte. Choisissez `false` si votre parser renvoie du texte. | `false` (permanent) |
-| [`rejectOnQueryError: true`](/fr/generator#generate.rejectOnQueryError) | Les promesses de `generate()` et de `tsForConfig()` sont rejetées avec l’erreur de connexion ou de requête d’origine. Relancez l’erreur ou définissez `process.exitCode = 1` si le script doit échouer. Une erreur synchrone d’un écouteur rejette aussi la promesse de génération. Gérez les promesses que renvoie l’écouteur. | `false` (arrêt immédiat, réglage permanent) |
+| [`rejectOnQueryError: true`](/fr/generator#generate.rejectOnQueryError) | Les promesses de `generate()` et de `tsForConfig()` sont rejetées avec l’erreur de connexion ou de requête d’origine. Relancez l’erreur ou définissez `process.exitCode = 1` si le script doit échouer. Une erreur synchrone d’un écouteur rejette aussi la promesse de génération. Gérez les promesses que renvoie l’écouteur. | `false` (arrêt immédiat, en 7.x) |
 
-Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de base de données. La fonction compare le contenu du schéma et, si le générateur produit un index des types personnalisés, celui de cet index. Elle vérifie aussi la présence de chaque placeholder. Si la vérification échoue, la promesse se résout avec `false`. Avec `rejectOnQueryError: false`, les trois fonctions arrêtent le processus en cas d’erreur de base de données. Les deux commandes, `pgcast` et `zapatos`, quittent avec le code 1 dans ce cas. Leur option `--check` renvoie aussi le code 1 quand cette vérification renvoie `false`. [Erreurs du générateur](/fr/generator#generate.rejectOnQueryError).
+Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de base de données. La fonction compare le contenu du schéma et, si le générateur produit un index des types personnalisés, celui de cet index. Elle vérifie aussi la présence de chaque placeholder. Si la vérification échoue, la promesse se résout avec `false`. En 7.x, avec `rejectOnQueryError: false`, les trois fonctions arrêtaient le processus en cas d’erreur de base de données ; la 8.0 retire l’option ([`rejectOnQueryError`](#from-8-0-rejectOnQueryError)). Les deux commandes, `pgcast` et `zapatos`, quittent avec le code 1 dans ce cas. Leur option `--check` renvoie aussi le code 1 quand cette vérification renvoie `false`. [Erreurs du générateur](/fr/generator#generate.rejectOnQueryError).
 
 La régénération conserve les placeholders existants dans `custom/`. Générez une seconde copie dans un `outDir` vide, hors de votre projet TypeScript. Comparez ses placeholders aux vôtres et intégrez les changements adaptés à vos parsers. Lancez ensuite `npx tsc` avec le schéma régénéré, puis vos tests.
 
@@ -375,11 +576,11 @@ En 7.0, `prints.keeper` utilise les labels de l’enum de l’autre schéma. Vé
 
 - Lorsque vous générez les types dans un nouveau dossier, les placeholders d’enums d’autres schémas, comme `PgStatus` et `Pg_mood`, sont absents de `zapatos/custom`. Les fichiers existants restent sur disque. Les colonnes concernées sont désormais typées à partir de l’enum de l’autre schéma. Remplacez chaque import par le type de la colonne, par exemple `products.Selectable['status']`, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
 - Si une colonne de type composite d’un autre schéma était typée avec l’enum local du même nom, elle a désormais son propre placeholder. Indiquez-y le type renvoyé par votre parser, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
-- Si vous passez le tableau `columnsTypedByEnumName` à `definitionForRelationInSchema()`, seul le réglage `typeEnumsAcrossSchemas: false` le remplit.
+- Si vous passez le tableau `columnsTypedByEnumName` à `definitionForRelationInSchema()`, seul le réglage `typeEnumsAcrossSchemas: false` le remplit, en 7.x ; la 8.0 le laisse vide.
 
 Pour un domaine sur un enum d’un autre schéma, [comparez le placeholder existant au nouveau](#regenerate-for-7-0) et intégrez les nouveaux labels.
 
-Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements.
+Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements ([`typeEnumsAcrossSchemas`](#from-8-0-typeEnumsAcrossSchemas), [`enumOrder`](#from-8-0-enumOrder)).
 
 ### Cibles de conflit nommées en 7.0 {#named-conflict-targets}
 
@@ -391,7 +592,7 @@ Sur Postgres 18, un upsert qui cible par son nom une clé `WITHOUT OVERLAPS` non
 
 Sur une table partitionnée, le type union suit l’index de la table parente. Il exclut une clé différable de la table parente, même si la clé non différable de la partition permet à l’upsert à cible nommée de fonctionner avec `{ reportAction: 'suppress' }`. Utilisez une requête SQL explicite ou réglez `uniqueIndexConstraintsOnly: false` en 7.x. Avec une clé non différable sur la table parente et une clé différable sur la partition, TypeScript accepte le nom, mais Postgres peut renvoyer l’erreur `55000`.
 
-Ce réglage rétablit le type union de la 6.x sans note de migration. C’est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
+En 7.x, ce réglage rétablissait le type union de la 6.x sans note de migration, et lui seul renseignait le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()` ; la 8.0 le retire et laisse ce paramètre vide ([`uniqueIndexConstraintsOnly`](#from-8-0-uniqueIndexConstraintsOnly)).
 
 ### Domaines, tableaux d’enums et intervalles en 7.0 {#domain-and-parser-types}
 
@@ -401,13 +602,13 @@ Si vous appelez `definitionForRelationInSchema()`, les quatre tableaux facultati
 
 | Paramètre de sortie | Quand il recense une colonne |
 |---|---|
-| `domainsNotByContext` | Avec `domainsTypedByContext: false`, pour un domaine dont le type de base est connu et varie selon le contexte |
-| `domainsUnderDomains` | Avec le même réglage, pour un domaine imbriqué ou un tableau de domaines dont le type de base est connu |
+| `domainsNotByContext` | Avec `domainsTypedByContext: false`, pour un domaine dont le type de base est connu et varie selon le contexte, en 7.x ; vide à partir de la 8.0 |
+| `domainsUnderDomains` | Avec le même réglage, pour un domaine imbriqué ou un tableau de domaines dont le type de base est connu, en 7.x ; vide à partir de la 8.0 |
 | `enumArraysNotAsText` | Si `enumArraysTypedAsText` est omis ou vaut `null`, pour un tableau d’enums reconnu ou un domaine portant directement sur ce tableau |
-| `intervalsAsText` | Si `intervalsTypedAsObjects` est omis ou vaut `null`, pour un intervalle, un tableau d’intervalles ou un domaine portant directement sur l’un des deux. Si la résolution du type de base donne un intervalle ou un tableau d’intervalles, la colonne est aussi recensée quand `domainsTypedByContext` est activé (par défaut en 7.0). |
+| `intervalsAsText` | Si `intervalsTypedAsObjects` est omis ou vaut `null`, pour un intervalle, un tableau d’intervalles ou un domaine portant directement sur l’un des deux. Si la résolution du type de base donne un intervalle ou un tableau d’intervalles, la colonne est aussi recensée quand `domainsTypedByContext` est activé (par défaut en 7.0, et toujours à partir de la 8.0). |
 
 - Avec [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), les raccourcis renvoient un nombre pour un domaine sur `bigint` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez le type `number | db.Int8String` avant d’appeler `.padStart()`.
-- Un domaine imbriqué dont le placeholder vaut `any` prend le type de base du domaine le plus intérieur. Un tableau de domaines sur `bigint` passe de `any` à `number[]` dans le JSON des raccourcis avec le parser par défaut. Si un tableau comporte plusieurs dimensions ou des éléments `null`, vérifiez sa structure avant d’utiliser un élément. Déclarez ces formes de tableau et le type brut `string` dans le placeholder du tableau, ou utilisez `domainsTypedByContext: false` en 7.x. Ce réglage disparaît en 8.0.
+- Un domaine imbriqué dont le placeholder vaut `any` prend le type de base du domaine le plus intérieur. Un tableau de domaines sur `bigint` passe de `any` à `number[]` dans le JSON des raccourcis avec le parser par défaut. Si un tableau comporte plusieurs dimensions ou des éléments `null`, vérifiez sa structure avant d’utiliser un élément. Déclarez ces formes de tableau et le type brut `string` dans le placeholder du tableau, ou utilisez `domainsTypedByContext: false` en 7.x ; la 8.0 retire cette option ([`domainsTypedByContext`](#from-8-0-domainsTypedByContext)).
 - Avec [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), une ligne renvoyée par une requête `sql` contient le texte du tableau. Pour appeler `.map()` ou enregistrer à nouveau les labels, utilisez le tableau renvoyé par un raccourci. Gardez `false` si votre parser `pg` renvoie déjà les labels sous forme de tableau.
 - Avec le réglage par défaut de la 7.0, si `sub` est une sous-requête `isInSelect()` qui sélectionne `c_enum_array`, la comparaison utilise le type brut `string`. TypeScript refuse désormais `{ c_enum_array: sub }` et accepte la comparaison avec une colonne de type texte. Postgres rejette cette dernière comparaison (42883). Réglez `enumArraysTypedAsText` sur `false` ou écrivez une condition `sql` explicite.
 - Avec [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), une ligne renvoyée par une requête `sql` contient un `PostgresInterval`. Lisez ses champs ou enregistrez de nouveau l’objet tel quel. Le JSON des raccourcis conserve le texte. Gardez `false` si votre parser renvoie le texte de l’intervalle. Les deux réglages liés aux parsers restent disponibles au-delà de la 8.0.
@@ -429,7 +630,7 @@ Rétablissez le paquet 6.x et son fichier de verrouillage, réinstallez les dép
 npm install zapatos@6.6.1
 ```
 
-- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn` et `transactionEventListener`, que TypeScript prend pour une faute de frappe de `transactionListener` (2561). Zapatos 6.6.1 n’appelle jamais cet écouteur : alimentez plutôt un log ou une métrique avec les messages de `transactionListener`.
+- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn`, `shortcutsUseJson`, `topLevelSelectAsRows` et `transactionEventListener`, que TypeScript prend pour une faute de frappe de `transactionListener` (2561). Zapatos 6.6.1 n’appelle jamais cet écouteur : alimentez plutôt un log ou une métrique avec les messages de `transactionListener`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
 - Renommez un `pgcastconfig.json` en `zapatosconfig.json` : la CLI de Zapatos 6.6.1 ne lit aucun autre fichier.
 - Retirez [`--check`](/fr/generator#check) de vos scripts. Avant l’argument JSON, la CLI de Zapatos 6.6.1 le lit comme cet argument, et s’arrête avec le code 1 ; après lui, elle l’ignore, écrit les fichiers et se termine avec le code 0 : la vérification passe donc toujours. [`check()`](/fr/generator#check) aussi : le `zapatos/generate` de Zapatos 6.6.1 n’a pas cet export, ce que TypeScript refuse (2305) ; à l’exécution, `require()` donne `undefined` et l’appel lève `TypeError: check is not a function`, et un import de module ES échoue avant que le moindre code ne s’exécute.

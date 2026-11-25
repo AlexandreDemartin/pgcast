@@ -1,5 +1,5 @@
 ---
-english: 35cbcccce19e
+english: 78d9e7bc4c31
 ---
 
 # Écritures
@@ -11,7 +11,7 @@ Ce que partagent toutes les écritures :
 
 - Chacune renvoie un `SQLFragment` : [`.run(pool)`](/fr/sql-template#run) l’envoie, `.compile()` donne son `text` et ses `values` sans rien envoyer.
 - Une valeur est envoyée comme paramètre (`$1`), jamais écrite dans le SQL ; un fragment `sql` est du SQL.
-- Les lignes reviennent via `to_jsonb()`, comme le `JSONSelectable` d’une table : un `timestamptz` est une chaîne ([Le catalogue](/fr/catalog-types)).
+- Les lignes reviennent via `to_json()` ([Le JSON construit](#json-functions)), comme le `JSONSelectable` d’une table : un `timestamptz` est une chaîne ([Le catalogue](/fr/catalog-types)).
 - Une erreur de Postgres rejette `.run()` avec une `DatabaseError` ([`isDatabaseError()`](/fr/transaction#isDatabaseError)). pgcast lève les erreurs ci-dessous pendant qu’il construit la requête, avant tout envoi.
 
 ## `insert()` {#insert}
@@ -58,13 +58,34 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 
 | Option | SQL ajouté | Effet sur le type |
 |---|---|---|
-| aucune | `RETURNING to_jsonb("films".*) AS result`<!-- probe: examples/insert.ts --> | `films.JSONSelectable` |
-| `returning: ['id']` | `jsonb_build_object($5::text, "id")`<!-- probe: examples/insert_returning.ts --> à la place de `to_jsonb("films".*)` | `Pick<films.JSONSelectable, 'id'>` |
-| `extras: { name: 'title', shouted: … }`, comme ci-dessus | `\|\| jsonb_build_object($6::text, "title", $7::text, upper("title"))`<!-- probe: examples/insert_returning.ts --> | ajoute `name`, du type de la colonne, et `shouted`, du `RunResult` du fragment : `string`, d’après `db.sql<s.films.SQL, string>` |
+| aucune | `RETURNING to_json("films".*) AS result`<!-- probe: examples/insert.ts --> | `films.JSONSelectable` |
+| `returning: ['id']` et `extras: { name: 'title', shouted: … }`, comme ci-dessus | `json_build_object($5::text, "id", $6::text, "title", $7::text, upper("title"))`<!-- probe: examples/insert_returning.ts --> à la place de `to_json("films".*)` | `Pick<films.JSONSelectable, 'id'>`, avec `name`, du type de la colonne, et `shouted`, du `RunResult` du fragment : `string`, d’après `db.sql<s.films.SQL, string>` |
 
 - Un tableau `readonly` dans `returning` (`['id'] as const`) donne le même SQL et le même type qu’un tableau modifiable ([`columns`](/fr/select#columns)).
 - Les deux ont besoin de `strictNullChecks` pour leurs types.
 - Des options `null` reviennent à n’en passer aucune. `returning: null` ou `extras: null`, en passant outre le type, lève une erreur à la compilation de la requête, si bien que `.run()` est rejetée avant toute requête, dans `upsert()`, `update()` et `deletes()` aussi : "`` `returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names. ``<!-- message -->". Un `insert()` ou un `upsert()` de `[]` reste sans effet, et une ligne sans clé lève toujours son erreur d’abord, à l’appel. Zapatos 6.6.1 levait une `TypeError` à l’appel.
+
+### Le JSON construit {#json-functions}
+
+À partir de la 8.0.0, le `RETURNING` d’`insert()`, d’`upsert()`, d’`update()` et de `deletes()` est construit avec les fonctions `json`, comme [les lignes de `select()`](/fr/select#json-functions) ; les clés d’une ligne viennent dans l’ordre de la table, puis `extras`, puis `$action`. Pendant toute la 7.x, ces `RETURNING` étaient en `jsonb`, sauf si [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson) était réglé ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
+
+| Option | SQL |
+|---|---|
+| `returning`, avec ou sans `extras` et `$action` | un seul `json_build_object($5::text, "id", $6::text, "title", $7::text, upper("title"))`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { returning: ['id'], extras: { name: 'title', shouted: db.sql`upper(${'title'})` } }) -->, dont les clés sont des paramètres ; dans `upsert()`, `'$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { returning: ['votes'] }) --> en dernier |
+| `extras`, ou le `$action` d’`upsert()`, à côté de toutes les colonnes | `to_json("row_films".*)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } }) --> de la ligne avec ses clés en alias, `upper("title") AS "shouted"`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } }) -->, dans une sous-requête `AS "row_films"`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } }) --> |
+| `reportAction: 'suppress'`, sans `extras` | `RETURNING to_json("ratings".*) AS result`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { reportAction: 'suppress' }) --> |
+
+- À côté de toutes les colonnes, chaque clé d’`extras` est un identifiant, chaque `"` doublé. Une clé vide, avec un NUL ou de plus de 63 octets en UTF-8, que Postgres refuserait ou tronquerait, lève une erreur à la compilation : passez `returning`, dont les clés restent des paramètres.
+- Une clé égale à une colonne, ou `$action` dans les `extras` d’`upsert()`, apparaît deux fois dans le JSON, et la dernière l’emporte, comme `||` la fait l’emporter.
+- Avec `returning`, un seul `json_build_object()` prend 100 arguments : au-delà de 50 clés, colonnes, `extras` et `$action` compris, une erreur est levée à la compilation.
+- À côté de toutes les colonnes, les `extras` s’exécutent dans une sous-requête sur la seule ligne, où Postgres accepte ce que `RETURNING` refuse : `count(*)` et `row_number() OVER ()` donnent 1, un agrégat d’une colonne échoue, et une fonction renvoyant un ensemble échoue sur deux lignes (21000) et donne une ligne `null` sur aucune. Un paramètre non typé, `extras: { u: db.param(5) }`, donne `"5"`, car la sous-requête le type en `text`. Pendant toute la 7.x sans `shortcutsUseJson`, un agrégat, une fonction de fenêtrage, une fonction renvoyant un ensemble ou un paramètre non typé y échouait (42803, 42P20, 0A000, 42P18).
+- Le `result` d’une écriture lu depuis une CTE ou un template `sql` est en `json` : une fonction ou un opérateur `jsonb` appliqué dessus, ou tout ce qui le compare ou le trie, échoue avec 42883, là où son cast, `::jsonb`, ou un champ, `->>`, fonctionne ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
+
+<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) -->
+```sql
+INSERT INTO "ratings" ("film_id", "stars", "votes") VALUES ($1, $2, $3) ON CONFLICT ("film_id", "stars") DO UPDATE SET ("film_id", "stars", "votes") = ROW(EXCLUDED."film_id", EXCLUDED."stars", EXCLUDED."votes") RETURNING (SELECT to_json("row_ratings".*) FROM (SELECT "ratings".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_ratings") AS result
+-- [1000, 5, 1]
+```
 
 ## `upsert()` {#upsert}
 
@@ -102,7 +123,7 @@ Chaque SQL remplace le `DO UPDATE SET …` de l’upsert simple, sur `ratings` (
 | `noNullUpdateColumns: 'tagline'` | `CASE WHEN EXCLUDED."tagline" IS NULL THEN "films"."tagline" ELSE EXCLUDED."tagline" END`<!-- probe: db.upsert('films', { id: 1002, tagline: null }, 'id', { noNullUpdateColumns: 'tagline' }) --> à la place de `EXCLUDED."tagline"` | aucun |
 | `updateValues: { votes: 10 }` | `ROW(EXCLUDED."film_id", EXCLUDED."stars", $3)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateValues: { votes: 10 } }) --> : `$3` à la place de `EXCLUDED."votes"` | aucun |
 | ``updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` }`` | `"ratings"."votes" + 1`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` } }) --> à la place de `EXCLUDED."votes"` | aucun |
-| `reportAction: 'suppress'` | pas de `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | pas d’`UpsertAction` |
+| `reportAction: 'suppress'` | pas de `CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action"`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | pas d’`UpsertAction` |
 
 - `updateColumns` prend une colonne ou un tableau ; `noNullUpdateColumns` une colonne, un tableau, ou `db.all` pour toutes les colonnes. [Batches](/fr/batches#rows-with-different-keys) a un cast panel avec `updateColumns` : une réservation garde son horaire.
 - Un `updateColumns` calculé à l’exécution peut être vide. Sans clé dans `updateValues`, le SQL est alors `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: ['votes'].filter(() => false) }) --> ; par défaut, une clé à `undefined` ne compte pas ([Une valeur `undefined`](#undefined-values)). Une ligne en conflit donne alors `undefined`, alors que le type d’un `ratings.Column[]` annonce la ligne. Testez si le résultat vaut `undefined` ou passez [`doNothing`](#doNothing) pour que le type prenne ce cas en compte.
@@ -142,13 +163,13 @@ Une table partitionnée a besoin de `'suppress'` quand une ligne arrive dans une
 
 ### Lignes aux clés différentes {#upsert-different-keys}
 
-Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+Un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
 - Donnez la clé à chaque ligne pour garder la mise à jour implicite.
 - Une nouvelle ligne peut omettre son `id` serial lors d’un upsert sur `'id'`. Le nom d’une contrainte ne suffit pas à pgcast pour en connaître les colonnes.
 - Une ligne `null` parmi d’autres compte comme une ligne à laquelle il manque toutes les clés.
 
-Avec [`upsertRequiresSameKeys: false`](/fr/runtime-config#Config.upsertRequiresSameKeys), la cellule manquante prend la valeur `DEFAULT`, qui peut écraser la valeur stockée. Par exemple, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` envoie `($4, $5, DEFAULT)`<!-- probe: (db.setConfig({ upsertRequiresSameKeys: false }), db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])) -->, et ramène à 1 le nombre de votes à 4 étoiles déjà enregistré.
+Pendant toute la 7.x, avec [`upsertRequiresSameKeys: false`](/fr/runtime-config#Config.upsertRequiresSameKeys), la cellule manquante prenait la valeur `DEFAULT`, qui pouvait écraser la valeur stockée. Par exemple, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` envoyait `($4, $5, DEFAULT)`, et ramenait à 1 le nombre de votes à 4 étoiles déjà enregistré. La 8.0 supprime l’option ([migration vers la 8.0](/fr/switching#from-8-0-upsertRequiresSameKeys)).
 
 ## `constraint()` {#constraint}
 
@@ -166,7 +187,7 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_pkey'))
 db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_key'));
 ```
 
-Par défaut, `constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la vérification de types de la 6.x. Postgres applique toujours les mêmes règles.
+`constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablissait la vérification de types de la 6.x, sous les mêmes règles de Postgres ; la 8.0 retire cette option.
 
 Postgres cherche la contrainte sur la table cible, même si une autre table a une contrainte du même nom. Si la contrainte est absente, Postgres renvoie 42704. Si aucun index de la contrainte ne peut servir d’arbitre, Postgres renvoie 42809, par exemple pour une contrainte `CHECK` qui porte le même nom qu’un index sans contrainte.
 
@@ -314,11 +335,11 @@ Avec `'CASCADE'`, Postgres vide chaque table qui référence l’une d’elles, 
 
 ## Une valeur `undefined` {#undefined-values}
 
-En 7.0, une valeur `undefined` à l’écriture compte comme une clé absente. Utilisez `null` pour écrire `NULL` dans une colonne qui l’accepte. Ces règles s’appliquent aux valeurs lues à l’appel, à condition qu’elles restent inchangées jusqu’à l’exécution de la requête et que les accesseurs renvoient la même valeur aux lectures suivantes.
+À partir de la 7.0, une valeur `undefined` à l’écriture compte comme une clé absente, et, à partir de la 8.0, sans exception. Utilisez `null` pour écrire `NULL` dans une colonne qui l’accepte. Ces règles s’appliquent aux valeurs lues à l’appel, à condition qu’elles restent inchangées jusqu’à l’exécution de la requête et que les accesseurs renvoient la même valeur aux lectures suivantes.
 
 <div class="stack">
 
-| Dans | Par défaut en 7.0 | Avec `undefinedMeansMissing: false` |
+| Dans | À partir de la 7.0 | Pendant toute la 7.x, avec `undefinedMeansMissing: false` |
 |---|---|---|
 | `insert()` | `DEFAULT` : `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 }) --> | `NULL` |
 | `update()` | omise : `SET ("title") = ROW($1)`<!-- probe: db.update('films', { title: 'x', tagline: undefined }, { id: 1000 }) --> ; sans clé restante, lève "nothing to update…"<!-- message --> | met la colonne à `NULL` et la clé compte comme présente |
@@ -329,7 +350,7 @@ En 7.0, une valeur `undefined` à l’écriture compte comme une clé absente. U
 
 Dans un filtre, `undefined` est toujours passé en paramètre. En cas de conflit, une valeur définie dans `updateValues` est prioritaire. Sinon, la colonne retenue pour la mise à jour prend sa valeur dans `EXCLUDED`. Pour les colonnes protégées par `noNullUpdateColumns`, un `CASE` garde la valeur stockée si la valeur entrante est `NULL`.
 
-Utilisez [`undefinedMeansMissing: false`](/fr/runtime-config#Config.undefinedMeansMissing) pour garder le comportement d’écriture de la 6.x pendant toute la 7.x. Ce choix est indépendant de la vérification des clés d’un upsert.
+Pendant toute la 7.x, [`undefinedMeansMissing: false`](/fr/runtime-config#Config.undefinedMeansMissing) gardait le comportement d’écriture de la 6.x, indépendamment de la vérification des clés d’un upsert. La 8.0 supprime l’option ([migration vers la 8.0](/fr/switching#from-8-0-undefinedMeansMissing)).
 
 ## `ReturningOptionsForTable` {#ReturningOptionsForTable}
 

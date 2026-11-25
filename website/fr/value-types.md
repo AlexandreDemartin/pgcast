@@ -1,5 +1,5 @@
 ---
-english: 67a8c504c405
+english: 62dad7e57439
 ---
 
 # Types de valeurs
@@ -26,7 +26,7 @@ Les types que le schéma généré donne aux valeurs que JSON ou `pg` rendent so
 - Dans un `Selectable`, `int8[]` donne `Int8String[]`. Dans une ligne brute, un [tableau d’enums](/fr/generator#generate.enumArraysTypedAsText) est représenté par du texte par défaut.
 - Avec l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur, `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans un `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - Les raccourcis renvoient des `JSONSelectable`. Un `Selectable` est ce que `pg` renvoie pour un simple `SELECT` de la ligne.
-- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). Avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type vient du placeholder, sauf dans les lignes brutes pour un [domaine portant directement sur un tableau d’enums](/fr/switching#domain-and-parser-types). Dans ce cas, `enumArraysTypedAsText: false` suffit à rétablir le type du placeholder. Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
+- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). En 7.x, avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type venait du placeholder ; la 8.0 retire cette option. Dans les lignes brutes, pour un [domaine portant directement sur un tableau d’enums](/fr/switching#domain-and-parser-types), `enumArraysTypedAsText: false` rétablit le type du placeholder. Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
 - Un `interval` donne un [`PostgresInterval`](#PostgresInterval) dans `Selectable`, une `string` en JSON et `string | PostgresInterval` dans une écriture. Avec [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects), les cinq interfaces utilisent `string`.
 
 Chaque type vérifie la forme d’une chaîne, pas sa valeur : `'2030-13-45'` est un `DateString`.
@@ -46,7 +46,7 @@ type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-L’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur utilise ce type pour les colonnes de type domaine dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable`, ainsi que dans `Selectable` pour un domaine imbriqué ou un tableau de domaines. Tant que le placeholder `Custom` correspond exactement à `Generated`, le type qu’y a écrit le générateur, le résultat est `InContext`, le type de base du domaine dans ce contexte. Sinon, le résultat est `Custom`, comme avec `domainsTypedByContext: false`.
+Le générateur utilise ce type pour les colonnes d’un domaine [typé selon le contexte](/fr/generator#generate.domainsTypedByContext) dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable`, ainsi que dans `Selectable` pour un domaine imbriqué ou un tableau de domaines. Tant que le placeholder `Custom` correspond exactement à `Generated`, le type qu’y a écrit le générateur, le résultat est `InContext`, le type de base du domaine dans ce contexte. Sinon, le résultat est `Custom`, dans tous les contextes.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` est `number` : un placeholder laissé tel que généré.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.
@@ -60,7 +60,7 @@ type WhereableValue<T> =
   T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>
 ```
 
-À partir de la 7.2.0. La valeur que prend un `Whereable` pour une colonne de type `T`, que l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) du générateur écrit à la place de cette union : `db.WhereableValue<number>` pour `films.release_year`.
+À partir de la 7.2.0. La valeur que prend un `Whereable` pour une colonne de type `T`. À partir de la 8.0.0, le générateur l’écrit à la place de cette union ([`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases)) : `db.WhereableValue<number>` pour `films.release_year`.
 
 ## `InsertableValue` {#InsertableValue}
 
@@ -68,7 +68,7 @@ type WhereableValue<T> =
 type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>
 ```
 
-À partir de la 7.2.0. La valeur que prend un `Insertable` pour une colonne de type `T`, écrite aussi par `valuesTypedAsAliases`. `Extra` vaut `null | DefaultType` pour une colonne nullable, `DefaultType` pour une colonne qui a une valeur par défaut : `db.InsertableValue<string, null | db.DefaultType>` pour `films.tagline`.
+À partir de la 7.2.0. La valeur que prend un `Insertable` pour une colonne de type `T`, que le générateur écrit aussi. `Extra` vaut `null | DefaultType` pour une colonne nullable, `DefaultType` pour une colonne qui a une valeur par défaut : `db.InsertableValue<string, null | db.DefaultType>` pour `films.tagline`.
 
 ## `UpdatableValue` {#UpdatableValue}
 
@@ -145,7 +145,7 @@ Un `numeric` tel que `pg` le renvoie, une chaîne qui garde ses chiffres : `'1.
 db.enableCustomJSONParsingForLargeNumbers(pg: typeof import('pg')): void
 ```
 
-Fait parser par `pg` les valeurs `json` et `jsonb` avec [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), qui donne un nombre sous forme de chaîne quand le convertir en `number` le modifierait. Chaque raccourci sauf les agrégats renvoie du `jsonb`, donc elle s’applique à leurs résultats.
+Fait parser par `pg` les valeurs `json` et `jsonb` avec [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), qui donne un nombre sous forme de chaîne quand le convertir en `number` le modifierait. Chaque raccourci sauf les agrégats renvoie du `json`, donc elle s’applique à leurs résultats.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -162,7 +162,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | un `numeric` au-delà de `Number.MAX_VALUE` | `Infinity` | ses chiffres, sous forme de chaîne |
 
-- Appelés directement, [`count()`](/fr/aggregates#count), `sum()` et `avg()` convertissent les valeurs non nulles avec `Number()`. Les appels directs à `min()` et `max()` donnent par défaut la valeur lue par `pg` et la convertissent avec `Number()` si `aggregatesTypedByColumn` vaut `false` à l’exécution. Sous une clé de `lateral`, c’est le parseur JSON de la requête extérieure qui s’applique. Activez le parseur personnalisé pour y préserver les grands nombres.
+- Appelés directement, [`count()`](/fr/aggregates#count), `sum()` et `avg()` convertissent les valeurs non nulles avec `Number()`. Les appels directs à `min()` et `max()` donnent la valeur lue par `pg`, là où `aggregatesTypedByColumn: false` la convertissait avec `Number()` pendant toute la 7.x. Sous une clé de `lateral`, c’est le parseur JSON de la requête extérieure qui s’applique. Activez le parseur personnalisé pour y préserver les grands nombres.
 - Elle règle les parsers de types du module `pg` que vous donnez, donc de chaque pool et chaque client de ce module, à partir de là, requêtes de pgcast ou non.
 - Elle ne change pas les types : c’est l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur qui le fait.
 - Une colonne `int8` ou `numeric` hors JSON est déjà une chaîne, par le parser de `pg` lui-même.
@@ -221,7 +221,7 @@ const word = bytes.toString();  // 'Larkspur'
 
 ## Dates et heures {#dates-and-times}
 
-Une date ou une heure dans un `JSONSelectable` est la chaîne qu’écrit `to_jsonb()`, en ISO 8601. Un `timestamptz` porte le décalage du `TimeZone` de la session : `'2030-03-01T19:30:00+00:00'` en `UTC`, `'2030-03-02T01:00:00+05:30'` en `Asia/Kolkata`.
+Une date ou une heure dans un `JSONSelectable` est la chaîne qu’écrit `to_json()`, en ISO 8601. Un `timestamptz` porte le décalage du `TimeZone` de la session : `'2030-03-01T19:30:00+00:00'` en `UTC`, `'2030-03-02T01:00:00+05:30'` en `Asia/Kolkata`.
 
 <CastPanel example="toDate">
 

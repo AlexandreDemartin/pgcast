@@ -160,31 +160,31 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+      created_at?: db.WhereableValue<(db.TimestampTzString | Date)>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      display_name?: db.WhereableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn>;
+      email?: db.WhereableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn>;
+      home?: db.WhereableValue<c.PgAddress>;
       /**
       * **users.id**
       * - `int4` in database
       * - Generated column
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **users.manager_id**
       *
@@ -193,25 +193,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      manager_id?: db.WhereableValue<number>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn>;
+      mood?: db.WhereableValue<mood>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      settings?: db.WhereableValue<db.JSONValue>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn>;
+      tags?: db.WhereableValue<c.PgTag_list>;
     }
     export interface Insertable {
       /**
@@ -219,25 +219,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
+      created_at?: db.InsertableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name: string | db.Parameter<string> | db.SQLFragment<any>;
+      display_name: db.InsertableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment<any>;
+      email: db.InsertableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment<any>;
+      home?: db.InsertableValue<c.PgAddress, null | db.DefaultType>;
       /**
       * **users.manager_id**
       *
@@ -246,25 +246,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+      manager_id?: db.InsertableValue<number, null | db.DefaultType>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
+      mood?: db.InsertableValue<mood, null | db.DefaultType>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
+      settings?: db.InsertableValue<db.JSONValue, db.DefaultType>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment<any>;
+      tags?: db.InsertableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -272,25 +272,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment>;
+      created_at?: db.UpdatableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      display_name?: db.UpdatableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment>;
+      email?: db.UpdatableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment>;
+      home?: db.UpdatableValue<c.PgAddress, null | db.DefaultType>;
       /**
       * **users.manager_id**
       *
@@ -299,25 +299,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+      manager_id?: db.UpdatableValue<number, null | db.DefaultType>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment>;
+      mood?: db.UpdatableValue<mood, null | db.DefaultType>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment>;
+      settings?: db.UpdatableValue<db.JSONValue, db.DefaultType>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment>;
+      tags?: db.UpdatableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export type UniqueIndex = 'users_email_key' | 'users_pkey';
     export type Column = keyof Selectable;
@@ -612,97 +612,97 @@ declare module 'zapatos/schema' {
         * - `any_case_format` (base type: `citext`) in database
         * - Nullable, no default
         */
-        any_case_format?: c.PgAny_case_format | db.Parameter<c.PgAny_case_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgAny_case_format | db.Parameter<c.PgAny_case_format> | db.SQLFragment | db.ParentColumn>;
+        any_case_format?: db.WhereableValue<c.PgAny_case_format>;
         /**
         * **unions.books.cover**
         * - `cover` (base type: `text`) in database
         * - Nullable, no default
         */
-        cover?: c.PgCover | db.Parameter<c.PgCover> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgCover | db.Parameter<c.PgCover> | db.SQLFragment | db.ParentColumn>;
+        cover?: db.WhereableValue<c.PgCover>;
         /**
         * **unions.books.digital_format**
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format?: db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | db.SQLFragment | db.ParentColumn>;
+        digital_format?: db.WhereableValue<db.DomainInContext<c.PgDigital_format, any, string>>;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
         * - Nullable, default: `'first'::text`
         */
-        edition?: c.PgEdition | db.Parameter<c.PgEdition> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgEdition | db.Parameter<c.PgEdition> | db.SQLFragment | db.ParentColumn>;
+        edition?: db.WhereableValue<c.PgEdition>;
         /**
         * **unions.books.either**
         * - `either` (base type: `text`) in database
         * - Nullable, no default
         */
-        either?: c.PgEither | db.Parameter<c.PgEither> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgEither | db.Parameter<c.PgEither> | db.SQLFragment | db.ParentColumn>;
+        either?: db.WhereableValue<c.PgEither>;
         /**
         * **unions.books.format**
         * - `book_format` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment | db.ParentColumn>;
+        format?: db.WhereableValue<c.PgBook_format>;
         /**
         * **unions.books.formats**
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats?: db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | db.SQLFragment | db.ParentColumn>;
+        formats?: db.WhereableValue<db.DomainInContext<c.Pg_book_format, any, string[]>>;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
         * - Nullable, no default
         */
-        free_text?: c.PgFree_text | db.Parameter<c.PgFree_text> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgFree_text | db.Parameter<c.PgFree_text> | db.SQLFragment | db.ParentColumn>;
+        free_text?: db.WhereableValue<c.PgFree_text>;
         /**
         * **unions.books.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
         /**
         * **unions.books.padded_format**
         * - `padded_format` (base type: `bpchar`) in database
         * - Nullable, no default
         */
-        padded_format?: c.PgPadded_format | db.Parameter<c.PgPadded_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPadded_format | db.Parameter<c.PgPadded_format> | db.SQLFragment | db.ParentColumn>;
+        padded_format?: db.WhereableValue<c.PgPadded_format>;
         /**
         * **unions.books.quirk**
         * - `quirk` (base type: `text`) in database
         * - Nullable, no default
         */
-        quirk?: c.PgQuirk | db.Parameter<c.PgQuirk> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgQuirk | db.Parameter<c.PgQuirk> | db.SQLFragment | db.ParentColumn>;
+        quirk?: db.WhereableValue<c.PgQuirk>;
         /**
         * **unions.books.shelf**
         * - `shelf` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        shelf?: c.PgShelf | db.Parameter<c.PgShelf> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgShelf | db.Parameter<c.PgShelf> | db.SQLFragment | db.ParentColumn>;
+        shelf?: db.WhereableValue<c.PgShelf>;
         /**
         * **unions.books.short_format**
         * - `short_format` (base type: `varchar`) in database
         * - Nullable, no default
         */
-        short_format?: c.PgShort_format | db.Parameter<c.PgShort_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgShort_format | db.Parameter<c.PgShort_format> | db.SQLFragment | db.ParentColumn>;
+        short_format?: db.WhereableValue<c.PgShort_format>;
         /**
         * **unions.books.twice**
         * - `twice` (base type: `text`) in database
         * - Nullable, no default
         */
-        twice?: c.PgTwice | db.Parameter<c.PgTwice> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTwice | db.Parameter<c.PgTwice> | db.SQLFragment | db.ParentColumn>;
+        twice?: db.WhereableValue<c.PgTwice>;
         /**
         * **unions.books.unchecked**
         * - `unchecked` (base type: `text`) in database
         * - Nullable, no default
         */
-        unchecked?: c.PgUnchecked | db.Parameter<c.PgUnchecked> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgUnchecked | db.Parameter<c.PgUnchecked> | db.SQLFragment | db.ParentColumn>;
+        unchecked?: db.WhereableValue<c.PgUnchecked>;
         /**
         * **unions.books.with_null**
         * - `with_null` (base type: `text`) in database
         * - Nullable, no default
         */
-        with_null?: c.PgWith_null | db.Parameter<c.PgWith_null> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgWith_null | db.Parameter<c.PgWith_null> | db.SQLFragment | db.ParentColumn>;
+        with_null?: db.WhereableValue<c.PgWith_null>;
       }
       export interface Insertable {
         /**
@@ -710,97 +710,97 @@ declare module 'zapatos/schema' {
         * - `any_case_format` (base type: `citext`) in database
         * - Nullable, no default
         */
-        any_case_format?: c.PgAny_case_format | db.Parameter<c.PgAny_case_format> | null | db.DefaultType | db.SQLFragment<any>;
+        any_case_format?: db.InsertableValue<c.PgAny_case_format, null | db.DefaultType>;
         /**
         * **unions.books.cover**
         * - `cover` (base type: `text`) in database
         * - Nullable, no default
         */
-        cover?: c.PgCover | db.Parameter<c.PgCover> | null | db.DefaultType | db.SQLFragment<any>;
+        cover?: db.InsertableValue<c.PgCover, null | db.DefaultType>;
         /**
         * **unions.books.digital_format**
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format?: db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | null | db.DefaultType | db.SQLFragment<any>;
+        digital_format?: db.InsertableValue<db.DomainInContext<c.PgDigital_format, any, string>, null | db.DefaultType>;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
         * - Nullable, default: `'first'::text`
         */
-        edition?: c.PgEdition | db.Parameter<c.PgEdition> | null | db.DefaultType | db.SQLFragment<any>;
+        edition?: db.InsertableValue<c.PgEdition, null | db.DefaultType>;
         /**
         * **unions.books.either**
         * - `either` (base type: `text`) in database
         * - Nullable, no default
         */
-        either?: c.PgEither | db.Parameter<c.PgEither> | null | db.DefaultType | db.SQLFragment<any>;
+        either?: db.InsertableValue<c.PgEither, null | db.DefaultType>;
         /**
         * **unions.books.format**
         * - `book_format` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        format: c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment<any>;
+        format: db.InsertableValue<c.PgBook_format>;
         /**
         * **unions.books.formats**
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats?: db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | null | db.DefaultType | db.SQLFragment<any>;
+        formats?: db.InsertableValue<db.DomainInContext<c.Pg_book_format, any, string[]>, null | db.DefaultType>;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
         * - Nullable, no default
         */
-        free_text?: c.PgFree_text | db.Parameter<c.PgFree_text> | null | db.DefaultType | db.SQLFragment<any>;
+        free_text?: db.InsertableValue<c.PgFree_text, null | db.DefaultType>;
         /**
         * **unions.books.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id: number | db.Parameter<number> | db.SQLFragment<any>;
+        id: db.InsertableValue<number>;
         /**
         * **unions.books.padded_format**
         * - `padded_format` (base type: `bpchar`) in database
         * - Nullable, no default
         */
-        padded_format?: c.PgPadded_format | db.Parameter<c.PgPadded_format> | null | db.DefaultType | db.SQLFragment<any>;
+        padded_format?: db.InsertableValue<c.PgPadded_format, null | db.DefaultType>;
         /**
         * **unions.books.quirk**
         * - `quirk` (base type: `text`) in database
         * - Nullable, no default
         */
-        quirk?: c.PgQuirk | db.Parameter<c.PgQuirk> | null | db.DefaultType | db.SQLFragment<any>;
+        quirk?: db.InsertableValue<c.PgQuirk, null | db.DefaultType>;
         /**
         * **unions.books.shelf**
         * - `shelf` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        shelf: c.PgShelf | db.Parameter<c.PgShelf> | db.SQLFragment<any>;
+        shelf: db.InsertableValue<c.PgShelf>;
         /**
         * **unions.books.short_format**
         * - `short_format` (base type: `varchar`) in database
         * - Nullable, no default
         */
-        short_format?: c.PgShort_format | db.Parameter<c.PgShort_format> | null | db.DefaultType | db.SQLFragment<any>;
+        short_format?: db.InsertableValue<c.PgShort_format, null | db.DefaultType>;
         /**
         * **unions.books.twice**
         * - `twice` (base type: `text`) in database
         * - Nullable, no default
         */
-        twice?: c.PgTwice | db.Parameter<c.PgTwice> | null | db.DefaultType | db.SQLFragment<any>;
+        twice?: db.InsertableValue<c.PgTwice, null | db.DefaultType>;
         /**
         * **unions.books.unchecked**
         * - `unchecked` (base type: `text`) in database
         * - Nullable, no default
         */
-        unchecked?: c.PgUnchecked | db.Parameter<c.PgUnchecked> | null | db.DefaultType | db.SQLFragment<any>;
+        unchecked?: db.InsertableValue<c.PgUnchecked, null | db.DefaultType>;
         /**
         * **unions.books.with_null**
         * - `with_null` (base type: `text`) in database
         * - Nullable, no default
         */
-        with_null?: c.PgWith_null | db.Parameter<c.PgWith_null> | null | db.DefaultType | db.SQLFragment<any>;
+        with_null?: db.InsertableValue<c.PgWith_null, null | db.DefaultType>;
       }
       export interface Updatable {
         /**
@@ -808,97 +808,97 @@ declare module 'zapatos/schema' {
         * - `any_case_format` (base type: `citext`) in database
         * - Nullable, no default
         */
-        any_case_format?: c.PgAny_case_format | db.Parameter<c.PgAny_case_format> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgAny_case_format | db.Parameter<c.PgAny_case_format> | null | db.DefaultType | db.SQLFragment>;
+        any_case_format?: db.UpdatableValue<c.PgAny_case_format, null | db.DefaultType>;
         /**
         * **unions.books.cover**
         * - `cover` (base type: `text`) in database
         * - Nullable, no default
         */
-        cover?: c.PgCover | db.Parameter<c.PgCover> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgCover | db.Parameter<c.PgCover> | null | db.DefaultType | db.SQLFragment>;
+        cover?: db.UpdatableValue<c.PgCover, null | db.DefaultType>;
         /**
         * **unions.books.digital_format**
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format?: db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DomainInContext<c.PgDigital_format, any, string> | db.Parameter<db.DomainInContext<c.PgDigital_format, any, string>> | null | db.DefaultType | db.SQLFragment>;
+        digital_format?: db.UpdatableValue<db.DomainInContext<c.PgDigital_format, any, string>, null | db.DefaultType>;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
         * - Nullable, default: `'first'::text`
         */
-        edition?: c.PgEdition | db.Parameter<c.PgEdition> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgEdition | db.Parameter<c.PgEdition> | null | db.DefaultType | db.SQLFragment>;
+        edition?: db.UpdatableValue<c.PgEdition, null | db.DefaultType>;
         /**
         * **unions.books.either**
         * - `either` (base type: `text`) in database
         * - Nullable, no default
         */
-        either?: c.PgEither | db.Parameter<c.PgEither> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgEither | db.Parameter<c.PgEither> | null | db.DefaultType | db.SQLFragment>;
+        either?: db.UpdatableValue<c.PgEither, null | db.DefaultType>;
         /**
         * **unions.books.format**
         * - `book_format` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment | db.SQLFragment<any, c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment>;
+        format?: db.UpdatableValue<c.PgBook_format>;
         /**
         * **unions.books.formats**
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats?: db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DomainInContext<c.Pg_book_format, any, string[]> | db.Parameter<db.DomainInContext<c.Pg_book_format, any, string[]>> | null | db.DefaultType | db.SQLFragment>;
+        formats?: db.UpdatableValue<db.DomainInContext<c.Pg_book_format, any, string[]>, null | db.DefaultType>;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
         * - Nullable, no default
         */
-        free_text?: c.PgFree_text | db.Parameter<c.PgFree_text> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgFree_text | db.Parameter<c.PgFree_text> | null | db.DefaultType | db.SQLFragment>;
+        free_text?: db.UpdatableValue<c.PgFree_text, null | db.DefaultType>;
         /**
         * **unions.books.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+        id?: db.UpdatableValue<number>;
         /**
         * **unions.books.padded_format**
         * - `padded_format` (base type: `bpchar`) in database
         * - Nullable, no default
         */
-        padded_format?: c.PgPadded_format | db.Parameter<c.PgPadded_format> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPadded_format | db.Parameter<c.PgPadded_format> | null | db.DefaultType | db.SQLFragment>;
+        padded_format?: db.UpdatableValue<c.PgPadded_format, null | db.DefaultType>;
         /**
         * **unions.books.quirk**
         * - `quirk` (base type: `text`) in database
         * - Nullable, no default
         */
-        quirk?: c.PgQuirk | db.Parameter<c.PgQuirk> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgQuirk | db.Parameter<c.PgQuirk> | null | db.DefaultType | db.SQLFragment>;
+        quirk?: db.UpdatableValue<c.PgQuirk, null | db.DefaultType>;
         /**
         * **unions.books.shelf**
         * - `shelf` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        shelf?: c.PgShelf | db.Parameter<c.PgShelf> | db.SQLFragment | db.SQLFragment<any, c.PgShelf | db.Parameter<c.PgShelf> | db.SQLFragment>;
+        shelf?: db.UpdatableValue<c.PgShelf>;
         /**
         * **unions.books.short_format**
         * - `short_format` (base type: `varchar`) in database
         * - Nullable, no default
         */
-        short_format?: c.PgShort_format | db.Parameter<c.PgShort_format> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgShort_format | db.Parameter<c.PgShort_format> | null | db.DefaultType | db.SQLFragment>;
+        short_format?: db.UpdatableValue<c.PgShort_format, null | db.DefaultType>;
         /**
         * **unions.books.twice**
         * - `twice` (base type: `text`) in database
         * - Nullable, no default
         */
-        twice?: c.PgTwice | db.Parameter<c.PgTwice> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTwice | db.Parameter<c.PgTwice> | null | db.DefaultType | db.SQLFragment>;
+        twice?: db.UpdatableValue<c.PgTwice, null | db.DefaultType>;
         /**
         * **unions.books.unchecked**
         * - `unchecked` (base type: `text`) in database
         * - Nullable, no default
         */
-        unchecked?: c.PgUnchecked | db.Parameter<c.PgUnchecked> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgUnchecked | db.Parameter<c.PgUnchecked> | null | db.DefaultType | db.SQLFragment>;
+        unchecked?: db.UpdatableValue<c.PgUnchecked, null | db.DefaultType>;
         /**
         * **unions.books.with_null**
         * - `with_null` (base type: `text`) in database
         * - Nullable, no default
         */
-        with_null?: c.PgWith_null | db.Parameter<c.PgWith_null> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgWith_null | db.Parameter<c.PgWith_null> | null | db.DefaultType | db.SQLFragment>;
+        with_null?: db.UpdatableValue<c.PgWith_null, null | db.DefaultType>;
       }
       export type UniqueIndex = 'books_pkey';
       export type Column = keyof Selectable;
@@ -947,13 +947,13 @@ declare module 'zapatos/schema' {
         * - `book_format` (base type: `text`) in database
         * - Nullable, no default
         */
-        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment | db.ParentColumn>;
+        format?: db.WhereableValue<c.PgBook_format>;
         /**
         * **unions.ebooks.id**
         * - `int4` in database
         * - Nullable, no default
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
       }
       export interface Insertable {
         /**
@@ -961,13 +961,13 @@ declare module 'zapatos/schema' {
         * - `book_format` (base type: `text`) in database
         * - Nullable, no default
         */
-        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | null | db.DefaultType | db.SQLFragment<any>;
+        format?: db.InsertableValue<c.PgBook_format, null | db.DefaultType>;
         /**
         * **unions.ebooks.id**
         * - `int4` in database
         * - Nullable, no default
         */
-        id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        id?: db.InsertableValue<number, null | db.DefaultType>;
       }
       export interface Updatable {
         /**
@@ -975,13 +975,13 @@ declare module 'zapatos/schema' {
         * - `book_format` (base type: `text`) in database
         * - Nullable, no default
         */
-        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgBook_format | db.Parameter<c.PgBook_format> | null | db.DefaultType | db.SQLFragment>;
+        format?: db.UpdatableValue<c.PgBook_format, null | db.DefaultType>;
         /**
         * **unions.ebooks.id**
         * - `int4` in database
         * - Nullable, no default
         */
-        id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        id?: db.UpdatableValue<number, null | db.DefaultType>;
       }
       export type UniqueIndex = never;
       export type Column = keyof Selectable;
@@ -1018,7 +1018,7 @@ declare module 'zapatos/schema' {
         * - `book_format` (base type: `text`) in database
         * - Materialized view column
         */
-        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment | db.ParentColumn>;
+        format?: db.WhereableValue<c.PgBook_format>;
       }
       export interface Insertable {
         [key: string]: never;

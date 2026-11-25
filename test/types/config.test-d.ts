@@ -34,10 +34,69 @@ describe('getConfig() and setConfig()', () => {
     expectTypeOf<keyof db.Config>().toEqualTypeOf<
       | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
       | 'queryListener' | 'resultListener' | 'transactionListener'
-      | 'upsertRequiresSameKeys' | 'undefinedMeansMissing' | 'transactionRequiresCommit' | 'transactionRequiresIdleClient'
-      | 'transactionRequiresSatisfyingLevel' | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn'
+      | 'selectExactlyOneChecksForSecondRow' | 'topLevelSelectAsRows'
       | 'transactionEventListener'
     >();
+  });
+
+  test('a key 8.0 removed is no key of Config: set in an object literal, TS2353; in a variable beside a kept key, it compiles', () => {
+    // @ts-expect-error undefinedMeansMissing is no key of Config from 8.0
+    db.setConfig({ undefinedMeansMissing: true });
+    // @ts-expect-error upsertRequiresSameKeys is no key of Config from 8.0
+    db.setConfig({ upsertRequiresSameKeys: true });
+    // @ts-expect-error undefinedMeansMissing is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, undefinedMeansMissing: false });
+    // @ts-expect-error upsertRequiresSameKeys is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, upsertRequiresSameKeys: false });
+    // @ts-expect-error undefinedMeansMissing is no key of the config getConfig() gives
+    db.getConfig().undefinedMeansMissing;
+    // @ts-expect-error upsertRequiresSameKeys is no key of the config getConfig() gives
+    db.getConfig().upsertRequiresSameKeys;
+    // @ts-expect-error transactionRequiresCommit is no key of Config from 8.0
+    db.setConfig({ transactionRequiresCommit: true });
+    // @ts-expect-error transactionRequiresIdleClient is no key of Config from 8.0
+    db.setConfig({ transactionRequiresIdleClient: true });
+    // @ts-expect-error transactionRequiresSatisfyingLevel is no key of Config from 8.0
+    db.setConfig({ transactionRequiresSatisfyingLevel: true });
+    // @ts-expect-error transactionRequiresCommit is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, transactionRequiresCommit: false });
+    // @ts-expect-error transactionRequiresIdleClient is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, transactionRequiresIdleClient: false });
+    // @ts-expect-error transactionRequiresSatisfyingLevel is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, transactionRequiresSatisfyingLevel: false });
+    // @ts-expect-error transactionRequiresCommit is no key of the config getConfig() gives
+    db.getConfig().transactionRequiresCommit;
+    // @ts-expect-error transactionRequiresIdleClient is no key of the config getConfig() gives
+    db.getConfig().transactionRequiresIdleClient;
+    // @ts-expect-error transactionRequiresSatisfyingLevel is no key of the config getConfig() gives
+    db.getConfig().transactionRequiresSatisfyingLevel;
+    // @ts-expect-error aggregatesTypedByColumn is no key of Config from 8.0
+    db.setConfig({ aggregatesTypedByColumn: false });
+    // @ts-expect-error aggregatesTypedByColumn is no key of Config from 8.0, its kept value too
+    db.setConfig({ aggregatesTypedByColumn: true });
+    // @ts-expect-error aggregatesTypedByColumn is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, aggregatesTypedByColumn: false });
+    // @ts-expect-error aggregatesTypedByColumn is no key of the config getConfig() gives
+    db.getConfig().aggregatesTypedByColumn;
+    // @ts-expect-error shortcutsUseJson is no key of Config from 8.0
+    db.setConfig({ shortcutsUseJson: false });
+    // @ts-expect-error shortcutsUseJson is no key of Config from 8.0, its kept value too
+    db.setConfig({ shortcutsUseJson: true });
+    // @ts-expect-error shortcutsUseJson is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, shortcutsUseJson: false });
+    // @ts-expect-error shortcutsUseJson is no key of the config getConfig() gives
+    db.getConfig().shortcutsUseJson;
+    const built = {
+      transactionAttemptsMax: 3, undefinedMeansMissing: false, upsertRequiresSameKeys: false,
+      transactionRequiresCommit: false, transactionRequiresIdleClient: false, transactionRequiresSatisfyingLevel: false,
+      aggregatesTypedByColumn: false, shortcutsUseJson: false,
+    };
+    expectTypeOf(db.setConfig).toBeCallableWith(built);  // hence setConfig()'s refusal at run time
+  });
+
+  test('ConfigTypes is no type of zapatos/db from 8.0: naming it is TS2694', () => {
+    // @ts-expect-error ConfigTypes went with aggregatesTypedByColumn, its only key
+    expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
   });
 });
 

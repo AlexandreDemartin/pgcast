@@ -27,11 +27,11 @@ const
   refusedAll = { name: 'Error', message: allAsWriteFilter };
 
 describe('insert', () => {
-  it('one row: columns in sorted key order, RETURNING to_jsonb', () => {
+  it('one row: columns in sorted key order, RETURNING to_json', () => {
     // characterization: the column order is the sorted key order, not the object's
     expect(db.insert('users', { email: 'e@x.org', display_name: 'E', mood: 'ok' }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) RETURNING to_jsonb("users".*) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) RETURNING to_json("users".*) AS result",
         "values": [
           "E",
           "e@x.org",
@@ -47,7 +47,7 @@ describe('insert', () => {
       { mood: 'ok', email: 'b@x.org', display_name: 'B', manager_id: 1 },
     ]).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, DEFAULT, DEFAULT), ($3, $4, $5, $6) RETURNING to_jsonb("users".*) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, DEFAULT, DEFAULT), ($3, $4, $5, $6) RETURNING to_json("users".*) AS result",
         "values": [
           "A",
           "a@x.org",
@@ -84,14 +84,10 @@ describe('insert', () => {
   it('a column in some row, or an undefined value, is a column', () => {
     // a key in one row is a column for all: DEFAULT elsewhere
     expect(db.insert('users', [{}, { mood: 'ok' }]).compile().text)
-      .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) RETURNING to_jsonb("users".*) AS result');
-    // an undefined value: DEFAULT by default, NULL with the legacy setting
-    db.setConfig({ undefinedMeansMissing: false });
+      .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) RETURNING to_json("users".*) AS result');
+    // an undefined value: DEFAULT
     expect(db.insert('users', { mood: undefined }).compile().text)
-      .toBe('INSERT INTO "users" ("mood") VALUES ($1) RETURNING to_jsonb("users".*) AS result');
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(db.insert('users', { mood: undefined }).compile().text)
-      .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT) RETURNING to_jsonb("users".*) AS result');
+      .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT) RETURNING to_json("users".*) AS result');
   });
 
   it('returning and extras', () => {
@@ -100,7 +96,7 @@ describe('insert', () => {
       extras: { upper: sql`upper(${'display_name'})`, created: 'created_at' },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING jsonb_build_object($3::text, "id", $4::text, "email") || jsonb_build_object($5::text, upper("display_name"), $6::text, "created_at") AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING json_build_object($3::text, "id", $4::text, "email", $5::text, upper("display_name"), $6::text, "created_at") AS result",
         "values": [
           "E",
           "e@x.org",
@@ -114,26 +110,13 @@ describe('insert', () => {
   });
 
   it('values: SQLFragment, Parameter with a cast, Default, undefined', () => {
-    // without undefinedMeansMissing, an undefined value is sent as a parameter (NULL)
-    db.setConfig({ undefinedMeansMissing: false });
+    // an undefined value is DEFAULT, as for a key missing from one of several rows
     const q = () => db.insert('accounts', {
       owner_id: 1, balance: sql`1 + 1`, ratio: param('0.5', 'float8'), lifetime_ops: Default, overdraft_limit: undefined,
     }).compile();
     expect(q()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "accounts" ("balance", "lifetime_ops", "overdraft_limit", "owner_id", "ratio") VALUES (1 + 1, DEFAULT, $1, $2, CAST($3 AS "float8")) RETURNING to_jsonb("accounts".*) AS result",
-        "values": [
-          undefined,
-          1,
-          "0.5",
-        ],
-      }
-    `);
-    // with it, DEFAULT, as for a key missing from one of several rows
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(q()).toMatchInlineSnapshot(`
-      {
-        "text": "INSERT INTO "accounts" ("balance", "lifetime_ops", "overdraft_limit", "owner_id", "ratio") VALUES (1 + 1, DEFAULT, DEFAULT, $1, CAST($2 AS "float8")) RETURNING to_jsonb("accounts".*) AS result",
+        "text": "INSERT INTO "accounts" ("balance", "lifetime_ops", "overdraft_limit", "owner_id", "ratio") VALUES (1 + 1, DEFAULT, DEFAULT, $1, CAST($2 AS "float8")) RETURNING to_json("accounts".*) AS result",
         "values": [
           1,
           "0.5",
@@ -149,7 +132,7 @@ describe('upsert', () => {
   it('one conflict column: every inserted column is updated, $action reported', () => {
     expect(db.upsert('users', ada, 'email').compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -159,13 +142,12 @@ describe('upsert', () => {
   });
 
   it('several conflict columns and several rows', () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
     expect(db.upsert('products', [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
-    ], ['sku', 'variant']).compile()).toMatchInlineSnapshot(`
+    ], ['sku', 'variant'], { updateColumns: ['sku', 'variant', 'price_cents', 'title'] }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant") DO UPDATE SET ("sku", "variant", "price_cents", "title") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant") DO UPDATE SET ("sku", "variant", "price_cents", "title") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", EXCLUDED."title") RETURNING (SELECT to_json("row_products".*) FROM (SELECT "products".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_products") AS result",
         "values": [
           1300,
           "TEE",
@@ -182,7 +164,7 @@ describe('upsert', () => {
   it('constraint(): ON CONFLICT ON CONSTRAINT', () => {
     expect(db.upsert('users', ada, db.constraint('users_email_key')).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ON CONSTRAINT "users_email_key" DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ON CONSTRAINT "users_email_key" DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -194,7 +176,7 @@ describe('upsert', () => {
   it('updateColumns: one column, or a list', () => {
     expect(db.upsert('users', ada, 'email', { updateColumns: 'display_name' }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -204,7 +186,7 @@ describe('upsert', () => {
     expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateColumns: ['display_name', 'mood'] }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", EXCLUDED."mood") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", EXCLUDED."mood") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
           "values": [
             "Ada L.",
             "ada@example.com",
@@ -220,7 +202,7 @@ describe('upsert', () => {
       updateValues: { mood: sql`'happy'`, display_name: sql`${'users'}.${'display_name'} || ${param('!')}` },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood") = ROW("users"."display_name" || $3, 'happy') RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood") = ROW("users"."display_name" || $3, 'happy') RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -333,7 +315,7 @@ describe('upsert', () => {
   it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", $3) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", $3) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -678,7 +660,7 @@ describe('upsert', () => {
     const values = { ...ada, mood: null };
     expect(db.upsert('users', values, 'email', { noNullUpdateColumns: 'mood' }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", CASE WHEN EXCLUDED."mood" IS NULL THEN "users"."mood" ELSE EXCLUDED."mood" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", CASE WHEN EXCLUDED."mood" IS NULL THEN "users"."mood" ELSE EXCLUDED."mood" END) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -689,7 +671,7 @@ describe('upsert', () => {
     expect(db.upsert('users', values, 'email', { noNullUpdateColumns: ['mood', 'display_name'] }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END, CASE WHEN EXCLUDED."mood" IS NULL THEN "users"."mood" ELSE EXCLUDED."mood" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END, CASE WHEN EXCLUDED."mood" IS NULL THEN "users"."mood" ELSE EXCLUDED."mood" END) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
           "values": [
             "Ada L.",
             "ada@example.com",
@@ -699,7 +681,7 @@ describe('upsert', () => {
       `);
     expect(db.upsert('users', values, 'email', { noNullUpdateColumns: all }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(CASE WHEN EXCLUDED."email" IS NULL THEN "users"."email" ELSE EXCLUDED."email" END, CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END, CASE WHEN EXCLUDED."mood" IS NULL THEN "users"."mood" ELSE EXCLUDED."mood" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(CASE WHEN EXCLUDED."email" IS NULL THEN "users"."email" ELSE EXCLUDED."email" END, CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END, CASE WHEN EXCLUDED."mood" IS NULL THEN "users"."mood" ELSE EXCLUDED."mood" END) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -712,7 +694,7 @@ describe('upsert', () => {
   it("reportAction: 'suppress' drops $action", () => {
     expect(db.upsert('users', ada, 'email', { reportAction: 'suppress' }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_json("users".*) AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -725,7 +707,7 @@ describe('upsert', () => {
     expect(db.doNothing).toEqual([]);
     expect(db.upsert('users', ada, 'email', { updateColumns: db.doNothing }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO NOTHING RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO NOTHING RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
@@ -738,7 +720,7 @@ describe('upsert', () => {
     expect(db.upsert('users', ada, 'email', { returning: ['id'], extras: { name: 'display_name' } }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING jsonb_build_object($3::text, "id") || jsonb_build_object($4::text, "display_name") || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING json_build_object($3::text, "id", $4::text, "display_name", '$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "values": [
             "Ada L.",
             "ada@example.com",
@@ -771,21 +753,17 @@ describe('upsert', () => {
   it.each([
     ['one row', () => db.upsert('users', { mood: undefined }, 'email')],
     ['several rows', () => db.upsert('users', [{ mood: undefined }, { mood: undefined }], 'email')],
-  ])('with undefinedMeansMissing, only undefined values: no column, throws, %s (#251)', (_, write) => {
+  ])('only undefined values: no column, throws, %s (#251)', (_, write) => {
     expect(write).toThrow(nothingToInsert);
   });
 
-  it('an undefined value is a column without undefinedMeansMissing, and a key in some row with it', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(db.upsert('users', { mood: undefined }, 'email').compile().text).toContain('INSERT INTO "users" ("mood") VALUES ($1) ON CONFLICT');
-    db.setConfig({ undefinedMeansMissing: true });
+  it('an undefined value is a key in some row', () => {
     expect(db.upsert('users', [{ mood: undefined }, { mood: 'ok' }], 'email', { updateColumns: ['mood'] }).compile().text)
       .toContain('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) ON CONFLICT');
   });
 });
 
-describe('upsertRequiresSameKeys', () => {
-  afterEach(resetConfig);
+describe('upsert of rows with different keys', () => {
   const
     rows = [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
@@ -793,7 +771,7 @@ describe('upsertRequiresSameKeys', () => {
     ],
     sameKeys = [{ ...rows[0], title: 'Tee' }, rows[1]];
 
-  it('with it, rows with different keys throw before any query', () => {
+  it('rows with different keys throw before any query', () => {
     expect(() => db.upsert('products', rows, ['sku', 'variant']))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
     expect(() => db.upsert('products', rows, ['sku', 'variant'], { updateValues: { price_cents: 1 } }))
@@ -806,20 +784,16 @@ describe('upsertRequiresSameKeys', () => {
       .toThrow(new Error('rows have different keys: pass updateColumns, or give every row the same keys'));
   });
 
-  it('with it, the same keys, one row, updateColumns or doNothing compile as without it', () => {
-    const queries = () => [
+  it('the same keys, one row, updateColumns or doNothing compile', () => {
+    const queries = [
       db.upsert('products', sameKeys, ['sku', 'variant']),
       db.upsert('products', rows[0], ['sku', 'variant']),
       db.upsert('products', rows, ['sku', 'variant'], { updateColumns: ['title'] }),
       db.upsert('products', rows, ['sku', 'variant'], { updateColumns: db.doNothing }),
     ].map(q => q.compile());
-    db.setConfig({ upsertRequiresSameKeys: false });
-    const without = queries();
-    db.setConfig({ upsertRequiresSameKeys: true });
-    expect(queries()).toEqual(without);
-    expect(without[2]).toMatchInlineSnapshot(`
+    expect(queries[2]).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant") DO UPDATE SET ("title") = ROW(EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant") DO UPDATE SET ("title") = ROW(EXCLUDED."title") RETURNING (SELECT to_json("row_products".*) FROM (SELECT "products".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_products") AS result",
         "values": [
           1300,
           "TEE",
@@ -842,19 +816,18 @@ const fresh = async () => {
   return { fdb: await import('../../src/db'), emitWarning };
 };
 
-describe('write defaults and legacy settings', () => {
+describe('write defaults', () => {
   afterEach(() => { vi.restoreAllMocks(); });
-  const returning = `RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
+  const returning = `RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result`;
   const ada = { display_name: 'A', email: 'Ada@Example.com' };
 
-  it.each([{}, { undefinedMeansMissing: false }])('keeps explicit null as a parameter with %j', config => {
-    db.setConfig(config);
+  it('keeps explicit null as a parameter', () => {
     expect(db.insert('users', { ...ada, mood: null }).compile()).toEqual({
-      text: 'INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) RETURNING to_jsonb("users".*) AS result',
+      text: 'INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3) RETURNING to_json("users".*) AS result',
       values: ['A', ada.email, null],
     });
     expect(db.update('users', { mood: null }, { id: 1 }).compile()).toEqual({
-      text: 'UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result',
+      text: 'UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING to_json("users".*) AS result',
       values: [null, 1],
     });
     expect(db.upsert('users', { ...ada, mood: null }, 'email').compile()).toEqual({
@@ -869,14 +842,14 @@ describe('write defaults and legacy settings', () => {
 
   it('uses DEFAULT for every undefined insert cell and omits undefined upsert keys', () => {
     expect(db.insert('accounts', { balance: undefined }).compile()).toEqual({
-      text: 'INSERT INTO "accounts" ("balance") VALUES (DEFAULT) RETURNING to_jsonb("accounts".*) AS result', values: [],
+      text: 'INSERT INTO "accounts" ("balance") VALUES (DEFAULT) RETURNING to_json("accounts".*) AS result', values: [],
     });
     expect(db.insert('accounts', { balance: undefined, owner_id: 1 }).compile()).toEqual({
-      text: 'INSERT INTO "accounts" ("balance", "owner_id") VALUES (DEFAULT, $1) RETURNING to_jsonb("accounts".*) AS result', values: [1],
+      text: 'INSERT INTO "accounts" ("balance", "owner_id") VALUES (DEFAULT, $1) RETURNING to_json("accounts".*) AS result', values: [1],
     });
     for (const first of [{ balance: undefined, owner_id: 1 }, { owner_id: 1 }]) {
       expect(db.insert('accounts', [first, { balance: 5, owner_id: 1 }]).compile()).toEqual({
-        text: 'INSERT INTO "accounts" ("balance", "owner_id") VALUES (DEFAULT, $1), ($2, $3) RETURNING to_jsonb("accounts".*) AS result',
+        text: 'INSERT INTO "accounts" ("balance", "owner_id") VALUES (DEFAULT, $1), ($2, $3) RETURNING to_json("accounts".*) AS result',
         values: [1, 5, 1],
       });
     }
@@ -892,7 +865,7 @@ describe('write defaults and legacy settings', () => {
     const cap = { sku: 'CAP', price_cents: 900 };
     const rows = [tee, { ...cap, variant: '', title: 'Cap' }];
     const target: ('sku' | 'variant')[] = ['sku', 'variant'];
-    const end = `RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
+    const end = `RETURNING (SELECT to_json("row_products".*) FROM (SELECT "products".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_products") AS result`;
     const insert = 'INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant")';
     const binds = [1300, 'TEE', 'S', 900, 'CAP', 'Cap', ''];
     expect(db.upsert('products', rows, target, { updateColumns: ['price_cents'] }).compile()).toEqual({
@@ -914,24 +887,12 @@ describe('write defaults and legacy settings', () => {
     }
   });
 
-  it.each([{}, { upsertRequiresSameKeys: false }, { undefinedMeansMissing: false },
-    { undefinedMeansMissing: false, upsertRequiresSameKeys: false }])('handles missing and undefined batch keys independently with %j', async config => {
+  it('handles missing and undefined batch keys alike, and warns of none', async () => {
     const tee = { sku: 'TEE', variant: 'S', price_cents: 1300 };
     for (const first of [tee, { ...tee, title: undefined }]) {
       const { fdb, emitWarning } = await fresh();
-      fdb.setConfig(config);
       const rows = [first, { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' }];
-      const upsert = () => fdb.upsert('products', rows, ['sku', 'variant']);
-      const boundTitle = 'title' in first && config.undefinedMeansMissing === false;
-      if (!boundTitle && config.upsertRequiresSameKeys !== false) {
-        expect(upsert).toThrow('rows have different keys');
-      } else {
-        const cells = boundTitle ? '($1, $2, $3, $4), ($5, $6, $7, $8)' : '($1, $2, DEFAULT, $3), ($4, $5, $6, $7)';
-        expect(upsert().compile()).toEqual({
-          text: `INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ${cells} ON CONFLICT ("sku", "variant") DO UPDATE SET ("sku", "variant", "price_cents", "title") = ROW(EXCLUDED."sku", EXCLUDED."variant", EXCLUDED."price_cents", EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
-          values: boundTitle ? [1300, 'TEE', undefined, 'S', 900, 'CAP', 'Cap', ''] : [1300, 'TEE', 'S', 900, 'CAP', 'Cap', ''],
-        });
-      }
+      expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).toThrow('rows have different keys');
       expect(emitWarning).not.toHaveBeenCalled();
     }
     for (const write of [
@@ -941,7 +902,6 @@ describe('write defaults and legacy settings', () => {
       (f: typeof db) => f.upsert('users', ada, 'email', { updateValues: { settings: undefined } }),
     ]) {
       const { fdb, emitWarning } = await fresh();
-      fdb.setConfig(config);
       write(fdb).compile();
       expect(emitWarning).not.toHaveBeenCalled();
     }
@@ -999,7 +959,7 @@ describe('upsert of rows with different keys: only a missing key still set from 
   });
 });
 
-describe('undefinedMeansMissing', () => {
+describe('an undefined value is a missing key', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('insert of several rows: an undefined cell sends DEFAULT, the columns are the union of the keys', () => {
@@ -1008,7 +968,7 @@ describe('undefinedMeansMissing', () => {
       { email: 'b@x.org', display_name: 'B', manager_id: 1 },
     ]).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, DEFAULT, DEFAULT), ($3, $4, $5, DEFAULT) RETURNING to_jsonb("users".*) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, DEFAULT, DEFAULT), ($3, $4, $5, DEFAULT) RETURNING to_json("users".*) AS result",
         "values": [
           "A",
           "a@x.org",
@@ -1041,7 +1001,7 @@ describe('undefinedMeansMissing', () => {
     expect(db.upsert('users', { email: 'a@x.org', display_name: 'A', mood: undefined }, 'email',
       { updateColumns: ['mood'] }).compile()).toMatchInlineSnapshot(`
         {
-          "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW(EXCLUDED."mood") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW(EXCLUDED."mood") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
           "values": [
             "A",
             "a@x.org",
@@ -1050,7 +1010,7 @@ describe('undefinedMeansMissing', () => {
       `);
   });
 
-  it('without an undefined value, or with one in a Whereable: the same SQL with it as without it', () => {
+  it('without an undefined value, or with one in a Whereable: every key is a column, as before', () => {
     // an undefined key of upsert() updateValues changes since #168: see below
     const queries = () => [
       db.insert('users', { email: 'e@x.org', display_name: 'E' }),
@@ -1059,34 +1019,60 @@ describe('undefinedMeansMissing', () => {
       db.update('users', { mood: 'ok' }, { manager_id: undefined }),
       db.deletes('users', { manager_id: undefined }),
     ].map(q => q.compile());
-    db.setConfig({ undefinedMeansMissing: false });
-    const without = queries();
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(queries()).toEqual(without);
+    expect(queries()).toMatchInlineSnapshot(`
+      [
+        {
+          "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING to_json("users".*) AS result",
+          "values": [
+            "E",
+            "e@x.org",
+          ],
+        },
+        {
+          "text": "INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, $5) RETURNING to_json("users".*) AS result",
+          "values": [
+            "A",
+            "a@x.org",
+            "B",
+            "b@x.org",
+            "ok",
+          ],
+        },
+        {
+          "text": "INSERT INTO "users" ("display_name", "email") VALUES (DEFAULT, DEFAULT), ($1, $2) RETURNING to_json("users".*) AS result",
+          "values": [
+            "A",
+            "a@x.org",
+          ],
+        },
+        {
+          "text": "UPDATE "users" SET ("mood") = ROW($1) WHERE ("manager_id" = $2) RETURNING to_json("users".*) AS result",
+          "values": [
+            "ok",
+            undefined,
+          ],
+        },
+        {
+          "text": "DELETE FROM "users" WHERE ("manager_id" = $1) RETURNING to_json("users".*) AS result",
+          "values": [
+            undefined,
+          ],
+        },
+      ]
+    `);
   });
 });
 
-describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () => {
+describe('an undefined key of upsert() updateValues', () => {
   afterEach(() => { vi.restoreAllMocks(); });
   const
     ada = { display_name: 'E', email: 'e@x.org' },
     upsert = (options: any, values: any = ada) => db.upsert('users', values, 'email', options).compile();
 
-  it('with it, adds no column, so the existing value stays; without it, sets it from EXCLUDED', () => {
-    db.setConfig({ undefinedMeansMissing: false });
+  it('adds no column, so the existing value stays', () => {
     expect(upsert({ updateValues: { settings: undefined } })).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "settings") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "values": [
-          "E",
-          "e@x.org",
-        ],
-      }
-    `);
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(upsert({ updateValues: { settings: undefined } })).toMatchInlineSnapshot(`
-      {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email") = ROW(EXCLUDED."display_name", EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email") = ROW(EXCLUDED."display_name", EXCLUDED."email") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result",
         "values": [
           "E",
           "e@x.org",
@@ -1095,79 +1081,54 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
     `);
   });
 
-  it('with it, a column inserted but left out of updateColumns: the key adds nothing either', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('a column inserted but left out of updateColumns: the key adds nothing either', () => {
     expect(upsert({ updateColumns: 'display_name', updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }).text)
       .toContain('DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name")');
   });
 
-  it('with it, every key undefined: as without updateValues', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('every key undefined: as without updateValues', () => {
     expect(upsert({ updateValues: { display_name: undefined, settings: undefined } })).toEqual(upsert({}));
   });
 
-  it('with it, nothing left to update: DO NOTHING, as doNothing alone', () => {
+  it('nothing left to update: DO NOTHING, as doNothing alone', () => {
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }))
       .toEqual(upsert({ updateColumns: db.doNothing }));
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
       .toContain('ON CONFLICT ("email") DO NOTHING RETURNING');
   });
 
-  it('with it, beside a value, only the value is updated', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('beside a value, only the value is updated', () => {
     expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: 'ok' } }).text)
       .toContain('DO UPDATE SET ("mood") = ROW($3)');
-  });
-
-  it('without it, doNothing and an undefined key: the key is set from EXCLUDED, alone or beside a param()', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
-      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings") = ROW(EXCLUDED."settings") RETURNING');
-    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }))
-      .toMatchObject({ values: ['E', 'e@x.org', 'ok'] });
-    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }).text)
-      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings", "mood") = ROW(EXCLUDED."settings", $3) RETURNING');
   });
 
   // updateValues[c] is read as on master, through getters and prototypes: only the column list loses the undefined key
   class Patch { settings = undefined; get mood() { return db.param('ok'); } }
   const patches = () => [new Patch(), Object.assign(Object.create({ mood: db.param('ok') }), { settings: undefined })];
 
-  it('with it, a class instance with a getter: the getter is still read, only the undefined key goes', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('a class instance with a getter: the getter is still read, only the undefined key goes', () => {
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }))
       .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }).text)
       .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
   });
 
-  it('with it, an Object.create() value: the inherited key is still read, only the undefined key goes', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('an Object.create() value: the inherited key is still read, only the undefined key goes', () => {
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }))
       .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
     expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }).text)
       .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
   });
 
-  it('without it, a class instance or an Object.create() value: the undefined key is set from EXCLUDED, as on master', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    for (const updateValues of patches()) expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues })).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood", "settings") = ROW(EXCLUDED."display_name", $3, EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
-      values: ['E', 'e@x.org', 'ok'],
-    });
-  });
-
-  it('a column inserted or named in updateColumns is still set from EXCLUDED: the same SQL with it as without it', () => {
+  it('a column inserted or named in updateColumns is still set from EXCLUDED', () => {
     const queries = () => [
       upsert({ updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }),
       upsert({ updateColumns: ['settings'], updateValues: { settings: undefined } }),
       upsert({ updateColumns: 'settings', updateValues: { settings: undefined } }),
     ];
-    db.setConfig({ undefinedMeansMissing: false });
-    const without = queries();
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(queries()).toEqual(without);
-    expect(without[1].text).toContain('DO UPDATE SET ("settings") = ROW(EXCLUDED."settings")');
+    expect(queries()[0].text).toContain('DO UPDATE SET ("display_name", "email", "mood") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."mood")');
+    expect(queries()[1].text).toContain('DO UPDATE SET ("settings") = ROW(EXCLUDED."settings")');
+    expect(queries()[2]).toEqual(queries()[1]);
   });
 
   it('an undefined override still exposes a missing key to the implicit update', () => {
@@ -1184,7 +1145,7 @@ describe('update', () => {
   it('one column: SET (...) = ROW(...)', () => {
     expect(db.update('accounts', { balance: 10 }, { id: 1 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "UPDATE "accounts" SET ("balance") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
+        "text": "UPDATE "accounts" SET ("balance") = ROW($1) WHERE ("id" = $2) RETURNING to_json("accounts".*) AS result",
         "values": [
           10,
           1,
@@ -1198,7 +1159,7 @@ describe('update', () => {
       sql`${'id'} < ${param(3)}`, { returning: ['id', 'balance'], extras: { ops: 'lifetime_ops' } }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "UPDATE "accounts" SET ("balance", "lifetime_ops", "ratio") = ROW("balance" + $1, "lifetime_ops" + 1, DEFAULT) WHERE "id" < $2 RETURNING jsonb_build_object($3::text, "id", $4::text, "balance") || jsonb_build_object($5::text, "lifetime_ops") AS result",
+          "text": "UPDATE "accounts" SET ("balance", "lifetime_ops", "ratio") = ROW("balance" + $1, "lifetime_ops" + 1, DEFAULT) WHERE "id" < $2 RETURNING json_build_object($3::text, "id", $4::text, "balance", $5::text, "lifetime_ops") AS result",
           "values": [
             5,
             3,
@@ -1215,7 +1176,7 @@ describe('update', () => {
     // '{"value":3}' (22P02); param(3) sends 3
     expect(db.update('accounts', { balance: { value: 3 } }, { id: 1 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "UPDATE "accounts" SET ("balance") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
+        "text": "UPDATE "accounts" SET ("balance") = ROW($1) WHERE ("id" = $2) RETURNING to_json("accounts".*) AS result",
         "values": [
           {
             "value": 3,
@@ -1233,7 +1194,7 @@ describe('update', () => {
     class Minutes { constructor(public value: number) { } toPostgres() { return String(this.value); } }
     expect(db.update('accounts', { balance: { value: 3 } }, { id: 1 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "UPDATE "accounts" SET ("balance") = ROW(CAST($1 AS "json")) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
+        "text": "UPDATE "accounts" SET ("balance") = ROW(CAST($1 AS "json")) WHERE ("id" = $2) RETURNING to_json("accounts".*) AS result",
         "values": [
           "{"value":3}",
           1,
@@ -1249,19 +1210,7 @@ describe('update', () => {
     // `SET () = ROW()` is invalid SQL, so update() throws while it builds the query
     expect(() => db.update('accounts', {}, { id: 1 }))
       .toThrow('nothing to update: an Updatable needs at least one column');
-    // without undefinedMeansMissing, a key whose value is undefined is still a column (see below)
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(db.update('accounts', { ratio: undefined }, { id: 1 }).compile()).toMatchInlineSnapshot(`
-      {
-        "text": "UPDATE "accounts" SET ("ratio") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
-        "values": [
-          undefined,
-          1,
-        ],
-      }
-    `);
-    // with it, only the kept keys count
-    db.setConfig({ undefinedMeansMissing: true });
+    // a key whose value is undefined is none
     expect(() => db.update('accounts', { ratio: undefined, balance: undefined }, { id: 1 }))
       .toThrow('nothing to update: an Updatable needs at least one column');
   });
@@ -1282,31 +1231,18 @@ describe('update', () => {
   });
 
   it('sql`TRUE`, as the db.all message advises, and {} as the filter: WHERE TRUE, every row', () => {
-    const text = 'UPDATE "accounts" SET ("balance") = ROW($1) WHERE TRUE RETURNING to_jsonb("accounts".*) AS result';
+    const text = 'UPDATE "accounts" SET ("balance") = ROW($1) WHERE TRUE RETURNING to_json("accounts".*) AS result';
     expect({
       fragment: db.update('accounts', { balance: 10 }, sql`TRUE`).compile(),
       empty: db.update('accounts', { balance: 10 }, {}).compile(),
     }).toEqual({ fragment: { text, values: [10] }, empty: { text, values: [10] } });
   });
 
-  it('an undefined value: set to NULL without undefinedMeansMissing, left out with it', () => {
-    // without it, the key is kept and the column set to NULL
-    db.setConfig({ undefinedMeansMissing: false });
+  it('an undefined value: its key is left out', () => {
     const q = () => db.update('users', { mood: 'ok', manager_id: undefined }, { id: 2 }).compile();
     expect(q()).toMatchInlineSnapshot(`
       {
-        "text": "UPDATE "users" SET ("manager_id", "mood") = ROW($1, $2) WHERE ("id" = $3) RETURNING to_jsonb("users".*) AS result",
-        "values": [
-          undefined,
-          "ok",
-          2,
-        ],
-      }
-    `);
-    db.setConfig({ undefinedMeansMissing: true });
-    expect(q()).toMatchInlineSnapshot(`
-      {
-        "text": "UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result",
+        "text": "UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING to_json("users".*) AS result",
         "values": [
           "ok",
           2,
@@ -1320,7 +1256,7 @@ describe('deletes', () => {
   it('a Whereable, a fragment, returning and extras', () => {
     expect(db.deletes('memberships', { user_id: 2 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "DELETE FROM "memberships" WHERE ("user_id" = $1) RETURNING to_jsonb("memberships".*) AS result",
+        "text": "DELETE FROM "memberships" WHERE ("user_id" = $1) RETURNING to_json("memberships".*) AS result",
         "values": [
           2,
         ],
@@ -1329,7 +1265,7 @@ describe('deletes', () => {
     expect(db.deletes('memberships', sql`${'role'} <> ${param('owner')}`, { returning: ['user_id'], extras: { r: 'role' } })
       .compile()).toMatchInlineSnapshot(`
         {
-          "text": "DELETE FROM "memberships" WHERE "role" <> $1 RETURNING jsonb_build_object($2::text, "user_id") || jsonb_build_object($3::text, "role") AS result",
+          "text": "DELETE FROM "memberships" WHERE "role" <> $1 RETURNING json_build_object($2::text, "user_id", $3::text, "role") AS result",
           "values": [
             "owner",
             "user_id",
@@ -1357,8 +1293,8 @@ describe('deletes', () => {
       fragment: db.deletes('memberships', sql`TRUE`).compile(),
       empty: db.deletes('memberships', {}).compile(),
     }).toEqual({
-      fragment: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_jsonb("memberships".*) AS result', values: [] },
-      empty: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_jsonb("memberships".*) AS result', values: [] },
+      fragment: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_json("memberships".*) AS result', values: [] },
+      empty: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_json("memberships".*) AS result', values: [] },
     });
   });
 });
@@ -1427,16 +1363,16 @@ describe('truncate', () => {
 });
 
 describe('select', () => {
-  it('all rows, or a Whereable: rows aggregated with jsonb_agg in a sub-select', () => {
+  it('all rows, or a Whereable: rows aggregated with json_agg in a sub-select', () => {
     expect(db.select('users', all).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users"",
         "values": [],
       }
     `);
     expect(db.select('users', { mood: 'ok' }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("mood" = $1)) AS "sq_users"",
+        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("mood" = $1)) AS "sq_users"",
         "values": [
           "ok",
         ],
@@ -1445,18 +1381,18 @@ describe('select', () => {
   });
 
   it('distinct: true, a column, a list, a fragment, false', () => {
-    expect(db.select('users', all, { distinct: true }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: 'mood' }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("mood") to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: ['mood', 'manager_id'] }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("mood", "manager_id") to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: sql`lower(${'display_name'})` }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON (lower("display_name")) to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
-    expect(db.select('users', all, { distinct: false }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { distinct: true }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { distinct: 'mood' }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("mood") to_json("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { distinct: ['mood', 'manager_id'] }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("mood", "manager_id") to_json("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { distinct: sql`lower(${'display_name'})` }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON (lower("display_name")) to_json("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { distinct: false }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users""`);
   });
 
   it('order: one spec, a list, nulls, a fragment', () => {
-    expect(db.select('users', all, { order: { by: 'id', direction: 'DESC' } }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "id" DESC) AS "sq_users""`);
+    expect(db.select('users', all, { order: { by: 'id', direction: 'DESC' } }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "id" DESC) AS "sq_users""`);
     expect(db.select('users', all, {
       order: [{ by: 'mood', direction: 'ASC', nulls: 'LAST' }, { by: sql`lower(${'display_name'})`, direction: 'DESC', nulls: 'FIRST' }],
-    }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "mood" ASC NULLS LAST, lower("display_name") DESC NULLS FIRST) AS "sq_users""`);
+    }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "mood" ASC NULLS LAST, lower("display_name") DESC NULLS FIRST) AS "sq_users""`);
   });
 
   it('order: a bad direction or nulls throws', () => {
@@ -1469,7 +1405,7 @@ describe('select', () => {
   it('limit, offset, withTies', () => {
     expect(db.select('users', all, { limit: 2, offset: 1 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"",
+        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"",
         "values": [
           2,
           1,
@@ -1479,7 +1415,7 @@ describe('select', () => {
     expect(db.select('users', all, { order: { by: 'mood', direction: 'ASC' }, limit: 1, withTies: true, offset: 0 }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "mood" ASC FETCH FIRST $1 ROWS WITH TIES OFFSET $2) AS "sq_users"",
+          "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "mood" ASC FETCH FIRST $1 ROWS WITH TIES OFFSET $2) AS "sq_users"",
           "values": [
             1,
             0,
@@ -1487,7 +1423,7 @@ describe('select', () => {
         }
       `);
     // characterization: withTies without limit is ignored
-    expect(db.select('users', all, { withTies: true }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users") AS "sq_users""`);
+    expect(db.select('users', all, { withTies: true }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users""`);
   });
 
   it('columns and extras', () => {
@@ -1496,7 +1432,7 @@ describe('select', () => {
       extras: { reports: sql`(SELECT count(*) FROM ${'users'} AS "r" WHERE "r".${'manager_id'} = ${'users'}.${'id'})`, mail: 'email' },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id", $2::text, "display_name") || jsonb_build_object($3::text, (SELECT count(*) FROM "users" AS "r" WHERE "r"."manager_id" = "users"."id"), $4::text, "email") AS result FROM "users") AS "sq_users"",
+        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "display_name", $3::text, (SELECT count(*) FROM "users" AS "r" WHERE "r"."manager_id" = "users"."id"), $4::text, "email") AS result FROM "users") AS "sq_users"",
         "values": [
           "id",
           "display_name",
@@ -1508,23 +1444,23 @@ describe('select', () => {
   });
 
   describe('a shortcut as an extras value, a scalar subquery (#262)', () => {
-    // 6.6.1 wrote it bare, `jsonb_build_object($2::text, SELECT …)`, which Postgres refuses (42601)
+    // 6.6.1 wrote it bare, `json_build_object($2::text, SELECT …)`, which Postgres refuses (42601)
     const
       owner = sql`${'owner_id'} = ${'users'}.${'id'}`,
       ordered = { columns: ['balance'], order: { by: 'balance', direction: 'ASC' } } as const,
       asExtra = (x: db.SQLFragment<any>) => db.selectOne('users', { id: 1 }, { columns: ['id'], extras: { x } }).compile(),
       outer = (inner: string, next: number) =>
-        `SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, (${inner})) AS result FROM "users" WHERE ("id" = $${next}) LIMIT $${next + 1}`;
+        `SELECT json_build_object($1::text, "id", $2::text, (${inner})) AS result FROM "users" WHERE ("id" = $${next}) LIMIT $${next + 1}`;
 
     it.each<[string, () => db.SQLFragment<any>, string, number, unknown[]]>([
       ['select', () => db.select('accounts', owner, ordered),
-        `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC) AS "sq_accounts"`, 4,
+        `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC) AS "sq_accounts"`, 4,
         ['id', 'x', 'balance', 1, 1]],
       ['selectOne', () => db.selectOne('accounts', owner, ordered),
-        `SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5,
+        `SELECT json_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5,
         ['id', 'x', 'balance', 1, 1, 1]],
       ['selectExactlyOne', () => db.selectExactlyOne('accounts', owner, ordered),
-        `SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5,
+        `SELECT json_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5,
         ['id', 'x', 'balance', 1, 1, 1]],
       ['count', () => db.count('accounts', owner),
         `SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id"`, 3, ['id', 'x', 1, 1]],
@@ -1542,7 +1478,7 @@ describe('select', () => {
 
     it('nested in the extras of a shortcut that is itself an extra', () => {
       expect(asExtra(db.selectOne('accounts', owner, { columns: ['id'], extras: { n: db.count('accounts', all) } }))).toEqual({
-        text: outer(`SELECT jsonb_build_object($3::text, "id") || jsonb_build_object($4::text, (SELECT count(*) AS result FROM "accounts")) AS result FROM "accounts" WHERE "owner_id" = "users"."id" LIMIT $5`, 6),
+        text: outer(`SELECT json_build_object($3::text, "id", $4::text, (SELECT count(*) AS result FROM "accounts")) AS result FROM "accounts" WHERE "owner_id" = "users"."id" LIMIT $5`, 6),
         values: ['id', 'x', 'id', 'n', 1, 1, 1],
       });
     });
@@ -1550,7 +1486,7 @@ describe('select', () => {
     it('selectExactlyOne keeps LIMIT 1 there, with selectExactlyOneChecksForSecondRow', () => {
       db.setConfig({ selectExactlyOneChecksForSecondRow: true });
       expect(asExtra(db.selectExactlyOne('accounts', owner, ordered))).toEqual({
-        text: outer(`SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5),
+        text: outer(`SELECT json_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5),
         values: ['id', 'x', 'balance', 1, 1, 1],
       });
     });
@@ -1564,7 +1500,7 @@ describe('select', () => {
 
     it('in the extras of a write', () => {
       expect(db.update('users', { mood: 'ok' }, { id: 1 }, { returning: ['id'], extras: { n: db.count('accounts', owner) } }).compile()).toEqual({
-        text: `UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING jsonb_build_object($3::text, "id") || jsonb_build_object($4::text, (SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id")) AS result`,
+        text: `UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING json_build_object($3::text, "id", $4::text, (SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id")) AS result`,
         values: ['ok', 1, 'id', 'n'],
       });
     });
@@ -1581,7 +1517,7 @@ describe('select', () => {
           bare: sql`${n}`,
         },
       }).compile()).toEqual({
-        text: `SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "email", $3::text, upper("display_name"), $4::text, (SELECT count(*) FROM "accounts" WHERE "owner_id" = "users"."id"), $5::text, (SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id"), $6::text, SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id") AS result FROM "users" WHERE ("id" = $7) LIMIT $8`,
+        text: `SELECT json_build_object($1::text, "id", $2::text, "email", $3::text, upper("display_name"), $4::text, (SELECT count(*) FROM "accounts" WHERE "owner_id" = "users"."id"), $5::text, (SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id"), $6::text, SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id") AS result FROM "users" WHERE ("id" = $7) LIMIT $8`,
         values: ['id', 'mail', 'up', 'sub', 'wrapped', 'bare', 1, 1],
       });
     });
@@ -1592,7 +1528,7 @@ describe('select', () => {
       columns: ['owner_id'], extras: { n: sql`count(*)` }, groupBy: 'owner_id', having: sql`count(*) > ${param(1)}`,
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "owner_id") || jsonb_build_object($2::text, count(*)) AS result FROM "accounts" GROUP BY "owner_id" HAVING count(*) > $3) AS "sq_accounts"",
+        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "owner_id", $2::text, count(*)) AS result FROM "accounts" GROUP BY "owner_id" HAVING count(*) > $3) AS "sq_accounts"",
         "values": [
           "owner_id",
           "n",
@@ -1603,13 +1539,13 @@ describe('select', () => {
     expect(db.select('accounts', all, { groupBy: ['owner_id', 'id'], having: { owner_id: 1 } }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" GROUP BY "owner_id", "id" HAVING ("owner_id" = $1)) AS "sq_accounts"",
+          "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" GROUP BY "owner_id", "id" HAVING ("owner_id" = $1)) AS "sq_accounts"",
           "values": [
             1,
           ],
         }
       `);
-    expect(db.select('accounts', all, { groupBy: sql`${'owner_id'}` }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" GROUP BY "owner_id") AS "sq_accounts""`);
+    expect(db.select('accounts', all, { groupBy: sql`${'owner_id'}` }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" GROUP BY "owner_id") AS "sq_accounts""`);
   });
 
   it('lateral as an object: one LEFT JOIN LATERAL per key, keys sorted', () => {
@@ -1620,11 +1556,8 @@ describe('select', () => {
       },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_accountCount".result, $2::text, "lateral_accounts".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_accountCount" ON true LEFT JOIN LATERAL (SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true) AS "sq_users"",
-        "values": [
-          "accountCount",
-          "accounts",
-        ],
+        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_accountCount".result AS "accountCount", "lateral_accounts".result AS "accounts" FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_accountCount" ON true LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true) AS "row_users") AS "sq_users"",
+        "values": [],
       }
     `);
   });
@@ -1633,7 +1566,7 @@ describe('select', () => {
     expect(db.select('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) }).compile())
       .toMatchInlineSnapshot(`
         {
-          "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true) AS "sq_users"",
+          "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true) AS "sq_users"",
           "values": [],
         }
       `);
@@ -1662,10 +1595,8 @@ describe('select', () => {
       },
     }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("u".*) || jsonb_build_object($1::text, "lateral_reports".result) AS result FROM "users" AS "u" LEFT JOIN LATERAL (SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("r".*) || jsonb_build_object($2::text, "lateral_accounts".result) AS result FROM "users" AS "r" LEFT JOIN LATERAL (SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($3::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "r"."id")) AS "sq_accounts") AS "lateral_accounts" ON true WHERE ("manager_id" = "u"."id")) AS "sq_r") AS "lateral_reports" ON true WHERE ("id" = $4)) AS "sq_u"",
+        "text": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_u".*) AS result FROM (SELECT "u".*, "lateral_reports".result AS "reports" FROM "users" AS "u" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_r".*) AS result FROM (SELECT "r".*, "lateral_accounts".result AS "accounts" FROM "users" AS "r" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "r"."id")) AS "sq_accounts") AS "lateral_accounts" ON true WHERE ("manager_id" = "u"."id")) AS "row_r") AS "sq_r") AS "lateral_reports" ON true WHERE ("id" = $2)) AS "row_u") AS "sq_u"",
         "values": [
-          "reports",
-          "accounts",
           "id",
           1,
         ],
@@ -1674,12 +1605,12 @@ describe('select', () => {
   });
 
   it('lock: one, a list, of, wait', () => {
-    expect(db.select('users', all, { lock: { for: 'UPDATE' } }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE) AS "sq_users""`);
+    expect(db.select('users', all, { lock: { for: 'UPDATE' } }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE) AS "sq_users""`);
     expect(db.select('users', all, { alias: 'u', lock: [
       { for: 'NO KEY UPDATE', of: 'u', wait: 'NOWAIT' },
       { for: 'SHARE', of: ['u'], wait: 'SKIP LOCKED' },
       { for: 'KEY SHARE' },
-    ] }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("u".*) AS result FROM "users" AS "u" FOR NO KEY UPDATE OF "u" NOWAIT FOR SHARE OF "u" SKIP LOCKED FOR KEY SHARE) AS "sq_u""`);
+    ] }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("u".*) AS result FROM "users" AS "u" FOR NO KEY UPDATE OF "u" NOWAIT FOR SHARE OF "u" SKIP LOCKED FOR KEY SHARE) AS "sq_u""`);
   });
 
   /** An `order` or `lock` item whose keys are getters that log each read; `key` answers `first`, then `later`. */
@@ -1695,7 +1626,7 @@ describe('select', () => {
     try { result = db.select('users', all, { [option]: item } as any).compile(); } catch (err) { result = `throws: ${(err as Error).message}`; }
     return { result, log };
   };
-  const ordered = (clause: string) => ({ text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
+  const ordered = (clause: string) => ({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
 
   // a getter may answer anew on each read: each key goes into the SQL, or the message, as its one read was checked;
   // Zapatos 6.6.1 read direction and nulls again for raw(), pgcast 6.6.2 to 6.8.0 for, wait, direction and nulls (#586)
@@ -1723,10 +1654,10 @@ describe('select', () => {
 });
 
 describe('selectOne, selectExactlyOne', () => {
-  it('LIMIT 1 as a parameter, no jsonb_agg', () => {
+  it('LIMIT 1 as a parameter, no json_agg', () => {
     expect(db.selectOne('users', { id: 1 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2",
+        "text": "SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2",
         "values": [
           1,
           1,
@@ -1735,7 +1666,7 @@ describe('selectOne, selectExactlyOne', () => {
     `);
     expect(db.selectExactlyOne('users', { id: 1 }, { columns: ['id'] }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT jsonb_build_object($1::text, "id") AS result FROM "users" WHERE ("id" = $2) LIMIT $3",
+        "text": "SELECT json_build_object($1::text, "id") AS result FROM "users" WHERE ("id" = $2) LIMIT $3",
         "values": [
           "id",
           1,
@@ -1752,11 +1683,11 @@ describe('selectOne, selectExactlyOne', () => {
   it('selectExactlyOneChecksForSecondRow: LIMIT 2 when compiled on its own', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     expect(db.selectExactlyOne('users', { id: 1 }).compile()).toEqual({
-      text: 'SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
+      text: 'SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
       values: [1, 2],
     });
     expect(db.selectExactlyOne('users', { id: 1 }).prepared('one_user').compile()).toEqual({
-      text: 'SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
+      text: 'SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
       values: [1, 2],
       name: 'one_user',
     });
@@ -1769,7 +1700,7 @@ describe('selectOne, selectExactlyOne', () => {
     const q = db.selectExactlyOne('users', { id: 1 });
     q.noop = true;
     expect(q.compile()).toEqual({
-      text: `/* marked no-op: won't hit DB unless forced -> */ SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2`,
+      text: `/* marked no-op: won't hit DB unless forced -> */ SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2`,
       values: [1, 2],
     });
   });
@@ -1778,12 +1709,12 @@ describe('selectOne, selectExactlyOne', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     const manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm' });
     expect(db.select('users', all, { columns: ['id'], lateral: { manager } }).compile()).toEqual({
-      text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_manager".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("m".*) AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $3) AS "lateral_manager" ON true) AS "sq_users"`,
+      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_manager".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_json("m".*) AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $3) AS "lateral_manager" ON true) AS "sq_users"`,
       values: ['id', 'manager', 1],
     });
     expect(db.selectOne('users', all, { lateral: manager }).compile().values).toEqual([1, 1]);
     expect(db.sql`SELECT (${db.selectExactlyOne('users', { id: 1 })})`.compile()).toEqual({
-      text: 'SELECT (SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2)',
+      text: 'SELECT (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2)',
       values: [1, 1],
     });
   });
@@ -1793,7 +1724,7 @@ describe('selectOne, selectExactlyOne', () => {
     const q = db.selectExactlyOne('users', { id: 1 });
     expect(q.compile().values).toEqual([1, 2]);
     expect(q.copy().compile()).toEqual({
-      text: 'SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
+      text: 'SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
       values: [1, 1],
     });
     expect(q.copy({ preparedName: 'one_user' }).compile().values).toEqual([1, 1]);
@@ -1803,9 +1734,9 @@ describe('selectOne, selectExactlyOne', () => {
     // documented, not fixed: FETCH FIRST 1 ROWS WITH TIES, as in Zapatos 6.6.1, wherever LIMIT 1 would be
     const
       byOwner = { columns: ['id'], order: { by: 'owner_id', direction: 'ASC' }, withTies: true } as const,
-      topText = 'SELECT jsonb_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "owner_id" ASC FETCH FIRST $3 ROWS WITH TIES',
+      topText = 'SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "owner_id" ASC FETCH FIRST $3 ROWS WITH TIES',
       inLateral = (account: db.SQLFragment<any>) => db.select('users', all, { columns: ['id'], lateral: { account } }).compile(),
-      lateralText = `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_account".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT jsonb_build_object($3::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "users"."id") ORDER BY "owner_id" ASC FETCH FIRST $4 ROWS WITH TIES) AS "lateral_account" ON true) AS "sq_users"`;
+      lateralText = `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_account".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT json_build_object($3::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "users"."id") ORDER BY "owner_id" ASC FETCH FIRST $4 ROWS WITH TIES) AS "lateral_account" ON true) AS "sq_users"`;
 
     it('selectOne, at top level and in a lateral', () => {
       expect(db.selectOne('accounts', { owner_id: 1 }, byOwner).compile()).toEqual({ text: topText, values: ['id', 1, 1] });
@@ -1829,7 +1760,7 @@ describe('selectOne, selectExactlyOne', () => {
       n = db.count('accounts', { owner_id: parent('id') }),
       manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm', columns: ['display_name'] });
     expect(db.select('users', all, { columns: ['id'], lateral: { n, manager } }).compile()).toEqual({
-      text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_manager".result, $3::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT jsonb_build_object($4::text, "display_name") AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $5) AS "lateral_manager" ON true LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true) AS "sq_users"`,
+      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "id", $2::text, "lateral_manager".result, $3::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT json_build_object($4::text, "display_name") AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $5) AS "lateral_manager" ON true LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true) AS "sq_users"`,
       values: ['id', 'manager', 'n', 'display_name', 1],
     });
     expect(db.selectOne('users', { id: 2 }, { lateral: n }).compile()).toEqual({
@@ -1849,16 +1780,16 @@ describe('selectOne, selectExactlyOne', () => {
 });
 
 describe('selectRows', () => {
-  it('is the query select() wraps in jsonb_agg, as a fragment of its own', () => {
+  it('is the query select() wraps in json_agg, as a fragment of its own', () => {
     expect(db.selectRows('users', all).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT to_jsonb("users".*) AS result FROM "users"",
+        "text": "SELECT to_json("users".*) AS result FROM "users"",
         "values": [],
       }
     `);
     expect(db.selectRows('users', { mood: 'ok' }, { columns: ['id', 'display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 50, offset: 10 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT jsonb_build_object($1::text, "id", $2::text, "display_name") AS result FROM "users" WHERE ("mood" = $3) ORDER BY "display_name" ASC LIMIT $4 OFFSET $5",
+        "text": "SELECT json_build_object($1::text, "id", $2::text, "display_name") AS result FROM "users" WHERE ("mood" = $3) ORDER BY "display_name" ASC LIMIT $4 OFFSET $5",
         "values": [
           "id",
           "display_name",
@@ -1870,7 +1801,7 @@ describe('selectRows', () => {
     `);
     expect(db.selectRows('accounts', { owner_id: 1 }, { lock: { for: 'UPDATE', wait: 'SKIP LOCKED' } }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) FOR UPDATE SKIP LOCKED",
+        "text": "SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) FOR UPDATE SKIP LOCKED",
         "values": [
           1,
         ],
@@ -1878,7 +1809,7 @@ describe('selectRows', () => {
     `);
   });
 
-  // each select() text is `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (` + selectRows()'s + `) AS "sq_<alias>"`
+  // each select() text is `SELECT coalesce(json_agg(result), '[]') AS result FROM (` + selectRows()'s + `) AS "sq_<alias>"`
   const cases: [string, Parameters<typeof db.select>[0], any, any?][] = [
     ['db.all', 'users', all],
     ['a Whereable', 'users', { mood: 'ok', manager_id: 1 }],
@@ -1900,13 +1831,13 @@ describe('selectRows', () => {
     ['locks of an alias and a table', 'users', all, { alias: 'u', lock: [{ for: 'SHARE', of: 'u' }, { for: 'UPDATE', of: ['accounts'], wait: 'NOWAIT' }] }],
   ];
   const aggregated = (rows: db.SQLQuery, alias: string) =>
-    ({ text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rows.text}) AS "sq_${alias.replace(/"/g, '""')}"`, values: rows.values });
+    ({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (${rows.text}) AS "sq_${alias.replace(/"/g, '""')}"`, values: rows.values });
 
-  it.each(cases)('%s: select() sends the same query, in jsonb_agg', (_, table, where, options) => {
+  it.each(cases)('%s: select() sends the same query, in json_agg', (_, table, where, options) => {
     expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
   });
 
-  it.each(cases)('%s, with selectExactlyOneChecksForSecondRow: select() sends the same query, in jsonb_agg', (_, table, where, options) => {
+  it.each(cases)('%s, with selectExactlyOneChecksForSecondRow: select() sends the same query, in json_agg', (_, table, where, options) => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
   });
@@ -1919,9 +1850,9 @@ describe('selectRows', () => {
   });
 
   it('prepared() and parentTable work as on any fragment', () => {
-    expect(db.selectRows('users', all).prepared('users_rows').compile()).toEqual({ text: 'SELECT to_jsonb("users".*) AS result FROM "users"', values: [], name: 'users_rows' });
+    expect(db.selectRows('users', all).prepared('users_rows').compile()).toEqual({ text: 'SELECT to_json("users".*) AS result FROM "users"', values: [], name: 'users_rows' });
     expect(db.selectRows('accounts', { owner_id: parent('id') }).copy({ parentTable: 'users' }).compile().text)
-      .toBe('SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")');
+      .toBe('SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")');
   });
 
   it('from JavaScript, a missing where is db.all and null options are none, as in select()', () => {
@@ -1931,6 +1862,137 @@ describe('selectRows', () => {
 
   it('adds no member to SelectResultMode', () => {
     expect(Object.keys(db.SelectResultMode)).toEqual(['0', '1', '2', '3', 'Many', 'One', 'ExactlyOne', 'Numeric']);
+  });
+
+  describe('select() with topLevelSelectAsRows (note 018 § 3)', () => {
+    const
+      asRows = () => db.setConfig({ topLevelSelectAsRows: true }),
+      // what `build()` compiles to without the option, then with it
+      offAndOn = (build: () => db.SQLFragment<any, any>) => {
+        const off = build().compile();
+        asRows();
+        return [off, build().compile()];
+      },
+      passthrough = { lateral: db.count('accounts', { owner_id: parent('id') }) as any },  // selectRows()'s type refuses a lateral typed number (#749)
+      passthroughRows = 'SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true';
+
+    it.each(cases.filter(([name]) => name !== 'a lateral passed through'))('%s: compiled on its own, select() sends selectRows()\'s query', (_, table, where, options) => {
+      asRows();
+      expect(db.select(table, where, options).compile()).toEqual(db.selectRows(table, where, options).compile());
+    });
+
+    it.each(cases)('%s, with topLevelSelectAsRows: false: select() sends the same query, in json_agg', (_, table, where, options) => {
+      db.setConfig({ topLevelSelectAsRows: false });
+      expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
+    });
+
+    it('the rows query, with no json_agg', () => {
+      asRows();
+      expect(db.select('accounts', { owner_id: 1 }, { order: { by: 'id', direction: 'ASC' } }).compile()).toEqual({
+        text: 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) ORDER BY "id" ASC',
+        values: [1],
+      });
+    });
+
+    it('a single lateral passed through is converted to JSON above the same rows query, as json_agg() converts it', () => {
+      expect(db.selectRows('users', all, passthrough).compile().text).toBe(passthroughRows);
+      asRows();
+      expect(db.select('users', all, passthrough).compile()).toEqual({ text: `SELECT to_json(result) AS result FROM (${passthroughRows}) AS "sq_users"`, values: [] });
+    });
+
+    it('a lateral map: the parent gives its rows, each lateral select() its json_agg', () => {
+      asRows();
+      expect(db.select('users', all, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } }).compile()).toEqual({
+        text: `SELECT json_build_object($1::text, "id", $2::text, "lateral_accounts".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "sq_accounts") AS "lateral_accounts" ON true`,
+        values: ['id', 'accounts'],
+      });
+    });
+
+    it('nested, it keeps its json_agg: a lateral, a lateral passed through, extras, a sql template', () => {
+      const accounts = () => db.select('accounts', { owner_id: parent('id') });
+      for (const build of [
+        () => db.selectOne('users', { id: 1 }, { lateral: { accounts: accounts() } }),
+        () => db.selectOne('users', { id: 1 }, { lateral: accounts() }),
+        () => db.selectOne('users', { id: 1 }, { extras: { accounts: db.select('accounts', { owner_id: 1 }) } }),
+        () => sql`SELECT (${db.select('accounts', { owner_id: 1 })}) AS accounts`,
+      ]) {
+        const [off, on] = offAndOn(build);
+        expect(on).toEqual(off);
+        expect(on.text).toContain(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE`);
+        db.setConfig({ topLevelSelectAsRows: false });
+      }
+    });
+
+    it('a copy compiles as nested, with its json_agg, and keeps the aggregate\'s runResultTransform', () => {
+      asRows();
+      const q = db.select('accounts', { owner_id: 1 }), qr = (results: unknown[]) => ({ rows: results.map(result => ({ result })) }) as any;
+      expect(q.copy().compile()).toEqual({
+        text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)) AS "sq_accounts"`,
+        values: [1],
+      });
+      expect(q.copy({ preparedName: 'copied' }).compile()).toMatchObject({ text: q.copy().compile().text, name: 'copied' });
+      // the rows form runs with its own: one set on the query is the aggregate's, as a copy runs it
+      expect(q.runResultTransform(qr([[{ id: 1 }, { id: 2 }]]))).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(q.copy().runResultTransform).toBe(q.runResultTransform);
+    });
+
+    it('prepared(), noop and parentTable set on the query go with the rows form', () => {
+      asRows();
+      const text = 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)';
+      expect(db.select('accounts', { owner_id: 1 }).prepared('accounts_rows').compile()).toEqual({ text, values: [1], name: 'accounts_rows' });
+      const q = db.select('accounts', { owner_id: 1 });
+      q.noop = true;
+      expect(q.compile()).toEqual({ text: `/* marked no-op: won't hit DB unless forced -> */ ${text}`, values: [1] });
+      const owned = db.select('accounts', { owner_id: parent('id') });
+      owned.parentTable = 'users';
+      expect(owned.compile().text).toBe('SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")');
+    });
+
+    it('compiled on its own first, its name and noop stay off its nested forms: a CTE, a copy', () => {
+      asRows();
+      for (const options of [{}, passthrough]) {
+        const
+          aggregate = db.select('users', all, options).copy().compile(),
+          prepared = db.select('users', all, options).prepared('users_rows'),
+          noop = db.select('users', all, options);
+        noop.noop = true;
+        expect(prepared.compile().name).toBe('users_rows');
+        expect(noop.compile().text).toMatch(/^\/\* marked no-op/);
+        expect(db.withCTEs({ f: prepared }, sql`SELECT result FROM f`).compile()).toEqual({ text: `WITH "f" AS (${aggregate.text}) SELECT result FROM f`, values: aggregate.values });
+        expect(noop.copy({ noop: false }).compile()).toEqual(aggregate);
+      }
+    });
+
+    it('is read when select() is called, not when the query is compiled', () => {
+      const off = db.select('accounts', all);
+      asRows();
+      const on = db.select('accounts', all);
+      db.setConfig({ topLevelSelectAsRows: false });
+      expect([off.compile().text, on.compile().text]).toEqual([
+        `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("accounts".*) AS result FROM "accounts") AS "sq_accounts"`,
+        'SELECT to_json("accounts".*) AS result FROM "accounts"',
+      ]);
+    });
+
+    it('leaves selectRows(), selectOne(), selectExactlyOne(), count() and the other aggregates as they are', () => {
+      for (const build of [
+        () => db.selectRows('accounts', { owner_id: 1 }),
+        () => db.selectOne('accounts', { owner_id: 1 }),
+        () => db.selectExactlyOne('accounts', { owner_id: 1 }),
+        () => db.count('accounts', { owner_id: 1 }),
+        () => db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }),
+      ]) {
+        const [off, on] = offAndOn(build);
+        expect(on).toEqual(off);
+        db.setConfig({ topLevelSelectAsRows: false });
+      }
+    });
+
+    it('with selectExactlyOneChecksForSecondRow too, each keeps its own top-level form', () => {
+      db.setConfig({ topLevelSelectAsRows: true, selectExactlyOneChecksForSecondRow: true });
+      expect(db.select('accounts', { owner_id: 1 }).compile().text).toBe('SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)');
+      expect(db.selectExactlyOne('accounts', { owner_id: 1 }).compile().values).toEqual([1, 2]);
+    });
   });
 });
 
@@ -2026,26 +2088,10 @@ describe('count, sum, avg, min, max', () => {
     expect(() => db.sum('accounts', all, { order: { by: 'id', direction: 'UP' } })).toThrow("Direction must be ASC/DESC, not 'UP'");
   });
 
-  it.each([{}, { aggregatesTypedByColumn: false }, { aggregatesTypedByColumn: true }])('binds the aggregate filter under %j', config => {
-    db.setConfig(config);
+  it('binds the aggregate filter', () => {
     expect(db.max('accounts', { owner_id: 1 }, { columns: ['balance'] }).compile()).toEqual({
       text: 'SELECT max("balance") AS result FROM "accounts" WHERE ("owner_id" = $1)', values: [1],
     });
-  });
-
-  it('aggregatesTypedByColumn changes no SQL, nor a refusal', () => {
-    const compiled = () => [
-      db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }),
-      db.avg('accounts', all, { columns: ['ratio'], alias: 'a' }),
-      db.min('events', all, { columns: ['occurred_on'] }),
-      db.max('users', all, { columns: ['display_name'], groupBy: 'mood' }),
-      db.count('users', { id: 1 }),
-    ].map(q => q.compile());
-    db.setConfig({ aggregatesTypedByColumn: false });
-    const off = compiled();
-    db.setConfig({ aggregatesTypedByColumn: true });
-    expect(compiled()).toEqual(off);
-    expect(() => db.max('accounts', all).compile()).toThrow("max() needs one column to aggregate: pass columns: ['column']");
   });
 
   it('select() in SelectResultMode.Numeric still takes several columns, for an aggregate of several arguments', () => {
@@ -2131,32 +2177,29 @@ describe('a null or primitive row in insert(), upsert() and update()', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('a primitive among rows whose undefined values undefinedMeansMissing drops still rejects', async () => {
+  it('a primitive among rows whose undefined values are dropped still rejects', async () => {
     // undefinedAsMissing rebuilds the object rows; a primitive one is left as it is, not made an object of its characters
-    db.setConfig({ undefinedMeansMissing: true });
     const queryable = { query: vi.fn() } as any;
     expect(await outcome(() => db.insert('users', [{ ...row, mood: undefined }, 'ab'] as any), queryable)).toBe(valsMessage('string'));
     expect(await outcome(() => db.upsert('users', [{ ...row, mood: undefined }, 'ab'] as any, 'email'), queryable)).toBe(valsMessage('string'));
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('upsert of a null or undefined row among others compiles as a row of defaults with the key check off', async () => {
+  it('upsert of a null or undefined row among others compiles as a row of defaults, given updateColumns', async () => {
     // since #27, hasOwnProperty.call(null, …) threw a TypeError at the call; the row is read as `{}`, as insert() reads
-    // it, so it misses every key, which is then set from EXCLUDED: the case the key check rejects. DO UPDATE SET
-    // takes the key order of the first completed row, unsorted, as in 6.6.1
+    // it, so it misses every key, which would then be set from EXCLUDED: the case the key check rejects
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ upsertRequiresSameKeys: false });
+    const updateColumns: ('email' | 'display_name')[] = ['email', 'display_name'];
     const upsertSQL = (defaultsFirst: boolean) =>
-      `INSERT INTO "users" ("display_name", "email") VALUES ${defaultsFirst ? '(DEFAULT, DEFAULT), ($1, $2)' : '($1, $2), (DEFAULT, DEFAULT)'} ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
-    expect(fdb.upsert('users', [row, null as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
-    expect(fdb.upsert('users', [null as any, row], 'email').compile()).toEqual({ text: upsertSQL(true), values: ['A', 'a@x.org'] });
-    expect(fdb.upsert('users', [row, undefined as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
+      `INSERT INTO "users" ("display_name", "email") VALUES ${defaultsFirst ? '(DEFAULT, DEFAULT), ($1, $2)' : '($1, $2), (DEFAULT, DEFAULT)'} ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result`;
+    expect(fdb.upsert('users', [row, null as any], 'email', { updateColumns }).compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
+    expect(fdb.upsert('users', [null as any, row], 'email', { updateColumns }).compile()).toEqual({ text: upsertSQL(true), values: ['A', 'a@x.org'] });
+    expect(fdb.upsert('users', [row, undefined as any], 'email', { updateColumns }).compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
     expect(emitWarning).not.toHaveBeenCalled();
-    fdb.setConfig({ upsertRequiresSameKeys: true });
     expect(() => fdb.upsert('users', [row, null as any], 'email'))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
     expect(fdb.upsert('users', [row, null as any], 'email', { updateColumns: ['display_name'] }).compile().text)
-      .toBe(`INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) ON CONFLICT ("email") DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`);
+      .toBe(`INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) ON CONFLICT ("email") DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result`);
   });
 
   it('a null row alone in an array still throws nothing to insert at the call, as an empty row does', () => {
@@ -2231,14 +2274,13 @@ describe('a built-in row among several in insert() and upsert()', () => {
     }
   };
 
-  it('rejects run(), with no query sent, beside a plain row, before or after it, with undefinedMeansMissing off and on', async () => {
-    // with undefinedMeansMissing, a row with an undefined value makes undefinedAsMissing rebuild every row
+  it('rejects run(), with no query sent, beside a plain row, before or after it, with an undefined value or none', async () => {
+    // a row with an undefined value makes undefinedAsMissing rebuild every row
     const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {}, expected: Record<string, string> = {};
-    for (const undefinedMeansMissing of [false, true]) {
-      db.setConfig({ undefinedMeansMissing });
-      const plain = undefinedMeansMissing ? { ...row, mood: undefined } : row;
+    for (const withUndefined of [false, true]) {
+      const plain = withUndefined ? { ...row, mood: undefined } : row;
       for (const [name, x] of Object.entries(refused())) for (const [order, values] of [['after', [plain, x]], ['before', [x, plain]]] as const) {
-        const key = `${name} ${order} ${undefinedMeansMissing ? 'undefinedMeansMissing' : ''}`;
+        const key = `${name} ${order} ${withUndefined ? 'undefined' : ''}`;
         outcomes[`insert ${key}`] = await outcome(() => db.insert('users', values as any), queryable);
         outcomes[`upsert ${key}`] = await outcome(() => db.upsert('users', values as any, 'email'), queryable);
         for (const fn of ['insert', 'upsert']) expected[`${fn} ${key}`] = message(order === 'after' ? 'vals' : 'cols', name, x);
@@ -2268,9 +2310,8 @@ describe('a built-in row among several in insert() and upsert()', () => {
     expect(() => db.upsert('users', [new Map() as any, row], 'email').compile()).toThrow(builtinMessage('cols', 'Map'));
   });
 
-  it('with undefinedMeansMissing, a Buffer row with an undefined own key rejects run(), alone and beside a row', async () => {
+  it('a Buffer row with an undefined own key rejects run(), alone and beside a row', async () => {
     // undefinedAsMissing rebuilt it into a plain object of its bytes: master compiled SET ("0") = ROW($1) with 97
-    db.setConfig({ undefinedMeansMissing: true });
     const
       queryable = { query: vi.fn() } as any,
       x = () => Object.assign(Buffer.from('a'), { mood: undefined }) as any,
@@ -2286,9 +2327,8 @@ describe('a built-in row among several in insert() and upsert()', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('with undefinedMeansMissing, an empty Buffer row whose own keys are undefined still throws nothing to update or insert at the call', () => {
+  it('an empty Buffer row whose own keys are undefined still throws nothing to update or insert at the call', () => {
     // as on master, where undefinedAsMissing rebuilt it into `{}`
-    db.setConfig({ undefinedMeansMissing: true });
     const x = () => Object.assign(Buffer.alloc(0), { email: undefined }) as any;
     expect(() => db.update('users', x(), { id: 1 })).toThrow('nothing to update: an Updatable needs at least one column');
     for (const values of [x(), [x()], [x(), x()], [new Date(0), x()]]) {
@@ -2307,7 +2347,7 @@ describe('a built-in row among several in insert() and upsert()', () => {
     class Film {}
     class Premiere extends Date {}
     const
-      insertSQL = (columns: string, rows: string) => `INSERT INTO "users" (${columns}) VALUES ${rows} RETURNING to_jsonb("users".*) AS result`,
+      insertSQL = (columns: string, rows: string) => `INSERT INTO "users" (${columns}) VALUES ${rows} RETURNING to_json("users".*) AS result`,
       compiled = (x: unknown) => db.insert('users', [row, x as any]).compile();
     expect({
       dated: compiled(Object.assign(new Date(0), { email: 'b@x.org' })),
@@ -2375,8 +2415,8 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
   const
     a = { email: 'a@x.org', display_name: 'A' },
     b = { email: 'b@x.org', display_name: 'B' },
-    returning = ' RETURNING to_jsonb("users".*) AS result',
-    upsertReturning = ` RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
+    returning = ' RETURNING to_json("users".*) AS result',
+    upsertReturning = ` RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result`,
     onConflict = ' ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")';
 
   /** Run `f` with a key added to `Object.prototype` by other code, deleted after it. */
@@ -2386,33 +2426,27 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
     try { return f(); } finally { delete proto.nickname; }
   };
 
-  it('a key added to Object.prototype is no column, as for one row, with undefinedMeansMissing and upsertRequiresSameKeys off and on', () => {
+  it('a key added to Object.prototype is no column, as for one row', () => {
     // Zapatos 6.6.1 and master listed it with the rows' keys: ("display_name", "email", "nickname"), DEFAULT in each row
-    const compiled: Record<string, unknown> = {}, expected: Record<string, unknown> = {};
-    for (const undefinedMeansMissing of [false, true]) for (const upsertRequiresSameKeys of [false, true]) {
-      db.setConfig({ undefinedMeansMissing, upsertRequiresSameKeys });
-      const config = `${undefinedMeansMissing ? 'undefinedMeansMissing' : ''} ${upsertRequiresSameKeys ? 'upsertRequiresSameKeys' : ''}`;
-      withPrototypeKey(() => {
-        compiled[`insert two ${config}`] = db.insert('users', [a, b]).compile();
-        compiled[`insert one in an array ${config}`] = db.insert('users', [a]).compile();
-        compiled[`insert a key one row has ${config}`] = db.insert('users', [{ ...a, mood: 'happy' }, b]).compile();
-        compiled[`insert an undefined value ${config}`] = db.insert('users', [{ ...a, mood: undefined }, b]).compile();
-        compiled[`insert a null row ${config}`] = db.insert('users', [a, null as any]).compile();
-        compiled[`upsert two ${config}`] = db.upsert('users', [a, b], 'email').compile();
-        compiled[`upsert one in an array ${config}`] = db.upsert('users', [a], 'email').compile();
-      });
-      Object.assign(expected, {
-        [`insert two ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
-        [`insert one in an array ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${returning}`, values: ['A', 'a@x.org'] },
-        [`insert a key one row has ${config}`]: { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'happy', 'B', 'b@x.org'] },
-        [`insert an undefined value ${config}`]: undefinedMeansMissing ?
-          { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] } :
-          { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', undefined, 'B', 'b@x.org'] },  // sent as NULL
-        [`insert a null row ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT)${returning}`, values: ['A', 'a@x.org'] },
-        [`upsert two ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
-        [`upsert one in an array ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org'] },
-      });
-    }
+    const compiled: Record<string, unknown> = {};
+    withPrototypeKey(() => {
+      compiled['insert two'] = db.insert('users', [a, b]).compile();
+      compiled['insert one in an array'] = db.insert('users', [a]).compile();
+      compiled['insert a key one row has'] = db.insert('users', [{ ...a, mood: 'happy' }, b]).compile();
+      compiled['insert an undefined value'] = db.insert('users', [{ ...a, mood: undefined }, b]).compile();
+      compiled['insert a null row'] = db.insert('users', [a, null as any]).compile();
+      compiled['upsert two'] = db.upsert('users', [a, b], 'email').compile();
+      compiled['upsert one in an array'] = db.upsert('users', [a], 'email').compile();
+    });
+    const expected = {
+      'insert two': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+      'insert one in an array': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${returning}`, values: ['A', 'a@x.org'] },
+      'insert a key one row has': { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'happy', 'B', 'b@x.org'] },
+      'insert an undefined value': { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+      'insert a null row': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT)${returning}`, values: ['A', 'a@x.org'] },
+      'upsert two': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+      'upsert one in an array': { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org'] },
+    };
     expect(compiled).toEqual(expected);
   });
 
@@ -2466,7 +2500,6 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
   });
 
   it('a Proxy row, with own keys or none, has its traps called as without a key added to Object.prototype', () => {
-    db.setConfig({ upsertRequiresSameKeys: false });
     // master, with the key, skipped the prototype read of a Proxy row with no own key, and read one more own key in upsert()
     const traps = (withKey: boolean) => {
       const counts: Record<string, Record<string, number> | string> = {};
@@ -2495,6 +2528,7 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
       'insert, no own key, alone': { getPrototypeOf: 3, ownKeys: 3 },
       'insert, no own key, alone throws': nothingToInsert,
       'upsert, no own key, after a row': { getPrototypeOf: 3, ownKeys: 3, getOwnPropertyDescriptor: 1 },
+      'upsert, no own key, after a row throws': 'rows have different keys: pass updateColumns, or give every row the same keys',
       'insert, own keys, after a row': { ownKeys: 3, getOwnPropertyDescriptor: 6, get: 6 },
       'upsert, own keys, first': { ownKeys: 3, getOwnPropertyDescriptor: 7, get: 6 },
       'upsert, own keys, alone': { ownKeys: 3, getOwnPropertyDescriptor: 7, get: 6 },
@@ -2547,7 +2581,7 @@ describe('lateral: null, or a lateral key whose query is null or undefined', () 
   it('lateral: undefined and an object of queries compile as before', () => {
     expect(db.select('users', all, { lateral: undefined }).compile()).toEqual(db.select('users', all).compile());
     expect(db.select('users', all, { lateral: { n: db.count('accounts', all) } }).compile().text)
-      .toBe(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "sq_users"`);
+      .toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_n".result AS "n" FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "row_users") AS "sq_users"`);
   });
 });
 
@@ -2578,7 +2612,7 @@ describe('null as options, or as an options key', () => {
   it('null options compile as no options in each read shortcut, nested too, as in the writes', () => {
     // Zapatos 6.6.1 read them so in selectOne(), selectExactlyOne() and the writes, and threw a TypeError at the call
     // in select() and the aggregates; #341 made selectOne() and selectExactlyOne() throw too
-    expect(db.selectOne('users', all, no).compile()).toEqual({ text: 'SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $1', values: [1] });
+    expect(db.selectOne('users', all, no).compile()).toEqual({ text: 'SELECT to_json("users".*) AS result FROM "users" LIMIT $1', values: [1] });
     expect(db.select('users', all, no).compile()).toEqual(db.select('users', all).compile());
     expect(db.selectExactlyOne('users', all, no).compile()).toEqual(db.selectExactlyOne('users', all).compile());
     expect(db.count('users', all, no).compile()).toEqual(db.count('users', all).compile());
@@ -2663,7 +2697,7 @@ describe('null as options, or as an options key', () => {
     expect(db.insert('users', [], { returning: no, extras: no }).compile()).toEqual(db.insert('users', []).compile());
     // sent as a parameter: Postgres reads LIMIT NULL as no limit, OFFSET NULL as none
     expect(db.select('users', all, { limit: no, offset: no }).compile()).toEqual({
-      text: 'SELECT coalesce(jsonb_agg(result), \'[]\') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"',
+      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"`,
       values: [null, null],
     });
   });
@@ -2675,10 +2709,10 @@ describe('null as options, or as an options key', () => {
 describe('a shortcut option added to Object.prototype by something else is no option', () => {
   const
     row = { email: 'e@x.org', display_name: 'E' },
-    upsertReturning = ` RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
-    selectMany = (inner: string) => `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${inner}) AS "sq_users"`,
-    plain = { text: 'SELECT to_jsonb("users".*) AS result FROM "users"', values: [] },
-    tied = { text: 'SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "email" ASC LIMIT $1', values: [1] };
+    upsertReturning = ` RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result`,
+    selectMany = (inner: string) => `SELECT coalesce(json_agg(result), '[]') AS result FROM (${inner}) AS "sq_users"`,
+    plain = { text: 'SELECT to_json("users".*) AS result FROM "users"', values: [] },
+    tied = { text: 'SELECT to_json("users".*) AS result FROM "users" ORDER BY "email" ASC LIMIT $1', values: [1] };
 
   /** Run `f` with `Object.prototype[key]` set to `value`, as other code would, deleted after it. */
   const withPrototypeKey = <T>(key: string, value: unknown, f: () => T): T => {
@@ -2716,7 +2750,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
 
   it.each(['returning', 'extras'])('insert(): %s', key => {
     expect(compiledWithKey(key, o => db.insert('users', { email: 'e@x.org' }, o))).toEqual({
-      text: 'INSERT INTO "users" ("email") VALUES ($1) RETURNING to_jsonb("users".*) AS result',
+      text: 'INSERT INTO "users" ("email") VALUES ($1) RETURNING to_json("users".*) AS result',
       values: ['e@x.org'],
     });
   });
@@ -2730,14 +2764,14 @@ describe('a shortcut option added to Object.prototype by something else is no op
 
   it.each(['returning', 'extras'])('update(): %s', key => {
     expect(compiledWithKey(key, o => db.update('users', { display_name: 'E' }, { email: 'e@x.org' }, o))).toEqual({
-      text: 'UPDATE "users" SET ("display_name") = ROW($1) WHERE ("email" = $2) RETURNING to_jsonb("users".*) AS result',
+      text: 'UPDATE "users" SET ("display_name") = ROW($1) WHERE ("email" = $2) RETURNING to_json("users".*) AS result',
       values: ['E', 'e@x.org'],
     });
   });
 
   it.each(['returning', 'extras'])('deletes(): %s', key => {
     expect(compiledWithKey(key, o => db.deletes('users', { email: 'e@x.org' }, o))).toEqual({
-      text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result',
+      text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_json("users".*) AS result',
       values: ['e@x.org'],
     });
   });
@@ -2843,7 +2877,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
   const readAsBefore = {
     selected: { text: selectMany(`${plain.text} ORDER BY "email" ASC FOR UPDATE`), values: [] },
     upserted: {
-      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING jsonb_build_object($3::text, "email") || jsonb_build_object(\'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING json_build_object($3::text, "email", \'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
       values: ['E', 'e@x.org', 'email'],
     },
     // lateral is read once for its refusal, once for the query
@@ -2885,7 +2919,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
   // object or its prototypes, it is Object.prototype's, read once per read of the option; a setter beside it changes nothing
   it.each([
     ['deletes(): returning', 'returning', () => ['email'], () => db.deletes('users', { email: 'e@x.org' }, {}),
-      { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] }, 1],
+      { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_json("users".*) AS result', values: ['e@x.org'] }, 1],
     ['upsert(): updateValues', 'updateValues', () => ({ display_name: 'X' }), () => db.upsert('users', row, 'email', {}),
       { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")' + upsertReturning, values: ['E', 'e@x.org'] }, 1],
     ['upsert(): a column of updateValues', 'mood', () => param('X'), () => db.upsert('users', { email: 'e@x.org', mood: 'ok' }, 'email', { updateValues: {} }),
@@ -2905,7 +2939,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
     // a property descriptor inherits from Object.prototype, so only an own `value` tells a data key from a getter
     expect(withPrototypeGetter('returning', () => ['email'], () =>
       withPrototypeKey('value', ['email'], () => db.deletes('users', { email: 'e@x.org' }, {}).compile()))).toEqual({
-      result: { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] },
+      result: { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_json("users".*) AS result', values: ['e@x.org'] },
       reads: 1,
     });
   });
@@ -2930,7 +2964,7 @@ describe('a shortcut option added to Object.prototype by something else is no op
       text = db.deletes('users', { email: 'e@x.org' }, counting(counts, {}, { returning: ['display_name'] }) as any).compile().text;
     } finally { delete (Object.prototype as any).returning; }
     expect({ text, counts }).toEqual({
-      text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
+      text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "display_name") AS result',
       counts: { 'get:returning': 1, 'get:extras': 1 },
     });
   });
@@ -2947,10 +2981,10 @@ describe('a shortcut option added to Object.prototype by something else is no op
       answering: deleted(counting(counts.answering, {}, { returning: ['display_name'] })),
     }))).toEqual({
       result: {
-        created: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
-        classed: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "mood") AS result',
-        owning: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
-        answering: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result',
+        created: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "display_name") AS result',
+        classed: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "mood") AS result',
+        owning: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "display_name") AS result',
+        answering: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_json("users".*) AS result',
       },
       reads: 0,
     });
@@ -2971,9 +3005,9 @@ describe('a shortcut option added to Object.prototype by something else is no op
     exactlyOne: db.selectExactlyOne('users', all, Object.create({ columns: ['email'] })).compile().text,
   });
   const prototypeOptionsRead = {
-    selected: selectMany('SELECT jsonb_build_object($1::text, "email") AS result FROM "users"'),
-    created: selectMany('SELECT jsonb_build_object($1::text, "email") AS result FROM "users"'),
-    upserted: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) AS result',
+    selected: selectMany('SELECT json_build_object($1::text, "email") AS result FROM "users"'),
+    created: selectMany('SELECT json_build_object($1::text, "email") AS result FROM "users"'),
+    upserted: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_json("users".*) AS result',
     one: `${plain.text} LIMIT $1`,
     exactlyOne: `${plain.text} LIMIT $1`,
   };
@@ -2991,17 +3025,17 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
   // 6.6.1 wrote it bare, `VALUES (SELECT …)` and `ROW(SELECT …)`, which Postgres refuses (42601), as in extras (#262)
   const
     ada = { display_name: 'Ada', email: 'ada@example.com' },
-    action = `jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`,
+    returning = `(SELECT to_json("row_users".*) FROM (SELECT "users".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users")`,
     ordered = { columns: ['balance'], order: { by: 'balance', direction: 'ASC' } } as const;
 
   // each read shortcut and its query, from its first placeholder `n`, and its values
   const shortcuts: [string, () => db.SQLFragment<any>, (n: number) => string, unknown[]][] = [
     ['select', () => db.select('accounts', all, ordered),
-      n => `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC) AS "sq_accounts"`, ['balance']],
+      n => `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC) AS "sq_accounts"`, ['balance']],
     ['selectOne', () => db.selectOne('accounts', all, ordered),
-      n => `SELECT jsonb_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $${n + 1}`, ['balance', 1]],
+      n => `SELECT json_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $${n + 1}`, ['balance', 1]],
     ['selectExactlyOne', () => db.selectExactlyOne('accounts', all, ordered),
-      n => `SELECT jsonb_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $${n + 1}`, ['balance', 1]],
+      n => `SELECT json_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $${n + 1}`, ['balance', 1]],
     ['count', () => db.count('accounts', all), () => 'SELECT count(*) AS result FROM "accounts"', []],
     ['sum', () => db.sum('accounts', all, { columns: ['balance'] }), () => 'SELECT sum("balance") AS result FROM "accounts"', []],
     ['avg', () => db.avg('accounts', all, { columns: ['ratio'] }), () => 'SELECT avg("ratio") AS result FROM "accounts"', []],
@@ -3013,7 +3047,7 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
 
   it.each(shortcuts)('%s, as an insert() value', (_name, q, inner, values) => {
     expect(db.insert('users', { ...ada, manager_id: q() }).compile()).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})) RETURNING to_jsonb("users".*) AS result`,
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})) RETURNING to_json("users".*) AS result`,
       values: ['Ada', 'ada@example.com', ...values],
     });
   });
@@ -3021,14 +3055,14 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
   it.each(shortcuts)('%s, as a value of the first of several insert() rows, the other taking DEFAULT', (_name, q, inner, values) => {
     const n = 3 + values.length;
     expect(db.insert('users', [{ ...ada, manager_id: q() }, { display_name: 'Bob', email: 'bob@example.com' }]).compile()).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})), ($${n}, $${n + 1}, DEFAULT) RETURNING to_jsonb("users".*) AS result`,
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})), ($${n}, $${n + 1}, DEFAULT) RETURNING to_json("users".*) AS result`,
       values: ['Ada', 'ada@example.com', ...values, 'Bob', 'bob@example.com'],
     });
   });
 
   it.each(shortcuts)('%s, as an upsert() value', (_name, q, inner, values) => {
     expect(db.upsert('users', { ...ada, manager_id: q() }, 'email').compile()).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."manager_id") RETURNING to_jsonb("users".*) || ${action} AS result`,
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."manager_id") RETURNING ${returning} AS result`,
       values: ['Ada', 'ada@example.com', ...values],
     });
   });
@@ -3036,67 +3070,54 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
   it.each(shortcuts)('%s, as a value of several upsert() rows', (_name, q, inner, values) => {
     const n = 3 + values.length;
     expect(db.upsert('users', [{ ...ada, manager_id: q() }, { display_name: 'Bob', email: 'bob@example.com', manager_id: 1 }], 'email').compile()).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})), ($${n}, $${n + 1}, $${n + 2}) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."manager_id") RETURNING to_jsonb("users".*) || ${action} AS result`,
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})), ($${n}, $${n + 1}, $${n + 2}) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."manager_id") RETURNING ${returning} AS result`,
       values: ['Ada', 'ada@example.com', ...values, 'Bob', 'bob@example.com', 1],
     });
   });
 
   it.each(shortcuts)('%s, as an upsert() updateValues value', (_name, q, inner, values) => {
     expect(db.upsert('users', ada, 'email', { updateValues: { manager_id: q() } }).compile()).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", (${inner(3)})) RETURNING to_jsonb("users".*) || ${action} AS result`,
+      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", (${inner(3)})) RETURNING ${returning} AS result`,
       values: ['Ada', 'ada@example.com', ...values],
     });
   });
 
   it.each(shortcuts)('%s, as an update() value', (_name, q, inner, values) => {
     expect(db.update('users', { manager_id: q() }, { id: 2 }).compile()).toEqual({
-      text: `UPDATE "users" SET ("manager_id") = ROW((${inner(1)})) WHERE ("id" = $${1 + values.length}) RETURNING to_jsonb("users".*) AS result`,
+      text: `UPDATE "users" SET ("manager_id") = ROW((${inner(1)})) WHERE ("id" = $${1 + values.length}) RETURNING to_json("users".*) AS result`,
       values: [...values, 2],
     });
   });
 
-  it('without undefinedMeansMissing, beside an undefined value, which pg sends as NULL', () => {
-    db.setConfig({ undefinedMeansMissing: false });
-    expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile()).toEqual({
-      text: 'INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), $3) RETURNING to_jsonb("users".*) AS result',
-      values: ['Ada', 'ada@example.com', undefined],
-    });
-    expect(db.update('users', { manager_id: db.count('accounts', all), mood: undefined }, { id: 2 }).compile()).toEqual({
-      text: 'UPDATE "users" SET ("manager_id", "mood") = ROW((SELECT count(*) AS result FROM "accounts"), $1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result',
-      values: [undefined, 2],
-    });
-  });
-
-  it('with undefinedMeansMissing, beside an undefined value', () => {
-    db.setConfig({ undefinedMeansMissing: true });
+  it('beside an undefined value', () => {
     expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile().text)
-      .toBe('INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), DEFAULT) RETURNING to_jsonb("users".*) AS result');
+      .toBe('INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), DEFAULT) RETURNING to_json("users".*) AS result');
     expect(db.update('users', { manager_id: db.count('accounts', all), mood: undefined }, { id: 2 }).compile().text)
-      .toBe('UPDATE "users" SET ("manager_id") = ROW((SELECT count(*) AS result FROM "accounts")) WHERE ("id" = $1) RETURNING to_jsonb("users".*) AS result');
+      .toBe('UPDATE "users" SET ("manager_id") = ROW((SELECT count(*) AS result FROM "accounts")) WHERE ("id" = $1) RETURNING to_json("users".*) AS result');
   });
 
   it('selectExactlyOne keeps LIMIT 1 there, with selectExactlyOneChecksForSecondRow', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     expect(db.update('users', { settings: db.selectExactlyOne('accounts', all, ordered) }, { id: 2 }).compile()).toEqual({
-      text: 'UPDATE "users" SET ("settings") = ROW((SELECT jsonb_build_object($1::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $2)) WHERE ("id" = $3) RETURNING to_jsonb("users".*) AS result',
+      text: 'UPDATE "users" SET ("settings") = ROW((SELECT json_build_object($1::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $2)) WHERE ("id" = $3) RETURNING to_json("users".*) AS result',
       values: ['balance', 1, 2],
     });
   });
 
   it('db.self in the shortcut is still the column, and parent() still throws', () => {
     expect(db.update('users', { manager_id: db.max('users', sql`${'id'} < ${db.self}`, { columns: ['id'] }) }, { id: 3 }).compile().text)
-      .toBe('UPDATE "users" SET ("manager_id") = ROW((SELECT max("id") AS result FROM "users" WHERE "id" < "manager_id")) WHERE ("id" = $1) RETURNING to_jsonb("users".*) AS result');
+      .toBe('UPDATE "users" SET ("manager_id") = ROW((SELECT max("id") AS result FROM "users" WHERE "id" < "manager_id")) WHERE ("id" = $1) RETURNING to_json("users".*) AS result');
     expect(failure(() => db.insert('users', { ...ada, manager_id: db.count('accounts', { owner_id: parent('id') }) }).compile()))
       .toEqual({ name: 'Error', message: `The 'parent' table alias has no meaning here` });
   });
 
   it('beside the returning, extras and updateColumns of the write', () => {
     expect(db.update('users', { manager_id: db.count('accounts', all) }, { id: 2 }, { returning: ['id'], extras: { n: db.count('accounts', all) } }).compile()).toEqual({
-      text: 'UPDATE "users" SET ("manager_id") = ROW((SELECT count(*) AS result FROM "accounts")) WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "id") || jsonb_build_object($3::text, (SELECT count(*) AS result FROM "accounts")) AS result',
+      text: 'UPDATE "users" SET ("manager_id") = ROW((SELECT count(*) AS result FROM "accounts")) WHERE ("id" = $1) RETURNING json_build_object($2::text, "id", $3::text, (SELECT count(*) AS result FROM "accounts")) AS result',
       values: [2, 'id', 'n'],
     });
     expect(db.upsert('users', { ...ada, manager_id: db.count('accounts', all) }, 'email', { updateColumns: ['manager_id'], updateValues: { mood: db.selectOne('users', { id: 1 }, { columns: ['mood'] }) } }).compile()).toEqual({
-      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts")) ON CONFLICT ("email") DO UPDATE SET ("manager_id", "mood") = ROW(EXCLUDED."manager_id", (SELECT jsonb_build_object($3::text, "mood") AS result FROM "users" WHERE ("id" = $4) LIMIT $5)) RETURNING to_jsonb("users".*) || ${action} AS result`,
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts")) ON CONFLICT ("email") DO UPDATE SET ("manager_id", "mood") = ROW(EXCLUDED."manager_id", (SELECT json_build_object($3::text, "mood") AS result FROM "users" WHERE ("id" = $4) LIMIT $5)) RETURNING ${returning} AS result`,
       values: ['Ada', 'ada@example.com', 'mood', 1, 1],
     });
   });
@@ -3104,9 +3125,9 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
   it('unchanged: a shortcut in a sql fragment, a caller\'s vals(), a write shortcut', () => {
     const n = db.count('accounts', all), o = { manager_id: n };
     expect(db.insert('users', { ...ada, manager_id: sql`(${n})` }).compile().text)
-      .toBe('INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts")) RETURNING to_jsonb("users".*) AS result');
+      .toBe('INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts")) RETURNING to_json("users".*) AS result');
     expect(db.update('users', { manager_id: sql`${n} + 1` }, { id: 2 }).compile().text)
-      .toBe('UPDATE "users" SET ("manager_id") = ROW(SELECT count(*) AS result FROM "accounts" + 1) WHERE ("id" = $1) RETURNING to_jsonb("users".*) AS result');
+      .toBe('UPDATE "users" SET ("manager_id") = ROW(SELECT count(*) AS result FROM "accounts" + 1) WHERE ("id" = $1) RETURNING to_json("users".*) AS result');
     expect(db.upsert('users', ada, 'email', { updateValues: { manager_id: sql`${n} + 1` } }).compile().text)
       .toContain('ROW(EXCLUDED."display_name", EXCLUDED."email", SELECT count(*) AS result FROM "accounts" + 1)');
     // Zapatos 6.6.1 ran these, a bare subquery
@@ -3116,7 +3137,7 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
       .toBe('INSERT INTO "users" ("manager_id") SELECT count(*) AS result FROM "accounts"');
     // a write runs in a subquery neither bare nor in parentheses (42601): only in a WITH
     expect(db.update('users', { settings: db.deletes('accounts', { id: 1 }) }, { id: 2 }).compile().text)
-      .toBe('UPDATE "users" SET ("settings") = ROW(DELETE FROM "accounts" WHERE ("id" = $1) RETURNING to_jsonb("accounts".*) AS result) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result');
+      .toBe('UPDATE "users" SET ("settings") = ROW(DELETE FROM "accounts" WHERE ("id" = $1) RETURNING to_json("accounts".*) AS result) WHERE ("id" = $2) RETURNING to_json("users".*) AS result');
   });
 
   it('a row with no shortcut is read as often as before: twice alone, three times among others; a lone row with one once, as in 6.6.1', () => {

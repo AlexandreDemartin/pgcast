@@ -12,17 +12,17 @@ import type { Parameter, ParentColumn, SQLFragment } from './core';
 export type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/Microsoft/TypeScript/issues/14829
 
 /**
- * The type of a domain's column in one context of the generated schema, with the generator's `domainsTypedByContext`:
- * `InContext`, its base type's type there, while its placeholder `Custom` is still exactly `Generated`, the type the
- * generator wrote in it; otherwise `Custom`, in every context, as without the option. So an `any` stays `any`, and an
+ * The type of a domain's column in one context of the generated schema: `InContext`, its base type's type there, while
+ * its placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, in
+ * every context. So an `any` stays `any`, and an
  * `any[]` stays `any[]`, such as a placeholder Zapatos 6.6.1 wrote over `int8[]` with no import.
  */
 export type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom;
 
 /**
- * The value a `Whereable` takes for a column of type `T`, written by the generator's `valuesTypedAsAliases` in place of
- * the union it otherwise spells out on each line: the same type.
+ * The value a `Whereable` takes for a column of type `T`, which the generator writes on each of its lines in place of
+ * the union 7.x spelled out there by default: the same type.
  */
 export type WhereableValue<T> =
   T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>;
@@ -31,6 +31,7 @@ export type WhereableValue<T> =
  * The value an `Insertable` takes for a column of type `T`, written as `WhereableValue` is. `Extra` is
  * `null | DefaultType` for a nullable column, `DefaultType` for one with a default.
  */
+// SQLFragment<any>: the default RunResult (any[]) refused a fragment typed sql<…, string> or a shortcut (#654)
 export type InsertableValue<T, Extra = never> = T | Parameter<T> | Extra | SQLFragment<any>;
 
 /** The value an `Updatable` takes for a column of type `T`, with `Extra` as in `InsertableValue`. */

@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
-// A library's value typed by upsert()'s updateValues slot for a column of primitives: it declares nothing in
-// ConfigTypes, but sits in this program as it emits declarations (tsconfig.json), so the slot's type must be one
-// a .d.ts can write out (TS2527 for a unique symbol shortcuts.ts does not export, #503).
+// A library's value typed by upsert()'s updateValues slot for a column of primitives: this program emits
+// declarations (tsconfig.json), so the slot's type must be one a .d.ts can write out (TS2527 for a unique
+// symbol shortcuts.ts does not export, #503).
 
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';

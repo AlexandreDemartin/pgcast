@@ -1,5 +1,5 @@
 ---
-english: 285b7ffd66e7
+english: 546ba9fc7b05
 ---
 
 # Pourquoi pgcast
@@ -52,7 +52,7 @@ Chaque raccourci écrit une seule requête, et sa référence montre ce SQL. La 
 
 Le panneau montre ce que vous obtenez dans votre propre code : [`.compile()`](/fr/sql-template#compile) donne les mêmes `text` et `values`, et n’envoie rien. Chaque valeur est un paramètre, les clés JSON comprises ; chaque nom de table et de colonne est entre guillemets.
 
-L’imbrication est l’œuvre de Postgres lui-même, `jsonb_agg`<!-- probe: examples/why_studio.ts --> dans un `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts --> : le studio et ses films reviennent en une seule valeur JSON, en un aller-retour, sans lignes à recoudre en JavaScript.
+L’imbrication est l’œuvre de Postgres lui-même, `json_agg`<!-- probe: examples/why_studio.ts --> dans un `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts --> : le studio et ses films reviennent en une seule valeur JSON, en un aller-retour, sans lignes à recoudre en JavaScript.
 
 TypeScript connaît la seule colonne demandée, les films en dessous, et `undefined` quand aucun studio n’a cet `id` : il faut pour cela `strict`, que [Première requête](/fr/first-query#set-up-the-project) active.
 
@@ -81,7 +81,7 @@ pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des test
 | Voie | Quand | Ce qui change pour vous | Exemple |
 |---|---|---|---|
 | Correction | une faille de sécurité ; ou Postgres ou le type refusait déjà l’appel ; ou le résultat contredit le nom, le type ou la doc de la fonction | l’appel fait ce qu’il dit, ou lève une erreur qui dit quoi faire, avant toute requête | [`update()`](/fr/insert#update) sans colonnes lève `nothing to update: an Updatable needs at least one column`<!-- message -->, là où Postgres refusait `SET () = ROW()` |
-| Opt-in | le résultat est valide, et du code peut en dépendre | rien tant que vous n’activez pas l’option ; l’ancien comportement déclenche un avertissement une fois par processus | en 6.x, `undefinedMeansMissing` traitait les valeurs `undefined` à l’écriture comme des clés absentes. La 7.0 a adopté ce comportement par défaut |
+| Opt-in | le résultat est valide, et du code peut en dépendre | rien tant que vous n’activez pas l’option ; l’ancien comportement déclenche un avertissement une fois par processus | en 6.x, `undefinedMeansMissing` traitait les valeurs `undefined` à l’écriture comme des clés absentes. La 7.0 a adopté ce comportement par défaut, et la 8.0 n’a plus que lui |
 | Documentation | Postgres fonctionne ainsi, c’était voulu, ou le type ne peut pas voir une valeur connue seulement à l’exécution | rien : la doc le dit | [`isNotIn()`](/fr/conditions#conditions.isNotIn) avec un `NULL` dans sa liste ne correspond à aucune ligne, comme Postgres lit `NOT IN` |
 
 </div>
@@ -92,9 +92,9 @@ Les corrections de sécurité sont venues d’abord, toutes dans la 6.6.2 ([Séc
 - une valeur simple dans les `updateValues` de [`upsert()`](/fr/insert#upsert) est un paramètre ;
 - les mots-clés d’un verrou, de `truncate()` ou d’un niveau d’isolation, et le nom d’un agrégat, sont vérifiés avant toute requête.
 
-pgcast 6.x vous permet d’activer les corrections avant leur activation par défaut. En 7.0, six réglages du runtime et sept du générateur changent. Le [guide de migration](/fr/switching#from-7-0) précise quels anciens réglages disparaissent en 8.0 et lesquels restent disponibles pour un parser personnalisé ou pour arrêter le processus en cas d’erreur de base de données, comme le fait la CLI.
+pgcast 6.x vous permet d’activer les corrections avant leur activation par défaut. En 7.0, six réglages du runtime et sept du générateur changent. Le [guide de migration](/fr/switching#from-7-0) précise quels anciens réglages disparaissent en 8.0 et lesquels restent disponibles pour un parser personnalisé.
 
-[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés ; l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) aussi, jusqu’à la 8.0. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
+[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés pendant toute la série 7.x, tout comme l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) ; la 8.0 retire la première et ne garde que le comportement des deux autres ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)). Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 
 Zapatos 6.6.1 n’avait pas de suite de tests à lui (les tests de son premier utilisateur exerçaient « <span lang="en">most of the code base at least a little</span> ») ; sa CI faisait le lint et le build. Sa feuille de route en jugeait une « <span lang="en">kind of indispensable</span> », une qui teste « <span lang="en">not just returned values but also inferred types</span> ».
 

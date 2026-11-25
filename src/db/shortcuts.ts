@@ -50,7 +50,7 @@ import {
   space,
 } from './utils';
 
-import { getConfig, ConfigTypes } from './config';
+import { getConfig } from './config';
 import type { PostgresInterval } from './date';
 
 
@@ -68,15 +68,14 @@ export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `C
 
 export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
 export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragment<any> | ColumnForTable<T> }
-// the type a typed min() or max() has nested in a query, as JSON, where it differs from what run() gives;
-// read unless ConfigTypes asks for the 6.x signatures, and behind `unknown extends RunResult`, so `any` gives `unknown` on TS 4.1 and `{} | null` from TS 5.x
+// the type a min() or max() has nested in a query, as JSON, where it differs from what run() gives;
+// read behind `unknown extends RunResult`, so `any` gives `unknown` on TS 4.1 and `{} | null` from TS 5.x
 declare const nestedResult: unique symbol;
 
 /**
- * A column-typed `min()` or `max()`: with the default runtime setting, `run()` gives the pg value.
- * A single lateral of `selectOne()`, `selectExactlyOne()` or `selectRows()` also gives the pg value.
- * `ConfigTypes` selects the types: `RunResult` there, `NestedResult` for JSON under a lateral key,
- * in `extras` or under `select()`. Nest the original fragment for JSON. A `.copy()` returns a plain
+ * A column-typed `min()` or `max()`: `run()` gives the pg value, and so does a single lateral of
+ * `selectOne()`, `selectExactlyOne()` or `selectRows()`, typed `RunResult`; `NestedResult` types
+ * the JSON under a lateral key, in `extras` or under `select()`. Nest the original fragment for JSON. A `.copy()` returns a plain
  * `SQLFragment` with the direct type (e.g. `Date | null` for a date returned as a JSON string).
  * The original fragment's own members name a symbol `zapatos/db` does not export,
  * so a package built with `declaration: true` cannot write them out (TS4023 on a
@@ -84,9 +83,7 @@ declare const nestedResult: unique symbol;
  */
 export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
 
-export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ?
-  (TypedByColumn extends true ? NestedResultOf<T, RunResult> : undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) :
-  never;
+export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ? NestedResultOf<T, RunResult> : never;
 
 type NestedResultOf<T, RunResult> = unknown extends RunResult ? NonNullable<RunResult> | null :
   T extends { [nestedResult]: infer N } ? N : undefined extends RunResult ? NonNullable<RunResult> | null : RunResult;
@@ -146,6 +143,8 @@ const
   allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
   writeFilter = (where: Whereable | SQLFragment<any>) => (where as unknown) === all ? refusedSQL(allAsWriteFilter) : where;
 
+// the jsonb row of `distinct: true`, which DISTINCT compares, json having no equality operator (42883); with
+// SQLForExtras and the lateral keys' jsonb_build_object(), the one place where the shortcuts build jsonb
 function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Table, nullMessage: string) {
   return columns === undefined ? sql`to_jsonb(${table}.*)` :
     columns === null ? refusedSQL(nullMessage) :
@@ -170,9 +169,19 @@ function SQLForAlias(prefix: string, name: string) {
 // bare, which Postgres refuses (42601): in extras, in jsonb_build_object() (#262), and as an insert(), upsert() or
 // update() value, in VALUES and ROW() (#656). A sql fragment is the caller's SQL, written as given
 const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInExtras'];
-// the LIMIT 2 form of a selectExactlyOne() that checks for a second row, which withCTEs() writes at the top level too
-const secondRowQuery = Symbol('secondRowQuery');
-type SecondRowChecked = { [secondRowQuery]?: SQLFragment<any, any> };
+// the query a shortcut compiles to on its own, which withCTEs() writes at the top level too: the LIMIT 2 form of a
+// selectExactlyOne() that checks for a second row, or the rows form of a select() with topLevelSelectAsRows, which
+// runs with rowsResult
+const topLevelForm = Symbol('topLevelForm');
+type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
+const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
+// set by select() and its kin on the runResultTransform of a query whose result is `json`, as they build it: a
+// parent's plain DISTINCT over it as a passed-through lateral compares it as `jsonb` (json has no equality, 42883),
+// where an aggregate's or a `jsonb` result (`distinct: true`'s row) is compared as it is. Each query gets a
+// transform of its own, which copy() and so withCTEs() keep, where they do not keep topLevelForm; a sql fragment
+// given a query's transform is the caller's SQL, and is read only on a query (isQuery)
+const jsonResult = Symbol('jsonResult');
+type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
 // a row of entries, a query among its values in parentheses
 const withScalarQueries = (entries: [string, unknown][]) => Object.fromEntries(entries.map(([k, v]) => [k, asScalar(v)]));
@@ -184,9 +193,55 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
       Object.keys(extras), sql`, `, k => sql`${param(k)}::text, ${asScalar(extras[k])}`)})`;
 }
 
+// json having no `||` (decision 018 § 2), a row of `columns` takes its columns, extras and lateral keys in one
+// json_build_object(), whose arguments Postgres limits to 100 (max_function_args; 54023 beyond); a write's
+// `returning`, extras and $action the same; left out, every column is to_json() of a row whose aliases name the rest. A key is a parameter, every caller's key included (a fragment past the type), but one flagged as
+// ours (`$action`), written as a literal
+const maxJSONKeys = 50;
+function SQLForJSONObject(pairs: [string, SQL, ours?: true][], parts = 'columns, extras and lateral keys', list = 'columns') {
+  return pairs.length > maxJSONKeys ? refusedSQL(`This row is built with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${pairs.length} keys (${parts} together) take ${pairs.length * 2}. Give ${maxJSONKeys} keys at most, or leave \`${list}\` out: every column then comes with the ${list === 'columns' ? 'extras and lateral keys' : 'extras and `$action`'} as column aliases.`) :
+    sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v, ours]) => sql`${ours ? raw(`'${k}'`) : sql`${param(k)}::text`}, ${v}`)})`;
+}
+
+// an extras or lateral key beside every column is a column alias, as to_json() names its keys
+// after the columns: one quoted identifier, every `"` doubled, so that it comes back as given (SQLForAlias keeps a
+// hand-escaped `a""b`, which would come back as `a"b`), never split on `.`. Postgres refuses an empty one (42601) and
+// a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles
+function SQLForKeyAlias(key: string, list: 'columns' | 'returning' = 'columns') {
+  const
+    text = `${key}`,
+    bytes = Buffer.byteLength(text),
+    problem = text === '' ? 'it is empty' : text.includes('\0') ? 'it holds a NUL' : bytes > 63 ? `it takes ${bytes} bytes in UTF-8, over Postgres's 63` : undefined;
+  return problem === undefined ? raw(`"${text.replace(/"/g, '""')}"`) :
+    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which an ${list === 'columns' ? '`extras` or `lateral` key' : '`extras` key'} beside every column becomes: ${problem}. Give \`${list}\`, whose keys stay parameters.`);
+}
+
+// the RETURNING list of insert(), upsert() (with `$action`, unless suppressed), update() and deletes(), `… AS result`.
+// json having no `||` (decision 018 § 2), every column beside extras or $action is to_json() of
+// a scalar subquery's row, whose column aliases name the keys, and `returning` beside them one json_build_object()
+function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, ColumnsOption<Table>, ExtrasOption<Table>> | undefined, reportAction = false) {
+  const
+    returning = callerValue(options, 'returning'),
+    extras = callerValue(options, 'extras'),
+    action = sql`CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END`;
+  const
+    keys = extras == null ? [] : Object.keys(extras),
+    row = SQLForAlias('row_', table),
+    json = returning === null ? refusedSQL(returningNull) :
+      extras === null ? refusedSQL(extrasNull) :
+      returning !== undefined ? SQLForJSONObject([
+        ...returning.map((c): [string, SQL] => [c, c]),
+        ...keys.map((k): [string, SQL] => [k, asScalar(extras![k])]),
+        ...(reportAction ? [['$action', action, true] as [string, SQL, true]] : []),
+      ], '`returning`, `extras` and `$action`', 'returning') :
+      keys.length === 0 && !reportAction ? sql`to_json(${table}.*)` :
+      sql`(SELECT to_json(${row}.*) FROM (SELECT ${table}.*${keys.map(k => sql`, ${asScalar(extras![k])} AS ${SQLForKeyAlias(k, 'returning')}`)}${reportAction ? sql`, ${action} AS "$action"` : []}) AS ${row})`;
+  return sql`${json} AS result`;
+}
+
 
 // an undefined value is a missing key: `toDefault` sends DEFAULT (insert), otherwise the
-// key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
+// key goes (update, upsert, whose missing keys then take DEFAULT, and the rule of rows with different keys);
 // a null row, which an untyped caller may pass among others, is read as `{}`, as completeKeysWithDefaultValue reads it,
 // and a primitive one, a Buffer (its values, one per byte, unlisted) and a built-in with no own enumerable key are
 // kept as they are, for cols() or vals() to refuse. A lone row's values are read once here, as before, and a query
@@ -197,7 +252,6 @@ function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V 
     lone = Array.isArray(values) || isRefusedBuffer(rows[0]) ? undefined : Object.entries(rows[0]),
     asGiven = lone?.some(([, v]) => isQuery(v)) ? withScalarQueries(lone) as V : values;
   if (!(lone ? lone.some(([, v]) => v === undefined) : rows.some(row => !isRefusedBuffer(row) && Object.values(row).includes(undefined)))) return asGiven;
-  if (!(getConfig().undefinedMeansMissing ?? true)) return asGiven;
   const kept = rows.map(row => {
     if (isPrimitive(row) || isRefusedBuffer(row)) return row;
     const entries = Object.entries(row);
@@ -213,13 +267,12 @@ const completedRows = <R extends object>(rows: R[]) => completeKeysWithDefaultVa
   row !== rows[i] && Object.values(row).some(isQuery) ? withScalarQueries(Object.entries(row)) as R : row);
 
 // the keys of upsert()'s updateValues that join the update: an undefined one is set from EXCLUDED, as in 6.6.1,
-// so if no row inserts its column, an existing row takes the column DEFAULT; with undefinedMeansMissing, it is a
+// so if no row inserts its column, an existing row takes the column DEFAULT; an undefined one is a
 // missing key, so it adds no column (`updated`: updateColumns, or the columns inserted, set from EXCLUDED either
 // way); the object itself is kept, as its values are still read through getters and prototypes
 function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[]): string[] {
   const keys = Object.keys(updateValues);
   if (!keys.some(k => updateValues[k] === undefined && !updated.includes(k))) return keys;
-  if (!(getConfig().undefinedMeansMissing ?? true)) return keys;
   return keys.filter(k => updateValues[k] !== undefined);
 }
 
@@ -231,13 +284,13 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
 const nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template';
 
 // a Buffer's bytes are its keys, so one with bytes has keys, which are not listed: one per byte, a long one took seconds;
-// undefinedAsMissing leaves a Buffer as it is, so for update() and upsert() (`undefinedIsMissing`), with
-// undefinedMeansMissing, an empty one's undefined keys are left out here, as from the `{}` it rebuilt one into before
+// undefinedAsMissing leaves a Buffer as it is, so for update() and upsert() (`undefinedIsMissing`),
+// an empty one's undefined keys are left out here, as from the `{}` it rebuilt one into before
 // #543: "nothing to update" or "nothing to insert" is still thrown at the call
 const hasOwnKey = (row: object, undefinedIsMissing = false) => {
   if (!isRefusedBuffer(row)) return Object.keys(row).length > 0;
   if ((row as Buffer).length > 0) return true;
-  return undefinedIsMissing && (getConfig().undefinedMeansMissing ?? true) ?
+  return undefinedIsMissing ?
     Object.values(row).some(v => v !== undefined) : Object.keys(row).length > 0;
 };
 
@@ -256,8 +309,8 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
  * `Date`, a `Map`…) beside a row with keys, which
  * `upsert()` refuses too; a `null` row in an array gives `DEFAULT` for each
  * column of the others. An `undefined` value sends `DEFAULT`, as a missing
- * cell does: `{ title: undefined }` gives `VALUES (DEFAULT)`. With
- * `undefinedMeansMissing: false`, it sends a parameter for SQL `NULL`.
+ * cell does: `{ title: undefined }` gives `VALUES (DEFAULT)`; for SQL `NULL`,
+ * give `null`.
  * These rules apply to the values read at the call, provided they stay unchanged
  * until the query runs and getters return the same value on later reads.
  * A shortcut's query (`count()`, `selectOne()`…) or its `copy()` is written in parentheses,
@@ -310,13 +363,12 @@ export const insert: {
       valuesSQL = Array.isArray(completedValues) ?
         mapWithSeparator(completedValues as Insertable[], sql`, `, v => sql`(${vals(v)})`) :
         sql`(${vals(completedValues)})`,
-      returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-      extrasSQL = SQLForExtras(callerValue(options, 'extras'));
+      returningSQL = SQLForReturning(table, options);
 
     // a null row on its own, or a primitive row anywhere, fails in compile(), in cols() or vals(), so run() rejects;
     // so does a built-in row completeKeysWithDefaultValue leaves, unless no row has a key
     if (firstRow != null && !anyPrimitive && !(Array.isArray(completedValues) ? completedValues : [firstRow]).some(row => hasOwnKey(row))) throw new Error(nothingToInsert);
-    query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}${extrasSQL} AS result`;
+    query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}`;
   }
 
   query.runResultTransform = Array.isArray(values) ?
@@ -344,12 +396,11 @@ export class Constraint<T extends Table> { constructor(public value: UniqueIndex
  * A missing constraint gives 42704. A constraint with no arbiter index, such
  * as a `CHECK` sharing a bare index's name, gives 42809.
  *
- * By default the generator lists the table's valid, non-deferrable unique and
+ * The generator lists the table's valid, non-deferrable unique and
  * primary-key constraints usable with `DO UPDATE`. A partitioned table's union
  * follows the parent constraint. Postgres checks the receiving partition's index,
  * so a deferrable key there can raise 55000. A deferrable parent key is omitted
- * even when the partitions' keys are immediate. In 7.x, generating with
- * `uniqueIndexConstraintsOnly: false` also admits names Postgres refuses.
+ * even when the partitions' keys are immediate.
  */
 export function constraint<T extends Table>(x: UniqueIndexForTable<T>) { return new Constraint<T>(x); }
 
@@ -460,7 +511,7 @@ const updateValueSQL = (value: any, column: string) =>
  * To read a column there, use a fragment, which is written as
  * it is: ``{ name: db.sql`${'users'}.${'name'}` }`` gives `ROW(..., "users"."name")`.
  * An `updateColumns` array that is empty at run time, with no `updateValues`
- * key (with `undefinedMeansMissing`, a key set to `undefined` is none), gives
+ * key (a key set to `undefined` is none), gives
  * `DO NOTHING`, as `doNothing` does: one row that conflicts then
  * returns `undefined`, which the type of a `Column[]` does not say; check for
  * it, or pass `doNothing`, which the type follows.
@@ -470,8 +521,6 @@ const updateValueSQL = (value: any, column: string) =>
  * to update, or supply a defined override in `updateValues`. Columns named
  * in `conflictTarget` are exempt: a new row may omit its serial `id` when
  * upserting on `'id'`. A constraint target does not identify its columns here.
- * With `upsertRequiresSameKeys: false`, the missing cell takes `DEFAULT` and
- * can overwrite the stored value on conflict.
  *
  * An `undefined` value is a missing key in both the row and `updateValues`.
  * The row omits the column unless another row supplies it, in which case its
@@ -480,8 +529,6 @@ const updateValueSQL = (value: any, column: string) =>
  * A defined `updateValues` override wins. Otherwise a selected column takes
  * its value from `EXCLUDED`, with a `CASE` for `noNullUpdateColumns` that
  * keeps the stored value if the incoming value is SQL `NULL`.
- * With `undefinedMeansMissing: false`, an undefined cell binds SQL `NULL` and
- * an undefined override adds its column to the update.
  * These rules apply to the values read at the call, provided they stay unchanged
  * until the query runs and getters return the same value on later reads.
  */
@@ -573,15 +620,14 @@ export const upsert: {
       callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c), c) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c as Column)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
-    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
-    suppressReport = callerValue(options, 'reportAction') === 'suppress';
+    suppressReport = callerValue(options, 'reportAction') === 'suppress',
+    returningSQL = SQLForReturning(table, options, !suppressReport);
 
   if (colNames.length === 0) throw new Error(nothingToInsert);
 
   // a key missing from some row is inserted as DEFAULT, then `SET col = EXCLUDED.col` overwrites the existing
   // value: Postgres can't tell that DEFAULT from a given one, so only the caller knows which columns to update
-  if (overwritesMissingKey && (getConfig().upsertRequiresSameKeys ?? true)) {
+  if (overwritesMissingKey) {
     throw new Error('rows have different keys: pass updateColumns, or give every row the same keys');
   }
 
@@ -595,8 +641,7 @@ export const upsert: {
     insertPart = sql`INSERT INTO ${table} (${insertColsSQL}) VALUES ${insertValuesSQL}`,
     conflictPart = sql`ON CONFLICT ${conflictTargetSQL} DO`,
     conflictActionPart = updateColsSQL.length > 0 ? sql`UPDATE SET (${updateColsSQL}) = ROW(${updateValuesSQL})` : sql`NOTHING`,
-    reportPart = sql` || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`,
-    returningPart = sql`RETURNING ${returningSQL}${extrasSQL}${suppressReport ? [] : reportPart} AS result`,
+    returningPart = sql`RETURNING ${returningSQL}`,
     query = sql`${insertPart} ${conflictPart} ${conflictActionPart} ${returningPart}`;
 
   query.runResultTransform = Array.isArray(values) ?
@@ -615,8 +660,8 @@ export const upsert: {
  * @param values An `Updatable` of the new values with which to update the table.
  * It needs at least one key: with none, there is nothing to set, and `update()`
  * throws before any query. An `undefined` value leaves its key out:
- * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
- * With `undefinedMeansMissing: false`, the key sets its column to `NULL`.
+ * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`; to set
+ * its column to `NULL`, give `null`.
  * These rules apply to the values read at the call, provided they stay unchanged
  * until the query runs and getters return the same value on later reads.
  * A shortcut's query is written in parentheses, as for `insert`.
@@ -647,9 +692,8 @@ export const update: {
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
 
   const
-    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
-    query = sql`UPDATE ${table} SET (${cols(values)}) = ROW(${vals(values)}) WHERE ${writeFilter(where)} RETURNING ${returningSQL}${extrasSQL} AS result`;
+    returningSQL = SQLForReturning(table, options),
+    query = sql`UPDATE ${table} SET (${cols(values)}) = ROW(${vals(values)}) WHERE ${writeFilter(where)} RETURNING ${returningSQL}`;
 
   query.runResultTransform = (qr) => qr.rows.map(r => r.result);
   return query;
@@ -680,9 +724,8 @@ export const deletes: DeleteSignatures = function (
 ): SQLFragment {
 
   const
-    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
-    query = sql`DELETE FROM ${table} WHERE ${writeFilter(where)} RETURNING ${returningSQL}${extrasSQL} AS result`;
+    returningSQL = SQLForReturning(table, options),
+    query = sql`DELETE FROM ${table} WHERE ${writeFilter(where)} RETURNING ${returningSQL}`;
 
   query.runResultTransform = (qr) => qr.rows.map(r => r.result);
   return query;
@@ -770,15 +813,13 @@ export interface SelectOptionsForTable<
 };
 
 // a single lateral query is passed through as it is by selectOne() and selectExactlyOne(), as JSON by select(),
-// which wraps the rows in jsonb_agg(): the two types differ only for a typed min() or max(), when column typing is enabled
-type PassedThroughResult<L extends SQLFragment<any>, M extends SelectResultMode> = TypedByColumn extends true ?
-  (M extends SelectResultMode.Many ? RunResultForSQLFragment<L> :
-    L extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never) :
-  RunResultForSQLFragment<L>;
+// which wraps the rows in json_agg(): the two types differ only for a min() or max(), typed by column
+type PassedThroughResult<L extends SQLFragment<any>, M extends SelectResultMode> =
+  M extends SelectResultMode.Many ? RunResultForSQLFragment<L> :
+    L extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never;
 
-// by default, selectOne() and selectExactlyOne() keep the brand of the min() or max() they pass through, which
-// comes back as JSON when nested in turn; not for `any` or `never`, nor for a lateral map, whose results are JSON already.
-// An explicit false declaration selects the signatures of 6.x.
+// selectOne() and selectExactlyOne() keep the brand of the min() or max() they pass through, which
+// comes back as JSON when nested in turn; not for `any` or `never`, nor for a lateral map, whose results are JSON already
 type PassingThroughFragment<RunResult, L> = 0 extends 1 & L ? SQLFragment<RunResult> : [L] extends [never] ? SQLFragment<RunResult> :
   [L] extends [ColumnAggregateFragment<any, infer N>] ? ColumnAggregateFragment<RunResult, N> : SQLFragment<RunResult>;
 
@@ -789,8 +830,6 @@ interface PassingThroughSignatures<M extends SelectResultMode> {
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): PassingThroughFragment<FullSelectReturnTypeForTable<T, C, L, E, M>, L>;
 }
-
-type ByColumn<Typed, Plain> = TypedByColumn extends true ? Typed : Plain;
 
 type SelectReturnTypeForTable<
   T extends Table,
@@ -881,7 +920,7 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * * `extras` — an object mapping key(s) to `SQLFragment`s, so that derived 
  * quantities can be included in the JSON result; a shortcut's query (`count`,
  * `selectOne`…) or its `copy()` is written in parentheses, as a scalar subquery:
- * `jsonb_build_object($1::text, (SELECT count(*) AS result FROM "films"))`
+ * `json_build_object($1::text, (SELECT count(*) AS result FROM "films"))`
  * @param mode (Used internally by `selectOne` and `count`)
  * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
  * The name of the aggregate function, plain, quoted or `U&` quoted, in up to
@@ -891,7 +930,18 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * `SELECT my_schema."MyAgg"("id") AS result FROM "users"`.
  *
  * For its rows one by one, as `cursor()` reads them, the same query without
- * `jsonb_agg`: `selectRows()`.
+ * its aggregate: `selectRows()`.
+ *
+ * With the `topLevelSelectAsRows` config option, read as `select()` is called,
+ * `select()` run or compiled on its own, or as the main query of `withCTEs()`,
+ * is `selectRows()`'s query, and `run()` gives the same array, one result per
+ * row: `SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
+ * A single `lateral` passed through is converted above that query,
+ * `SELECT to_json(result) AS result FROM (…) AS "sq_films"`, so its value
+ * stays JSON, ordered and made distinct by its raw value. Nested (a
+ * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
+ * `cursor()`, it keeps its aggregate. The rows form runs with its own
+ * `runResultTransform`: one set on the query applies to the aggregate only.
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -944,16 +994,33 @@ function selectQuery(
     columns = callerValue(allOptions, 'columns'), extras = callerValue(allOptions, 'extras'),
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
+    passthrough = lateral instanceof SQLFragment,
+    jsonChild = passthrough && isQuery(lateral) && !!(lateral.runResultTransform as JSONResult)[jsonResult],
+    plainDistinct = !!distinct && !(distinct instanceof SQLFragment || typeof distinct === 'string' || Array.isArray(distinct)),
+    // the JSON of a row is built with json functions (decision 018 § 2), but under a plain DISTINCT, which compares
+    // jsonb rows, json having no equality operator (42883)
+    asJson = !plainDistinct && !passthrough && mode !== SelectResultMode.Numeric,
+    keyPairs: [string, SQL][] = !asJson || extras == null ? [] : Object.keys(extras).map(k => [k, asScalar(extras[k])]),
+    lateralPairs: [string, SQL][] = !asJson ? [] : Object.keys(lateral ?? {}).sort().map(k => [k, sql`${SQLForAlias('lateral_', k)}.result`]),
+    // every column beside extras or lateral keys: to_json() of a row level, "row_<alias>", whose output columns a bare
+    // name in ORDER BY or DISTINCT ON would match first, so a string there is written after the alias (42702 beside
+    // a key of the same name); a fragment is the caller's SQL, written as given
+    asRow = asJson && columns === undefined && extras !== null && keyPairs.length + lateralPairs.length > 0,
+    qualified = (name: SQL): SQL => asRow && typeof name === 'string' && !name.includes('.') ? sql`${alias}.${name}` : name,
     tableAliasSQL = alias === table ? [] : sql<string>` AS ${alias}`,
-    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct})` :
-      Array.isArray(distinct) ? sql` ON (${cols(distinct)})` : []}`,
-    colsSQL = lateral instanceof SQLFragment ? [] :
+    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${qualified(distinct)})` :
+      Array.isArray(distinct) ? sql` ON (${asRow ? mapWithSeparator(distinct, sql`, `, c => qualified(String(c))) : cols(distinct)})` : []}`,
+    colsSQL = passthrough ? [] :
       mode === SelectResultMode.Numeric ?
         (columns ? sql`${raw(aggregate)}(${cols(columns)})` : sql`${raw(aggregate)}(*)`) :
-        SQLForColumnsOfTable(columns, alias as Table, columnsNull),
-    colsExtraSQL = lateral instanceof SQLFragment || mode === SelectResultMode.Numeric ? [] : SQLForExtras(extras),
-    colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric ? [] :
-      lateral instanceof SQLFragment ? sql`"lateral_passthru".result` :
+        !asJson ? SQLForColumnsOfTable(columns, alias as Table, columnsNull) :
+          columns === null ? refusedSQL(columnsNull) :
+          extras === null ? refusedSQL(extrasNull) :
+          columns === undefined ? sql`to_json(${asRow ? SQLForAlias('row_', alias) : alias}.*)` :
+          SQLForJSONObject([...columns.map((c): [string, SQL] => [c, c]), ...keyPairs, ...lateralPairs]),
+    colsExtraSQL = passthrough || mode === SelectResultMode.Numeric || asJson ? [] : SQLForExtras(extras),
+    colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric || asJson ? [] :
+      passthrough ? (plainDistinct && jsonChild ? sql`to_jsonb("lateral_passthru".result)` : sql`"lateral_passthru".result`) :
         sql` || jsonb_build_object(${mapWithSeparator(
           Object.keys(lateral).sort(), sql`, `, k => sql`${param(k)}::text, ${SQLForAlias('lateral_', k)}.result`)})`,
     allColsSQL = sql`${colsSQL}${colsExtraSQL}${colsLateralSQL}`,
@@ -969,7 +1036,7 @@ function selectQuery(
         if (!['ASC', 'DESC'].includes(direction)) throw new Error(`Direction must be ASC/DESC, not '${direction}'`);
         const nulls = callerValue(o, 'nulls');
         if (nulls && !['FIRST', 'LAST'].includes(nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${nulls}'`);
-        return sql`${callerValue(o, 'by')!} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
+        return sql`${qualified(callerValue(o, 'by')!)} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
       })}`,
     limitSQL = (limit: number | undefined) => limit === undefined ? [] :
       callerValue(allOptions, 'withTies') ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
@@ -996,32 +1063,51 @@ function selectQuery(
         });
 
   const
-    rowsSQL = (limit: number | undefined) => sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
-    rowsQuery = rowsSQL(callerValue(allOptions, 'limit')),
+    limit = callerValue(allOptions, 'limit'),
+    fromSQL = (limit: number | undefined) => sql` FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
+    keysAsSQL = asRow ? [...keyPairs, ...lateralPairs].map(([k, v]) => sql`, ${v} AS ${SQLForKeyAlias(k)}`) : [],
+    rowsSQL = (limit: number | undefined) => asRow ?
+      sql<SQL, any>`SELECT ${allColsSQL} AS result FROM (SELECT${distinctSQL} ${alias}.*${keysAsSQL}${fromSQL(limit)}) AS ${SQLForAlias('row_', alias)}` :
+      sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result${fromSQL(limit)}`,
+    rowsQuery = rowsSQL(limit),
     query = mode !== SelectResultMode.Many || rows ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
-      sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
-    checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false);
+      sql<SQL, any>`SELECT coalesce(json_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
+    checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false),
+    asRows = mode === SelectResultMode.Many && !rows && (getConfig().topLevelSelectAsRows ?? false);
 
-  if (checksSecondRow) {
-    // compiled on its own, as `run()` does, the query asks for a second row; a parent query compiles it
-    // into its own `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`,
-    // where a second row would duplicate the parent row; the `LIMIT 2` form takes the properties
-    // a caller may have set on the query since (those `copy()` carries over)
-    const topLevelQuery = rowsSQL(2), nestedCompile = query.compile;
-    (query as SecondRowChecked)[secondRowQuery] = topLevelQuery;
-    query.compile = (result, parentTable, currentColumn) => {
-      if (result) return nestedCompile(result, parentTable, currentColumn);
-      const { parentTable: queryParentTable, preparedName, noop } = query;
-      return Object.assign(topLevelQuery, { parentTable: queryParentTable, preparedName, noop })
-        .compile(undefined, parentTable, currentColumn);
-    };
+  if (checksSecondRow || asRows) {
+    // compiled on its own, as `run()` does, the query asks for a second row, or is selectRows()'s; a parent query
+    // compiles it into its own `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`, where a
+    // second row would duplicate the parent row, or its aggregate, which the parent reads as one value; the top-level
+    // form takes the properties a caller may have set on the query since (those `copy()` carries over), so it is a
+    // fragment of its own, never the one nested in the aggregate, which would carry the name and noop nested
+    const
+      topLevelQuery = checksSecondRow ? rowsSQL(2) :
+        // a single lateral passed through keeps its JSON value, as json_agg() converts it (pg parses the bare column,
+        // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
+        // still act on the raw value; to_json() keeps a json child's key order
+        lateral instanceof SQLFragment ?
+          sql<SQL, any>`SELECT to_json(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
+          rowsSQL(limit),
+      nestedCompile = query.compile,
+      topLevel = () => Object.assign(topLevelQuery,
+        { parentTable: query.parentTable, preparedName: query.preparedName, noop: query.noop, noopResult: query.noopResult });
+    (query as TopLevelFormed)[topLevelForm] = topLevelQuery;
+    query.compile = (result, parentTable, currentColumn) =>
+      result ? nestedCompile(result, parentTable, currentColumn) : topLevel().compile(undefined, parentTable, currentColumn);
+    if (asRows) {
+      // run() too: a copy, which compiles as nested, keeps the query's own runResultTransform, the aggregate's
+      topLevelQuery.runResultTransform = rowsResult;
+      query.run = (queryable, force) => topLevel().run(queryable, force);
+    }
   }
 
   query.runResultTransform =
 
-    // selectRows(): one result per row, as insert() of an array gives its rows
-    rows ? (qr) => qr.rows.map(r => r.result) :
+    // selectRows(): one result per row, as insert() of an array gives its rows; a transform of its own, which
+    // jsonResult marks, never the shared rowsResult
+    rows ? (qr) => rowsResult(qr) :
 
     mode === SelectResultMode.Numeric ?
       // note: pg deliberately returns strings for int8 in case 64-bit numbers overflow
@@ -1039,6 +1125,9 @@ function selectQuery(
         // SelectResultMode.One or SelectResultMode.Many
         (qr) => qr.rows[0]?.result;
 
+  // select()'s json_agg, a row built with json functions, or a passed-through json result kept as it is
+  (query.runResultTransform as JSONResult)[jsonResult] = mode !== SelectResultMode.Numeric &&
+    ((mode === SelectResultMode.Many && !rows) || asJson || (jsonChild && !plainDistinct));
   query['parenthesisedInExtras'] = true;
   return query;
 }
@@ -1083,20 +1172,20 @@ export interface SelectRowsSignatures {
 }
 
 /**
- * Generate the query `select()` wraps in `jsonb_agg`, as a `SQLFragment` of
+ * Generate the query `select()` wraps in its aggregate, as a `SQLFragment` of
  * its own, one row per result: for `cursor()`, which runs exactly the
- * fragment it is given, and so reads a `select()` as its one `jsonb_agg` row.
+ * fragment it is given, and so reads a `select()` as its one aggregate row.
  * With `{ columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }`:
- * `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
+ * `SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
  * where `select()` sends
- * `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…the same…) AS "sq_films"`.
+ * `SELECT coalesce(json_agg(result), '[]') AS result FROM (…the same…) AS "sq_films"`.
  *
  * `run()` gives what `select()` gives, `[]` for no row, but for a single
  * `lateral` subquery, whose result is passed through as `selectOne()` passes
  * it, as `pg` parses its column, and typed so. One typed `number`, alone or in
- * a union, does not compile: `count()`, `sum()`, `avg()`, and `min()` or
- * `max()` unless typed by column (`aggregatesTypedByColumn`), since `pg` gives
- * a `bigint` or a `numeric` as a string and a `date` as a `Date` (#749).
+ * a union, does not compile: `count()`, `sum()` or `avg()`, since `pg` gives
+ * a `bigint` or a `numeric` as a string (#749); `min()` and `max()`, typed by
+ * column, do.
  * Under a `lateral` key it is JSON, as in `select()`; past the type, from
  * JavaScript, `pg`'s value.
  * A `lateral` whose type is a type parameter, or a fragment typed by an
@@ -1122,19 +1211,7 @@ export const selectRows: SelectRowsSignatures = function (
 
 /* === selectOne === */
 
-export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<SelectResultMode.One>, {
-  <
-    T extends Table,
-    C extends ColumnsOption<T>,
-    L extends LateralOption<C, E>,
-    E extends ExtrasOption<T>,
-    A extends string,
-  >(
-    table: T,
-    where: WhereableArg<T> | SQLFragment<any> | AllType,
-    options?: SelectOptionsForTable<T, C, L, E, A>,
-  ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>>;
-}> { }
+export interface SelectOneSignatures extends PassingThroughSignatures<SelectResultMode.One> { }
 
 /**
  * Generate a `SELECT` query `SQLFragment` that returns only a single result (or 
@@ -1165,19 +1242,7 @@ export const selectOne: SelectOneSignatures = function (table, where, options = 
 
 /* === selectExactlyOne === */
 
-export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSignatures<SelectResultMode.ExactlyOne>, {
-  <
-    T extends Table,
-    C extends ColumnsOption<T>,
-    L extends LateralOption<C, E>,
-    E extends ExtrasOption<T>,
-    A extends string,
-  >(
-    table: T,
-    where: WhereableArg<T> | SQLFragment<any> | AllType,
-    options?: SelectOptionsForTable<T, C, L, E, A>,
-  ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.ExactlyOne>>;
-}> { }
+export interface SelectExactlyOneSignatures extends PassingThroughSignatures<SelectResultMode.ExactlyOne> { }
 
 /**
  * Generate a `SELECT` query `SQLFragment` that returns a single result or 
@@ -1187,7 +1252,7 @@ export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSigna
  *
  * With the `selectExactlyOneChecksForSecondRow` config option, the query run
  * (or compiled) on its own asks for `LIMIT 2` and also throws on a second row:
- * `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
+ * `SELECT to_json("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
  * `$2` being `2`. Nested in another query (a `lateral`, a `sql` template), or
  * compiled into a `result` of its own, it keeps `LIMIT 1`.
  *
@@ -1221,10 +1286,6 @@ export interface NumericAggregateSignatures {
   ): SQLFragment<number>;
 }
 
-// Only literal false selects the legacy signatures. Exclude any, then check assignability both ways.
-type TypedByColumn = ConfigTypes extends { aggregatesTypedByColumn: infer Setting } ?
-  true extends Setting ? true : [Setting, false] extends [false, Setting] ? false : true :
-  true;
 type ColumnValueOrNull<S, C> = C extends readonly (keyof S)[] ? S[C[number]] | null : never;
 
 export interface NullableNumericAggregateSignatures {
@@ -1265,13 +1326,12 @@ const numericAggregate = (
     byColumn = aggregate === 'min' || aggregate === 'max';
 
   if (refusal === undefined) {
-    // Number() makes a NULL 0, a date its epoch ms, a text NaN, and an int8 or numeric string a number;
-    // the option changes no SQL, so it is read at run(), as the type, declared once for the program, says
+    // min() and max() give the column's value as pg parses it, sum() and avg() Number() of an int8 or numeric
+    // string, and both a NULL as null; count() keeps select()'s transform, which reads no row as 0
     if (aggregate !== 'count') {
       query.runResultTransform = (qr) => {
         const result = qr.rows[0]?.result ?? null;  // no row reads as a NULL result, as for count()
-        if (getConfig().aggregatesTypedByColumn ?? true) return byColumn || result === null ? result : Number(result);
-        return Number(result);
+        return byColumn || result === null ? result : Number(result);
       };
     }
     return query;
@@ -1315,10 +1375,9 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * `sum("col")`; no column, several, a string in place of the array, or a
  * single query as `lateral`, throw as the query compiles, so `run()` rejects
  * before any query is sent.
- * An empty set or a query returning no row gives `null`, or `0` with `aggregatesTypedByColumn: false`
- * in `setConfig()`. Only a literal `false` in `ConfigTypes` selects the legacy `number` signature.
+ * An empty set or a query returning no row gives `null`.
  */
-export const sum: TypedByColumn extends true ? NullableNumericAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
+export const sum: NullableNumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'sum');
 };
 
@@ -1330,10 +1389,10 @@ export const sum: TypedByColumn extends true ? NullableNumericAggregateSignature
  * @param where A `Whereable` or `SQLFragment` defining the rows to be
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
- * `columns` holds the one column to aggregate, and an empty set gives `null` or
- * the legacy `0`, as for `sum`; passed through, as for `sum`.
+ * `columns` holds the one column to aggregate, and an empty set gives `null`,
+ * as for `sum`; passed through, as for `sum`.
  */
-export const avg: TypedByColumn extends true ? NullableNumericAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
+export const avg: NullableNumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'avg');
 };
 
@@ -1346,10 +1405,9 @@ export const avg: TypedByColumn extends true ? NullableNumericAggregateSignature
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns` holds the one column to aggregate, as for `sum`. The result is
- * the column's value as `pg` parses it, nested as JSON, or `null`. With
- * `aggregatesTypedByColumn: false`, `.run()` passes it through `Number()`.
+ * the column's value as `pg` parses it, nested as JSON, or `null`.
  */
-export const min: TypedByColumn extends true ? ColumnAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
+export const min: ColumnAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'min');
 } as ColumnAggregateSignatures;
 
@@ -1364,7 +1422,7 @@ export const min: TypedByColumn extends true ? ColumnAggregateSignatures : Numer
  * `columns` holds the one column to aggregate, and the result is typed, as
  * for `min`.
  */
-export const max: TypedByColumn extends true ? ColumnAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
+export const max: ColumnAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'max');
 } as ColumnAggregateSignatures;
 
@@ -1379,7 +1437,7 @@ export const max: TypedByColumn extends true ? ColumnAggregateSignatures : Numer
 // ALWAYS column and on a view (428C9)
 const inWith = <F>(fragment: F) =>
   !(fragment instanceof SQLFragment) ? fragment :
-    fragment.noop ? sql`SELECT NULL::jsonb AS result WHERE false` :
+    fragment.noop ? sql`SELECT NULL::json AS result WHERE false` :
       Object.assign(fragment.copy(), { preparedName: undefined });
 
 /**
@@ -1394,11 +1452,12 @@ const inWith = <F>(fragment: F) =>
  * The result is a copy of `query`: it resolves to what `query` does, and is
  * written in parentheses as an `extras` or `insert()` value where `query` is.
  * A no-op `query` or CTE (an `insert()` or `upsert()` of no row) is written
- * `SELECT NULL::jsonb AS result WHERE false`, and the result is no no-op, so
+ * `SELECT NULL::json AS result WHERE false`, and the result is no no-op, so
  * the CTEs run. A `selectExactlyOne()` that checks for a second row still does
- * at the top level. The result is never prepared, whatever `query` is, even
- * by a `prepared()` called on `query` or a CTE afterwards: call `prepared()`
- * on it.
+ * at the top level, and a `select()` with `topLevelSelectAsRows` is still its
+ * rows query there, a CTE keeping its aggregate. The result is never
+ * prepared, whatever `query` is, even by a `prepared()` called on `query` or a
+ * CTE afterwards: call `prepared()` on it.
  * @param ctes The CTEs, keyed by name: a shortcut or a `sql` fragment each
  * @param query The main query
  */
@@ -1409,14 +1468,20 @@ export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]
       sql`WITH ${mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${inWith(cte)})`)} ${inWith(main)}`,
     result = Object.assign(entries.length === 0 ? query.copy() as Q :
       query.copy({ literals: ['', ''], expressions: [withClause(query)], noop: false }) as Q, { preparedName: undefined }),
-    topLevelQuery = (query as SecondRowChecked)[secondRowQuery];
+    topLevelQuery = (query as TopLevelFormed)[topLevelForm];
 
   if (topLevelQuery) {
-    // compiled on its own, the LIMIT 2 form, as select() compiles it; nested, LIMIT 1
-    const nestedCompile = result.compile;
+    // compiled on its own, the LIMIT 2 form or the rows form, as select() compiles it; nested, LIMIT 1 or the aggregate
+    const
+      nestedCompile = result.compile,
+      topLevel = () => Object.assign(entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery), { parentTable: result.parentTable, preparedName: result.preparedName });
     result.compile = (compiled, parentTable, currentColumn) => compiled ? nestedCompile(compiled, parentTable, currentColumn) :
-      Object.assign(entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery), { parentTable: result.parentTable, preparedName: result.preparedName })
-        .compile(undefined, parentTable, currentColumn);
+      topLevel().compile(undefined, parentTable, currentColumn);
+    // the rows form runs with its own result, one per row, as select() runs it
+    if (topLevelQuery.runResultTransform === rowsResult) {
+      result.run = (queryable, force) =>
+        Object.assign(topLevel(), { runResultTransform: rowsResult, noop: result.noop, noopResult: result.noopResult }).run(queryable, force);
+    }
   }
   return result;
 };

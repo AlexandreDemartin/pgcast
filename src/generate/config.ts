@@ -7,6 +7,7 @@ Released under the MIT licence: see LICENCE file
 import * as fs from 'fs';
 import * as path from 'path';
 import type * as pg from 'pg';
+import { refuseRemovedOptions, withoutRemovedOptions } from './removedOptions';
 import { schemaRulesAsTyped } from './schemaRules';
 
 
@@ -27,21 +28,14 @@ export interface OptionalConfig {
   schemaJSDoc: boolean;
   unprefixedSchema: string | null;
   customJSONParsingForLargeNumbers: boolean;
-  // optional, so a CompleteConfig written for 6.6.1 still compiles
-  typeEnumsAcrossSchemas?: boolean;  // look up an enum in its own schema by default; false uses the relation's schema
-  enumOrder?: 'alphabetical' | 'declared';  // Postgres's declared order by default; 'alphabetical' sorts the labels
-  // optional too; read it with ?? 'zapatos'
+  // optional, so a CompleteConfig written for 6.6.1 still compiles; read it with ?? 'zapatos'
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
-  // optional for a CompleteConfig written for 6.6.1; the CLI sets false
-  rejectOnQueryError?: boolean;  // reject with the query or connection error by default; false prints it and exits
-  uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists usable ON CONFLICT ON CONSTRAINT arbiters by default; false lists all unique indexes
+  // optional for a CompleteConfig written for 6.6.1
   constraintNames?: boolean;  // true adds each relation's Constraint type, including all its unique indexes
-  domainsTypedByContext?: boolean;  // use the base type by context when the placeholder matches the type generated with these settings
   enumArraysTypedAsText?: boolean;  // pg returns an enum array as text in Selectable by default; false keeps the label array for a custom parser
   intervalsTypedAsObjects?: boolean;  // pg returns a PostgresInterval in Selectable by default; false keeps string for a custom parser
   // optional too; read it with ?? false
   domainsTypedAsUnions?: boolean;  // a domain over text whose valid CHECK lists its values is declared as their union, which a new placeholder names
-  valuesTypedAsAliases?: boolean;  // a column's value in Whereable, Insertable and Updatable is written as db.WhereableValue<…> and its siblings: the same types
 }
 
 /** The type of `schemas`: by schema, the relations to generate. */
@@ -92,7 +86,8 @@ export const moduleRoot = () => {
 };
 
 export const finaliseConfig = (config: Config) => {
-  const finalConfig = { ...defaultConfig, ...config } as CompleteConfig;
+  refuseRemovedOptions(config);  // before any query, whoever finalises: generate(), check(), the CLI
+  const finalConfig = withoutRemovedOptions({ ...defaultConfig, ...config } as CompleteConfig);
   finalConfig.schemas = schemaRulesAsTyped(finalConfig.schemas);  // a rule missing include or exclude (#301), or giving one as a string (#442)
   return finalConfig;
 };
