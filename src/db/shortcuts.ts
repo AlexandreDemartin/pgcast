@@ -214,7 +214,7 @@ function SQLForKeyAlias(key: string, list: 'columns' | 'returning' = 'columns') 
     bytes = Buffer.byteLength(text),
     problem = text === '' ? 'it is empty' : text.includes('\0') ? 'it holds a NUL' : bytes > 63 ? `it takes ${bytes} bytes in UTF-8, over Postgres's 63` : undefined;
   return problem === undefined ? raw(`"${text.replace(/"/g, '""')}"`) :
-    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which \`shortcutsUseJson\` makes of an ${list === 'columns' ? '\`extras\` or \`lateral\` key' : '\`extras\` key'} beside every column: ${problem}. Give \`${list}\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.`);
+    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which \`shortcutsUseJson\` makes of an ${list === 'columns' ? '`extras` or `lateral` key' : '`extras` key'} beside every column: ${problem}. Give \`${list}\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.`);
 }
 
 // the RETURNING list of insert(), upsert() (with `$action`, unless suppressed), update() and deletes(), `… AS result`.
