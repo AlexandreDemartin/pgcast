@@ -1,5 +1,5 @@
 ---
-english: 9209e1476a00
+english: 89bc1c8c34a6
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -351,7 +351,7 @@ Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.condi
 
 ### Régénérer et compiler {#regenerate-for-7-0}
 
-Régénérez le schéma dès que vous changez de version du générateur ou d’option de sortie. Lancez `npx pgcast`, puis examinez le diff du schéma généré. Les quatre premiers anciens réglages du tableau restent disponibles sans avertissement en 7.x et disparaissent en 8.0. Les trois derniers sont permanents.
+Régénérez le schéma dès que vous changez de version du générateur ou d’option de sortie. Lancez `npx pgcast`, puis examinez le diff du schéma généré. Les quatre premiers anciens réglages du tableau, et le dernier, restent disponibles sans avertissement en 7.x et disparaissent en 8.0 ; les deux choix de parser restent.
 
 | Valeur par défaut en 7.0 | Ce qui change pour votre code | Ancien réglage |
 |---|---|---|
@@ -361,7 +361,7 @@ Régénérez le schéma dès que vous changez de version du générateur ou d’
 | [`domainsTypedByContext: true`](/fr/generator#generate.domainsTypedByContext) | Avec le placeholder généré et les parseurs par défaut, un domaine sur `bigint` donne une chaîne dans une ligne brute et un nombre dans le JSON d’un raccourci. Il accepte un `bigint` à l’écriture. [Types des domaines](#domain-and-parser-types). | `false` |
 | [`enumArraysTypedAsText: true`](/fr/generator#generate.enumArraysTypedAsText) | Dans une ligne brute, un tableau d’enums est du texte, par exemple `'{writer,editor}'`. Utilisez le tableau du raccourci pour appeler `.map()`, ou choisissez `false` si votre parser renvoie un tableau. | `false` (permanent) |
 | [`intervalsTypedAsObjects: true`](/fr/generator#generate.intervalsTypedAsObjects) | Dans une ligne brute, un intervalle possède la méthode `toPostgres()`. Le JSON d’un raccourci conserve le texte. Choisissez `false` si votre parser renvoie du texte. | `false` (permanent) |
-| [`rejectOnQueryError: true`](/fr/generator#generate.rejectOnQueryError) | Les promesses de `generate()` et de `tsForConfig()` sont rejetées avec l’erreur de connexion ou de requête d’origine. Relancez l’erreur ou définissez `process.exitCode = 1` si le script doit échouer. Une erreur synchrone d’un écouteur rejette aussi la promesse de génération. Gérez les promesses que renvoie l’écouteur. | `false` (arrêt immédiat, réglage permanent) |
+| [`rejectOnQueryError: true`](/fr/generator#generate.rejectOnQueryError) | Les promesses de `generate()` et de `tsForConfig()` sont rejetées avec l’erreur de connexion ou de requête d’origine. Relancez l’erreur ou définissez `process.exitCode = 1` si le script doit échouer. Une erreur synchrone d’un écouteur rejette aussi la promesse de génération. Gérez les promesses que renvoie l’écouteur. | `false` (arrêt immédiat, en 7.x) |
 
 Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de base de données. La fonction compare le contenu du schéma et, si le générateur produit un index des types personnalisés, celui de cet index. Elle vérifie aussi la présence de chaque placeholder. Si la vérification échoue, la promesse se résout avec `false`. Avec `rejectOnQueryError: false`, les trois fonctions arrêtent le processus en cas d’erreur de base de données. Les deux commandes, `pgcast` et `zapatos`, quittent avec le code 1 dans ce cas. Leur option `--check` renvoie aussi le code 1 quand cette vérification renvoie `false`. [Erreurs du générateur](/fr/generator#generate.rejectOnQueryError).
 
@@ -429,7 +429,7 @@ Rétablissez le paquet 6.x et son fichier de verrouillage, réinstallez les dép
 npm install zapatos@6.6.1
 ```
 
-- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn`, `topLevelSelectAsRows` et `transactionEventListener`, que TypeScript prend pour une faute de frappe de `transactionListener` (2561). Zapatos 6.6.1 n’appelle jamais cet écouteur : alimentez plutôt un log ou une métrique avec les messages de `transactionListener`.
+- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn`, `shortcutsUseJson`, `topLevelSelectAsRows` et `transactionEventListener`, que TypeScript prend pour une faute de frappe de `transactionListener` (2561). Zapatos 6.6.1 n’appelle jamais cet écouteur : alimentez plutôt un log ou une métrique avec les messages de `transactionListener`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
 - Renommez un `pgcastconfig.json` en `zapatosconfig.json` : la CLI de Zapatos 6.6.1 ne lit aucun autre fichier.
 - Retirez [`--check`](/fr/generator#check) de vos scripts. Avant l’argument JSON, la CLI de Zapatos 6.6.1 le lit comme cet argument, et s’arrête avec le code 1 ; après lui, elle l’ignore, écrit les fichiers et se termine avec le code 0 : la vérification passe donc toujours. [`check()`](/fr/generator#check) aussi : le `zapatos/generate` de Zapatos 6.6.1 n’a pas cet export, ce que TypeScript refuse (2305) ; à l’exécution, `require()` donne `undefined` et l’appel lève `TypeError: check is not a function`, et un import de module ES échoue avant que le moindre code ne s’exécute.

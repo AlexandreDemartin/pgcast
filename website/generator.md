@@ -169,7 +169,7 @@ These options changed their default in 7.0.0. Each keeps the 6.x behaviour with 
 |---|---|---|---|---|
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `true` | `false` | removed | the type of an enum of another schema |
 | [`enumOrder`](#generate.enumOrder) | `"declared"` | `"alphabetical"` | removed | the order of an enum's labels |
-| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | `false` | stays | whether a failed query rejects, or ends the process |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | `false` | removed | whether a failed query rejects, or ends the process |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | `false` | removed | the names in each relation's `UniqueIndex` |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | `false` | removed | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, outside `Selectable`, and of a domain over a domain or an array of a domain |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | `false` | stays | the `Selectable` type of an array of an enum |
@@ -403,7 +403,7 @@ import type * as s from 'pgcast/schema';
 
 From 7.0.0. This boolean defaults to `true`. With the option omitted, set to `null` in JSON, or set to `true`, a failed connection or query rejects `generate()`, `tsForConfig()` and [`check()`](#export-check) with the original error before any files are written. A synchronous throw from a listener also rejects generation. Handle any promise the listener returns yourself. Earlier listener output stays visible.
 
-Set `rejectOnQueryError: false` to print `*** error <n> ***` and the error to stdout, then end the process with code 1 before the promise settles. This is a permanent option and the one [the CLI](#cli) uses.
+Set `rejectOnQueryError: false` to print `*** error <n> ***` and the error to stdout, then end the process with code 1 before the promise settles: what [the CLI](#cli) does through 7.x. 8.0 removes the option: a failed query always rejects, and the CLI prints the error and exits with code 1 itself ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 If generation must fail the job, rethrow the error or set the exit code in your handler.
 
@@ -583,7 +583,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 - The second type argument is `null | db.DefaultType` for a nullable column, `db.DefaultType` for one with a default, and left out otherwise.
 - The schema file is smaller, and `tsc` uses less memory: on 300 tables of 20 columns, 5.1 MB rather than 7.0 MB, and 293 MB rather than 387 MB with `skipLibCheck: false`, 196 MB rather than 280 MB with `skipLibCheck: true`.
 - An editor's hover and an error name the alias on TypeScript 5.9: `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`. TypeScript 4.1 shows the union in full.
-- The queries' SQL doesn't change. With `false`, nor does the output. It becomes the default in 8.0, and `false` stays ([decision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
+- The queries' SQL doesn't change. With `false`, nor does the output. 8.0 keeps it alone ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md); [decision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
 
 ### `progressListener` {#generate.progressListener}
 

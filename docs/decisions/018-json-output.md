@@ -22,8 +22,8 @@
 
 | Key | Values | 7.x | 8.0 |
 |---|---|---|---|
-| `shortcutsUseJson?: boolean` | `true`: § 2; `false`, or left out in 7.x: today's `jsonb` | off | on; `false` is permanent, for SQL that applies a `jsonb` function, `DISTINCT` or `UNION` to a nested result, or a type parser set for `jsonb` alone |
-| `topLevelSelectAsRows?: boolean` | `true`: § 3; `false`, or left out in 7.x: today's aggregate | off | on; `false` is permanent, for code that runs `compile()`'s text with its own client and reads `rows[0].result` |
+| `shortcutsUseJson?: boolean` | `true`: § 2; `false`, or left out in 7.x: today's `jsonb` | off | on; ~~`false` is permanent, for SQL that applies a `jsonb` function, `DISTINCT` or `UNION` to a nested result, or a type parser set for `jsonb` alone~~ superseded by [019](./019-one-behaviour.md) § 3: `true` alone |
+| `topLevelSelectAsRows?: boolean` | `true`: § 3; `false`, or left out in 7.x: today's aggregate | off | on; ~~`false` is permanent, for code that runs `compile()`'s text with its own client and reads `rows[0].result`~~ superseded by [019](./019-one-behaviour.md) § 3: `true` alone |
 
 - **Class** (decision 003 § Rule): opt-in, then the default at the next major, now 8.0, as note 017. Not Fix: today's SQL is valid, and code may read its text or a nested `jsonb`.
 - **Names**: flat keys of the runtime `Config`, optional (`?:`) with `false` in its defaults (decision 003 § Rule), each saying what the shortcuts do (`selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn`).
@@ -104,7 +104,7 @@ The other cases swap the function names only: `alias` (`to_json("f".*) … AS "s
   - `columns`, `extras` beside `columns`, the lateral `FROM` alias (`"lateral_films"`) and `'$action'` keep today's form. #939 adds the injection tests of skill `sql-safety` for each name the new shape writes.
 - **A key equal to a column**: `||` lets the right side win; `to_json` writes both keys, in the order `||` merges them today (columns, then `extras`, then the sorted `lateral` keys, then `$action`), and `JSON.parse`, `json-custom-numbers`, a cast to `jsonb` and `->>` all keep the last. Same value; the duplicate goes over the wire.
 - **`order` and `distinct` beside such a key**: in the alias shape, a bare name in `ORDER BY` or `DISTINCT ON` matches an output column first, and two of them fail (42702, "ORDER BY "name" is ambiguous"). So there, a string `order.by` and each string of `distinct` are written after the alias, `ORDER BY "studios"."name"`, unless they already hold a `.`; a fragment is the caller's SQL, written as given. `GROUP BY` takes the input column first: unchanged.
-- **Why not a scalar subquery in a read**: `(SELECT to_json(r.*) FROM (SELECT "films".studio_id, count(*) AS n) r)` moves an `extras` aggregate to the subquery's level: `count(*)` gave 1 in place of 20. The read wraps the row level instead; `RETURNING` refuses aggregates (42803), window functions (42P20) and set-returning functions (0A000), so a write can take the scalar subquery, which accepts some of what `RETURNING` refuses (`website/insert.md` § With `shortcutsUseJson`).
+- **Why not a scalar subquery in a read**: `(SELECT to_json(r.*) FROM (SELECT "films".studio_id, count(*) AS n) r)` moves an `extras` aggregate to the subquery's level: `count(*)` gave 1 in place of 20. The read wraps the row level instead; `RETURNING` refuses aggregates (42803), window functions (42P20) and set-returning functions (0A000), so a write can take the scalar subquery, which accepts some of what `RETURNING` refuses ([`website/insert.md` § With `shortcutsUseJson`](../../website/insert.md#shortcutsUseJson)).
 - **`columns` with a merge**: one `json_build_object`, not the alias shape: keys stay parameters, no `ORDER BY` collision, and it measured the same (§ 5).
   - Postgres takes 100 arguments in a call (`max_function_args`; 102 gave 54023 on 17.3), so 50 keys, where today `columns`, `extras` and the `lateral` keys each have their own `jsonb_build_object`. Over 50 keys, together, are refused as the query compiles, with a message that names the limit, the count and the ways out (fewer keys, or the option off); no fallback to another shape (§ 6). Decided in #939.
 - **`alias`**: the row level is `"row_<alias>"` and the aggregate `"sq_<alias>"`, both written as `SQLForAlias` writes `"sq_<alias>"` today.
@@ -144,8 +144,10 @@ WITH "s" AS (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_j
 | | A nested result is `json` (type 114): a `jsonb` function fails on it (`jsonb_array_length(json)`, 42883), and so do `DISTINCT` and `UNION` over it; `->` and `->>` work | SQL around a nested shortcut |
 | | A type parser set for `jsonb` (3802) alone no longer applies; `enableCustomJSONParsingForLargeNumbers()` sets both | a custom `pg.types` setup |
 | | The SQL text, and the key refusals of § 2 | logs, SQL snapshots |
+| | Beside every column, a bare name in a `sql` fragment of `order.by` or `distinct` that equals an `extras` or `lateral` key is ambiguous, 42702; qualified, `"films"."title"`, it runs (#956) | `order` and `distinct` fragments |
 | | The aggregate's cap: `jsonb_agg` stops at 256 MB (54000), `json_agg` at a value's 1 GB | very large reads |
 | `topLevelSelectAsRows` | `compile()` gives the rows query: code that runs it with its own client and reads `rows[0].result` breaks | code that runs `compile()` |
+| | A `runResultTransform` set on a `select()` applies to its aggregate only, not to what `.run()` gives (`'mine'` off, the rows on), and a `compile` wrapped on it is not what `.run()` sends (a `/* tag */` prefix sent off, dropped on) (#956) | code that sets either on a `select()` |
 | | No cap for the whole result; each row keeps a value's, and `pg` a single JS string's ~512 MB ([brianc/node-postgres#2653](https://github.com/brianc/node-postgres/issues/2653)) | very large reads |
 
 ## 5. The probe
@@ -181,4 +183,4 @@ Client medians in ms, 9 interleaved rounds after 2 warm-ups; timings move about 
 
 Superseded by decision [019](./019-one-behaviour.md) § 3: 8.0 removes both options and keeps `true` alone.
 
-Both options become `true` by default; `false` keeps today's SQL, with no warning, after 8.0 too (decision 003 § An explicit old value is kept). Nothing else is removed.
+~~Both options become `true` by default; `false` keeps today's SQL, with no warning, after 8.0 too (decision 003 § An explicit old value is kept). Nothing else is removed.~~

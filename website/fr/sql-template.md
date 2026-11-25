@@ -1,5 +1,5 @@
 ---
-english: 9172efbed35b
+english: 727fd0c50094
 ---
 
 # Template SQL
@@ -610,7 +610,7 @@ withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<an
 - **Noms** : chaque clé est un seul nom, jamais coupé sur `.`, écrit entre guillemets comme un [identifiant](#identifiers) : `'a.b'` donne `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, un `"` est doublé, et une clé déjà échappée à la main est gardée telle quelle, si bien que `'a""b'` et `'a"b'` nomment toutes deux la CTE `a"b` : dans un même appel, Postgres refuse la paire (42712).
 - **Aucune CTE** : `withCTEs({}, query)` donne une copie de `query`, son propre SQL, si bien qu’une liste construite à l’exécution n’a besoin d’aucune branche.
 - **Le résultat** : une [`copy()`](#copy) de `query`, de son type. Il se résout en ce que donne `query`, imbriqué dans un `lateral` ou dans `extras` aussi, et s’écrit entre parenthèses comme valeur d’`extras` ou d’`insert()` là où `query` l’est.
-- **Sans effet** : un `insert()` ou un `upsert()` sans ligne, comme requête ou comme CTE, s’écrit `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, une requête sans ligne sur n’importe quelle table, et le résultat n’est pas sans effet : ses CTE s’exécutent donc ; comme requête, il se résout en `[]`.
+- **Sans effet** : un `insert()` ou un `upsert()` sans ligne, comme requête ou comme CTE, s’écrit `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) --> (`NULL::json` avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson)), une requête sans ligne sur n’importe quelle table, et le résultat n’est pas sans effet : ses CTE s’exécutent donc ; comme requête, il se résout en `[]`.
 - **`selectExactlyOne()`** : avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), le résultat demande toujours une deuxième ligne (par défaut `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`). Si la requête en trouve une, sa promesse est rejetée, comme pour le raccourci exécuté seul. Imbriquée, elle demande une ligne et, avec `withTies: true`, les éventuelles lignes ex æquo.
 - **`select()`** : avec [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), le résultat reste sa requête des lignes, `SELECT to_jsonb("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.select('films', db.all))) --> après le `WITH`, et donne le même tableau. Comme CTE ou imbriqué, il garde son `jsonb_agg`.
 - **Un seul `WITH`** : la requête ne peut pas commencer par son propre `WITH`, un résultat de `withCTEs()` ou un fragment `sql`, ni être un [`truncate()`](/fr/insert#truncate) : Postgres refuse le texte (42601). Mettez toutes les CTE dans un seul appel.

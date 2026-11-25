@@ -1,5 +1,5 @@
 ---
-english: 627bbc76186e
+english: 6965bcae7f0b
 ---
 
 # Générateur
@@ -173,7 +173,7 @@ Les options suivantes ont changé de valeur par défaut en 7.0.0. Chacune garde 
 |---|---|---|---|---|
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `true` | `false` | retirée | le type d’un enum d’un autre schéma |
 | [`enumOrder`](#generate.enumOrder) | `"declared"` | `"alphabetical"` | retirée | l’ordre des labels d’un enum |
-| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | `false` | reste | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | `false` | retirée | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | `false` | retirée | les noms figurant dans l’`UniqueIndex` de chaque relation |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | `false` | retirée | le type des domaines imbriqués et des tableaux de domaines, ainsi que celui des domaines sur `bigint`, `numeric`, `bytea`, `money`, une date ou un tableau de ces types hors de `Selectable` |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | `false` | reste | le type `Selectable` d’un tableau d’un enum |
@@ -407,7 +407,7 @@ import type * as s from 'pgcast/schema';
 
 À partir de la 7.0.0, cette option booléenne vaut `true` par défaut. Si vous omettez l’option, indiquez `null` en JSON ou choisissez `true`, la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) est rejetée avec l’erreur d’origine en cas d’échec de connexion ou de requête, avant toute écriture de fichier. Une erreur levée de façon synchrone par un écouteur rejette aussi la promesse de génération. Gérez vous-même les promesses que renvoient vos écouteurs. Les messages que les écouteurs ont déjà affichés restent visibles.
 
-Réglez `rejectOnQueryError: false` pour afficher `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêter le processus avec le code 1 avant que la promesse se résolve ou soit rejetée. Cette valeur reste disponible et c’est celle qu’utilise [la CLI](#cli).
+Réglez `rejectOnQueryError: false` pour afficher `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêter le processus avec le code 1 avant que la promesse se résolve ou soit rejetée : ce que fait [la CLI](#cli) en 7.x. La 8.0 retire l’option : une requête qui échoue rejette toujours la promesse, et la CLI affiche elle-même l’erreur et se termine avec le code 1 ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 Si votre script doit se terminer en erreur en cas d’échec de la génération, relancez l’erreur ou fixez le code de sortie dans votre gestionnaire d’erreurs.
 
@@ -587,7 +587,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 - Le second argument de type est `null | db.DefaultType` pour une colonne nullable, `db.DefaultType` pour une colonne qui a une valeur par défaut, et absent sinon.
 - Le fichier du schéma est plus petit, et `tsc` utilise moins de mémoire : sur 300 tables de 20 colonnes, 5,1 Mo au lieu de 7,0 Mo, et 293 Mo au lieu de 387 Mo avec `skipLibCheck: false`, 196 Mo au lieu de 280 Mo avec `skipLibCheck: true`.
 - Le survol d’un éditeur et une erreur nomment l’alias avec TypeScript 5.9 : `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`. TypeScript 4.1 affiche l’union en entier.
-- Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus. L’option devient la valeur par défaut en 8.0, et `false` reste possible ([décision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
+- Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus. La 8.0 ne garde que ce comportement ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md) ; [décision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
 
 ### `progressListener` {#generate.progressListener}
 

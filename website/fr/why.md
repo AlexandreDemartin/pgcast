@@ -1,5 +1,5 @@
 ---
-english: 285b7ffd66e7
+english: f5de4f454e19
 ---
 
 # Pourquoi pgcast
@@ -92,7 +92,7 @@ Les corrections de sécurité sont venues d’abord, toutes dans la 6.6.2 ([Séc
 - une valeur simple dans les `updateValues` de [`upsert()`](/fr/insert#upsert) est un paramètre ;
 - les mots-clés d’un verrou, de `truncate()` ou d’un niveau d’isolation, et le nom d’un agrégat, sont vérifiés avant toute requête.
 
-pgcast 6.x vous permet d’activer les corrections avant leur activation par défaut. En 7.0, six réglages du runtime et sept du générateur changent. Le [guide de migration](/fr/switching#from-7-0) précise quels anciens réglages disparaissent en 8.0 et lesquels restent disponibles pour un parser personnalisé ou pour arrêter le processus en cas d’erreur de base de données, comme le fait la CLI.
+pgcast 6.x vous permet d’activer les corrections avant leur activation par défaut. En 7.0, six réglages du runtime et sept du générateur changent. Le [guide de migration](/fr/switching#from-7-0) précise quels anciens réglages disparaissent en 8.0 et lesquels restent disponibles pour un parser personnalisé.
 
 [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés ; l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) aussi, jusqu’à la 8.0. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 
