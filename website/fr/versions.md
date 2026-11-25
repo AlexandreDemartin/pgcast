@@ -1,5 +1,5 @@
 ---
-english: 56bbb4f7719e
+english: 0da3269bd8a0
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -112,7 +112,7 @@ De la 6.7 à la fin de la 6.x, si l’option `rejectOnQueryError` était omise o
 
 [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases), à partir de la 7.2.0, écrit le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` comme un alias de `zapatos/db`, avec les mêmes types. L’option n’a pas de note, puisqu’il n’y a rien à migrer, et reste désactivée pendant toute la série 7.x. À partir de la 8.0.0, l’option est retirée et le générateur écrit toujours les alias ([migration vers la 8.0](/fr/switching#from-8-0-valuesTypedAsAliases)).
 
-[`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), à partir de la 7.3.0, envoie un `select()` exécuté seul sous la forme d’une ligne par résultat, avec les mêmes valeurs. L’option n’émet jamais d’avertissement, et la 8.0 ne garde que ce comportement : le code qui exécute lui-même le texte de `.compile()` lit `rows.map(r => r.result)`.
+[`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), à partir de la 7.3.0, envoie un `select()` exécuté seul sous la forme d’une ligne par résultat, avec les mêmes valeurs. L’option n’émet jamais d’avertissement, et la 8.0 retire la clé et ne garde que les lignes : le code qui exécute lui-même le texte de `.compile()` lit `rows.map(r => r.result)` ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)).
 
 [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), à partir de la 7.3.0, construit le JSON de `select()` et de ses semblables, et celui du `RETURNING` des écritures, avec les fonctions `json`, pour les mêmes valeurs, sauf l’ordre des clés d’une ligne et le type d’un résultat imbriqué. L’option n’émet jamais d’avertissement, et la 8.0 supprime la clé et ne garde que `json` ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
 

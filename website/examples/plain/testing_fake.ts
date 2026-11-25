@@ -22,7 +22,7 @@ test('programme() gives each film its year', async () => {
     { title: 'The Quiet Ferry', release_year: 1988 },
     { title: 'Tidewater', release_year: 2021 },
   ];
-  const queryable = answering([{ result: films }]);  // select() reads one row, its column result
+  const queryable = answering(films.map(result => ({ result })));  // select() reads one row per film, its column result
 
   assert.deepEqual(await programme(queryable, 1000), ['The Quiet Ferry (1988)', 'Tidewater (2021)']);
 });
