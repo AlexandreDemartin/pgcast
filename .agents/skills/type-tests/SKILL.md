@@ -11,7 +11,7 @@ Cases that serve a minority of steps are in [reference.md](reference.md), read w
 
 ## Rules
 
-- **Files**: `test/**/*.test-d.ts`, run by `npm run test:types` (Vitest `--typecheck`). The same command compiles `test/types-opt-in/legacy` separately for the literal `false` aggregate declaration.
+- **Files**: `test/**/*.test-d.ts`, run by `npm run test:types` (Vitest `--typecheck`).
 - **Positive**: `expectTypeOf(x).toEqualTypeOf<…>()`, never `toMatchTypeOf` when equality is possible: it lets a too-wide type through.
 - **Negative**: one wrong call per line under `// @ts-expect-error <reason>`; the reason says what must be refused. A call or an `expectTypeOf`, never an unused `type X = …`: with `noUnusedLocals`, its own error fills the expectation. Make each negative valid once to see "Unused '@ts-expect-error'", and compile a new one against master's types: one that holds there too (a `T` collapsed to `never`) freezes nothing, so an indexed access goes where a value goes (`null as unknown as T['k']`, #41). An unrelated error fills it too: a `1n` literal under the ES2019 target (TS2737: write `null as unknown as bigint`). A sweep of negatives diffs the whole `tsc` output, every `(line, code)` pair and its continuation lines, under each `strict` and `exactOptionalPropertyTypes` setting (TS2375 replaces TS2322), and uses the function as a value too (`.map(fn)`) (#516, #520, #579, #615).
 - **The call itself**: the shortcut's call, its value built apart, not through a typed helper (`constraint<'users'>(…)` tests the helper) nor an annotated variable (inference differs).

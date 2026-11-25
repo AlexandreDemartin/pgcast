@@ -1,5 +1,5 @@
 ---
-english: 6ad3f44998d8
+english: 60eff158641c
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -30,7 +30,7 @@ db.setConfig({
   - Zapatos 6.6.1 réglait la clé à `undefined`. Après `transactionAttemptsMax: undefined`, `transaction()` abandonnait après sa première tentative (« <span lang="en">… on attempt 1 of undefined, giving up</span> ») ; après `transactionRetryDelay: undefined`, chaque `transaction()` était rejetée avec « <span lang="en">TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.</span> » et ne libérait jamais le client qu’elle avait récupéré du pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - Elle renvoie une copie de la nouvelle configuration, comme `getConfig()` : modifier cet objet ne change rien. Zapatos 6.6.1 renvoyait la configuration elle-même ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - Elle garde l’objet `transactionRetryDelay` que vous lui donnez, pas une copie : modifier ensuite son `minMs` ou son `maxMs` modifie la configuration.
-- Une clé que la 8.0 a supprimée, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) ou [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel), ne compile pas (TS2353). Donnée quand même, depuis une variable ou du JavaScript, elle lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours (`true`), `null` ou `undefined`, et la configuration n’en garde aucune. Erreur : `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
+- Une clé que la 8.0 a supprimée, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient), [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) ou [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), ne compile pas (TS2353). Donnée quand même, depuis une variable ou du JavaScript, elle lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours (`true`), `null` ou `undefined`, et la configuration n’en garde aucune. Erreur : `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
 - Une clé inconnue ne compile pas (TS2353), pas plus qu’une valeur du mauvais type (TS2322) :
 
 ```ts twoslash
@@ -74,7 +74,6 @@ interface Config {
   castArrayParamsToJson: boolean;
   castObjectParamsToJson: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
-  aggregatesTypedByColumn?: boolean;
   shortcutsUseJson?: boolean;
   topLevelSelectAsRows?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
@@ -84,7 +83,7 @@ interface Config {
 }
 ```
 
-Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours. Le type que renvoie `getConfig()` pour ces clés est `boolean | undefined`, même si chacune a toujours une valeur. Si vous réglez `aggregatesTypedByColumn` sur `false`, déclarez aussi cette valeur dans [`ConfigTypes`](#ConfigTypes).
+Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours. Le type que renvoie `getConfig()` pour ces clés est `boolean | undefined`, même si chacune a toujours une valeur.
 
 <div class="stack">
 
@@ -95,7 +94,6 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | un paramètre tableau : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul demande deux lignes et sa promesse est rejetée s’il en trouve une deuxième | à chaque `selectExactlyOne()` |
-| [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
 | [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` et ses semblables, et le `RETURNING` des écritures, construisent leur JSON avec les fonctions `json` : `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | à chaque `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()`, `withCTEs()`, `insert()`, `upsert()`, `update()` et `deletes()` |
 | [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) | `false` | un `select()` exécuté seul envoie la requête de `selectRows()`, une ligne par résultat, au lieu d’une seule valeur agrégée | à chaque `select()` |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
@@ -248,18 +246,14 @@ Avec la vérification activée et `withTies` désactivé, un [`selectExactlyOne(
 
 ### `aggregatesTypedByColumn` {#Config.aggregatesTypedByColumn}
 
-```ts
-aggregatesTypedByColumn?: boolean  // default: true
-```
+À partir de la 7.0.0, l’option valait `true` par défaut. À partir de la 8.0.0, la clé est supprimée et pgcast se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-aggregatesTypedByColumn)).
 
-À partir de la 7.0.0, par défaut, [`sum()`](/fr/aggregates#sum), [`avg()`](/fr/aggregates#avg), [`min()`](/fr/aggregates#min) et [`max()`](/fr/aggregates#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour une valeur finie de type `timestamptz` et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/aggregates#count) restent les mêmes.
+[`sum()`](/fr/aggregates#sum), [`avg()`](/fr/aggregates#avg), [`min()`](/fr/aggregates#min) et [`max()`](/fr/aggregates#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour une valeur finie de type `timestamptz` et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/aggregates#count) restent les mêmes.
 
-Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne `0`, une date finie lue comme un `Date` donne le nombre de millisecondes depuis l’époque Unix et un texte non numérique donne `NaN`. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
+Pendant toute la 7.x, avec `false`, `.run()` appliquait `Number()` au résultat, sans avertissement : un ensemble vide donnait `0`, une date finie lue comme un `Date` le nombre de millisecondes depuis l’époque Unix et un texte non numérique `NaN`. Déclaré aussi à `false` dans [`ConfigTypes`](#ConfigTypes), il typait les quatre agrégats en `number`.
 
-- Pour retrouver les types de la 6.x, déclarez aussi `false` dans [`ConfigTypes`](#ConfigTypes). Si vous avez déjà déclaré l’option à `true`, cette déclaration reste valide.
-- Sous une clé de `lateral` ou comme valeur d’`extras`, le résultat de l’agrégat est renvoyé en JSON quel que soit le réglage et vaut `null` quand aucune ligne ne correspond. Par défaut, il est typé comme le type `JSONSelectable` de la colonne.
+- Sous une clé de `lateral` ou comme valeur d’`extras`, le résultat de l’agrégat est renvoyé en JSON et vaut `null` quand aucune ligne ne correspond. Il est typé comme le type `JSONSelectable` de la colonne.
   - Pour un [`lateral` transmis](/fr/select#lateral), appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou `selectRows()` pour obtenir la colonne telle que `pg` la parse. Un `select()` extérieur renvoie du JSON. [`selectRows()`](/fr/select#selectRows) refuse à la compilation un fragment numérique transmis directement, comme `count()`.
-- Chaque appel à `.run()` lit l’option même si la requête a été construite avant `setConfig()`. Réglez l’option sur `true` pour rétablir la valeur par défaut. JavaScript accepte aussi `null` et `undefined`. TypeScript refuse `null` avec `strictNullChecks` et `undefined` avec `exactOptionalPropertyTypes`. Une requête qui ne renvoie aucune ligne donne alors `null`.
 - Les exemples, et chaque type : [Typé par colonne](/fr/aggregates#typed-by-column).
 
 ### `shortcutsUseJson` {#Config.shortcutsUseJson}
@@ -404,34 +398,16 @@ Ce que prend [`setConfig()`](#setConfig) : n’importe quelles clés de `Config
 
 ## `ConfigTypes` {#ConfigTypes}
 
-```ts
-interface ConfigTypes { }
-```
-
-À partir de la 6.7.0, déclarez dans cette interface les options de `Config` qui changent un type, avec les mêmes valeurs qu’à l’exécution, puisque TypeScript ne peut pas lire `setConfig()`. Une interface vide reprend les valeurs par défaut de la 7.0. Pour retrouver les résultats numériques des agrégats de la 6.x, déclarez l’option une seule fois dans un module inclus par votre `tsconfig.json` (un fichier avec un `import` ou un `export`) et donnez-lui la même valeur à l’exécution.
-
-```ts twoslash
-import * as db from 'zapatos/db';
-
-declare module 'zapatos/db' {
-  interface ConfigTypes { aggregatesTypedByColumn: false }
-}
-
-db.setConfig({ aggregatesTypedByColumn: false });
-```
-
-Un `.d.ts` qui ne contient que la déclaration a besoin d’`export {}` : sans lui, le fichier déclare son propre `zapatos/db`, qui masque celui du paquet (`db.min`, `db.all` et le reste disparaissent).
+De la 6.7.0 à la fin de la 7.x. La 8.0 supprime l’interface avec [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), la seule clé qu’elle lisait ([migration vers la 8.0](/fr/switching#from-8-0-ConfigTypes)). Cette interface déclarait les options de `Config` qui changent un type, puisque TypeScript ne peut pas lire `setConfig()` :
 
 ```ts
-// pgcast.d.ts
-export {};
-
 declare module 'zapatos/db' {
   interface ConfigTypes { aggregatesTypedByColumn: false }
 }
 ```
 
-Avec [`moduleNames: "pgcast"`](/fr/generator#generate.moduleNames), c’est `declare module 'pgcast/db'`. Seule la clé [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) y est lue.
+- À partir de la 8.0.0, une déclaration restée de la 7.x compile toujours et ne change aucun type : `sum()`, `avg()`, `min()` et `max()` sont typés par colonne, quoi qu’elle contienne.
+- Sans une telle déclaration, nommer `db.ConfigTypes` ne compile plus (TS2694).
 
 ## `SQLQuery` {#SQLQuery}
 
@@ -464,7 +440,7 @@ type TransactionEvent =
 
 ## Opt-ins et avertissements {#opt-ins-and-warnings}
 
-En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x ; la 8.0 les supprime tous, sauf `aggregatesTypedByColumn` (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
+En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x ; la 8.0 les supprime tous les six et se comporte toujours comme avec `true` (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente ; la 8.0 la retire et ne garde que `LIMIT 1`. [`shortcutsUseJson`](#Config.shortcutsUseJson), à partir de la 7.3.0, n’a pas d’avertissement non plus, puisque ses valeurs sont les mêmes : elle est désactivée en 7.x, et la 8.0 ne garde que `json`.
 

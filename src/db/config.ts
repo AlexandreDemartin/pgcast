@@ -36,7 +36,6 @@ export interface Config {
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
-  aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value; declare false in ConfigTypes for the 6.x types
   shortcutsUseJson?: boolean;  // select() and its kin, and the writes' RETURNING, build their JSON with to_json, json_agg and json_build_object, not their jsonb twins
   topLevelSelectAsRows?: boolean;  // select() run or compiled on its own is selectRows()'s query, one row per result; nested, its aggregate
   queryListener?(query: SQLQuery, txnId?: number): void;
@@ -46,21 +45,12 @@ export interface Config {
 }
 export type NewConfig = Partial<Config>;
 
-/**
- * The options of `Config` that change a type, as you set them: the compiler cannot read `setConfig()`.
- * Declare each in a module of your project, a file with an `import` or an
- * `export` (`export {}` in a `.d.ts`), e.g.
- * `declare module 'zapatos/db' { interface ConfigTypes { aggregatesTypedByColumn: false } }`.
- */
-export interface ConfigTypes { }
-
 const defaults: Config = {
   transactionAttemptsMax: 5,
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
-  aggregatesTypedByColumn: true,
   shortcutsUseJson: false,  // the only behaviour in 8.0 (decision 019)
   topLevelSelectAsRows: false,  // the only behaviour in 8.0 (decision 019)
 };
@@ -75,6 +65,7 @@ const removedOptions: { [key: string]: boolean } = {
   transactionRequiresCommit: true,  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
   transactionRequiresIdleClient: true,  // transaction() rejects a client already inside a transaction block, before its START TRANSACTION
   transactionRequiresSatisfyingLevel: true,  // transaction() rejects the client of a transaction at a level that doesn't satisfy its own
+  aggregatesTypedByColumn: true,  // sum() and avg() give null on an empty set, min() and max() the column's value as pg parses it
 };
 
 /**

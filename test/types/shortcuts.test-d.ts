@@ -394,8 +394,7 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf(db.min).toEqualTypeOf<db.ColumnAggregateSignatures>();
   });
 
-  test('an empty ConfigTypes gives the column type at top level and its JSON type under a key', () => {
-    expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
+  test('min and max give the column type at top level and its JSON type under a key', () => {
     const first = db.min('events', db.all, { columns: ['occurred_on'] });
     expectTypeOf(first.run(pool)).resolves.toEqualTypeOf<Date | null>();
     expectTypeOf(first.run(pool)).resolves.not.toBeAny();
