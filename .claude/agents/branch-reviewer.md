@@ -48,4 +48,4 @@ Style is not reviewed: ESLint, `tsc` and `check:agents` cover it.
 
 - The comment's text, in Conventional Comments (skill `review-comments`).
 - "Learning" remarks in a separate list, possibly empty: general, verifiable, preventing a real bug.
-- A harness the review ran stays in the scratch folder, named in the report, so the fix round reruns the same one.
+- A harness the review ran stays in the scratch folder, named in the report, so the fix round reruns the same one: it takes the database URL from the environment and its paths as arguments (`path.resolve`), not joined to `__dirname`, so it runs as is from another folder and against another build (#940, #953).

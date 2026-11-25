@@ -74,10 +74,10 @@ The method's current state and history live in Epic #836, rewritten by each meth
 
 ## Releases
 
-The core's release, `@pgcast/pgcast`, goes in this order; an extension's, below. The tag and the deployment stay the owner's (`AGENTS.md` § Stop points).
+The core's release, `@pgcast/pgcast`, goes in this order; an extension's, below. The tag and the deployment stay the owner's (`AGENTS.md` § Stop points). `release.yml` releases only a tag on a master commit that carries its version PR, so a plan that announces a minor before a breaking change releases it before the first breaking merge, or names a branch (#953).
 
 1. **The pre-release pass**, before every publication:
-   - a range review of every PR merged since the last pass, with the `[Unreleased]` of each package whose files the range touches: a README changed after its package shipped needs its line (#889, 7.1.2's range review);
+   - a range review of every PR merged since the last pass, with the `[Unreleased]` of each package whose files the range touches: a README changed after its package shipped needs its line, checked per package from its own last tag, `git diff <tag>..origin/master -- README.md tools/*/README.md adapters/*/README.md` (#889, 7.1.2's range review, #928);
    - an audit of `npm pack` (files, README, `package.json` fields) and of the docs site: each feature's "From x.y.z." in EN and FR, no current-version number in the README or the docs;
    - a consumer probe that installs as the docs say: `typescript` as `/install` gives it, `latest` (pinning 6 hid an `ERESOLVE` on 7), and a package manager that installs no peers (`--legacy-peer-deps`) before the docs name the alias alone (chapter #62's review), for each install command of the READMEs and pages; each command that installs the core or an adapter names every required peer of the core (`pg`), except the home's line (#371) and `switching.md`'s swap of an existing project (#878, #886); its package is built as `release.yml` builds it, from a `git archive` of the commit with `npm ci --ignore-scripts` at the root and in the package (its pack then matched the checkout's byte for byte, #867);
    - a fix for each finding, merged before the version PR.
