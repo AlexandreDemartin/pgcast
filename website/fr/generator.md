@@ -1,5 +1,5 @@
 ---
-english: 7f89747688cb
+english: 2329b6c72cb1
 ---
 
 # Générateur
@@ -578,7 +578,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
 
-De la 7.2.0 à la fin de la série 7.x, un opt-in, `false` par défaut. À partir de la 8.0.0, la clé est retirée et le générateur se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-valuesTypedAsAliases)). La valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), là où Zapatos 6.6.1, et la 7.x avec `false`, écrivent son union en entier. Les types sont les mêmes : chaque appel qui compile compile encore, et chaque appel refusé l’est encore :
+De la 7.2.0 à la fin de la série 7.x, un opt-in, `false` par défaut. À partir de la 8.0.0, la clé est retirée et le générateur se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-valuesTypedAsAliases)). La valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), là où la 7.x écrit par défaut son union en entier. Les types sont les mêmes : chaque appel qui compile compile encore, et chaque appel refusé l’est encore :
 
 | `films` | Jusqu’à la 7.x, `false` | À partir de la 8.0.0 |
 |---|---|---|

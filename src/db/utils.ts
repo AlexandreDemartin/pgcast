@@ -22,7 +22,7 @@ export type DomainInContext<Custom, Generated, InContext> =
 
 /**
  * The value a `Whereable` takes for a column of type `T`, which the generator writes on each of its lines in place of
- * the union Zapatos 6.6.1 spells out there: the same type.
+ * the union 7.x spelled out there by default: the same type.
  */
 export type WhereableValue<T> =
   T | Parameter<T> | SQLFragment | ParentColumn | SQLFragment<any, T | Parameter<T> | SQLFragment | ParentColumn>;

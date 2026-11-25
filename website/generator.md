@@ -574,7 +574,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
 
-From 7.2.0 through 7.x, an opt-in, `false` by default. From 8.0.0, the key is removed and the generator always behaves as `true` ([8.0 migration](/switching#from-8-0-valuesTypedAsAliases)). Each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), where Zapatos 6.6.1, and 7.x with `false`, spell out its union. The types are the same, so every call that compiles still does, and every call that fails still fails:
+From 7.2.0 through 7.x, an opt-in, `false` by default. From 8.0.0, the key is removed and the generator always behaves as `true` ([8.0 migration](/switching#from-8-0-valuesTypedAsAliases)). Each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), where 7.x by default spells out its union. The types are the same, so every call that compiles still does, and every call that fails still fails:
 
 | `films` | Through 7.x, `false` | From 8.0.0 |
 |---|---|---|
