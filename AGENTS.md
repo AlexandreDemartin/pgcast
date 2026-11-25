@@ -83,7 +83,7 @@ When the conversation is compacted, keep: the step and PR numbers in progress, t
 - **Read the code concerned before changing it**, and summarise what you understood.
 - **Tests first**, or with the implementation: runtime, compiled SQL (`text` and `values`) and types (positive **and** negative, `@ts-expect-error`).
 - **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small (skill `pr-shape`).
-- **No breaking change** to the public API: stop and ask (skill `backward-compat`).
+- **No breaking change** to the public API in a minor or a patch, nor at a major outside its decided list (for 8.0, decision 019 § 3): stop and ask (skill `backward-compat`).
 - **A breaking change ships with its migration entry**, in the same PR, in the major's guide (`website/switching.md` and `website/fr/switching.md`): before → after code, what the user sees change, how to find the calls (a grep, a type error). Without it, it is not merged (decision 019).
 - **A new option that switches between two behaviours of pgcast names its exit**, the sole behaviour at the next major, or it is refused; configuration by nature (a fact the database cannot state, a listener) and an addition, off by default, that changes nothing while off are kept (decision 019).
 - **`core.ts`**: never touch it without saying so; each change adds SQL injection tests (skill `sql-safety`).
@@ -93,7 +93,7 @@ When the conversation is compacted, keep: the step and PR numbers in progress, t
 
 ## Stop points (mandatory: stop and ask)
 
-- Before any change to the public API or to the codegen output (except an opt-in addition).
+- Before any change to the public API or to the codegen output, except an opt-in addition and, at a major, a break its decided list names (for 8.0, decision 019 § 3).
 - Before any change to escaping or SQL compilation in `core.ts`.
 - An ambiguous design decision: write `docs/decisions/NNN-title.md` (context, options, proposed choice) and ask for validation before implementing.
 - If the compile benchmark exceeds its threshold (+20 %).

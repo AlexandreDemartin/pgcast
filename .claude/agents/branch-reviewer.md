@@ -27,7 +27,7 @@ You review a pgcast branch. You change nothing: no file, no git state of the che
 5. **Bugs, security and performance**: each input path, each hostile input (skill `sql-safety`); a query or a loop that grows with the data.
 6. **The SQL**: for each helper, is the SQL produced the one you would write by hand, unique, documented, frozen by a test?
 7. **The types**: a negative per public type; nothing `any` or too wide; compile cost.
-8. **The compat**: is a call valid under Zapatos 6.6.1 still valid, with the same SQL and the same type?
+8. **The compat**: is a call valid under Zapatos 6.6.1 still valid, with the same SQL and the same type? At a major, a break its decided list names (for 8.0, decision 019 § 3) is not blocking when its migration entry is in the PR, English and French (skill `backward-compat`).
 9. **Scope** (skill `pr-shape`): a PR that mixes two subjects is blocking; its size and title are non-blocking.
 10. **Check before asserting**: each blocker rests on a concrete scenario (input → wrong behaviour), run; its "Expected" type or SQL is compiled, not reasoned (#134 gave two wrong ones).
 
