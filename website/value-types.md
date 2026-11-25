@@ -22,7 +22,7 @@ The types the generated schema gives values that JSON or `pg` hand back as strin
 - In a `Selectable`, `int8[]` gives `Int8String[]`. A raw [enum array](/generator#generate.enumArraysTypedAsText) is text by default.
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
-- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder, except in raw rows for a [direct domain over an enum array](/switching#domain-and-parser-types). There, `enumArraysTypedAsText: false` alone restores the placeholder. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
+- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). Through 7.x, [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) used the placeholder; 8.0 removes it. In raw rows, for a [direct domain over an enum array](/switching#domain-and-parser-types), `enumArraysTypedAsText: false` restores the placeholder. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
 - An `interval` gives a [`PostgresInterval`](#PostgresInterval) in `Selectable`, a `string` in JSON and `string | PostgresInterval` in a write. With [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects), all five interfaces use `string`.
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.
@@ -42,7 +42,7 @@ type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-The type that the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) writes for a column of a domain, in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`, and in `Selectable` too for a domain over a domain or an array of a domain: `InContext`, its base type's type there, while the placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, as with `domainsTypedByContext: false`.
+The type that the generator writes for a column of a domain [typed by context](/generator#generate.domainsTypedByContext), in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`, and in `Selectable` too for a domain over a domain or an array of a domain: `InContext`, its base type's type there, while the placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, in every context.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` is `number`: a placeholder left as generated.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` is `number | db.Int8String`: an edited placeholder keeps its type, in every context.

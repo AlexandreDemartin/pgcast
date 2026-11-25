@@ -136,8 +136,8 @@ await generate({
 - A connection or query error rejects the promise before any files are written. You can catch the original `pg` error or set [`rejectOnQueryError: false`](#generate.rejectOnQueryError) to keep the 6.x exit.
 - Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2353, or TS2561 with a suggestion for a near-miss such as `outdir`).
-- A key 8.0 removed, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) or [`enumOrder`](#generate.enumOrder), fails to compile too (TS2353). Given anyway, from a variable, a config file or the CLI's JSON argument, `finaliseConfig()` throws, and `generate()`, `check()`, `tsForConfig()`, `definitionForRelationInSchema()` and the CLI reject, before any query and writing nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`. Error: `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
-- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others). `definitionForRelationInSchema()` leaves its `columnsTypedByEnumName` array empty from 8.0.0; through 7.x, only `typeEnumsAcrossSchemas: false` filled it. `tsTypeForPgType()` maps a type name in one context, so an enum array maps to an array. `definitionForRelationInSchema()` applies `enumArraysTypedAsText` to raw reads. See the [relation helper's out-parameters](/switching#domain-and-parser-types).
+- A key 8.0 removed, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), [`enumOrder`](#generate.enumOrder), [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) or [`domainsTypedByContext`](#generate.domainsTypedByContext), fails to compile too (TS2353). Given anyway, from a variable, a config file or the CLI's JSON argument, `finaliseConfig()` throws, and `generate()`, `check()`, `tsForConfig()`, `definitionForRelationInSchema()` and the CLI reject, before any query and writing nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`. Error: `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
+- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others). From 8.0.0, `definitionForRelationInSchema()` leaves its `columnsTypedByEnumName`, `uniqueIndexesNotArbiters`, `domainsNotByContext` and `domainsUnderDomains` arrays empty; through 7.x, only `typeEnumsAcrossSchemas: false`, `uniqueIndexConstraintsOnly: false` and `domainsTypedByContext: false` filled them. `tsTypeForPgType()` maps a type name in one context, so an enum array maps to an array. `definitionForRelationInSchema()` applies `enumArraysTypedAsText` to raw reads. See the [relation helper's out-parameters](/switching#domain-and-parser-types).
 
 ## Options {#options}
 
@@ -421,7 +421,7 @@ try {
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
-From 7.0.0. This boolean defaults to `true`, including for JSON `null`. Each relation's `UniqueIndex` lists its non-deferrable `UNIQUE` and `PRIMARY KEY` constraints backed by valid, non-exclusion indexes. With `false`, the generator lists all of the relation's unique indexes.
+From 7.0.0, the default was `true`. From 8.0.0, the key is removed and the generator always behaves as `true` ([8.0 migration](/switching#from-8-0-uniqueIndexConstraintsOnly)): each relation's `UniqueIndex` lists its non-deferrable `UNIQUE` and `PRIMARY KEY` constraints backed by valid, non-exclusion indexes. Through 7.x, `false` kept the 6.x list of all the relation's unique indexes.
 
 [`constraint()`](/insert#constraint) compiles a name such as `screenings.id` as a qualified identifier: `"screenings"."id"` (42601). Use an explicit `sql` statement with `ON CONSTRAINT "screenings.id"`.
 
@@ -438,22 +438,22 @@ CREATE TABLE festival_entries (
 CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHERE NOT withdrawn;
 ```
 
-| In `UniqueIndex` | `false` | `true` | `ON CONFLICT ON CONSTRAINT … DO UPDATE` |
+| In `UniqueIndex` | 7.x with `false` | 8.0 | `ON CONFLICT ON CONSTRAINT … DO UPDATE` |
 |---|---|---|---|
 | `festival_entries_pkey` | yes | yes | taken |
 | `festival_entries_film_festival_key` | yes | yes | taken |
 | `festival_entries_slot_key`, `DEFERRABLE` | yes | no | 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters` |
 | `festival_entries_live_idx`, an index and no constraint | yes | no | 42704, `constraint "festival_entries_live_idx" for table "festival_entries" does not exist` |
 
-- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint. `DO NOTHING` accepts a non-deferrable key and, when there is a row to insert, returns 55000 for a deferrable one. `DO UPDATE` returns 42809 for either declaration. An `EXCLUDE` constraint is in neither list, since its index isn't unique.
-- `true` leaves out, too, a constraint whose index isn't valid yet: a partitioned table's, added with `ALTER TABLE ONLY`, until each partition's index is attached ([Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html#DDL-PARTITIONING-DECLARATIVE-MAINTENANCE)). Postgres answers 42P10 meanwhile, `there is no unique or exclusion constraint matching the ON CONFLICT specification`; regenerate once they are.
+- The list also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint. `DO NOTHING` accepts a non-deferrable key and, when there is a row to insert, returns 55000 for a deferrable one. `DO UPDATE` returns 42809 for either declaration. An `EXCLUDE` constraint is in neither list, since its index isn't unique.
+- It leaves out, too, a constraint whose index isn't valid yet: a partitioned table's, added with `ALTER TABLE ONLY`, until each partition's index is attached ([Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html#DDL-PARTITIONING-DECLARATIVE-MAINTENANCE)). Postgres answers 42P10 meanwhile, `there is no unique or exclusion constraint matching the ON CONFLICT specification`; regenerate once they are.
 - For a partitioned table, the union follows the parent constraint. Postgres checks the receiving partition's index, so a deferrable key there can still raise 55000. A deferrable parent key is omitted even when the partitions' keys are immediate.
 - A relation left with none gets `never`. `UniqueIndexForTable` and the aggregate `UniqueIndex` types follow.
-- In 7.x, `false` restores the 6.x union without a migration note. The override goes in 8.0.
+- The key, given anyway with any value but `true`, `null` and `undefined`, stops the generator before any query, and writes nothing: `uniqueIndexConstraintsOnly was removed in 8.0, which always does what uniqueIndexConstraintsOnly: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-uniqueIndexConstraintsOnly`.
 
 ### `constraintNames` {#generate.constraintNames}
 
-From 7.1.0. Set `constraintNames` to `true` to generate a `Constraint` type in each relation's namespace. It lists the names of its primary keys, unique constraints, foreign keys, checks, exclusion constraints and all its unique indexes. For the table above, `festival_entries.Constraint` includes both `festival_entries_slot_key` and `festival_entries_live_idx` with either setting of `uniqueIndexConstraintsOnly`.
+From 7.1.0. Set `constraintNames` to `true` to generate a `Constraint` type in each relation's namespace. It lists the names of its primary keys, unique constraints, foreign keys, checks, exclusion constraints and all its unique indexes. For the table above, `festival_entries.Constraint` includes both `festival_entries_slot_key` and `festival_entries_live_idx`, which `UniqueIndex` leaves out.
 
 The type lists the catalogue names whether or not Postgres enforces them. A trigger or function can report a name outside the type. A relation with no matching names gets `never`.
 
@@ -467,7 +467,7 @@ The extra catalogue query and declaration are off unless the merged configuratio
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
-From 7.0.0. This boolean defaults to `true`. JSON `null` also selects the default. The type of a column whose domain is over `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` or `timestamptz`, or over an array of one: types that `pg`, the shortcuts' JSON and a write each give in their own way ([Value types](/value-types)). `false`, as in Zapatos 6.6.1, types it by its placeholder in all five interfaces, which, as generated, holds what `pg` returns; `true` types it by context, as its base type is, while its placeholder holds what the generator wrote for it. Say a booking has a ticket number:
+From 7.0.0, the default was `true`. From 8.0.0, the key is removed and the generator always behaves as `true` ([8.0 migration](/switching#from-8-0-domainsTypedByContext)). It concerns a column whose domain is over `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` or `timestamptz`, or over an array of one: types that `pg`, the shortcuts' JSON and a write each give in their own way ([Value types](/value-types)). The generator types it by context, as its base type is, while its placeholder holds what the generator wrote for it. Through 7.x, `false`, as in Zapatos 6.6.1, typed it by its placeholder in all five interfaces, which, as generated, holds what `pg` returns. Say a booking has a ticket number:
 
 ```sql
 CREATE DOMAIN ticket_no AS bigint;
@@ -476,38 +476,39 @@ ALTER TABLE seat_bookings ADD COLUMN ticket ticket_no;
 
 Its placeholder, `PgTicket_no.d.ts`, holds `db.Int8String`. With the default JSON parser, the shortcuts return the ticket as a number, and Postgres takes a number for it:
 
-| `seat_bookings.ticket` | `false` | `true` |
+| `seat_bookings.ticket` | 7.x with `false` | 8.0 |
 |---|---|---|
 | `Selectable`, a row from `pg` | `PgTicket_no`, a string | the same |
 | `JSONSelectable`, a row from the shortcuts | `PgTicket_no`, a string | `number` |
 | `Whereable`, `Insertable`, `Updatable` | `PgTicket_no`, a string: `insert()` refuses `ticket: 1` (TS2769) | `number \| Int8String \| bigint` |
 
-- `true` writes [`DomainInContext`](/value-types#DomainInContext) in the four other interfaces, `db.DomainInContext<c.PgTicket_no, db.Int8String, number>` in `JSONSelectable`; an editor shows `number`.
+- The generator writes [`DomainInContext`](/value-types#DomainInContext) in the four other interfaces, `db.DomainInContext<c.PgTicket_no, db.Int8String, number>` in `JSONSelectable`; an editor shows `number`.
 - A placeholder whose type differs from the current generated type supplies all five interfaces. Type identity alone decides this, even for an untouched 6.x file. To compare files, follow the [migration guide](/switching#domain-and-parser-types).
-- A placeholder Zapatos 6.6.1 wrote over `int8` or `numeric` holds the same type without its import, and the generator never rewrites it: the column is `any`, with `false` and `true`, so `insert()` takes `ticket: 'abc'`. Over an array of one, it holds `db.Int8String[]` or `db.NumericString[]`, which is `any[]`, with `false` and `true` too: `insert()` takes `nos: ['abc']` and refuses `nos: 'abc'` (TS2769). In the placeholder, `tsc` says TS2503, and nothing under `skipLibCheck`. Add its import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Over `date`, `timestamp`, `timestamptz`, `bytea` or `money`, 6.6.1's placeholder is the one the generator writes.
-- Two domains that share a placeholder, such as `public.ticket_no AS bigint` and `archive.ticket_no AS date`, both `PgTicket_no` ([`customTypesTransform`](#generate.customTypesTransform)), share its one type, as the generator's note `custom types … are both named PgTicket_no` says ([`warningListener`](#generate.warningListener)): `true` types by context the columns of the domain whose type the placeholder holds, and leaves the other's typed by the placeholder in all five interfaces. Rename one of the two in the database.
+- A placeholder Zapatos 6.6.1 wrote over `int8` or `numeric` holds the same type without its import, and the generator never rewrites it: the column is `any`, so `insert()` takes `ticket: 'abc'`. Over an array of one, it holds `db.Int8String[]` or `db.NumericString[]`, which is `any[]`: `insert()` takes `nos: ['abc']` and refuses `nos: 'abc'` (TS2769). In the placeholder, `tsc` says TS2503, and nothing under `skipLibCheck`. Add its import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Over `date`, `timestamp`, `timestamptz`, `bytea` or `money`, 6.6.1's placeholder is the one the generator writes.
+- Two domains that share a placeholder, such as `public.ticket_no AS bigint` and `archive.ticket_no AS date`, both `PgTicket_no` ([`customTypesTransform`](#generate.customTypesTransform)), share its one type, as the generator's note `custom types … are both named PgTicket_no` says ([`warningListener`](#generate.warningListener)): the generator types by context the columns of the domain whose type the placeholder holds, and leaves the other's typed by the placeholder in all five interfaces. Rename one of the two in the database.
 - Each base type takes its own types: `numeric` `number`, then `number | NumericString`; `date`, `timestamp` and `timestamptz` their string type, then that or a `Date`; `bytea` `ByteArrayString`, then that or a `Buffer`; `money` `string`, then `number | string`; an array, its item's, as an array. With [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in `JSONSelectable`.
 - Unchanged: a domain typed alike in every context, such as `seat_label`.
 - Generated array types omit [element nullability](/catalog-types#what-the-generator-doesn-t-read). A column's `NOT NULL` applies to the array. Even with a `NOT NULL` domain as the element type, an assignment past the end, such as `a[3] = 3` on `{1}`, stores `{1,NULL,3}`.
 - For a plain `numeric[]`, and for a domain rooted in it when the domain is typed by context from a fresh placeholder, `Selectable` declares `db.NumericString[]`. The default `pg` array parser returns numbers.
 
-A domain over a domain, or an array of a domain, gets a placeholder that holds `any`: the generator reads the inner domain, or the array's type, as a custom type. `true` types it in all five interfaces by the base type of its innermost domain, while its placeholder holds `any`:
+A domain over a domain, or an array of a domain, gets a placeholder that holds `any`: the generator reads the inner domain, or the array's type, as a custom type. The generator types it in all five interfaces by the base type of its innermost domain, while its placeholder holds `any`:
 
 ```sql
 CREATE DOMAIN vip_ticket_no AS ticket_no;
 ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN tickets ticket_no[];
 ```
 
-| `true` | `vip_ticket` | `tickets` |
+| | `vip_ticket` | `tickets` |
 |---|---|---|
 | `Selectable`, a row from `pg` | `Int8String`, as `pg` parses a `bigint` | `string`, the text `pg` returns: `'{1,2}'` |
 | `JSONSelectable`, a row from the shortcuts | `number` | `number[]` |
 | `Whereable`, `Insertable`, `Updatable` | `number \| Int8String \| bigint` | `(number \| Int8String \| bigint)[]` |
 
-- In 7.x, `false` quietly restores the placeholder type, `any`, in all five interfaces for both columns. This override goes in 8.0.
+- Through 7.x, `false` restored the placeholder type, `any`, in all five interfaces for both columns.
 - `pg` parses a domain over a domain as its innermost domain's base type, but returns an array of a domain as its text, since it doesn't know that array's type: so does a domain over such an array, directly or through other domains. An array of a domain over an array stays `any`, and so does a domain over one, or a base type the generator can't map, such as `point`.
 - An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another: never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a fresh placeholder with an unshared name holds the enum's labels.
-- A placeholder you edit keeps its type in all five, `unknown` included. One you edit to `any` counts as left as generated: write `unknown`, or set the option to `false`, to keep such a column untyped.
+- A placeholder you edit keeps its type in all five, `unknown` included. One you edit to `any` counts as left as generated: write `unknown` to keep such a column untyped.
+- The key, given anyway with any value but `true`, `null` and `undefined`, stops the generator before any query, and writes nothing: `domainsTypedByContext was removed in 8.0, which always does what domainsTypedByContext: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-domainsTypedByContext`.
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
 
@@ -527,7 +528,7 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COL
 - `false`: the array, with no note, including beyond 8.0: the right type for a project that parses it with `pg.types.setTypeParser`, given the array type's OID (`SELECT 'crew_job[]'::regtype::oid`) and the parser of `text[]`. Declare `const textArrayOid: number = 1009`, then pass `pg.types.getTypeParser(textArrayOid)`.
 - `true`: `string`, the text `pg` returns. The writes still take an array, so a `sql` row's text isn't written back as it is: `insert()` and `update()` refuse it (TS2769, TS2322), though Postgres would take it.
 - A domain over such an array, as `crew.past_jobs`, takes `db.DomainInContext<c.PgJob_list, crew_job[], string>` in `Selectable` ([`DomainInContext`](/value-types#DomainInContext)): `string` while its placeholder matches the current generated type, even if edited. A different placeholder type is preserved in all five interfaces.
-- An array of an enum of another schema, typed by its labels, is a `string` in `Selectable` too. An array of a domain over an enum is [`domainsTypedByContext`](#generate.domainsTypedByContext)'s.
+- An array of an enum of another schema, typed by its labels, is a `string` in `Selectable` too. An array of a domain over an enum is [typed by context](#generate.domainsTypedByContext).
 
 ### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
 
@@ -546,7 +547,7 @@ ALTER TABLE screenings ADD COLUMN intermission interval;
 - `false` remains available beyond 8.0 for custom parsers. Use `pg.types.setTypeParser(1186, v => v)` for interval text and, for an array of interval strings, `const intervalArrayOid: number = 1187` and `const textArrayOid: number = 1009`, then `pg.types.setTypeParser(intervalArrayOid, pg.types.getTypeParser(textArrayOid))`: literal OIDs fail to compile (TS2345) with TypeScript 5.9 and later.
 - `true`: a `PostgresInterval` in `Selectable`, an array of them for an `interval[]`. A write takes one back, as `pg` sends it through its `toPostgres()`; `insert()` still refuses a plain object such as `{ minutes: 15 }` (TS2769): Postgres 17 and later refuse it too (22007), and Postgres 16 and earlier store `00:00:15` for it.
 - `pg` reads the default `IntervalStyle`, `postgres`, only: under `iso_8601`, `sql_standard` or `postgres_verbose`, its object comes back with parts missing, often `{}`, whatever the type says. The shortcuts give the text, in that style.
-- A domain over one follows: a new placeholder holds `db.PostgresInterval`, and with [`domainsTypedByContext`](#generate.domainsTypedByContext) its column is typed by context, as a domain over `date` is. A domain over such a domain takes `PostgresInterval` in `Selectable` with `domainsTypedByContext`; an array of a domain stays `string` there, the text `pg` returns. A placeholder written before holds `string`, and the generator never rewrites it.
+- A domain over one follows: a new placeholder holds `db.PostgresInterval`, and its column is [typed by context](#generate.domainsTypedByContext), as a domain over `date` is. A domain over such a domain takes `PostgresInterval` in `Selectable`; an array of a domain stays `string` there, the text `pg` returns. A placeholder written before holds `string`, and the generator never rewrites it.
 
 ### `domainsTypedAsUnions` {#generate.domainsTypedAsUnions}
 

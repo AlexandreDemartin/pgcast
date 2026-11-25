@@ -67,9 +67,9 @@ A materialised view keeps no `NOT NULL` at all, not even a domain's, so its colu
 
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
-- `UniqueIndex` lists constraints usable with `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restores all of the relation's unique indexes.
+- `UniqueIndex` lists constraints usable with `ON CONFLICT ON CONSTRAINT … DO UPDATE`. Through 7.x, [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) restored all of the relation's unique indexes; 8.0 removes it, and [`constraintNames`](/generator#generate.constraintNames) lists them in `Constraint`.
 - A domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, follows its base type in each context while its placeholder holds the generated type.
-- A nested domain or an array of domains follows the innermost domain's base type if the generator recognises it. [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) restores the placeholder type in all five interfaces.
+- A nested domain or an array of domains follows the innermost domain's base type if the generator recognises it. Through 7.x, [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) restored the placeholder type in all five interfaces; 8.0 removes it.
 - A column's `NOT NULL` applies to the array itself. Even with a `NOT NULL` domain as the element type, an assignment past the end, such as `a[3] = 3` on `{1}`, stores `{1,NULL,3}`. As in Zapatos 6.6.1, pgcast types `int4[] NOT NULL` as `number[]`, but `pg` reads `{1,NULL}` as `[1, null]`.
 - An enum array is text in `Selectable` and a label array in shortcut JSON. [`enumArraysTypedAsText: false`](/generator#generate.enumArraysTypedAsText) suits a parser that returns an array.
 - A domain over `text` whose `CHECK` lists its values, `CHECK (VALUE IN ('U', 'PG', '12'))`, is a `string`, its placeholder's type as generated, unless [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) is on.
@@ -107,7 +107,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-The `seat_label` domain is a string in all five interfaces. For a domain over `bigint`, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) keeps the string from `pg` in `Selectable` and gives a number in `JSONSelectable` with the default JSON parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` first. Editing the placeholder to another type gives the column that type in all five interfaces.
+The `seat_label` domain is a string in all five interfaces. For a domain over `bigint`, the generator [types by context](/generator#generate.domainsTypedByContext): it keeps the string from `pg` in `Selectable` and gives a number in `JSONSelectable` with the default JSON parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` first. Editing the placeholder to another type gives the column that type in all five interfaces.
 
 The same row, asked for twice, shows the first two side by side:
 

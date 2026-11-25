@@ -1,5 +1,5 @@
 ---
-english: 0454e6737e66
+english: ed7aef31fcce
 ---
 
 # Le catalogue
@@ -71,9 +71,9 @@ Une vue matérialisée ne garde aucun `NOT NULL`, pas même celui d’un domaine
 
 Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos : une nullabilité que la base ne déclare pas serait une supposition, et une supposition est la seule chose qu’un type généré ne doit pas être. Certaines lacunes de ce que lit le générateur sont connues, et décrites ici telles qu’elles sont aujourd’hui :
 
-- `UniqueIndex` liste les contraintes utilisables avec `ON CONFLICT ON CONSTRAINT … DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la liste de tous les index uniques de la relation.
+- `UniqueIndex` liste les contraintes utilisables avec `ON CONFLICT ON CONSTRAINT … DO UPDATE`. En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablissait la liste de tous les index uniques de la relation ; la 8.0 retire cette option, et [`constraintNames`](/fr/generator#generate.constraintNames) les liste dans `Constraint`.
 - Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, suit son type de base dans chaque contexte tant que son placeholder contient le type généré.
-- Un domaine imbriqué ou un tableau de domaines suit le type de base du domaine au dernier niveau d’imbrication si le générateur reconnaît ce type. [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext) rétablit le type du placeholder dans les cinq interfaces.
+- Un domaine imbriqué ou un tableau de domaines suit le type de base du domaine au dernier niveau d’imbrication si le générateur reconnaît ce type. En 7.x, [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext) rétablissait le type du placeholder dans les cinq interfaces ; la 8.0 retire cette option.
 - La contrainte `NOT NULL` de la colonne s’applique au tableau lui-même. Même si les éléments ont pour type un domaine `NOT NULL`, une affectation au-delà de la fin, comme `a[3] = 3` sur `{1}`, enregistre `{1,NULL,3}`. Comme Zapatos 6.6.1, pgcast type `int4[] NOT NULL` en `number[]`, mais `pg` lit `{1,NULL}` comme `[1, null]`.
 - Un tableau d’enums est représenté par du texte dans `Selectable` et par un tableau de labels dans le JSON des raccourcis. [`enumArraysTypedAsText: false`](/fr/generator#generate.enumArraysTypedAsText) convient à un parser qui renvoie un tableau.
 - Un domaine sur `text` dont le `CHECK` liste les valeurs, `CHECK (VALUE IN ('U', 'PG', '12'))`, est une `string`, le type de son placeholder tel que généré, sauf si [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) est activé.
@@ -111,7 +111,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-Le domaine `seat_label` est une chaîne dans les cinq interfaces. Pour un domaine sur `bigint`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) conserve la chaîne de `pg` dans `Selectable` et donne un nombre dans `JSONSelectable` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. Si vous modifiez le type du placeholder, la colonne prend ce type dans les cinq interfaces.
+Le domaine `seat_label` est une chaîne dans les cinq interfaces. Pour un domaine sur `bigint`, le générateur [type selon le contexte](/fr/generator#generate.domainsTypedByContext) : il conserve la chaîne de `pg` dans `Selectable` et donne un nombre dans `JSONSelectable` avec le parser JSON par défaut. Avec `customJSONParsingForLargeNumbers: true` et le parser correspondant, affinez d’abord le type `number | db.Int8String`. Si vous modifiez le type du placeholder, la colonne prend ce type dans les cinq interfaces.
 
 La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 

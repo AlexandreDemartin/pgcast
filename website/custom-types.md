@@ -114,7 +114,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Type a domain
 
-A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns, or the union of its values ([below](#a-domain-of-values)). That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on (the default from 7.0, [below](#when-a-placeholder-does-not-compile)). A domain over another domain, or an array of a domain, gets `any`, which that option types by the base type of its innermost domain. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
+A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns, or the union of its values ([below](#a-domain-of-values)). That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type [typed by context](/generator#generate.domainsTypedByContext) (from 7.0, [below](#when-a-placeholder-does-not-compile)). A domain over another domain, or an array of a domain, gets `any`, which the generator types by the base type of its innermost domain. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
 
 ::: code-group
 
@@ -265,9 +265,9 @@ A domain's placeholder holds its base type's TypeScript name, and imports what t
 - Under [`customTypesTransform`](/generator#generate.customTypesTransform) `'my_type'`, or a function that keeps the name, a placeholder named as its domain's schema, `tone` for a domain `tone.tone` over the enum `tone.mood`, imports that schema's namespace, `import type { tone }`. When `zapatos/schema` declares a type named `tone` too, an enum or a union of [`unprefixedSchema`](/generator#generate.unprefixedSchema), or one of its own, such as `Table` or `Selectable`, that import brings it as well, TS2440 (`Import declaration conflicts with local declaration of 'tone'.`): the placeholder then names the type with no import, `export type tone = import('zapatos/schema').tone.mood;`. pgcast from 6.7.0 to 6.10.0 wrote the import: write that type in one written before, or delete it and generate again ([#661](https://github.com/AlexandreDemartin/pgcast/issues/661)).
 - From 7.0 a fresh placeholder for a domain over an enum used by a table in another schema contains the enum's labels unless another type shares its placeholder name. Through 7.x, with [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas), each table looked up the enum in its own schema: if two tables found different enums, import the one the domain is based on; if a table found no enum of that name, the placeholder got `any` unless [another type shares it](https://github.com/AlexandreDemartin/pgcast/issues/42). Zapatos 6.6.1 wrote the enum name or `any` according to [which table it read last](https://github.com/AlexandreDemartin/pgcast/issues/455). To update an existing placeholder, follow the [migration guide](/switching).
 
-For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns. From 7.0, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) gives [`select()`](/select#select) a number with the default JSON parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` first. [`insert()`](/insert#insert) accepts `number | Int8String | bigint`.
+For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns. From 7.0, the generator [types it by context](/generator#generate.domainsTypedByContext), which gives [`select()`](/select#select) a number with the default JSON parser. With `customJSONParsingForLargeNumbers: true` and the matching parser, narrow `number | db.Int8String` first. [`insert()`](/insert#insert) accepts `number | Int8String | bigint`.
 
-For this domain, `domainsTypedByContext: false` makes the placeholder supply the type in all five interfaces. If you keep that setting in 7.x, you can declare both representations there:
+To type the column by its placeholder in all five interfaces instead, as `domainsTypedByContext: false` did through 7.x, edit the placeholder; you can declare both representations there:
 
 ::: code-group
 
@@ -280,8 +280,8 @@ declare module 'zapatos/custom' {
 
 :::
 
-- A domain over `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` or `money` is in the same case: its placeholder holds what `pg` returns, less than a write takes and, except for `money`, other than what the shortcuts return, and the option types it by context too.
-- An edited placeholder, such as this one, keeps its type in all five interfaces, with the option too.
+- A domain over `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` or `money` is in the same case: its placeholder holds what `pg` returns, less than a write takes and, except for `money`, other than what the shortcuts return, and the generator types it by context too.
+- An edited placeholder, such as this one, keeps its type in all five interfaces.
 - Past `Number.MAX_SAFE_INTEGER`, the number loses its last digits, as for any `bigint`: `9007199254740993` comes back as `9007199254740992` ([`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers)).
 
 ## See also
