@@ -447,6 +447,14 @@ try {
 - **Find the calls**: `grep -rn domainsTypedByContext` over your config files and scripts, then regenerate and run `tsc`: each read of a shortcut's row that expects the placeholder's string, and each write the root's type refuses, fails to compile. `grep -rnE 'domainsNotByContext|domainsUnderDomains'` lists the out-parameters' readers.
 - **Before → after**: delete `"domainsTypedByContext": false`. To keep a column typed by its placeholder in all five interfaces, as `false` did, edit the placeholder to another type than the generated one, such as `export type PgTicket_no = number | db.Int8String` ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)), or `unknown` for a domain over a domain: one edited to `any` counts as left as generated.
 
+### `rejectOnQueryError` {#from-8-0-rejectOnQueryError}
+
+8.0 always does what `rejectOnQueryError: true`, the 7.x default, did: a failed connection or query rejects `generate()`, `tsForConfig()` and `check()` with the original error, before any files are written ([`rejectOnQueryError`](/generator#generate.rejectOnQueryError)). The CLI prints it as 7.x did, `*** error <n> ***` and the error on stdout, and exits with code 1, with or without `--check` ([CLI](/generator#cli)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, the generator throws `rejectOnQueryError was removed in 8.0, which always does what rejectOnQueryError: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-rejectOnQueryError`, and so does the CLI given it in its config file or JSON argument, which 7.x ignored there. Once you delete it, a failed query rejects the promise, where 7.x with `false` printed it and ended the process. Left uncaught, Node prints the error on stderr and exits with code 1; caught, your program goes on. A CLI run without the key prints and exits as in 7.x.
+- **Find the calls**: `grep -rn rejectOnQueryError` over your config files and scripts; each `false` also throws as the generator starts, before any query.
+- **Before → after**: `await generate({ …, rejectOnQueryError: false })` becomes `await generate({ … }).catch(e => { console.error(e); process.exit(1); })`; in a config file, delete `"rejectOnQueryError": false`.
+
 ## Migrate from pgcast 6.x to 7.0 {#from-7-0}
 
 On 6.x, [trace the warnings](#read-the-warnings) and [enable the fixes](#turn-on-the-opt-ins) first. Keep your existing package alias when installing 7.x. Choose the command that matches your imports.
@@ -527,7 +535,7 @@ Regenerate whenever the generator version or an output option changes. Run `npx 
 | [`intervalsTypedAsObjects: true`](/generator#generate.intervalsTypedAsObjects) | A raw interval has `toPostgres()`. Shortcut JSON keeps the text. Select `false` if your parser returns text. | `false` (permanent) |
 | [`rejectOnQueryError: true`](/generator#generate.rejectOnQueryError) | `await generate()` and `await tsForConfig()` reject with the original connection or query error. Rethrow it or set `process.exitCode = 1` if the job must fail. A synchronous listener error also rejects generation. Handle any promise the listener returns. | `false` (immediate exit, through 7.x) |
 
-By default, `await check()` already rejects on database errors. It compares the contents of the schema and any generated custom types index, and checks that each placeholder exists. A failed check returns `false`. Explicit `rejectOnQueryError: false` ends the process on database errors for all three functions. Both CLI names, `pgcast` and `zapatos`, exit 1 on database errors. Their `--check` also exits 1 when that check returns `false`. [Generator errors](/generator#generate.rejectOnQueryError).
+By default, `await check()` already rejects on database errors. It compares the contents of the schema and any generated custom types index, and checks that each placeholder exists. A failed check returns `false`. Through 7.x, explicit `rejectOnQueryError: false` ended the process on database errors for all three functions; 8.0 removes it ([`rejectOnQueryError`](#from-8-0-rejectOnQueryError)). Both CLI names, `pgcast` and `zapatos`, exit 1 on database errors. Their `--check` also exits 1 when that check returns `false`. [Generator errors](/generator#generate.rejectOnQueryError).
 
 Regeneration preserves existing `custom/` placeholders. Generate a second copy into an empty `outDir` outside your TypeScript project, compare its placeholders with yours and merge the changes that fit your parsers. Then run `npx tsc` against the regenerated schema and run your tests.
 

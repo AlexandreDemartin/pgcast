@@ -1,5 +1,5 @@
 ---
-english: 05301c50d157
+english: 5b85975e12cd
 ---
 
 # Générateur
@@ -55,7 +55,7 @@ Puis elle se termine par la cause :
 | JSON invalide | le message de `JSON.parse`, qui dépend de l’entrée et de Node : sur Node 22, `Unexpected end of JSON input` pour un fichier vide, `No number after minus sign in JSON at position 1 (line 1 column 2)` pour `-x`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` pour une virgule finale |
 | une variable n’est pas définie | `Environment variable 'DATABASE_URL' is not set` |
 
-Si la connexion ou une requête échoue, la CLI affiche `*** error <n> ***` et l’erreur sur la sortie standard, puis quitte avec le code 1. Les deux commandes, `pgcast` et `zapatos`, fixent [`rejectOnQueryError`](#generate.rejectOnQueryError) à `false`, quels que soient le fichier de configuration et l’argument JSON, y compris avec `--check`.
+Si la connexion ou une requête échoue, la CLI affiche `*** error <n> ***` et l’erreur sur la sortie standard, puis quitte avec le code 1, y compris avec `--check`. À partir de la 8.0.0, les deux commandes, `pgcast` et `zapatos`, le font elles-mêmes, alors qu’en 7.x elles fixaient [`rejectOnQueryError`](#generate.rejectOnQueryError) à `false`, quels que soient le fichier de configuration et l’argument JSON.
 
 ### Variables d’environnement {#environment-variables}
 
@@ -112,7 +112,7 @@ if (!upToDate) process.exitCode = 1;
 
 - Elle prend la config de [`generate()`](#generate), et se résout avec `true` quand chaque fichier correspond. Le code de sortie, c’est à vous de le fixer.
 - Elle signale le résultat de la comparaison des fichiers uniquement via les écouteurs. [`warningListener`](#generate.warningListener) affiche une ligne par fichier différent ou manquant, avec `console.log` par défaut. Le message `The generated files in src/zapatos are up to date.` passe par [`progressListener`](#generate.progressListener). Seule la CLI affiche la dernière ligne, `Run the generator without --check to write them.`
-- Si une requête échoue, la promesse est rejetée avec l’erreur d’origine. Réglez [`rejectOnQueryError: false`](#generate.rejectOnQueryError) pour afficher l’erreur et quitter avec le code 1.
+- Si une requête échoue, la promesse est rejetée avec l’erreur d’origine.
 
 ## `generate()` {#generate}
 
@@ -137,10 +137,10 @@ await generate({
 
 - Il ouvre son propre `pg.Pool` sur `config.db`, et le ferme avant de se résoudre.
 - Il n’envoie que des `SELECT`, sur `information_schema` et `pg_catalog` : un pour les relations de chaque schéma, un pour ses enums, puis deux par relation, ses colonnes et ses index uniques, et un pour les enums de chaque autre schéma d’où vient le type d’une colonne (`pg_catalog` compris).
-- Si la connexion ou une requête échoue, la promesse est rejetée avant toute écriture. Vous pouvez intercepter l’erreur d’origine de `pg` ou régler [`rejectOnQueryError: false`](#generate.rejectOnQueryError) pour que le processus s’arrête comme en 6.x.
+- Si la connexion ou une requête échoue, la promesse est rejetée avec l’erreur d’origine de `pg`, avant toute écriture ([`rejectOnQueryError`](#generate.rejectOnQueryError)).
 - Sur les autres erreurs, la promesse est rejetée : une écriture qui échoue (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` quand `outDir` est un fichier), une [règle](#generate.schemas) mal formée.
 - À l’exécution, une clé qu’il ne connaît pas est ignorée : un ancien `srcMode`, un `outdir` mal orthographié. En TypeScript, un littéral objet qui en contient une ne compile pas (TS2353, ou TS2561 avec une suggestion pour un nom proche comme `outdir`).
-- Une clé que la 8.0 a retirée, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), [`enumOrder`](#generate.enumOrder), [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) ou [`domainsTypedByContext`](#generate.domainsTypedByContext), ne compile pas non plus (TS2353). Donnée quand même, depuis une variable, un fichier de configuration ou l’argument JSON de la CLI, `finaliseConfig()` lève une erreur, la promesse de `generate()`, de `check()`, de `tsForConfig()` ou de `definitionForRelationInSchema()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Erreur : `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
+- Une clé que la 8.0 a retirée, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), [`enumOrder`](#generate.enumOrder), [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](#generate.domainsTypedByContext) ou [`rejectOnQueryError`](#generate.rejectOnQueryError), ne compile pas non plus (TS2353). Donnée quand même, depuis une variable, un fichier de configuration ou l’argument JSON de la CLI, `finaliseConfig()` lève une erreur, la promesse de `generate()`, de `check()`, de `tsForConfig()` ou de `definitionForRelationInSchema()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Erreur : `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
 - `zapatos/generate` exporte aussi `Config` et les fonctions qui composent `generate()` (`tsForConfig()`, `definitionForRelationInSchema()` et d’autres). À partir de la 8.0.0, `definitionForRelationInSchema()` laisse vides ses tableaux `columnsTypedByEnumName`, `uniqueIndexesNotArbiters`, `domainsNotByContext` et `domainsUnderDomains` ; en 7.x, seuls `typeEnumsAcrossSchemas: false`, `uniqueIndexConstraintsOnly: false` et `domainsTypedByContext: false` les remplissaient. `tsTypeForPgType()` traduit un nom de type dans un contexte donné. Pour un tableau d’enums, elle donne donc un type tableau. `definitionForRelationInSchema()` applique `enumArraysTypedAsText` aux lignes brutes. Voir les [paramètres de sortie de cette fonction](/fr/switching#domain-and-parser-types).
 
 ## Les options {#options}
@@ -406,9 +406,7 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-À partir de la 7.0.0, cette option booléenne vaut `true` par défaut. Si vous omettez l’option, indiquez `null` en JSON ou choisissez `true`, la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) est rejetée avec l’erreur d’origine en cas d’échec de connexion ou de requête, avant toute écriture de fichier. Une erreur levée de façon synchrone par un écouteur rejette aussi la promesse de génération. Gérez vous-même les promesses que renvoient vos écouteurs. Les messages que les écouteurs ont déjà affichés restent visibles.
-
-Réglez `rejectOnQueryError: false` pour afficher `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêter le processus avec le code 1 avant que la promesse se résolve ou soit rejetée : ce que fait [la CLI](#cli) en 7.x. La 8.0 retire l’option : une requête qui échoue rejette toujours la promesse, et la CLI affiche elle-même l’erreur et se termine avec le code 1 ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
+À partir de la 7.0.0, la valeur par défaut était `true`. À partir de la 8.0.0, la clé est retirée et le générateur se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-rejectOnQueryError)) : en cas d’échec de connexion ou de requête, la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) est rejetée avec l’erreur d’origine, avant toute écriture de fichier. Une erreur levée de façon synchrone par un écouteur rejette aussi la promesse de génération. Gérez vous-même les promesses que renvoient vos écouteurs. Les messages que les écouteurs ont déjà affichés restent visibles. En 7.x, la valeur `false` affichait `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêtait le processus avec le code 1 avant que la promesse se résolve ou soit rejetée, comme le fait toujours [la CLI](#cli).
 
 Si votre script doit se terminer en erreur en cas d’échec de la génération, relancez l’erreur ou fixez le code de sortie dans votre gestionnaire d’erreurs.
 
@@ -422,6 +420,8 @@ try {
   process.exitCode = 1;
 }
 ```
+
+- Donnée quand même, avec toute valeur autre que `true`, `null` et `undefined`, la clé arrête le générateur avant la première requête, sans écrire aucun fichier : `rejectOnQueryError was removed in 8.0, which always does what rejectOnQueryError: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-rejectOnQueryError`. La CLI s’arrête de même si son fichier de configuration ou son argument JSON la contient, alors que la 7.x l’y ignorait.
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
