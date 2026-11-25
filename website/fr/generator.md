@@ -1,5 +1,5 @@
 ---
-english: 5b85975e12cd
+english: 2329b6c72cb1
 ---
 
 # Générateur
@@ -140,7 +140,7 @@ await generate({
 - Si la connexion ou une requête échoue, la promesse est rejetée avec l’erreur d’origine de `pg`, avant toute écriture ([`rejectOnQueryError`](#generate.rejectOnQueryError)).
 - Sur les autres erreurs, la promesse est rejetée : une écriture qui échoue (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` quand `outDir` est un fichier), une [règle](#generate.schemas) mal formée.
 - À l’exécution, une clé qu’il ne connaît pas est ignorée : un ancien `srcMode`, un `outdir` mal orthographié. En TypeScript, un littéral objet qui en contient une ne compile pas (TS2353, ou TS2561 avec une suggestion pour un nom proche comme `outdir`).
-- Une clé que la 8.0 a retirée, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), [`enumOrder`](#generate.enumOrder), [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](#generate.domainsTypedByContext) ou [`rejectOnQueryError`](#generate.rejectOnQueryError), ne compile pas non plus (TS2353). Donnée quand même, depuis une variable, un fichier de configuration ou l’argument JSON de la CLI, `finaliseConfig()` lève une erreur, la promesse de `generate()`, de `check()`, de `tsForConfig()` ou de `definitionForRelationInSchema()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Erreur : `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
+- Une clé que la 8.0 a retirée, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), [`enumOrder`](#generate.enumOrder), [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](#generate.domainsTypedByContext), [`rejectOnQueryError`](#generate.rejectOnQueryError) ou [`valuesTypedAsAliases`](#generate.valuesTypedAsAliases), ne compile pas non plus (TS2353). Donnée quand même, depuis une variable, un fichier de configuration ou l’argument JSON de la CLI, `finaliseConfig()` lève une erreur, la promesse de `generate()`, de `check()`, de `tsForConfig()` ou de `definitionForRelationInSchema()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Erreur : `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
 - `zapatos/generate` exporte aussi `Config` et les fonctions qui composent `generate()` (`tsForConfig()`, `definitionForRelationInSchema()` et d’autres). À partir de la 8.0.0, `definitionForRelationInSchema()` laisse vides ses tableaux `columnsTypedByEnumName`, `uniqueIndexesNotArbiters`, `domainsNotByContext` et `domainsUnderDomains` ; en 7.x, seuls `typeEnumsAcrossSchemas: false`, `uniqueIndexConstraintsOnly: false` et `domainsTypedByContext: false` les remplissaient. `tsTypeForPgType()` traduit un nom de type dans un contexte donné. Pour un tableau d’enums, elle donne donc un type tableau. `definitionForRelationInSchema()` applique `enumArraysTypedAsText` aux lignes brutes. Voir les [paramètres de sortie de cette fonction](/fr/switching#domain-and-parser-types).
 
 ## Les options {#options}
@@ -163,7 +163,7 @@ Les réglages courants :
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`constraintNames`](#generate.constraintNames) | `false` | les noms figurant dans le type `Constraint` de chaque relation |
 | [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions) | `false` | le type d’un domaine sur `text` dont le `CHECK` liste les valeurs |
-| [`valuesTypedAsAliases`](#generate.valuesTypedAsAliases) | `false` | la façon d’écrire le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` |
+| [`valuesTypedAsAliases`](#generate.valuesTypedAsAliases) | retirée en 8.0, toujours `true` | la façon d’écrire le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -266,7 +266,7 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 |---|---|
 | `"insert": "auto"`, `"update": "auto"` | aucun : ce que dit le catalogue, les valeurs par défaut |
 | `"insert": "excluded"` | la clé quitte `Insertable` : `db.insert('films', { …, tagline: 'x' })` ne compile pas (TS2769) |
-| `"insert": "optional"` | la clé est facultative dans `Insertable`, son type inchangé : `title?: string \| db.Parameter<string> \| db.SQLFragment<any>` |
+| `"insert": "optional"` | la clé est facultative dans `Insertable`, son type inchangé : `title?: db.InsertableValue<string>` |
 | `"update": "excluded"` | la clé quitte `Updatable` : `db.update('seat_bookings', { booked_at: … }, …)` ne compile pas (TS2353) |
 
 - La table est nommée comme la nomme son type `Table` : `films`, `archive.screenings`, et `public.films` quand [`unprefixedSchema`](#generate.unprefixedSchema) vaut `null`. `"films"` ne s’applique qu’à `public.films`.
@@ -578,9 +578,9 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `valuesTypedAsAliases` {#generate.valuesTypedAsAliases}
 
-`boolean`, par défaut `false` ; un opt-in, à partir de la 7.2.0. La valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), au lieu d’écrire son union en entier. Les types sont les mêmes : chaque appel qui compile compile encore, et chaque appel refusé l’est encore :
+De la 7.2.0 à la fin de la série 7.x, un opt-in, `false` par défaut. À partir de la 8.0.0, la clé est retirée et le générateur se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-valuesTypedAsAliases)). La valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` nomme un alias de `zapatos/db`, [`WhereableValue`](/fr/value-types#WhereableValue), [`InsertableValue`](/fr/value-types#InsertableValue) ou [`UpdatableValue`](/fr/value-types#UpdatableValue), là où la 7.x écrit par défaut son union en entier. Les types sont les mêmes : chaque appel qui compile compile encore, et chaque appel refusé l’est encore :
 
-| `films` | `false` | `true` |
+| `films` | Jusqu’à la 7.x, `false` | À partir de la 8.0.0 |
 |---|---|---|
 | `Whereable` | `release_year?: number \| db.Parameter<number> \| db.SQLFragment \| db.ParentColumn \| db.SQLFragment<any, …>;` | `release_year?: db.WhereableValue<number>;` |
 | `Insertable` | `tagline?: string \| db.Parameter<string> \| null \| db.DefaultType \| db.SQLFragment<any>;` | `tagline?: db.InsertableValue<string, null \| db.DefaultType>;` |
@@ -589,7 +589,9 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 - Le second argument de type est `null | db.DefaultType` pour une colonne nullable, `db.DefaultType` pour une colonne qui a une valeur par défaut, et absent sinon.
 - Le fichier du schéma est plus petit, et `tsc` utilise moins de mémoire : sur 300 tables de 20 colonnes, 5,1 Mo au lieu de 7,0 Mo, et 293 Mo au lieu de 387 Mo avec `skipLibCheck: false`, 196 Mo au lieu de 280 Mo avec `skipLibCheck: true`.
 - Le survol d’un éditeur et une erreur nomment l’alias avec TypeScript 5.9 : `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`. TypeScript 4.1 affiche l’union en entier.
-- Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus. La 8.0 ne garde que ce comportement ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md) ; [décision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md)).
+- Les alias sont dans `zapatos/db` depuis la 7.2.0 : un schéma écrit par la 8.0 ne compile pas avec un `zapatos/db` plus ancien, sur chaque ligne de valeur (TS2694), et sous `skipLibCheck` ces valeurs sont `any`. Après un retour en arrière, régénérez.
+- Le SQL des requêtes ne change pas ([décision 017](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/017-value-aliases.md), [décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
+- Donnée quand même, avec toute valeur autre que `true`, `null` et `undefined`, la clé arrête le générateur avant la première requête, sans écrire aucun fichier : `valuesTypedAsAliases was removed in 8.0, which always does what valuesTypedAsAliases: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-valuesTypedAsAliases`.
 
 ### `progressListener` {#generate.progressListener}
 

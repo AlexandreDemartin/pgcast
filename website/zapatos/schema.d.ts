@@ -67,13 +67,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('actors_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **actors.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      name?: db.WhereableValue<string>;
     }
     export interface Insertable {
       /**
@@ -81,13 +81,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('actors_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **actors.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment<any>;
+      name: db.InsertableValue<string>;
     }
     export interface Updatable {
       /**
@@ -95,13 +95,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('actors_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **actors.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      name?: db.UpdatableValue<string>;
     }
     export type UniqueIndex = 'actors_pkey';
     export type Constraint = UniqueIndex;
@@ -167,7 +167,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('cinemas_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **cinemas.location**
       *
@@ -175,13 +175,13 @@ declare module 'zapatos/schema' {
       * - `point` in database
       * - `NOT NULL`, no default
       */
-      location?: c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment | db.ParentColumn>;
+      location?: db.WhereableValue<c.PgPoint>;
       /**
       * **cinemas.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      name?: db.WhereableValue<string>;
     }
     export interface Insertable {
       /**
@@ -189,7 +189,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('cinemas_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **cinemas.location**
       *
@@ -197,13 +197,13 @@ declare module 'zapatos/schema' {
       * - `point` in database
       * - `NOT NULL`, no default
       */
-      location: c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment<any>;
+      location: db.InsertableValue<c.PgPoint>;
       /**
       * **cinemas.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment<any>;
+      name: db.InsertableValue<string>;
     }
     export interface Updatable {
       /**
@@ -211,7 +211,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('cinemas_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **cinemas.location**
       *
@@ -219,13 +219,13 @@ declare module 'zapatos/schema' {
       * - `point` in database
       * - `NOT NULL`, no default
       */
-      location?: c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment | db.SQLFragment<any, c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment>;
+      location?: db.UpdatableValue<c.PgPoint>;
       /**
       * **cinemas.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      name?: db.UpdatableValue<string>;
     }
     export type UniqueIndex = 'cinemas_pkey';
     export type Constraint = UniqueIndex;
@@ -299,25 +299,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('crew_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **crew.job**
       * - `crew_job` in database
       * - `NOT NULL`, no default
       */
-      job?: crew_job | db.Parameter<crew_job> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, crew_job | db.Parameter<crew_job> | db.SQLFragment | db.ParentColumn>;
+      job?: db.WhereableValue<crew_job>;
       /**
       * **crew.mentor_id**
       * - `int4` in database
       * - Nullable, no default
       */
-      mentor_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      mentor_id?: db.WhereableValue<number>;
       /**
       * **crew.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      name?: db.WhereableValue<string>;
     }
     export interface Insertable {
       /**
@@ -325,25 +325,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('crew_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **crew.job**
       * - `crew_job` in database
       * - `NOT NULL`, no default
       */
-      job: crew_job | db.Parameter<crew_job> | db.SQLFragment<any>;
+      job: db.InsertableValue<crew_job>;
       /**
       * **crew.mentor_id**
       * - `int4` in database
       * - Nullable, no default
       */
-      mentor_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+      mentor_id?: db.InsertableValue<number, null | db.DefaultType>;
       /**
       * **crew.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment<any>;
+      name: db.InsertableValue<string>;
     }
     export interface Updatable {
       /**
@@ -351,25 +351,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('crew_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **crew.job**
       * - `crew_job` in database
       * - `NOT NULL`, no default
       */
-      job?: crew_job | db.Parameter<crew_job> | db.SQLFragment | db.SQLFragment<any, crew_job | db.Parameter<crew_job> | db.SQLFragment>;
+      job?: db.UpdatableValue<crew_job>;
       /**
       * **crew.mentor_id**
       * - `int4` in database
       * - Nullable, no default
       */
-      mentor_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+      mentor_id?: db.UpdatableValue<number, null | db.DefaultType>;
       /**
       * **crew.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      name?: db.UpdatableValue<string>;
     }
     export type UniqueIndex = 'crew_pkey';
     export type Constraint = UniqueIndex | 'crew_mentor_id_fkey';
@@ -509,55 +509,55 @@ declare module 'zapatos/schema' {
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      details?: db.WhereableValue<db.JSONValue>;
       /**
       * **films.genres**
       * - `_text` in database
       * - `NOT NULL`, default: `'{}'::text[]`
       */
-      genres?: string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn>;
+      genres?: db.WhereableValue<string[]>;
       /**
       * **films.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('films_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **films.release_year**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      release_year?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      release_year?: db.WhereableValue<number>;
       /**
       * **films.runtime_minutes**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      runtime_minutes?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      runtime_minutes?: db.WhereableValue<number>;
       /**
       * **films.studio_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      studio_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      studio_id?: db.WhereableValue<number>;
       /**
       * **films.tagline**
       * - `text` in database
       * - Nullable, no default
       */
-      tagline?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      tagline?: db.WhereableValue<string>;
       /**
       * **films.title**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      title?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      title?: db.WhereableValue<string>;
       /**
       * **films.title_search**
       * - `tsvector` in database
       * - Generated column
       */
-      title_search?: c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn>;
+      title_search?: db.WhereableValue<c.PgTsvector>;
     }
     export interface Insertable {
       /**
@@ -567,49 +567,49 @@ declare module 'zapatos/schema' {
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
+      details?: db.InsertableValue<db.JSONValue, db.DefaultType>;
       /**
       * **films.genres**
       * - `_text` in database
       * - `NOT NULL`, default: `'{}'::text[]`
       */
-      genres?: string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment<any>;
+      genres?: db.InsertableValue<string[], db.DefaultType>;
       /**
       * **films.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('films_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **films.release_year**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      release_year: number | db.Parameter<number> | db.SQLFragment<any>;
+      release_year: db.InsertableValue<number>;
       /**
       * **films.runtime_minutes**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      runtime_minutes: number | db.Parameter<number> | db.SQLFragment<any>;
+      runtime_minutes: db.InsertableValue<number>;
       /**
       * **films.studio_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      studio_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      studio_id: db.InsertableValue<number>;
       /**
       * **films.tagline**
       * - `text` in database
       * - Nullable, no default
       */
-      tagline?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      tagline?: db.InsertableValue<string, null | db.DefaultType>;
       /**
       * **films.title**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      title: string | db.Parameter<string> | db.SQLFragment<any>;
+      title: db.InsertableValue<string>;
     }
     export interface Updatable {
       /**
@@ -619,49 +619,49 @@ declare module 'zapatos/schema' {
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment>;
+      details?: db.UpdatableValue<db.JSONValue, db.DefaultType>;
       /**
       * **films.genres**
       * - `_text` in database
       * - `NOT NULL`, default: `'{}'::text[]`
       */
-      genres?: string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment>;
+      genres?: db.UpdatableValue<string[], db.DefaultType>;
       /**
       * **films.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('films_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **films.release_year**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      release_year?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      release_year?: db.UpdatableValue<number>;
       /**
       * **films.runtime_minutes**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      runtime_minutes?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      runtime_minutes?: db.UpdatableValue<number>;
       /**
       * **films.studio_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      studio_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      studio_id?: db.UpdatableValue<number>;
       /**
       * **films.tagline**
       * - `text` in database
       * - Nullable, no default
       */
-      tagline?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      tagline?: db.UpdatableValue<string, null | db.DefaultType>;
       /**
       * **films.title**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      title?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      title?: db.UpdatableValue<string>;
     }
     export type UniqueIndex = 'films_pkey';
     export type Constraint = UniqueIndex | 'films_studio_id_fkey';
@@ -723,19 +723,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      film_id?: db.WhereableValue<number>;
       /**
       * **ratings.stars**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      stars?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      stars?: db.WhereableValue<number>;
       /**
       * **ratings.votes**
       * - `int4` in database
       * - `NOT NULL`, default: `1`
       */
-      votes?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      votes?: db.WhereableValue<number>;
     }
     export interface Insertable {
       /**
@@ -743,19 +743,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      film_id: db.InsertableValue<number>;
       /**
       * **ratings.stars**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      stars: number | db.Parameter<number> | db.SQLFragment<any>;
+      stars: db.InsertableValue<number>;
       /**
       * **ratings.votes**
       * - `int4` in database
       * - `NOT NULL`, default: `1`
       */
-      votes?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      votes?: db.InsertableValue<number, db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -763,19 +763,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      film_id?: db.UpdatableValue<number>;
       /**
       * **ratings.stars**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      stars?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      stars?: db.UpdatableValue<number>;
       /**
       * **ratings.votes**
       * - `int4` in database
       * - `NOT NULL`, default: `1`
       */
-      votes?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      votes?: db.UpdatableValue<number, db.DefaultType>;
     }
     export type UniqueIndex = 'ratings_pkey';
     export type Constraint = UniqueIndex | 'ratings_film_id_fkey' | 'ratings_stars_check';
@@ -853,7 +853,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      actor_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      actor_id?: db.WhereableValue<number>;
       /**
       * **roles.billing**
       *
@@ -861,19 +861,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      billing?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      billing?: db.WhereableValue<number>;
       /**
       * **roles.character**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      character?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      character?: db.WhereableValue<string>;
       /**
       * **roles.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      film_id?: db.WhereableValue<number>;
     }
     export interface Insertable {
       /**
@@ -881,7 +881,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      actor_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      actor_id: db.InsertableValue<number>;
       /**
       * **roles.billing**
       *
@@ -889,19 +889,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      billing: number | db.Parameter<number> | db.SQLFragment<any>;
+      billing: db.InsertableValue<number>;
       /**
       * **roles.character**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      character: string | db.Parameter<string> | db.SQLFragment<any>;
+      character: db.InsertableValue<string>;
       /**
       * **roles.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      film_id: db.InsertableValue<number>;
     }
     export interface Updatable {
       /**
@@ -909,7 +909,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      actor_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      actor_id?: db.UpdatableValue<number>;
       /**
       * **roles.billing**
       *
@@ -917,19 +917,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      billing?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      billing?: db.UpdatableValue<number>;
       /**
       * **roles.character**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      character?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      character?: db.UpdatableValue<string>;
       /**
       * **roles.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      film_id?: db.UpdatableValue<number>;
     }
     export type UniqueIndex = 'roles_pkey';
     export type Constraint = UniqueIndex | 'roles_actor_id_fkey' | 'roles_film_id_fkey';
@@ -1019,25 +1019,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      cinema_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      cinema_id?: db.WhereableValue<number>;
       /**
       * **screenings.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      film_id?: db.WhereableValue<number>;
       /**
       * **screenings.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('screenings_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **screenings.starts_at**
       * - `timestamptz` in database
       * - `NOT NULL`, no default
       */
-      starts_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+      starts_at?: db.WhereableValue<(db.TimestampTzString | Date)>;
       /**
       * **screenings.subtitled**
       *
@@ -1045,7 +1045,7 @@ declare module 'zapatos/schema' {
       * - `bool` in database
       * - Nullable, no default
       */
-      subtitled?: boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn>;
+      subtitled?: db.WhereableValue<boolean>;
     }
     export interface Insertable {
       /**
@@ -1053,25 +1053,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      cinema_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      cinema_id: db.InsertableValue<number>;
       /**
       * **screenings.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      film_id: db.InsertableValue<number>;
       /**
       * **screenings.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('screenings_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **screenings.starts_at**
       * - `timestamptz` in database
       * - `NOT NULL`, no default
       */
-      starts_at: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment<any>;
+      starts_at: db.InsertableValue<(db.TimestampTzString | Date)>;
       /**
       * **screenings.subtitled**
       *
@@ -1079,7 +1079,7 @@ declare module 'zapatos/schema' {
       * - `bool` in database
       * - Nullable, no default
       */
-      subtitled?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment<any>;
+      subtitled?: db.InsertableValue<boolean, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -1087,25 +1087,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      cinema_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      cinema_id?: db.UpdatableValue<number>;
       /**
       * **screenings.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      film_id?: db.UpdatableValue<number>;
       /**
       * **screenings.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('screenings_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **screenings.starts_at**
       * - `timestamptz` in database
       * - `NOT NULL`, no default
       */
-      starts_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment>;
+      starts_at?: db.UpdatableValue<(db.TimestampTzString | Date)>;
       /**
       * **screenings.subtitled**
       *
@@ -1113,7 +1113,7 @@ declare module 'zapatos/schema' {
       * - `bool` in database
       * - Nullable, no default
       */
-      subtitled?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment>;
+      subtitled?: db.UpdatableValue<boolean, null | db.DefaultType>;
     }
     export type UniqueIndex = 'screenings_pkey';
     export type Constraint = UniqueIndex | 'screenings_cinema_id_fkey' | 'screenings_film_id_fkey';
@@ -1187,25 +1187,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      booked_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+      booked_at?: db.WhereableValue<(db.TimestampTzString | Date)>;
       /**
       * **seat_bookings.customer**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      customer?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      customer?: db.WhereableValue<string>;
       /**
       * **seat_bookings.screening_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      screening_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      screening_id?: db.WhereableValue<number>;
       /**
       * **seat_bookings.seat**
       * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat?: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment | db.ParentColumn>;
+      seat?: db.WhereableValue<c.PgSeat_label>;
     }
     export interface Insertable {
       /**
@@ -1213,25 +1213,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      booked_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
+      booked_at?: db.InsertableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **seat_bookings.customer**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      customer: string | db.Parameter<string> | db.SQLFragment<any>;
+      customer: db.InsertableValue<string>;
       /**
       * **seat_bookings.screening_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      screening_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      screening_id: db.InsertableValue<number>;
       /**
       * **seat_bookings.seat**
       * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment<any>;
+      seat: db.InsertableValue<c.PgSeat_label>;
     }
     export interface Updatable {
       /**
@@ -1239,25 +1239,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      booked_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment>;
+      booked_at?: db.UpdatableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **seat_bookings.customer**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      customer?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      customer?: db.UpdatableValue<string>;
       /**
       * **seat_bookings.screening_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      screening_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      screening_id?: db.UpdatableValue<number>;
       /**
       * **seat_bookings.seat**
       * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat?: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment | db.SQLFragment<any, c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment>;
+      seat?: db.UpdatableValue<c.PgSeat_label>;
     }
     export type UniqueIndex = 'seat_bookings_pkey';
     export type Constraint = UniqueIndex | 'seat_bookings_screening_id_fkey';
@@ -1307,13 +1307,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('studios_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **studios.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      name?: db.WhereableValue<string>;
     }
     export interface Insertable {
       /**
@@ -1321,13 +1321,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('studios_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **studios.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment<any>;
+      name: db.InsertableValue<string>;
     }
     export interface Updatable {
       /**
@@ -1335,13 +1335,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('studios_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **studios.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      name?: db.UpdatableValue<string>;
     }
     export type UniqueIndex = 'studios_pkey';
     export type Constraint = UniqueIndex;
@@ -1391,13 +1391,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      film_id?: db.WhereableValue<number>;
       /**
       * **tags.tag**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      tag?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      tag?: db.WhereableValue<string>;
     }
     export interface Insertable {
       /**
@@ -1405,13 +1405,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      film_id: db.InsertableValue<number>;
       /**
       * **tags.tag**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      tag: string | db.Parameter<string> | db.SQLFragment<any>;
+      tag: db.InsertableValue<string>;
     }
     export interface Updatable {
       /**
@@ -1419,13 +1419,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      film_id?: db.UpdatableValue<number>;
       /**
       * **tags.tag**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      tag?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      tag?: db.UpdatableValue<string>;
     }
     export type UniqueIndex = 'tags_pkey';
     export type Constraint = UniqueIndex | 'tags_film_id_fkey';

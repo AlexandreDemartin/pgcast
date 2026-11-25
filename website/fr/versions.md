@@ -1,5 +1,5 @@
 ---
-english: 9b82d48e7d7e
+english: 157fd8bd738b
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -110,7 +110,7 @@ De la 6.7 à la fin de la 6.x, si l’option `rejectOnQueryError` était omise o
 
 [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), à partir de la 6.10, type un domaine sur `text` par les valeurs que liste son `CHECK`. Il n’a pas de note et reste désactivé en 7.0 : un placeholder qui contient le type de base du domaine est la façon dont Zapatos type un domaine, plus large que les valeurs mais pas faux, puisque Postgres refuse le reste. La 8.0 ne garde que ce comportement : l’union de chaque domaine de ce type est déclarée, et un nouveau placeholder la nomme, tandis qu’un placeholder déjà sur le disque garde son `string`.
 
-[`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) écrit le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` comme un alias de `zapatos/db`, avec les mêmes types. L’option n’a pas de note, puisqu’il n’y a rien à migrer, et la 8.0 ne garde que ce comportement.
+[`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases), à partir de la 7.2.0, écrit le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` comme un alias de `zapatos/db`, avec les mêmes types. L’option n’a pas de note, puisqu’il n’y a rien à migrer, et reste désactivée pendant toute la série 7.x. À partir de la 8.0.0, l’option est retirée et le générateur écrit toujours les alias ([migration vers la 8.0](/fr/switching#from-8-0-valuesTypedAsAliases)).
 
 [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), à partir de la 7.3.0, envoie un `select()` exécuté seul sous la forme d’une ligne par résultat, avec les mêmes valeurs. L’option n’émet jamais d’avertissement, et la 8.0 ne garde que ce comportement : le code qui exécute lui-même le texte de `.compile()` lit `rows.map(r => r.result)`.
 

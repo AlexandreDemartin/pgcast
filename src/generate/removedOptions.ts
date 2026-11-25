@@ -13,6 +13,7 @@ const removedOptions: { [key: string]: unknown } = {
   uniqueIndexConstraintsOnly: true,
   domainsTypedByContext: true,
   rejectOnQueryError: true,
+  valuesTypedAsAliases: true,
 };
 
 /**
