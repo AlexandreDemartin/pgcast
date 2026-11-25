@@ -125,7 +125,7 @@ Each row comes back whole by default, and from an upsert with its `$action`. For
 
 </CastPanel>
 
-- [`returning: ['seat']`](/insert#insert-options) sends `jsonb_build_object($8::text, "seat")`<!-- probe: examples/batches_returning.ts --> in place of `to_jsonb("seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
+- [`returning: ['seat']`](/insert#insert-options) sends `json_build_object($8::text, "seat", '$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: examples/batches_returning.ts --> in place of `to_json("row_seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
 - `$action` tells the new rows from the updated ones: `newSeats` is `['F8']` when F7 was already booked.
 - [`reportAction: 'suppress'`](/insert#upsert-options) leaves `$action` out of the SQL and of the type, for a batch that doesn't need it.
 - Both narrow the type only with `strictNullChecks` on ([Options](/insert#insert-options)).

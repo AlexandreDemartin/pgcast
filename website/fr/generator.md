@@ -1,5 +1,5 @@
 ---
-english: 2329b6c72cb1
+english: 887ec4652e06
 ---
 
 # Générateur
@@ -235,7 +235,7 @@ Une requête nomme sa table avec le schéma, et ses lignes sont des `s.archive.s
 const past = await db.select('archive.screenings', { film_id: 1000 }).run(pool);
 ```
 
-Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guillemets partie par partie : `to_jsonb("archive"."screenings".*)`, `FROM "archive"."screenings"`, et l’alias `"sq_archive.screenings"`.
+Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guillemets partie par partie : `to_json("archive"."screenings".*)`, `FROM "archive"."screenings"`, et l’alias `"sq_archive.screenings"`.
 
 ### `unprefixedSchema` {#generate.unprefixedSchema}
 

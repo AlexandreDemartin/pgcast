@@ -85,7 +85,7 @@ A crew member's mentor is another row of `crew`. Give the subquery an `alias`, s
 - Without the aliases, the subquery's `FROM "crew"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> hides the outer one, and `"crew"."mentor_id"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> is the subquery's own row. Postgres runs it with no error, and every `mentor` comes back `null`, every count `0`:
 
   ```sql
-  SELECT jsonb_build_object($5::text, "name") AS result
+  SELECT json_build_object($5::text, "name") AS result
   FROM "crew"
   WHERE ("id" = "crew"."mentor_id")
   LIMIT $6
@@ -120,9 +120,9 @@ Each `lateral` key joins as a table of the query, `"lateral_<key>"`, with one co
 
 - `WHERE "lateral_castSize".result >= $3`<!-- probe: examples/lateral_result.ts --> and `ORDER BY "lateral_castSize".result DESC`<!-- probe: examples/lateral_result.ts --> read each film's count of roles.
 - Quote the name as pgcast does: unquoted, Postgres folds it to `lateral_castsize`, and refuses the query (42P01). A `"` in a key is doubled, `"lateral_a""b"`<!-- probe: db.select('films', db.all, { lateral: { 'a"b': db.count('roles', { film_id: db.parent('id') }) } }) -->.
-- `result` is the subquery's: a number for `count()`, `jsonb` for the others. Read a field with `->>`, as in `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
+- `result` is the subquery's: a number for `count()`, `json` for the others. Read a field with `->>`, as in `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
 
-With a `groupBy`, each lateral's result is in the row too, so group by it as well: Postgres refuses the query otherwise (42803). Give both in one fragment, typed so that its columns are checked:
+With a `groupBy`, each lateral's result is in the row too, so group by it as well: Postgres refuses the query otherwise (42803). A `count()` groups, as in `GROUP BY "lateral_castSize".result`<!-- probe: db.select('films', db.all, { columns: [], extras: { films: db.sql`count(*)::int` }, lateral: { castSize: db.count('roles', { film_id: db.parent('id') }) }, groupBy: db.sql`"lateral_castSize".result` }) -->. A nested `select()`, `selectOne()` or `selectExactlyOne()` doesn't: `json` has no equality operator (42883), and a group by its cast, `::jsonb`, leaves the result itself ungrouped (42803). To count rows for each nested row, turn the query around, with a `count()` under each studio:
 
 <CastPanel example="lateral_result_group">
 
@@ -130,8 +130,8 @@ With a `groupBy`, each lateral's result is in the row too, so group by it as wel
 
 </CastPanel>
 
-- `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts -->: each studio once, with its name and its number of films.
-- `db.sql<s.films.SQL>` refuses `${'name'}`, a column of `studios`. An array of columns can't hold the fragment: [`groupBy`](/select#groupby-and-having) takes a column, an array of columns, or one fragment.
+- `LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_films" ON true`<!-- probe: examples/lateral_result_group.ts -->: each studio once, with its name and its number of films, and no `GROUP BY`. A studio with no film counts 0, where grouping `films` left it out.
+- `films` is a `number`, as `count()` gives it: no fragment to type by hand.
 
 ## Name the row of a reusable lateral
 
@@ -182,7 +182,7 @@ db.select('films', db.all, {
 
 - **`strictNullChecks`**: without it (or `strict`), `columns`, `extras` and `lateral` leave the type as the full row, and it refuses nothing ([Strict](/select#options)).
 - **An unchecked join**: `db.parent()` takes a column of any table, unless you name the table ([Check the parent column](#check-the-parent-column)).
-- **[`withTies`](/select#order-limit-offset-and-withties) in a nested `selectOne()`**: it writes `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, which keeps every tied row: under an outer `select()`, the parent row comes back once per tie; under `selectOne()` or `selectExactlyOne()`, with one of them, though with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) `selectExactlyOne()` rejects with `NotExactlyOneError`. In a nested `select()`, the ties stay in the array. As a `lateral` of `count()`, each tie is counted: 6 for two films of three tied roles each. In a `lateral`, unchanged from Zapatos 6.6.1, and kept: it is the SQL `withTies` asks for ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). As an `extras` value, a tie makes Postgres refuse the query (21000): "more than one row returned by a subquery used as an expression"; Zapatos 6.6.1 refused every shortcut as an `extras` value (42601), tie or not.
+- **[`withTies`](/select#order-limit-offset-and-withties) in a nested `selectOne()`**: it writes `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, which keeps every tied row: under an outer `select()`, the parent row comes back once per tie; under `selectOne()` or `selectExactlyOne()`, with one of them, though with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) `selectExactlyOne()` rejects with `NotExactlyOneError`. In a nested `select()`, the ties stay in the array. As a `lateral` of `count()`, each tie is counted: 6 for two films of three tied roles each. In a `lateral`, unchanged from Zapatos 6.6.1, and kept: it is the SQL `withTies` asks for ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). As an `extras` value, a tie makes Postgres refuse the query (21000): "more than one row returned by a subquery used as an expression"; Zapatos 6.6.1 refused every shortcut as an `extras` value (42601), tie or not.
 - **A `lock`**: without `of`, `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> reaches the subqueries, and Postgres refuses the query (0A000): "FOR UPDATE is not allowed with aggregate functions" under `select()` or `count()`, "FOR UPDATE cannot be applied to the nullable side of an outer join" under `selectOne()`. Name the table ([`lock`](/select#lock)):
 
 <CastPanel example="lateral_lock">

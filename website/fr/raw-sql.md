@@ -1,5 +1,5 @@
 ---
-english: 8ee4b16e8d34
+english: 7071ddab3166
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
@@ -347,7 +347,7 @@ Un raccourci d’écriture peut aussi être une CTE. Il s’exécute, et la requ
 
 - `tagsBefore` vaut `0` sur le schéma de la doc : le tag n’est là qu’une fois l’instruction exécutée. Pour lire les lignes insérées, lisez la CTE, ``db.sql`SELECT result FROM added` ``, chaque ligne en JSON dans `result`, comme le raccourci la renvoie.
 - Postgres n’exécute une CTE qui modifie des données qu’au premier niveau. Imbriquée, dans un `lateral` par exemple, elle est refusée (0A000).
-- Un `insert()` ou un `upsert()` sans ligne, comme requête principale ou comme CTE, s’écrit `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, qu’aucune table ne refuse : les CTE s’exécutent, et la requête principale se résout en `[]`.
+- Un `insert()` ou un `upsert()` sans ligne, comme requête principale ou comme CTE, s’écrit `SELECT NULL::json AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, qu’aucune table ne refuse : les CTE s’exécutent, et la requête principale se résout en `[]`.
 
 Imbriqué, `withCTEs()` va là où irait sa requête : entre parenthèses comme valeur d’`extras` ou d’`insert()`, comme sous-requête dans un `lateral`.
 

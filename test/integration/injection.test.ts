@@ -991,13 +991,13 @@ describe('without parameters (simple protocol)', () => {
         "mixedEscaped key": "3 rows",
         "mixedEscaped table": "0A000",
         "nul alias": "08P01",
-        "nul key": "08P01",
+        "nul key": undefined,
         "nul table": "08P01",
         "prequoted alias": "3 rows",
         "prequoted key": "3 rows",
         "prequoted table": "42P01",
         "prequotedCloses alias": "3 rows",
-        "prequotedCloses key": "3 rows",
+        "prequotedCloses key": undefined,
         "prequotedCloses table": "42P01",
         "prequotedEmpty alias": "3 rows",
         "prequotedEmpty key": "3 rows",
@@ -1153,12 +1153,12 @@ describe('without parameters (simple protocol)', () => {
     `);
   });
 
-  it('a pre-quoted alias that closes its quotes stays one alias, in FROM and to_jsonb() alike', async () => {
-    // 6.6.1, and master before this fix: written as is in `to_jsonb(<alias>.*)` and `FROM "users" AS <alias>`
+  it('a pre-quoted alias that closes its quotes stays one alias, in FROM and to_json() alike', async () => {
+    // 6.6.1, and master before this fix: written as is in `to_json(<alias>.*)` and `FROM "users" AS <alias>`
     const alias = `"u"; ${update}; --"`;
     const q = db.select('users', all, { alias, order: { by: 'id', direction: 'ASC' } } as any);
     const { text, values } = q.compile();
-    expect(text).toContain(`to_jsonb("""u""; ${update}; --""".*)`);
+    expect(text).toContain(`to_json("""u""; ${update}; --""".*)`);
     expect(text).toContain(`FROM "users" AS """u""; ${update}; --"""`);
     expect(values).toEqual([]);
     expect((await q.run(t.client)).map(u => u.id)).toEqual([1, 2, 3]);
@@ -1185,7 +1185,7 @@ describe('without parameters (simple protocol)', () => {
       [{ order: { by: 'id', direction: 'ASC', get nulls() { return nulls(); } } }, ' ORDER BY "id" ASC NULLS FIRST'],
     ] as const) {
       const q = db.select('users', all, options as any);
-      expect(q.compile()).toEqual({ text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
+      expect(q.compile()).toEqual({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
       expect((await q.run(t.client)).map(u => u.id).sort()).toEqual([1, 2, 3]);
       expect(await adaName()).toBe('Ada');
     }
@@ -1739,7 +1739,7 @@ describe('exists() and isInSelect()', () => {
   });
 });
 
-describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every column', () => {
+describe('an extras or lateral key, and an alias, beside every column', () => {
   // compiled text: test/unit/injection.test.ts; with no parameter, so through the simple protocol, which would run a
   // second statement; the key must come back as given, as the one key it is
   const
@@ -1760,7 +1760,6 @@ describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every
   afterEach(resetConfig);
 
   it('an extras key and a lateral key come back as given, and nothing else runs', async () => {
-    db.setConfig({ shortcutsUseJson: true });
     const
       extras = keyBack(key => db.selectRows('users', sql`"id" = 1`, { extras: { [key]: sql`'v'` } } as any)),
       lateral = keyBack(key => db.selectRows('users', sql`"id" = 1`, { lateral: { [key]: db.count('accounts', { owner_id: db.parent('id') }) } } as any)),
@@ -1770,9 +1769,8 @@ describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every
   });
 
   it('an alias stays one alias in "row_<alias>", and nothing else runs', async () => {
-    db.setConfig({ shortcutsUseJson: true });
     const rows = (q: db.SQLFragment<any[]>) => ({ run: async (client: pg.ClientBase) => `${(await q.run(client)).length} rows` });
-    // a dotted alias is split on `.` in `FROM "users" AS "a"."b"`, 42601 without the option too
+    // a dotted alias is split on `.` in `FROM "users" AS "a"."b"`, 42601
     expect(await identifierOutcomes(payloads, input => ({
       alias: rows(db.select('users', all, { alias: input, extras: { e: sql`1` } } as any)),
     }))).toMatchInlineSnapshot(`
@@ -1797,7 +1795,7 @@ describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every
   });
 });
 
-describe('shortcutsUseJson: an extras key in a write\'s RETURNING beside every column', () => {
+describe('an extras key in a write\'s RETURNING beside every column', () => {
   // compiled text: test/unit/injection.test.ts; every value a fragment, so with no parameter, through the simple
   // protocol, which would run a second statement; the key must come back as given, as the one key it is
   const
@@ -1820,7 +1818,6 @@ describe('shortcutsUseJson: an extras key in a write\'s RETURNING beside every c
   afterEach(resetConfig);
 
   it('comes back as given in each write, and nothing else runs', async () => {
-    db.setConfig({ shortcutsUseJson: true });
     const outcomes: Record<string, unknown[]> = {};
     for (const [name, key] of Object.entries(payloads)) {
       outcomes[name] = [];

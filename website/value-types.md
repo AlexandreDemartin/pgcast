@@ -141,7 +141,7 @@ A `numeric` as `pg` returns it, a string that keeps its digits: `'1.10'`.
 db.enableCustomJSONParsingForLargeNumbers(pg: typeof import('pg')): void
 ```
 
-Makes `pg` parse `json` and `jsonb` values with [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), which gives a number as a string when a `number` would change it. Each shortcut except the aggregates returns `jsonb`, so it applies to their results.
+Makes `pg` parse `json` and `jsonb` values with [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), which gives a number as a string when a `number` would change it. Each shortcut except the aggregates returns `json`, so it applies to their results.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -217,7 +217,7 @@ const word = bytes.toString();  // 'Larkspur'
 
 ## Dates and times {#dates-and-times}
 
-A date or time in a `JSONSelectable` is the string `to_jsonb()` writes, ISO 8601. A `timestamptz` carries the session's `TimeZone` offset: `'2030-03-01T19:30:00+00:00'` in `UTC`, `'2030-03-02T01:00:00+05:30'` in `Asia/Kolkata`.
+A date or time in a `JSONSelectable` is the string `to_json()` writes, ISO 8601. A `timestamptz` carries the session's `TimeZone` offset: `'2030-03-01T19:30:00+00:00'` in `UTC`, `'2030-03-02T01:00:00+05:30'` in `Asia/Kolkata`.
 
 <CastPanel example="toDate">
 

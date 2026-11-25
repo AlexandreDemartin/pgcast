@@ -9,7 +9,7 @@
 db.count(table, where, options?)
 ```
 
-`SELECT count(*) AS result`<!-- probe: db.count('films', db.all) -->, with no `jsonb_agg`: `.run(pool)` gives a `number`, `0` when no row matches the `where`. The `bigint` that Postgres returns goes through `Number()`.
+`SELECT count(*) AS result`<!-- probe: db.count('films', db.all) -->, with no `json_agg`: `.run(pool)` gives a `number`, `0` when no row matches the `where`. The `bigint` that Postgres returns goes through `Number()`.
 
 <CastPanel example="count">
 
@@ -154,7 +154,7 @@ const firstShow = await db.min('screenings', db.all, {
 - The SQL is the same either way: `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: db.min('screenings', db.all, { columns: ['starts_at'] }) -->.
 - `min()` and `max()` give a `bigint` or `numeric` as a string with the default pg parser. Under a lateral key the outer JSON parser reads the number and can preserve large values as strings.
 - `count()` is not typed by column: `0` at top level, and `null` nested in a `lateral` or as an `extras` value when its query returns no row.
-- Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`. That `selectOne()` or `selectExactlyOne()`, nested in turn, is typed as nested.
+- Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `json_agg()`. That `selectOne()` or `selectExactlyOne()`, nested in turn, is typed as nested.
 - `.copy()` returns a plain `SQLFragment`. In `extras` or under a `lateral` key, nest the original `min()` or `max()`. A copied date aggregate keeps the direct type `Date | null` even though Postgres returns a date string in JSON for a non-null date.
 
 ## Types

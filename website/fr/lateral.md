@@ -1,5 +1,5 @@
 ---
-english: 9d50276eb192
+english: b0f4a0833ae2
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -90,7 +90,7 @@ Le mentor d’un membre de l’équipe est une autre ligne de `crew`. Donnez un 
 - Sans les alias, le `FROM "crew"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> de la sous-requête masque celui de la requête extérieure, et `"crew"."mentor_id"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> est la ligne même de la sous-requête. Postgres l’exécute sans erreur, et chaque `mentor` revient `null`, chaque compte `0` :
 
   ```sql
-  SELECT jsonb_build_object($5::text, "name") AS result
+  SELECT json_build_object($5::text, "name") AS result
   FROM "crew"
   WHERE ("id" = "crew"."mentor_id")
   LIMIT $6
@@ -125,9 +125,9 @@ Chaque clé de `lateral` est jointe à la requête comme une table, `"lateral_<k
 
 - `WHERE "lateral_castSize".result >= $3`<!-- probe: examples/lateral_result.ts --> et `ORDER BY "lateral_castSize".result DESC`<!-- probe: examples/lateral_result.ts --> lisent le nombre de rôles de chaque film.
 - Mettez le nom entre guillemets doubles, comme le fait pgcast : sans eux, Postgres le passe en minuscules, `lateral_castsize`, et refuse la requête (42P01). Un `"` dans une clé est doublé, `"lateral_a""b"`<!-- probe: db.select('films', db.all, { lateral: { 'a"b': db.count('roles', { film_id: db.parent('id') }) } }) -->.
-- `result` est le résultat de la sous-requête : un nombre pour `count()`, du `jsonb` pour les autres. Lisez un champ avec `->>`, comme dans `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
+- `result` est le résultat de la sous-requête : un nombre pour `count()`, du `json` pour les autres. Lisez un champ avec `->>`, comme dans `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
 
-Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : groupez donc par lui également, sinon Postgres refuse la requête (42803). Donnez les deux dans un seul fragment, typé pour que ses colonnes soient vérifiées :
+Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : groupez donc par lui également, sinon Postgres refuse la requête (42803). Un `count()` peut être groupé, comme dans `GROUP BY "lateral_castSize".result`<!-- probe: db.select('films', db.all, { columns: [], extras: { films: db.sql`count(*)::int` }, lateral: { castSize: db.count('roles', { film_id: db.parent('id') }) }, groupBy: db.sql`"lateral_castSize".result` }) -->. Un `select()`, `selectOne()` ou `selectExactlyOne()` imbriqué, non : `json` n’a pas d’opérateur d’égalité (42883), et grouper par son cast, `::jsonb`, laisse le résultat lui-même hors du groupement (42803). Pour compter des lignes pour chaque ligne imbriquée, retournez la requête, avec un `count()` sous chaque studio :
 
 <CastPanel example="lateral_result_group">
 
@@ -135,8 +135,8 @@ Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : 
 
 </CastPanel>
 
-- `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts --> : chaque studio une seule fois, avec son nom et son nombre de films.
-- `db.sql<s.films.SQL>` refuse `${'name'}`, une colonne de `studios`. Un tableau de colonnes ne peut pas contenir le fragment : [`groupBy`](/fr/select#groupby-and-having) prend une colonne, un tableau de colonnes ou un seul fragment.
+- `LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_films" ON true`<!-- probe: examples/lateral_result_group.ts --> : chaque studio une seule fois, avec son nom et son nombre de films, sans `GROUP BY`. Un studio sans film compte 0, là où grouper `films` l’omettait.
+- `films` est un `number`, tel que `count()` le donne : aucun fragment à typer à la main.
 
 ## Nommer la ligne d’un lateral réutilisable {#name-the-row-of-a-reusable-lateral}
 
@@ -187,7 +187,7 @@ db.select('films', db.all, {
 
 - **`strictNullChecks`** : sans lui (ou `strict`), `columns`, `extras` et `lateral` laissent au type la ligne entière, et il ne refuse rien ([Strict](/fr/select#options)).
 - **Une jointure non vérifiée** : `db.parent()` accepte une colonne de n’importe quelle table, sauf si vous nommez la table ([Vérifier la colonne parente](#check-the-parent-column)).
-- **[`withTies`](/fr/select#order-limit-offset-and-withties) dans un `selectOne()` imbriqué** : il écrit `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, qui garde toutes les lignes ex æquo : sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo ; sous `selectOne()` ou `selectExactlyOne()`, elle revient une fois, avec l’une des lignes ex æquo, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Dans un `select()` imbriqué, les ex æquo restent dans le tableau. Comme `lateral` de `count()`, chaque ex æquo est compté : 6 pour deux films de trois rôles ex æquo chacun. Dans un `lateral`, inchangé depuis Zapatos 6.6.1, et conservé : c’est le SQL que demande `withTies` ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). Comme valeur d’`extras`, un ex æquo fait refuser la requête par Postgres (21000) : « <span lang="en">more than one row returned by a subquery used as an expression</span> » ; Zapatos 6.6.1 refusait tout raccourci comme valeur d’`extras` (42601), ex æquo ou non.
+- **[`withTies`](/fr/select#order-limit-offset-and-withties) dans un `selectOne()` imbriqué** : il écrit `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, qui garde toutes les lignes ex æquo : sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo ; sous `selectOne()` ou `selectExactlyOne()`, elle revient une fois, avec l’une des lignes ex æquo, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Dans un `select()` imbriqué, les ex æquo restent dans le tableau. Comme `lateral` de `count()`, chaque ex æquo est compté : 6 pour deux films de trois rôles ex æquo chacun. Dans un `lateral`, inchangé depuis Zapatos 6.6.1, et conservé : c’est le SQL que demande `withTies` ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). Comme valeur d’`extras`, un ex æquo fait refuser la requête par Postgres (21000) : « <span lang="en">more than one row returned by a subquery used as an expression</span> » ; Zapatos 6.6.1 refusait tout raccourci comme valeur d’`extras` (42601), ex æquo ou non.
 - **Un `lock`** : sans `of`, `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> atteint les sous-requêtes, et Postgres refuse la requête (0A000) : « <span lang="en">FOR UPDATE is not allowed with aggregate functions</span> » sous `select()` ou `count()`, « <span lang="en">FOR UPDATE cannot be applied to the nullable side of an outer join</span> » sous `selectOne()`. Nommez la table ([`lock`](/fr/select#lock)) :
 
 <CastPanel example="lateral_lock">

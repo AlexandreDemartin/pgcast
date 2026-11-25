@@ -113,7 +113,7 @@ From 6.7 until 7.0, with `rejectOnQueryError` omitted or set to `null` in JSON, 
 
 [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0, sends a `select()` run on its own as one row per result, with the same values. It never warns, and 8.0 keeps it alone: code that runs `.compile()`'s text itself reads `rows.map(r => r.result)`.
 
-[`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), from 7.3.0, builds the JSON of `select()` and its kin, and of the writes' `RETURNING`, with `json` functions, with the same values but for a row's key order and a nested result's type. It never warns, and 8.0 keeps it alone.
+[`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), from 7.3.0, builds the JSON of `select()` and its kin, and of the writes' `RETURNING`, with `json` functions, with the same values but for a row's key order and a nested result's type. It never warns, and 8.0 removes the key and keeps `json` alone ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
 In 8.0 each option keeps one behaviour, the better one ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 

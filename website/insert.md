@@ -7,7 +7,7 @@ What every write shares:
 
 - It returns a `SQLFragment`: [`.run(pool)`](/sql-template#run) sends it, `.compile()` gives its `text` and `values` without sending anything.
 - A value is sent as a parameter (`$1`), never written into the SQL; a `sql` fragment is SQL.
-- Rows come back through `to_jsonb()`, or `to_json()` [with `shortcutsUseJson`](#shortcutsUseJson), from 7.3.0, as a table's `JSONSelectable`: a `timestamptz` is a string ([The catalog](/catalog-types)).
+- Rows come back through `to_json()` ([The JSON it builds](#json-functions)), as a table's `JSONSelectable`: a `timestamptz` is a string ([The catalog](/catalog-types)).
 - An error from Postgres rejects `.run()` with a `DatabaseError` ([`isDatabaseError()`](/transaction#isDatabaseError)). The errors below are thrown by pgcast as it builds the query, before anything is sent.
 
 ## `insert()` {#insert}
@@ -54,32 +54,30 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| none | `RETURNING to_jsonb("films".*) AS result`<!-- probe: examples/insert.ts --> | `films.JSONSelectable` |
-| `returning: ['id']` | `jsonb_build_object($5::text, "id")`<!-- probe: examples/insert_returning.ts --> in place of `to_jsonb("films".*)` | `Pick<films.JSONSelectable, 'id'>` |
-| `extras: { name: 'title', shouted: … }`, as above | `\|\| jsonb_build_object($6::text, "title", $7::text, upper("title"))`<!-- probe: examples/insert_returning.ts --> | adds `name`, of the column's type, and `shouted`, of the fragment's `RunResult`: `string`, from `db.sql<s.films.SQL, string>` |
+| none | `RETURNING to_json("films".*) AS result`<!-- probe: examples/insert.ts --> | `films.JSONSelectable` |
+| `returning: ['id']` and `extras: { name: 'title', shouted: … }`, as above | `json_build_object($5::text, "id", $6::text, "title", $7::text, upper("title"))`<!-- probe: examples/insert_returning.ts --> in place of `to_json("films".*)` | `Pick<films.JSONSelectable, 'id'>`, with `name`, of the column's type, and `shouted`, of the fragment's `RunResult`: `string`, from `db.sql<s.films.SQL, string>` |
 
 - A `readonly` array in `returning` (`['id'] as const`) gives the same SQL and the same type as a mutable one ([`columns`](/select#columns)).
 - Both need `strictNullChecks` for their types.
 - `null` options are none. `returning: null` or `extras: null`, past the type, throws as the query compiles, so `.run()` rejects before any query, in `upsert()`, `update()` and `deletes()` too: "`` `returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names. ``<!-- message -->". An `insert()` or `upsert()` of `[]` is still a no-op, and a row with no key still throws first, at the call. Zapatos 6.6.1 threw a `TypeError` at the call.
 
-### With `shortcutsUseJson` {#shortcutsUseJson}
+### The JSON it builds {#json-functions}
 
-From 7.3.0. With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), the `RETURNING` of `insert()`, `upsert()`, `update()` and `deletes()` is built with `json` functions, in place of their `jsonb` twins. The values and the types are the same, but for a row's key order: the table's columns, then `extras`, then `$action`.
+From 8.0.0, the `RETURNING` of `insert()`, `upsert()`, `update()` and `deletes()` is built with `json` functions, as [`select()`'s rows](/select#json-functions) are; a row's keys come in the table's order, then `extras`, then `$action`. Through 7.x, they were `jsonb` unless [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson) was set ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
-| Option | SQL with `shortcutsUseJson` |
+| Option | SQL |
 |---|---|
-| none | `RETURNING to_json("films".*) AS result`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 })) --> |
-| `returning`, with or without `extras` and `$action` | one `json_build_object($5::text, "id", $6::text, "title", $7::text, upper("title"))`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { returning: ['id'], extras: { name: 'title', shouted: db.sql`upper(${'title'})` } })) -->, its keys parameters; in `upsert()`, `'$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { returning: ['votes'] })) --> last |
-| `extras`, or `upsert()`'s `$action`, beside every column | `to_json("row_films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } })) --> of the row with its keys as aliases, `upper("title") AS "shouted"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } })) -->, in a subquery `AS "row_films"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } })) --> |
-| `reportAction: 'suppress'`, with no `extras` | `RETURNING to_json("ratings".*) AS result`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { reportAction: 'suppress' })) --> |
+| `returning`, with or without `extras` and `$action` | one `json_build_object($5::text, "id", $6::text, "title", $7::text, upper("title"))`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { returning: ['id'], extras: { name: 'title', shouted: db.sql`upper(${'title'})` } }) -->, its keys parameters; in `upsert()`, `'$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { returning: ['votes'] }) --> last |
+| `extras`, or `upsert()`'s `$action`, beside every column | `to_json("row_films".*)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } }) --> of the row with its keys as aliases, `upper("title") AS "shouted"`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } }) -->, in a subquery `AS "row_films"`<!-- probe: db.insert('films', { studio_id: 1000, title: 'Winter at Fennick Lock', release_year: 2032, runtime_minutes: 108 }, { extras: { shouted: db.sql`upper(${'title'})` } }) --> |
+| `reportAction: 'suppress'`, with no `extras` | `RETURNING to_json("ratings".*) AS result`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { reportAction: 'suppress' }) --> |
 
 - Beside every column, each `extras` key is one identifier, any `"` doubled. An empty key, one with a NUL, or one over 63 bytes in UTF-8, which Postgres would refuse or truncate, throws while compiling: give `returning`, whose keys stay parameters.
 - A key equal to a column, or `$action` in `upsert()`'s `extras`, comes twice in the JSON, and the last wins, as `||` makes it win.
 - With `returning`, one `json_build_object()` takes 100 arguments: over 50 keys, columns, `extras` and `$action` together, throw while compiling.
-- Beside every column, `extras` run in a subquery over the one row, where Postgres takes what `RETURNING` refuses. Off, an aggregate, a window function or a set-returning function fails (42803, 42P20, 0A000); on, `count(*)` and `row_number() OVER ()` give 1, an aggregate of a column still fails, and a set-returning function fails over two rows (21000) and gives a `null` row over none. An untyped parameter, `extras: { u: db.param(5) }`, fails off (42P18) and gives `"5"` on, as the subquery types it `text`. A write that runs off gives the same values on.
-- A write's `result` read from a CTE or a `sql` template is `json`, so `DISTINCT`, `UNION` or a `jsonb` function over it needs `::jsonb` ([Configuration](/runtime-config#Config.shortcutsUseJson)).
+- Beside every column, `extras` run in a subquery over the one row, where Postgres takes what `RETURNING` refuses: `count(*)` and `row_number() OVER ()` give 1, an aggregate of a column fails, and a set-returning function fails over two rows (21000) and gives a `null` row over none. An untyped parameter, `extras: { u: db.param(5) }`, gives `"5"`, as the subquery types it `text`. Through 7.x without `shortcutsUseJson`, an aggregate, a window function, a set-returning function or an untyped parameter failed there (42803, 42P20, 0A000, 42P18).
+- A write's `result` read from a CTE or a `sql` template is `json`: a `jsonb` function or operator over it, or anything that compares or sorts it, fails with 42883, where its cast, `::jsonb`, or a field, `->>`, works ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
-<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'])) -->
+<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) -->
 ```sql
 INSERT INTO "ratings" ("film_id", "stars", "votes") VALUES ($1, $2, $3) ON CONFLICT ("film_id", "stars") DO UPDATE SET ("film_id", "stars", "votes") = ROW(EXCLUDED."film_id", EXCLUDED."stars", EXCLUDED."votes") RETURNING (SELECT to_json("row_ratings".*) FROM (SELECT "ratings".*, CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_ratings") AS result
 -- [1000, 5, 1]
@@ -121,7 +119,7 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 | `noNullUpdateColumns: 'tagline'` | `CASE WHEN EXCLUDED."tagline" IS NULL THEN "films"."tagline" ELSE EXCLUDED."tagline" END`<!-- probe: db.upsert('films', { id: 1002, tagline: null }, 'id', { noNullUpdateColumns: 'tagline' }) --> in place of `EXCLUDED."tagline"` | none |
 | `updateValues: { votes: 10 }` | `ROW(EXCLUDED."film_id", EXCLUDED."stars", $3)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateValues: { votes: 10 } }) -->: `$3` in place of `EXCLUDED."votes"` | none |
 | ``updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` }`` | `"ratings"."votes" + 1`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` } }) --> in place of `EXCLUDED."votes"` | none |
-| `reportAction: 'suppress'` | no `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | no `UpsertAction` |
+| `reportAction: 'suppress'` | no `CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action"`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | no `UpsertAction` |
 
 - `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Batches](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
 - An `updateColumns` computed at run time may be empty. With no `updateValues` key, the SQL is then `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: ['votes'].filter(() => false) }) -->; by default, a key set to `undefined` is none ([An `undefined` value](#undefined-values)). One row that conflicts then gives `undefined`, though the type of a `ratings.Column[]` says the row. Check for `undefined`, or pass [`doNothing`](#doNothing), which the type follows.

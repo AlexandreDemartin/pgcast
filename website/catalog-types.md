@@ -117,13 +117,13 @@ In a session whose `TimeZone` is `UTC`, the first is the `Date` `2030-03-01T19:3
 
 ## Why the shortcuts return JSON
 
-Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_jsonb()` or `jsonb_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `jsonb_agg()`.
+Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_json()` or `json_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `json_agg()`.
 
 That's how `select()` brings back films with their cast already in place, in one round trip, with nothing to assemble in JavaScript afterwards.
 
 The price is that every value travels as JSON, and JSON has no dates, no bytes and one kind of number. `JSONSelectable` says what arrives instead:
 
-- a date or a time, as the ISO 8601 string `to_jsonb()` writes; a `timestamptz` with the session's offset, `+00:00` in `UTC` and `+05:30` in `Asia/Kolkata`;
+- a date or a time, as the ISO 8601 string `to_json()` writes; a `timestamptz` with the session's offset, `+00:00` in `UTC` and `+05:30` in `Asia/Kolkata`;
 - a `bytea`, as its hex string (with the default `bytea_output`), `'\xdeadbeef'`, where `pg` gives a `Buffer`;
 - an `int8` or a `numeric`, as a JSON number, where `pg` gives a string. A large one loses precision as `JSON.parse()` reads it: the `int8` `9007199254740993` arrives as `9007199254740992`. The generator warns when a schema has such columns, and [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) types them for a parser that keeps them whole.
 

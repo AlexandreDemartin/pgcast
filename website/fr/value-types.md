@@ -1,5 +1,5 @@
 ---
-english: 9b0fb2e61cc1
+english: 62dad7e57439
 ---
 
 # Types de valeurs
@@ -145,7 +145,7 @@ Un `numeric` tel que `pg` le renvoie, une chaîne qui garde ses chiffres : `'1.
 db.enableCustomJSONParsingForLargeNumbers(pg: typeof import('pg')): void
 ```
 
-Fait parser par `pg` les valeurs `json` et `jsonb` avec [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), qui donne un nombre sous forme de chaîne quand le convertir en `number` le modifierait. Chaque raccourci sauf les agrégats renvoie du `jsonb`, donc elle s’applique à leurs résultats.
+Fait parser par `pg` les valeurs `json` et `jsonb` avec [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), qui donne un nombre sous forme de chaîne quand le convertir en `number` le modifierait. Chaque raccourci sauf les agrégats renvoie du `json`, donc elle s’applique à leurs résultats.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -221,7 +221,7 @@ const word = bytes.toString();  // 'Larkspur'
 
 ## Dates et heures {#dates-and-times}
 
-Une date ou une heure dans un `JSONSelectable` est la chaîne qu’écrit `to_jsonb()`, en ISO 8601. Un `timestamptz` porte le décalage du `TimeZone` de la session : `'2030-03-01T19:30:00+00:00'` en `UTC`, `'2030-03-02T01:00:00+05:30'` en `Asia/Kolkata`.
+Une date ou une heure dans un `JSONSelectable` est la chaîne qu’écrit `to_json()`, en ISO 8601. Un `timestamptz` porte le décalage du `TimeZone` de la session : `'2030-03-01T19:30:00+00:00'` en `UTC`, `'2030-03-02T01:00:00+05:30'` en `Asia/Kolkata`.
 
 <CastPanel example="toDate">
 

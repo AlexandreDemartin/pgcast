@@ -1946,7 +1946,7 @@ describe('cursor()', () => {
       expect(await read(db.cursor(c, query, { batchSize: 2 }))).toEqual([gs(1, 2), gs(3)]);
       const users = db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }), texts = sent();
       expect(await read(db.cursor(c, users, { batchSize: 2 }))).toEqual([await users.run(c)]);
-      expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT coalesce(jsonb_agg(result),']);
+      expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT coalesce(json_agg(result),']);
     });
   });
 

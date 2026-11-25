@@ -55,6 +55,29 @@ Candidates for a check, a rule or a skill line.
 - learning: a rewording that moves a claim's reference point (from 7.x's written-out union to Zapatos 6.6.1's) must be replayed against the new reference for each case; #654 made the Insertable differ from 6.6.1's.
 - learning: a "same output" proof that compiles only the main variant is completed cheaply by expanding each snapshot diff's added alias line through the old template and comparing it with the removed line: every variant in under a second, no database.
 - learning: before writing "same as Zapatos 6.6.1" about a type, check it against 6.6.1's `dist/generate/tables.js` (cached under `node_modules/.cache/pgcast-zapatos-661/`); pgcast changed the generated unions after 6.6.1 (#654), so the last pgcast release is usually the safer reference.
+- A `gh issue comment` that times out (502/504) may still have posted: check `gh issue view --json comments` before retrying (#969).
+- Probes that need a changed `src/` go in a detached scratch worktree from the start: auto mode refuses a temporary edit of the checkout (#969).
+- Rewriting failing test literals from captured values trusts the actual value: a helper that extracts a substring and falls back to the full text was silently rewritten to the fallback, and shared helpers (`insertSQL(...)`) were inlined; flag rewrites whose length moves a lot and diff for removed helper calls before committing (#969).
+- A replay compared as a multiset per test, with a fallback per file, survives renamed tests; random statement names and pids are named in Proofs (#969).
+- A one-shot `git grep` for a removed SQL form missed four prose lines that a per-page hit count, EN against FR, found: count per page before committing the English (#988).
+- `node check-prose.mjs`, run from `website/`, checks every docs probe in about 10 s without `docs:build`: the fast loop for SQL text in the docs (#988).
+- When an entry of another class joins a migration section (group B: the 7.x default is not the kept value), reread the section's intro: its general claims ("never set → no change") were written for the entries already there (#988).
+- `bench:runtime` can fail its gate from machine load alone (spreads over 200 %, load ~10 gave +61/+76 % on prepared inserts; a calm rerun −9/+7 %): read the spread column and `uptime` before calling a red gate a regression (#988).
+- A shipped gain with no baseline refresh leaves the gate blind to losing it (a lateral back from 19 to 90 ms passes under +50 % of 63.8; a `null` baseline is never gated): the bench script's refresh rule should cover a measured gain, not only a justified slowdown (#988).
+- `adapters/pglite`'s `check:browser` fails whenever the checkout path has a space: `test/browser-bundle.mjs` hands Vite `new URL(...).pathname`, which keeps `%20`; `fileURLToPath` fixes it, a symlink with `--preserve-symlinks --preserve-symlinks-main` works around it (#988).
+- In a worktree `.git` is a file: `git commit -F .git/MERGE_MSG` fails; use `git rev-parse --git-path MERGE_MSG` (#988).
+- To check a merge commit, rebuild it with `git merge-tree --write-tree <ours> <theirs>` and diff that tree against the real merge: only the hand-resolved lines show, so a dropped line of the other branch shows at once (#988).
+- Local `docs:build` does not run the docs examples against Postgres: a change of SQL output runs `cd website && npm run docs:examples` too, or CI's `docs` job is the first to see a documented pattern break (#988: `GROUP BY` over a `json` lateral, 42883).
+- One probe script can check Postgres and PGlite: `.compile()` once, then send the same text to a `pg` client and to `open(schema)` from `website/.vitepress/playground/pglite.ts` (#988).
+- After a change of SQL type, grep the docs for the old type's name too, not only the failing example: a page still said a nested result is `jsonb` after round 1 (#988).
+- A type change that drops operators (`jsonb` → `json`: no equality, no ordering) is documented by its cause, "anything that compares or sorts it fails", not by a list of clauses: each list left one out (`GROUP BY` in round 2, then `ORDER BY`, `=`, `IN`) (#988).
+- learning: running the way out before writing it showed that `::jsonb` and `->>` do not fix a `select()` `groupBy` beside a lateral (42803); a way out written from memory would have been wrong.
+- learning: `update()` refuses `db.all` as a filter, so a probe that writes every row needs `db.sql\`TRUE\``.
+- learning: changing a value's type from `jsonb` to `json` does not always fail loudly: `||` with an untyped literal resolves to `anynonarray || text` and returns text; a migration entry for a type change is checked against the old type's operators and against mixing with it (COALESCE, CASE, UNION), not only its functions and comparisons.
+- learning: three rounds on one migration entry came from lists written from memory; the class of a type change is enumerated from `pg_operator`/`pg_proc` once, not case by case.
+- learning: a sweep built from the catalog (`pg_operator` and `pg_proc` filtered on `jsonb`, each in 7.x's shape, 8.0's and the way out, on both engines) closed in about 15 calls a class that three lists written from memory kept missing.
+- learning: the class has a boundary: assigning into a `jsonb` column and the polymorphic `jsonb` builders (`to_jsonb`, `jsonb_agg`, `jsonb_build_object`) are unchanged, so the entry need not list them.
+- learning: an error code named for "an operator that takes only jsonb" is checked with an untyped value on the other side too: `unknown @> json` and `json <@ unknown` resolve against the polymorphic range operators and fail with 42725, which a sweep of typed operands misses.
 
 ## Minors kept
 
@@ -77,3 +100,12 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `form` `CHANGELOG.md:15` (#986): "refused too, as 7.x's `tsForConfig()` read it" does not name the one config that goes from working to refused: `generate()` with an inherited removed key, which 7.x's `finaliseConfig()` spread dropped.
 - `form` #989 `website/switching.md` § from-8-0-valuesTypedAsAliases: **What you see** could name that `--check` or `check()` in CI fails after the upgrade until `schema.d.ts` is regenerated.
 - `form` #989 `CHANGELOG.md:17`: the `bench:types:large --aliases` removal is contributor tooling on a user-facing Breaking line; `docs/WORKFLOW.md` already says it.
+- `defect` `test/integration/injection.test.ts:994`, `:1000` (#988): `"nul key"` and `"prequotedCloses key"` record a codeless throw as `undefined`, so a refusal for another reason passes too; the comment at `:938` still says a lateral key is a parameter (extended protocol).
+- `defect` `website/switching.md:424` and FR `:425` (#988): `{"balance" : 20.00}` is `json_build_object`'s text, with `columns` or `returning` only; without them `to_json` writes compact text.
+- `form` `src/db/transaction.ts:614` (#988): "its one `jsonb_agg` row" is now `json_agg`.
+- `form` `website/select.md:64`, `website/runtime-config.md:258`, `website/performance.md:12`, `CHANGELOG.md` (#988): four figures for the same lateral scenario; keep one, link to it.
+- `form` `src/db/shortcuts.ts:202` (#988): names `$action` for writes, which have none.
+- `defect` `adapters/pglite/test/browser-bundle.mjs` (#988): `new URL(...).pathname` keeps `%20`, so `check:browser` fails in a checkout whose path has a space; use `fileURLToPath`.
+- `form` #988 `website/switching.md` § from-8-0-shortcutsUseJson and `website/select.md:67`: the way out (`::jsonb`, `->>`) does not fix a `groupBy` beside a `lateral` (42803); add `->>` to the 42803 sentence and restore select.md's link to `/lateral#filter-sort-and-group-by-a-lateral`, EN and FR.
+- `defect` #988 `website/switching.md:426` (FR `:427`): an untyped value on the other side of `@>` (nested right) or `<@` (nested left) fails with 42725, not the 42883 the entry names; name it or give no code for operators.
+- `form` #988 `website/switching.md:426`: "`COALESCE`, `CASE` or `UNION`" reads as closed (`GREATEST`, `INTERSECT`, `VALUES`, `ARRAY[…]`, casts give 42846 too; "such as"); `->> 0` on an array of objects keeps `json`'s spacing; the bullet (~120 words) would read better split.

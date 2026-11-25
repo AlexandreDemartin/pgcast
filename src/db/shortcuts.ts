@@ -143,6 +143,8 @@ const
   allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
   writeFilter = (where: Whereable | SQLFragment<any>) => (where as unknown) === all ? refusedSQL(allAsWriteFilter) : where;
 
+// the jsonb row of `distinct: true`, which DISTINCT compares, json having no equality operator (42883); with
+// SQLForExtras and the lateral keys' jsonb_build_object(), the one place where the shortcuts build jsonb
 function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Table, nullMessage: string) {
   return columns === undefined ? sql`to_jsonb(${table}.*)` :
     columns === null ? refusedSQL(nullMessage) :
@@ -173,11 +175,11 @@ const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInEx
 const topLevelForm = Symbol('topLevelForm');
 type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
 const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
-// set by select() and its kin on the runResultTransform of a query whose result is `json`, as shortcutsUseJson
-// builds it: a parent's plain DISTINCT over it as a passed-through lateral compares it as `jsonb` (json has no
-// equality, 42883), where an aggregate's or a `jsonb` result is compared as it is. Each query gets a transform of its
-// own, which copy() and so withCTEs() keep, where they do not keep topLevelForm; a sql fragment given a query's
-// transform is the caller's SQL, and is read only on a query (isQuery)
+// set by select() and its kin on the runResultTransform of a query whose result is `json`, as they build it: a
+// parent's plain DISTINCT over it as a passed-through lateral compares it as `jsonb` (json has no equality, 42883),
+// where an aggregate's or a `jsonb` result (`distinct: true`'s row) is compared as it is. Each query gets a
+// transform of its own, which copy() and so withCTEs() keep, where they do not keep topLevelForm; a sql fragment
+// given a query's transform is the caller's SQL, and is read only on a query (isQuery)
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
@@ -191,18 +193,17 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
       Object.keys(extras), sql`, `, k => sql`${param(k)}::text, ${asScalar(extras[k])}`)})`;
 }
 
-// with shortcutsUseJson (decision 018 § 2), json having no `||`, a row of `columns` takes its columns, extras and
-// lateral keys in one json_build_object(), whose arguments Postgres limits to 100 (max_function_args; 54023 beyond),
-// where each part takes a jsonb_build_object() of its own without the option; a write's `returning`, extras and
-// $action the same. A key is a parameter, every caller's key included (a fragment past the type), but one flagged as
+// json having no `||` (decision 018 § 2), a row of `columns` takes its columns, extras and lateral keys in one
+// json_build_object(), whose arguments Postgres limits to 100 (max_function_args; 54023 beyond); a write's
+// `returning`, extras and $action the same; left out, every column is to_json() of a row whose aliases name the rest. A key is a parameter, every caller's key included (a fragment past the type), but one flagged as
 // ours (`$action`), written as a literal
 const maxJSONKeys = 50;
-function SQLForJSONObject(pairs: [string, SQL, ours?: true][], parts = 'columns, extras and lateral keys') {
-  return pairs.length > maxJSONKeys ? refusedSQL(`\`shortcutsUseJson\` builds this row with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${pairs.length} keys (${parts} together) take ${pairs.length * 2}. Give ${maxJSONKeys} keys at most, or set \`shortcutsUseJson: false\`, under which ${parts} take one \`jsonb_build_object()\` each.`) :
+function SQLForJSONObject(pairs: [string, SQL, ours?: true][], parts = 'columns, extras and lateral keys', list = 'columns') {
+  return pairs.length > maxJSONKeys ? refusedSQL(`This row is built with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${pairs.length} keys (${parts} together) take ${pairs.length * 2}. Give ${maxJSONKeys} keys at most, or leave \`${list}\` out: every column then comes with the ${list === 'columns' ? 'extras and lateral keys' : 'extras and `$action`'} as column aliases.`) :
     sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v, ours]) => sql`${ours ? raw(`'${k}'`) : sql`${param(k)}::text`}, ${v}`)})`;
 }
 
-// with shortcutsUseJson, an extras or lateral key beside every column is a column alias, as to_json() names its keys
+// an extras or lateral key beside every column is a column alias, as to_json() names its keys
 // after the columns: one quoted identifier, every `"` doubled, so that it comes back as given (SQLForAlias keeps a
 // hand-escaped `a""b`, which would come back as `a"b`), never split on `.`. Postgres refuses an empty one (42601) and
 // a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles
@@ -212,18 +213,17 @@ function SQLForKeyAlias(key: string, list: 'columns' | 'returning' = 'columns') 
     bytes = Buffer.byteLength(text),
     problem = text === '' ? 'it is empty' : text.includes('\0') ? 'it holds a NUL' : bytes > 63 ? `it takes ${bytes} bytes in UTF-8, over Postgres's 63` : undefined;
   return problem === undefined ? raw(`"${text.replace(/"/g, '""')}"`) :
-    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which \`shortcutsUseJson\` makes of an ${list === 'columns' ? '`extras` or `lateral` key' : '`extras` key'} beside every column: ${problem}. Give \`${list}\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.`);
+    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which an ${list === 'columns' ? '`extras` or `lateral` key' : '`extras` key'} beside every column becomes: ${problem}. Give \`${list}\`, whose keys stay parameters.`);
 }
 
 // the RETURNING list of insert(), upsert() (with `$action`, unless suppressed), update() and deletes(), `… AS result`.
-// With shortcutsUseJson (decision 018 § 2), json having no `||`, every column beside extras or $action is to_json() of
+// json having no `||` (decision 018 § 2), every column beside extras or $action is to_json() of
 // a scalar subquery's row, whose column aliases name the keys, and `returning` beside them one json_build_object()
 function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, ColumnsOption<Table>, ExtrasOption<Table>> | undefined, reportAction = false) {
   const
     returning = callerValue(options, 'returning'),
     extras = callerValue(options, 'extras'),
     action = sql`CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END`;
-  if (!(getConfig().shortcutsUseJson ?? false)) return sql`${SQLForColumnsOfTable(returning, table, returningNull)}${SQLForExtras(extras)}${reportAction ? sql` || jsonb_build_object('$action', ${action})` : []} AS result`;
   const
     keys = extras == null ? [] : Object.keys(extras),
     row = SQLForAlias('row_', table),
@@ -233,7 +233,7 @@ function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, 
         ...returning.map((c): [string, SQL] => [c, c]),
         ...keys.map((k): [string, SQL] => [k, asScalar(extras![k])]),
         ...(reportAction ? [['$action', action, true] as [string, SQL, true]] : []),
-      ], '`returning`, `extras` and `$action`') :
+      ], '`returning`, `extras` and `$action`', 'returning') :
       keys.length === 0 && !reportAction ? sql`to_json(${table}.*)` :
       sql`(SELECT to_json(${row}.*) FROM (SELECT ${table}.*${keys.map(k => sql`, ${asScalar(extras![k])} AS ${SQLForKeyAlias(k, 'returning')}`)}${reportAction ? sql`, ${action} AS "$action"` : []}) AS ${row})`;
   return sql`${json} AS result`;
@@ -813,7 +813,7 @@ export interface SelectOptionsForTable<
 };
 
 // a single lateral query is passed through as it is by selectOne() and selectExactlyOne(), as JSON by select(),
-// which wraps the rows in jsonb_agg(): the two types differ only for a min() or max(), typed by column
+// which wraps the rows in json_agg(): the two types differ only for a min() or max(), typed by column
 type PassedThroughResult<L extends SQLFragment<any>, M extends SelectResultMode> =
   M extends SelectResultMode.Many ? RunResultForSQLFragment<L> :
     L extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never;
@@ -920,7 +920,7 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * * `extras` — an object mapping key(s) to `SQLFragment`s, so that derived 
  * quantities can be included in the JSON result; a shortcut's query (`count`,
  * `selectOne`…) or its `copy()` is written in parentheses, as a scalar subquery:
- * `jsonb_build_object($1::text, (SELECT count(*) AS result FROM "films"))`
+ * `json_build_object($1::text, (SELECT count(*) AS result FROM "films"))`
  * @param mode (Used internally by `selectOne` and `count`)
  * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
  * The name of the aggregate function, plain, quoted or `U&` quoted, in up to
@@ -935,11 +935,10 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * With the `topLevelSelectAsRows` config option, read as `select()` is called,
  * `select()` run or compiled on its own, or as the main query of `withCTEs()`,
  * is `selectRows()`'s query, and `run()` gives the same array, one result per
- * row: `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
+ * row: `SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
  * A single `lateral` passed through is converted above that query,
- * `SELECT to_jsonb(result) AS result FROM (…) AS "sq_films"` (`to_json` with
- * `shortcutsUseJson`), so its value stays JSON, ordered and made distinct by
- * its raw value. Nested (a
+ * `SELECT to_json(result) AS result FROM (…) AS "sq_films"`, so its value
+ * stays JSON, ordered and made distinct by its raw value. Nested (a
  * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
  * `cursor()`, it keeps its aggregate. The rows form runs with its own
  * `runResultTransform`: one set on the query applies to the aggregate only.
@@ -995,13 +994,12 @@ function selectQuery(
     columns = callerValue(allOptions, 'columns'), extras = callerValue(allOptions, 'extras'),
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
-    // shortcutsUseJson (decision 018 § 2), read once per call: the JSON of a row is built with json functions, but
-    // under a plain DISTINCT, which compares today's jsonb rows, json having no equality operator (42883)
-    json = getConfig().shortcutsUseJson ?? false,
     passthrough = lateral instanceof SQLFragment,
     jsonChild = passthrough && isQuery(lateral) && !!(lateral.runResultTransform as JSONResult)[jsonResult],
     plainDistinct = !!distinct && !(distinct instanceof SQLFragment || typeof distinct === 'string' || Array.isArray(distinct)),
-    asJson = json && !plainDistinct && !passthrough && mode !== SelectResultMode.Numeric,
+    // the JSON of a row is built with json functions (decision 018 § 2), but under a plain DISTINCT, which compares
+    // jsonb rows, json having no equality operator (42883)
+    asJson = !plainDistinct && !passthrough && mode !== SelectResultMode.Numeric,
     keyPairs: [string, SQL][] = !asJson || extras == null ? [] : Object.keys(extras).map(k => [k, asScalar(extras[k])]),
     lateralPairs: [string, SQL][] = !asJson ? [] : Object.keys(lateral ?? {}).sort().map(k => [k, sql`${SQLForAlias('lateral_', k)}.result`]),
     // every column beside extras or lateral keys: to_json() of a row level, "row_<alias>", whose output columns a bare
@@ -1074,8 +1072,7 @@ function selectQuery(
     rowsQuery = rowsSQL(limit),
     query = mode !== SelectResultMode.Many || rows ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
-      json ? sql<SQL, any>`SELECT coalesce(json_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
-        sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
+      sql<SQL, any>`SELECT coalesce(json_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
     checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false),
     asRows = mode === SelectResultMode.Many && !rows && (getConfig().topLevelSelectAsRows ?? false);
 
@@ -1087,11 +1084,11 @@ function selectQuery(
     // fragment of its own, never the one nested in the aggregate, which would carry the name and noop nested
     const
       topLevelQuery = checksSecondRow ? rowsSQL(2) :
-        // a single lateral passed through keeps its JSON value, as jsonb_agg() or json_agg() converts it (pg parses the
-        // bare column, a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY
-        // and DISTINCT still act on the raw value; to_json() with shortcutsUseJson keeps a json child's key order
+        // a single lateral passed through keeps its JSON value, as json_agg() converts it (pg parses the bare column,
+        // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
+        // still act on the raw value; to_json() keeps a json child's key order
         lateral instanceof SQLFragment ?
-          sql<SQL, any>`SELECT ${raw(json ? 'to_json' : 'to_jsonb')}(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
+          sql<SQL, any>`SELECT to_json(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
           rowsSQL(limit),
       nestedCompile = query.compile,
       topLevel = () => Object.assign(topLevelQuery,
@@ -1130,7 +1127,7 @@ function selectQuery(
 
   // select()'s json_agg, a row built with json functions, or a passed-through json result kept as it is
   (query.runResultTransform as JSONResult)[jsonResult] = mode !== SelectResultMode.Numeric &&
-    (mode === SelectResultMode.Many && !rows ? json : asJson || (jsonChild && !plainDistinct));
+    ((mode === SelectResultMode.Many && !rows) || asJson || (jsonChild && !plainDistinct));
   query['parenthesisedInExtras'] = true;
   return query;
 }
@@ -1179,9 +1176,9 @@ export interface SelectRowsSignatures {
  * its own, one row per result: for `cursor()`, which runs exactly the
  * fragment it is given, and so reads a `select()` as its one aggregate row.
  * With `{ columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }`:
- * `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
+ * `SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
  * where `select()` sends
- * `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…the same…) AS "sq_films"`.
+ * `SELECT coalesce(json_agg(result), '[]') AS result FROM (…the same…) AS "sq_films"`.
  *
  * `run()` gives what `select()` gives, `[]` for no row, but for a single
  * `lateral` subquery, whose result is passed through as `selectOne()` passes
@@ -1255,7 +1252,7 @@ export interface SelectExactlyOneSignatures extends PassingThroughSignatures<Sel
  *
  * With the `selectExactlyOneChecksForSecondRow` config option, the query run
  * (or compiled) on its own asks for `LIMIT 2` and also throws on a second row:
- * `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
+ * `SELECT to_json("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
  * `$2` being `2`. Nested in another query (a `lateral`, a `sql` template), or
  * compiled into a `result` of its own, it keeps `LIMIT 1`.
  *
@@ -1438,9 +1435,9 @@ export const max: ColumnAggregateSignatures = function (table, where, options?) 
 // made at the call, so that a prepared() on the fragment afterwards stays its own. A no-op (an insert() or upsert()
 // of no row) is a query of no row, from no table: its own text, which runs if forced, is refused on a GENERATED
 // ALWAYS column and on a view (428C9)
-const inWith = <F>(fragment: F, json: boolean) =>
+const inWith = <F>(fragment: F) =>
   !(fragment instanceof SQLFragment) ? fragment :
-    fragment.noop ? (json ? sql`SELECT NULL::json AS result WHERE false` : sql`SELECT NULL::jsonb AS result WHERE false`) :
+    fragment.noop ? sql`SELECT NULL::json AS result WHERE false` :
       Object.assign(fragment.copy(), { preparedName: undefined });
 
 /**
@@ -1455,8 +1452,7 @@ const inWith = <F>(fragment: F, json: boolean) =>
  * The result is a copy of `query`: it resolves to what `query` does, and is
  * written in parentheses as an `extras` or `insert()` value where `query` is.
  * A no-op `query` or CTE (an `insert()` or `upsert()` of no row) is written
- * `SELECT NULL::jsonb AS result WHERE false` (`NULL::json` with
- * `shortcutsUseJson`), and the result is no no-op, so
+ * `SELECT NULL::json AS result WHERE false`, and the result is no no-op, so
  * the CTEs run. A `selectExactlyOne()` that checks for a second row still does
  * at the top level, and a `select()` with `topLevelSelectAsRows` is still its
  * rows query there, a CTE keeping its aggregate. The result is never
@@ -1468,9 +1464,8 @@ const inWith = <F>(fragment: F, json: boolean) =>
 export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q => {
   const
     entries = Object.entries(ctes),
-    json = getConfig().shortcutsUseJson ?? false,  // read at the call, as the shortcuts read it
     withClause = (main: SQLFragment<any, any>) =>
-      sql`WITH ${mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${inWith(cte, json)})`)} ${inWith(main, json)}`,
+      sql`WITH ${mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${inWith(cte)})`)} ${inWith(main)}`,
     result = Object.assign(entries.length === 0 ? query.copy() as Q :
       query.copy({ literals: ['', ''], expressions: [withClause(query)], noop: false }) as Q, { preparedName: undefined }),
     topLevelQuery = (query as TopLevelFormed)[topLevelForm];

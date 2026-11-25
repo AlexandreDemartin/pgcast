@@ -802,17 +802,17 @@ describe('range strings', () => {
       { returning: ['batch_sizes', 'fee_band', 'valid_during', 'value_days'] });
     expect(insert.compile()).toEqual({
       text: 'INSERT INTO "transfers" ("amount", "batch_sizes", "fee_band", "from_account", "note", "to_account", "valid_during", "value_days") '
-        + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING jsonb_build_object($9::text, "batch_sizes", $10::text, "fee_band", '
+        + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING json_build_object($9::text, "batch_sizes", $10::text, "fee_band", '
         + '$11::text, "valid_during", $12::text, "value_days") AS result',
       values: [1, 'empty', '[1.5,1.5)', 1, 'empty ranges', 2, 'empty', '[2026-01-01,2026-01-01)', 'batch_sizes', 'fee_band', 'valid_during', 'value_days'],
     });
     const allEmpty = { batch_sizes: 'empty', fee_band: 'empty', valid_during: 'empty', value_days: 'empty' };
-    // JSONSelectable: to_jsonb writes an empty range, and one whose bounds hold nothing, as "empty"
+    // JSONSelectable: json_build_object() writes an empty range, and one whose bounds hold nothing, as "empty"
     expect(await insert.run(t.client)).toEqual(allEmpty);
 
     const where = db.select('transfers', { batch_sizes: 'empty', value_days: c.eq('empty') }, { columns: ['note'] });
     expect(where.compile()).toEqual({
-      text: 'SELECT coalesce(jsonb_agg(result), \'[]\') AS result FROM (SELECT jsonb_build_object($1::text, "note") AS result '
+      text: 'SELECT coalesce(json_agg(result), \'[]\') AS result FROM (SELECT json_build_object($1::text, "note") AS result '
         + 'FROM "transfers" WHERE ("batch_sizes" = $2 AND ("value_days" = $3))) AS "sq_transfers"',
       values: ['note', 'empty', 'empty'],
     });
@@ -833,13 +833,13 @@ describe('range strings', () => {
     // Postgres reads 'infinity', 'inf' and 'nan' too, but writes them as above
     await sql`INSERT INTO transfers (from_account, to_account, amount, note, fee_band) VALUES (1, 2, 1, 'band 5', ${param('[-inf,infinity]')}), (1, 2, 1, 'band 6', ${param('[1,nan)')})`.run(t.client);
     const written = [...bands, { note: 'band 5', fee_band: '[-Infinity,Infinity]', value_days: null }, { note: 'band 6', fee_band: '[1,NaN)', value_days: null }];
-    // JSONSelectable: to_jsonb writes the range as its text
+    // JSONSelectable: json_build_object() writes the range as its text
     expect(await db.insert('transfers', bands.map(b => ({ from_account: 1, to_account: 2, amount: 1, ...b })), { returning: ['note', 'fee_band', 'value_days'] }).run(t.client)).toEqual(bands);
     expect(await db.select('transfers', { note: c.like('band %') }, { columns: ['note', 'fee_band', 'value_days'], order: { by: 'note', direction: 'ASC' } }).run(t.client)).toEqual(written);
 
     const where = db.select('transfers', { fee_band: '[1,Infinity)', value_days: c.eq('[2026-01-01,infinity)') }, { columns: ['note'] });
     expect(where.compile()).toEqual({
-      text: 'SELECT coalesce(jsonb_agg(result), \'[]\') AS result FROM (SELECT jsonb_build_object($1::text, "note") AS result '
+      text: 'SELECT coalesce(json_agg(result), \'[]\') AS result FROM (SELECT json_build_object($1::text, "note") AS result '
         + 'FROM "transfers" WHERE ("fee_band" = $2 AND ("value_days" = $3))) AS "sq_transfers"',
       values: ['note', '[1,Infinity)', '[2026-01-01,infinity)'],
     });

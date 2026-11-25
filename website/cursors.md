@@ -9,14 +9,14 @@ Choose the columns the index needs and order the films by ID. Inside the transac
 
 <<< ./examples/plain/cursors_films.ts{ts twoslash}
 
-Hover over `films` for its type, `{ id: number; title: string }[]`. It’s the type [`select()`](/select#select) gives for the same columns. Use [`selectRows()`](/select#selectRows) here so Postgres returns one row per film. A cursor over `select()` would fetch its single aggregate row (`jsonb_agg`) and give the index all four films at once.
+Hover over `films` for its type, `{ id: number; title: string }[]`. It’s the type [`select()`](/select#select) gives for the same columns. Use [`selectRows()`](/select#selectRows) here so Postgres returns one row per film. A cursor over `select()` would fetch its single aggregate row (`json_agg`) and give the index all four films at once.
 
 The example index logs IDs 1000 and 1001 together, then 1002 and 1003. With a batch size of three, the second batch holds just the fourth film. The values in the declaration are `['id', 'title']`.
 
 <!-- probe: db.repeatableReadRO(pool, async txnClient => { for await (const films of db.cursor(txnClient, db.selectRows('films', db.all, { columns: ['id', 'title'], order: { by: 'id', direction: 'ASC' } }), { batchSize: 2 })) { } }) -->
 ```sql
 START TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY
-DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "id" ASC
+DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "id" ASC
 FETCH FORWARD 2 FROM pgcast_cursor_1
 -- The second FETCH returns the last two films. A third returns no rows.
 CLOSE pgcast_cursor_1
