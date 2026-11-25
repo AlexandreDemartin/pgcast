@@ -86,6 +86,11 @@ describe('getConfig() and setConfig()', () => {
     expectTypeOf(db.setConfig).toBeCallableWith(built);  // hence setConfig()'s refusal at run time
   });
 
+  test('ConfigTypes is no type of zapatos/db from 8.0: naming it is TS2694', () => {
+    // @ts-expect-error ConfigTypes went with aggregatesTypedByColumn, its only key
+    expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
+  });
+
   test('shortcutsUseJson is an optional boolean, so a Config written for Zapatos 6.6.1 still compiles', () => {
     expectTypeOf<db.Config['shortcutsUseJson']>().toEqualTypeOf<boolean | undefined>();
     db.setConfig({ shortcutsUseJson: true });

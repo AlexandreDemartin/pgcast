@@ -45,14 +45,6 @@ export interface Config {
 }
 export type NewConfig = Partial<Config>;
 
-/**
- * The options of `Config` that change a type, as you set them: the compiler cannot read `setConfig()`.
- * Declare each in a module of your project, a file with an `import` or an
- * `export` (`export {}` in a `.d.ts`), e.g.
- * `declare module 'zapatos/db' { interface ConfigTypes { aggregatesTypedByColumn: false } }`.
- */
-export interface ConfigTypes { }
-
 const defaults: Config = {
   transactionAttemptsMax: 5,
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
@@ -65,7 +57,6 @@ const defaults: Config = {
 
 let config: Config = { ...defaults };
 
-  aggregatesTypedByColumn: true,  // sum() and avg() give null on an empty set, min() and max() the column's value as pg parses it
 // the runtime keys 8.0 removed (decision 019 § 4), each with the value whose behaviour 8.0 always has, through 8.x:
 // setConfig() takes that value, null or undefined, and keeps none of them, and throws on any other
 const removedOptions: { [key: string]: boolean } = {
@@ -74,6 +65,7 @@ const removedOptions: { [key: string]: boolean } = {
   transactionRequiresCommit: true,  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
   transactionRequiresIdleClient: true,  // transaction() rejects a client already inside a transaction block, before its START TRANSACTION
   transactionRequiresSatisfyingLevel: true,  // transaction() rejects the client of a transaction at a level that doesn't satisfy its own
+  aggregatesTypedByColumn: true,  // sum() and avg() give null on an empty set, min() and max() the column's value as pg parses it
 };
 
 /**
