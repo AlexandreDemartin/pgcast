@@ -47,3 +47,8 @@ it('lets a key that was never an option through', () => {
   expect(() => refuseRemovedOptions({ noSuchOption: false })).not.toThrow();
   expect(finaliseConfig(JSON.parse('{"noSuchOption":false}'))).toHaveProperty('noSuchOption', false);
 });
+
+it.each([undefined, null])('lets finaliseConfig(%j) give the defaults, as from JavaScript in 7.x', config => {
+  expect(finaliseConfig(config as any)).toEqual(finaliseConfig({}));
+  expect(() => refuseRemovedOptions(config as any)).not.toThrow();
+});
