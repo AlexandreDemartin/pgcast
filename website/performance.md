@@ -9,7 +9,7 @@ Each row is `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, and `select
 
 - **Large values**: `to_jsonb` reads each value whole, a large `jsonb` stored out of line included, and builds it again. On 10,000 rows with a 4 KB `jsonb`, `select()` takes about 0.6 s, `SELECT *` about 0.2 s.
 - **Many rows**: `jsonb_agg` builds the whole result as one value in Postgres's memory, sent and parsed in one piece, up to a [limit](#limits).
-- **Nested laterals**: each level builds its rows' `jsonb` and merges it into its parent's. 1,000 studios with 20 films each take about 0.1 s, against 50 ms for a plain join nested in JavaScript. With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), each level builds `json`, which Postgres doesn't parse again: a third of the time on that case.
+- **Nested laterals**: each level builds its rows' `jsonb` and merges it into its parent's. 1,000 studios with 20 films each take about 0.1 s, against 50 ms for a plain join nested in JavaScript. From 7.3.0, with [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), each level builds `json`, which Postgres doesn't parse again: a third of the time on that case.
 
 A page of 50 small rows takes 0.1 to 0.2 ms in every form measured, about one round trip to a local Postgres: there, the JSON is not worth avoiding. These figures are orders of magnitude, timed from the client on Postgres 17.3 on localhost.
 
@@ -37,7 +37,7 @@ The films of a studio without their `details`, a `jsonb` column:
 
 - `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/performance_select_rows.ts -->: no `jsonb_agg`, so each row is a value of its own. On the 10,000 rows of 4 KB, about 0.3 s against 0.6 s. On 2,000 rows of 100 KB, about 1.6 s, where `select()` fails.
 - The type is `select()`'s, `s.films.JSONSelectable[]`.
-- For every `select()` run on its own, turn on [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows): each sends this query, and nested ones keep their aggregate.
+- From 7.3.0, for every `select()` run on its own, turn on [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows): each sends this query, and nested ones keep their aggregate.
 
 ## Read in batches
 
@@ -72,7 +72,7 @@ The [`sql`](/sql-template#sql) template builds no JSON at all:
 
 ## Limits
 
-- `select()` fails once its `jsonb_agg` passes 256 MB, with Postgres's 54000, `total size of jsonb array elements exceeds the maximum of 268435455 bytes`. `columns`, `selectRows()` or a `cursor()` keep under it, and so does [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows) for a `select()` run on its own. With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), `json_agg` may reach a value's 1 GB.
+- `select()` fails once its `jsonb_agg` passes 256 MB, with Postgres's 54000, `total size of jsonb array elements exceeds the maximum of 268435455 bytes`. `columns`, `selectRows()` or a `cursor()` keep under it, and so does [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0, for a `select()` run on its own. From 7.3.0, with [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), `json_agg` may reach a value's 1 GB.
 - `pg` reads each value into one JavaScript string, and Node caps a string at about 512 MB ([node-postgres#2653](https://github.com/brianc/node-postgres/issues/2653)).
 
 ## Measure

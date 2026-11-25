@@ -1,5 +1,5 @@
 ---
-english: 5bbdea269dbb
+english: b5e0ae4e7b56
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -297,7 +297,7 @@ Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne 
 shortcutsUseJson?: boolean  // default: false; true in 8.0
 ```
 
-Avec `true`, [`select()`](/fr/select#select), [`selectOne()`](/fr/select#selectOne), [`selectExactlyOne()`](/fr/select#selectExactlyOne) et [`selectRows()`](/fr/select#selectRows) construisent chaque ligne avec `to_json` et `json_build_object`, et `select()` son tableau avec `json_agg`, à la place de leurs équivalents `jsonb` : `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. [`insert()`](/fr/insert#insert), [`upsert()`](/fr/insert#upsert), [`update()`](/fr/insert#update) et [`deletes()`](/fr/insert#deletes) font de même dans leur `RETURNING`. `json` garde le texte tel que Postgres l’écrit, là où `jsonb` le parse et le trie : sur 1000 studios avec un `lateral` de 20 films chacun, 37 ms au lieu de 110 ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Le SQL de chaque option : [lectures](/fr/select#shortcutsUseJson) et [écritures](/fr/insert#shortcutsUseJson).
+À partir de la 7.3.0. Avec `true`, [`select()`](/fr/select#select), [`selectOne()`](/fr/select#selectOne), [`selectExactlyOne()`](/fr/select#selectExactlyOne) et [`selectRows()`](/fr/select#selectRows) construisent chaque ligne avec `to_json` et `json_build_object`, et `select()` son tableau avec `json_agg`, à la place de leurs équivalents `jsonb` : `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. [`insert()`](/fr/insert#insert), [`upsert()`](/fr/insert#upsert), [`update()`](/fr/insert#update) et [`deletes()`](/fr/insert#deletes) font de même dans leur `RETURNING`. `json` garde le texte tel que Postgres l’écrit, là où `jsonb` le parse et le trie : sur 1000 studios avec un `lateral` de 20 films chacun, 37 ms au lieu de 110 ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Le SQL de chaque option : [lectures](/fr/select#shortcutsUseJson) et [écritures](/fr/insert#shortcutsUseJson).
 
 Les valeurs et les types sont les mêmes, sauf :
 
@@ -495,7 +495,7 @@ type TransactionEvent =
 
 En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
-Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente ; la 8.0 la retire et ne garde que `LIMIT 1`. [`shortcutsUseJson`](#Config.shortcutsUseJson) n’a pas d’avertissement non plus, puisque ses valeurs sont les mêmes : elle est désactivée en 7.x, et la 8.0 ne garde que `json`.
+Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente ; la 8.0 la retire et ne garde que `LIMIT 1`. [`shortcutsUseJson`](#Config.shortcutsUseJson), à partir de la 7.3.0, n’a pas d’avertissement non plus, puisque ses valeurs sont les mêmes : elle est désactivée en 7.x, et la 8.0 ne garde que `json`.
 
 [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows), à partir de la 7.3.0, n’émet pas d’avertissement non plus, puisque ses valeurs sont les mêmes : désactivée en 7.x ; la 8.0 la retire et ne garde que la requête des lignes ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
