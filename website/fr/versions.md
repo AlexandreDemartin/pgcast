@@ -1,5 +1,5 @@
 ---
-english: f2195c3d5db6
+english: 2113623da6e2
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -94,7 +94,7 @@ Activez toutes les corrections en 6.x, y compris le typage des agrégats dans `C
 
 Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements ([migration vers la 8.0](/fr/switching#from-8-0)). Elle supprime aussi `rejectOnQueryError: false`. Deux anciennes valeurs restent, puisqu’elles disent comment votre `pg` parse : `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
 
-En 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` et `transactionRequiresSatisfyingLevel` valent aussi `true` par défaut. Passez une de ces options à `false` pour rétablir le [comportement correspondant en 6.x](/fr/switching#runtime-migration) sans avertissement. Ces trois réglages disparaissent en 8.0.
+En 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` et `transactionRequiresSatisfyingLevel` valent aussi `true` par défaut. Passez une de ces options à `false` pour rétablir le [comportement correspondant en 6.x](/fr/switching#runtime-migration) sans avertissement. Ces trois réglages disparaissent en 8.0 ([migration vers la 8.0](/fr/switching#from-8-0)).
 
 Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui utilise les labels d’un enum d’un autre schéma, sauf en cas de collision de noms, [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), qui rejette la promesse de `generate()` quand une requête échoue, plutôt que d’arrêter le processus, [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), qui filtre les cibles de conflit nommées selon l’index de la relation, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), qui type un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, selon le contexte, comme l’est son type de base, et un domaine sur un domaine ou un tableau d’un domaine, `any` sans l’option, par le type de base de son domaine le plus intérieur, [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), qui donne aux tableaux d’enums dans `Selectable` le type texte que renvoie `pg`, et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), qui type un `interval` dans `Selectable` comme `pg` le parse.
 
