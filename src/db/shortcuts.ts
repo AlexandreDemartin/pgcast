@@ -244,7 +244,7 @@ function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, 
 
 
 // an undefined value is a missing key: `toDefault` sends DEFAULT (insert), otherwise the
-// key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
+// key goes (update, upsert, whose missing keys then take DEFAULT, and the rule of rows with different keys);
 // a null row, which an untyped caller may pass among others, is read as `{}`, as completeKeysWithDefaultValue reads it,
 // and a primitive one, a Buffer (its values, one per byte, unlisted) and a built-in with no own enumerable key are
 // kept as they are, for cols() or vals() to refuse. A lone row's values are read once here, as before, and a query
@@ -255,7 +255,6 @@ function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V 
     lone = Array.isArray(values) || isRefusedBuffer(rows[0]) ? undefined : Object.entries(rows[0]),
     asGiven = lone?.some(([, v]) => isQuery(v)) ? withScalarQueries(lone) as V : values;
   if (!(lone ? lone.some(([, v]) => v === undefined) : rows.some(row => !isRefusedBuffer(row) && Object.values(row).includes(undefined)))) return asGiven;
-  if (!(getConfig().undefinedMeansMissing ?? true)) return asGiven;
   const kept = rows.map(row => {
     if (isPrimitive(row) || isRefusedBuffer(row)) return row;
     const entries = Object.entries(row);
@@ -271,13 +270,12 @@ const completedRows = <R extends object>(rows: R[]) => completeKeysWithDefaultVa
   row !== rows[i] && Object.values(row).some(isQuery) ? withScalarQueries(Object.entries(row)) as R : row);
 
 // the keys of upsert()'s updateValues that join the update: an undefined one is set from EXCLUDED, as in 6.6.1,
-// so if no row inserts its column, an existing row takes the column DEFAULT; with undefinedMeansMissing, it is a
+// so if no row inserts its column, an existing row takes the column DEFAULT; an undefined one is a
 // missing key, so it adds no column (`updated`: updateColumns, or the columns inserted, set from EXCLUDED either
 // way); the object itself is kept, as its values are still read through getters and prototypes
 function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[]): string[] {
   const keys = Object.keys(updateValues);
   if (!keys.some(k => updateValues[k] === undefined && !updated.includes(k))) return keys;
-  if (!(getConfig().undefinedMeansMissing ?? true)) return keys;
   return keys.filter(k => updateValues[k] !== undefined);
 }
 
@@ -289,13 +287,13 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
 const nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template';
 
 // a Buffer's bytes are its keys, so one with bytes has keys, which are not listed: one per byte, a long one took seconds;
-// undefinedAsMissing leaves a Buffer as it is, so for update() and upsert() (`undefinedIsMissing`), with
-// undefinedMeansMissing, an empty one's undefined keys are left out here, as from the `{}` it rebuilt one into before
+// undefinedAsMissing leaves a Buffer as it is, so for update() and upsert() (`undefinedIsMissing`),
+// an empty one's undefined keys are left out here, as from the `{}` it rebuilt one into before
 // #543: "nothing to update" or "nothing to insert" is still thrown at the call
 const hasOwnKey = (row: object, undefinedIsMissing = false) => {
   if (!isRefusedBuffer(row)) return Object.keys(row).length > 0;
   if ((row as Buffer).length > 0) return true;
-  return undefinedIsMissing && (getConfig().undefinedMeansMissing ?? true) ?
+  return undefinedIsMissing ?
     Object.values(row).some(v => v !== undefined) : Object.keys(row).length > 0;
 };
 
@@ -314,8 +312,8 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
  * `Date`, a `Map`…) beside a row with keys, which
  * `upsert()` refuses too; a `null` row in an array gives `DEFAULT` for each
  * column of the others. An `undefined` value sends `DEFAULT`, as a missing
- * cell does: `{ title: undefined }` gives `VALUES (DEFAULT)`. With
- * `undefinedMeansMissing: false`, it sends a parameter for SQL `NULL`.
+ * cell does: `{ title: undefined }` gives `VALUES (DEFAULT)`; for SQL `NULL`,
+ * give `null`.
  * These rules apply to the values read at the call, provided they stay unchanged
  * until the query runs and getters return the same value on later reads.
  * A shortcut's query (`count()`, `selectOne()`…) or its `copy()` is written in parentheses,
@@ -517,7 +515,7 @@ const updateValueSQL = (value: any, column: string) =>
  * To read a column there, use a fragment, which is written as
  * it is: ``{ name: db.sql`${'users'}.${'name'}` }`` gives `ROW(..., "users"."name")`.
  * An `updateColumns` array that is empty at run time, with no `updateValues`
- * key (with `undefinedMeansMissing`, a key set to `undefined` is none), gives
+ * key (a key set to `undefined` is none), gives
  * `DO NOTHING`, as `doNothing` does: one row that conflicts then
  * returns `undefined`, which the type of a `Column[]` does not say; check for
  * it, or pass `doNothing`, which the type follows.
@@ -527,8 +525,6 @@ const updateValueSQL = (value: any, column: string) =>
  * to update, or supply a defined override in `updateValues`. Columns named
  * in `conflictTarget` are exempt: a new row may omit its serial `id` when
  * upserting on `'id'`. A constraint target does not identify its columns here.
- * With `upsertRequiresSameKeys: false`, the missing cell takes `DEFAULT` and
- * can overwrite the stored value on conflict.
  *
  * An `undefined` value is a missing key in both the row and `updateValues`.
  * The row omits the column unless another row supplies it, in which case its
@@ -537,8 +533,6 @@ const updateValueSQL = (value: any, column: string) =>
  * A defined `updateValues` override wins. Otherwise a selected column takes
  * its value from `EXCLUDED`, with a `CASE` for `noNullUpdateColumns` that
  * keeps the stored value if the incoming value is SQL `NULL`.
- * With `undefinedMeansMissing: false`, an undefined cell binds SQL `NULL` and
- * an undefined override adds its column to the update.
  * These rules apply to the values read at the call, provided they stay unchanged
  * until the query runs and getters return the same value on later reads.
  */
@@ -637,7 +631,7 @@ export const upsert: {
 
   // a key missing from some row is inserted as DEFAULT, then `SET col = EXCLUDED.col` overwrites the existing
   // value: Postgres can't tell that DEFAULT from a given one, so only the caller knows which columns to update
-  if (overwritesMissingKey && (getConfig().upsertRequiresSameKeys ?? true)) {
+  if (overwritesMissingKey) {
     throw new Error('rows have different keys: pass updateColumns, or give every row the same keys');
   }
 
@@ -670,8 +664,8 @@ export const upsert: {
  * @param values An `Updatable` of the new values with which to update the table.
  * It needs at least one key: with none, there is nothing to set, and `update()`
  * throws before any query. An `undefined` value leaves its key out:
- * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
- * With `undefinedMeansMissing: false`, the key sets its column to `NULL`.
+ * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`; to set
+ * its column to `NULL`, give `null`.
  * These rules apply to the values read at the call, provided they stay unchanged
  * until the query runs and getters return the same value on later reads.
  * A shortcut's query is written in parentheses, as for `insert`.

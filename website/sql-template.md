@@ -319,7 +319,7 @@ It is how to write a condition in `sql`: each value must be of its column's type
 | `Default`, `self`, `all` | throws |
 | `raw()`, `cols()`, `vals()` | throws ([`raw()`](#raw)) |
 
-- `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull). So is `undefined`, sent as `NULL`, with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) or without: `{ tagline: undefined }` gives `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, and no row: leaving the key out would widen the filter.
+- `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull). So is `undefined`, sent as `NULL`, as [the write rule for `undefined`](/insert#undefined-values) leaves filters alone: `{ tagline: undefined }` gives `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, and no row: leaving the key out would widen the filter.
 - `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"; Zapatos 6.6.1 sent it as `'Symbol(DEFAULT)'`.
 - The shortcuts take the same object as their `where` ([`select()`](/select#select)).
 

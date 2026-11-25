@@ -1,5 +1,5 @@
 ---
-english: 9015c0ec1937
+english: 7b813fabd395
 description: "À la fin de cette page, vous aurez généré les types d’une base, demandé des films et ajouté un film, avec sous les yeux le SQL et le type de chaque requête."
 ---
 
@@ -289,8 +289,8 @@ const row: s.films.Insertable = {
 };
 ```
 
-::: tip Par défaut en 7.0
-Une clé absente ou une cellule `undefined` utilise la valeur par défaut de la colonne. Avec `undefinedMeansMissing: false`, seule la clé absente garde ce comportement : une cellule `undefined` passe `undefined` en paramètre, ce que `pg` envoie comme `NULL`. Omettre la seule clé lève l’erreur `nothing to insert`. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
+::: tip À partir de la 7.0
+Une clé absente ou une cellule `undefined` utilise la valeur par défaut de la colonne. Pendant toute la 7.x, avec `undefinedMeansMissing: false`, seule la clé absente gardait ce comportement : une cellule `undefined` passait `undefined` en paramètre, ce que `pg` envoyait comme `NULL` ; la 8.0 supprime l’option. Omettre la seule clé lève l’erreur `nothing to insert`. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->
