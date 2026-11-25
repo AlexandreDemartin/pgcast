@@ -568,7 +568,7 @@ Applied by `run()` to what `pg` returns. `qr` is typed `pg.QueryResult`, but a [
 
 </CastPanel>
 
-It applies only to `run()` on that fragment: not when it is nested in another, nor given to `lateral` or `extras`.
+It applies only to `run()` on that fragment: not when it is nested in another, nor given to `lateral` or `extras`. A [`select()`](/select#select) run on its own compiles and transforms its rows query with a transform of its own, so its `.run()` gives the array whatever you assign: one you set applies to its copies only, which run the aggregate ([8.0 migration](/switching#from-8-0-topLevelSelectAsRows)).
 
 ### `prepared()` {#prepared}
 

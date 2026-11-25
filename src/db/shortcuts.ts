@@ -938,8 +938,9 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * `SELECT to_json(result) AS result FROM (…) AS "sq_films"`, so its value
  * stays JSON, ordered and made distinct by its raw value. Nested (a
  * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
- * `cursor()`, it keeps its aggregate. The rows form runs with its own
- * `runResultTransform`: one set on the query applies to the aggregate only.
+ * `cursor()`, it keeps its aggregate. Run on its own, it compiles and
+ * transforms its rows query with a `runResultTransform` of its own: one you
+ * set on the query applies to its copies only, which run the aggregate.
  */
 export const select: SelectSignatures = function (
   table: Table,

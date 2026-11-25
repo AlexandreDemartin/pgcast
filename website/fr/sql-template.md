@@ -1,5 +1,5 @@
 ---
-english: 0dc73e8cba1c
+english: 0a7a3a571f4b
 ---
 
 # Template SQL
@@ -572,7 +572,7 @@ Appliqué par `run()` à ce que renvoie `pg`. `qr` est typé `pg.QueryResult`, m
 
 </CastPanel>
 
-Il ne s’applique qu’au `run()` de ce fragment : pas quand il est imbriqué dans un autre, ni donné à `lateral` ou à `extras`.
+Il ne s’applique qu’au `run()` de ce fragment : pas quand il est imbriqué dans un autre, ni donné à `lateral` ou à `extras`. Un [`select()`](/fr/select#select) exécuté seul compile et transforme sa requête des lignes avec une transformation à lui, si bien que son `.run()` donne le tableau quoi que vous assigniez : celle que vous définissez ne s’applique qu’à ses copies, qui exécutent l’agrégat ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)).
 
 ### `prepared()` {#prepared}
 
