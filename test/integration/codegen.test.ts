@@ -3477,7 +3477,10 @@ describe('the order of an enum\'s labels', () => {
 // decision 019 § 4: a key 8.0 removed, set to anything but the value it keeps, fails before the generator touches the
 // database, whichever way it comes in; the kept value and null ask for what 8.0 does
 describe('removed options', () => {
-  const removed = [['typeEnumsAcrossSchemas', false, true, 'true'], ['enumOrder', 'alphabetical', 'declared', '"declared"']] as const;
+  const removed = [
+    ['typeEnumsAcrossSchemas', false, true, 'true'], ['enumOrder', 'alphabetical', 'declared', '"declared"'],
+    ['uniqueIndexConstraintsOnly', false, true, 'true'], ['domainsTypedByContext', false, true, 'true'],
+  ] as const;
   const messageOf = (key: string, kept: string) => `${key} was removed in 8.0, which always does what ${key}: ${kept} did; ` +
     `delete it from the generator's config: https://pgcast.dev/switching#from-8-0-${key}`;
 
