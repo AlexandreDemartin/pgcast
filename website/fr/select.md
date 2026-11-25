@@ -1,5 +1,5 @@
 ---
-english: 8459b24a22a3
+english: 9967a0ea1d30
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -68,7 +68,7 @@ Le SQL de chaque ligne du tableau est ce que compile la bibliothèque construite
 À partir de la 8.0.0, chaque ligne et le tableau sont construits avec les fonctions `json`, qui gardent le texte tel que Postgres l’écrit, là où `jsonb` le parse et le trie : sur 1000 studios avec un `lateral` de 20 films chacun, 37 ms au lieu de 110 ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Pendant toute la 7.x, ils étaient en `jsonb`, sauf si [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson) était réglé ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
 
 - Les clés d’une ligne viennent dans l’ordre de la table, puis `extras`, puis les clés de `lateral`.
-- Un résultat imbriqué est du `json` : une fonction `jsonb` appliquée dessus échoue avec 42883, de même que `DISTINCT` et `UNION` ; `->` et `->>` fonctionnent, tout comme un cast, `::jsonb`.
+- Un résultat imbriqué est du `json` : une fonction `jsonb` appliquée dessus échoue avec 42883, de même que `DISTINCT`, `UNION` et `GROUP BY` ([à côté d’un lateral](/fr/lateral#filter-sort-and-group-by-a-lateral)) ; `->` et `->>` fonctionnent, tout comme un cast, `::jsonb`.
 
 | Option | SQL |
 |---|---|
