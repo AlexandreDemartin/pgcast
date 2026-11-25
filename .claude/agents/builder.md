@@ -11,7 +11,7 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 - The number of the step's issue and the decisions taken for it. You read it with `gh issue view <n> --repo AlexandreDemartin/pgcast`, and only it: **Files**, and in its **Notes**, **Risk** and **Read**.
 - Or "plan checked", to resume a `high` step after its plan.
-- Or, to fix: the PR, its branch and the blocking items of the review comment (`file:line`, expected fix); a non-blocking one is not fixed.
+- Or, to fix: the PR, its branch and the blocking items of the review comment (`file:line`, expected fix); a non-blocking one is not fixed. A fix rereads `origin/master` before each item: an open PR may have landed it meanwhile (#960).
 
 ## Where to work
 
@@ -31,7 +31,7 @@ Explore, plan, code, commit.
 - A stop point (`AGENTS.md` § Stop points) that the orchestrator has not settled: **stop** and report it.
 - No new dependency, even a dev one, without the user's agreement.
 - A choice that nothing writes down: skill `decision-philosophy`; it goes under **Decided alone** in the PR.
-- Docs: `CHANGELOG.md`, the npm package's (a docs-site change goes in `website/README.md`, #870), the docs touched and, for an Rn finding, its line in `docs/CHARACTERISATION-REPORT.md` ("**fixed**, PR #n"); nothing else.
+- Docs: `CHANGELOG.md`, the npm package's (a docs-site change goes in `website/README.md`, #870), the docs touched and, for an Rn finding, its line in `docs/CHARACTERISATION-REPORT.md` ("**fixed**, PR #n", committed once the PR is open, never a placeholder, #982); nothing else. A test renamed or removed: `git grep -F` its old name in the report's **Test that pins it** cells, which `check:agents` does not read (#981).
 
 ## Verify
 
@@ -46,7 +46,7 @@ Explore, plan, code, commit.
 - Layer of a stack, only if the orchestrator asks (skill `pr-shape` § Stacking): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
 - Small, atomic commits (skill `pr-shape` § Commits), staged by path, never `git commit -am` with two changes in progress (#709); two changes in one file go apart by `git apply --cached --unidiff-zero` of one hunk of `git diff -U0` (at the default context, two changes within six lines share a hunk), as `git add -p` is interactive here and a pushed mixed commit cannot be amended (#874, #886); each ends with the requested `Co-Authored-By` line.
 - Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`). To retry, run `git push` alone again, then compare `git rev-parse HEAD` with `git ls-remote origin <branch>`: a loop or a pipe hides the exit code, and in a worktree the sandbox refuses compound `git` commands.
-- Another revision is read with `git show "<ref>:<path>"` or a detached worktree; never `git checkout <ref>`, `git stash` or `git checkout -- <file>` in your checkout, which move `HEAD` or drop uncommitted edits.
+- Another revision is read with `git show "<ref>:<path>"` or a detached worktree, and so is a probe that needs a changed `src/`, from the start: auto mode refuses a temporary edit of the checkout (#969); never `git checkout <ref>`, `git stash` or `git checkout -- <file>` in your checkout, which move `HEAD` or drop uncommitted edits.
 
 ## The PR
 
