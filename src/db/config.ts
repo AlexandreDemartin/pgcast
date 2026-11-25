@@ -71,8 +71,8 @@ const defaults: Config = {
   transactionRequiresSatisfyingLevel: true,
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
   aggregatesTypedByColumn: true,
-  shortcutsUseJson: false,  // true in 8.0 (decision 018)
-  topLevelSelectAsRows: false,  // the default in 8.0
+  shortcutsUseJson: false,  // the only behaviour in 8.0 (decision 019)
+  topLevelSelectAsRows: false,  // the only behaviour in 8.0 (decision 019)
 };
 
 let config: Config = { ...defaults };

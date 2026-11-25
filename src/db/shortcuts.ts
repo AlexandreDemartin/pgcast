@@ -944,7 +944,7 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * `SELECT my_schema."MyAgg"("id") AS result FROM "users"`.
  *
  * For its rows one by one, as `cursor()` reads them, the same query without
- * `jsonb_agg`: `selectRows()`.
+ * its aggregate: `selectRows()`.
  *
  * With the `topLevelSelectAsRows` config option, read as `select()` is called,
  * `select()` run or compiled on its own, or as the main query of `withCTEs()`,
@@ -955,7 +955,7 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * `shortcutsUseJson`), so its value stays JSON, ordered and made distinct by
  * its raw value. Nested (a
  * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
- * `cursor()`, it keeps its `jsonb_agg`. The rows form runs with its own
+ * `cursor()`, it keeps its aggregate. The rows form runs with its own
  * `runResultTransform`: one set on the query applies to the aggregate only.
  */
 export const select: SelectSignatures = function (
@@ -1189,9 +1189,9 @@ export interface SelectRowsSignatures {
 }
 
 /**
- * Generate the query `select()` wraps in `jsonb_agg`, as a `SQLFragment` of
+ * Generate the query `select()` wraps in its aggregate, as a `SQLFragment` of
  * its own, one row per result: for `cursor()`, which runs exactly the
- * fragment it is given, and so reads a `select()` as its one `jsonb_agg` row.
+ * fragment it is given, and so reads a `select()` as its one aggregate row.
  * With `{ columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }`:
  * `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
  * where `select()` sends
@@ -1500,10 +1500,11 @@ const inWith = <F>(fragment: F, json: boolean) =>
  * The result is a copy of `query`: it resolves to what `query` does, and is
  * written in parentheses as an `extras` or `insert()` value where `query` is.
  * A no-op `query` or CTE (an `insert()` or `upsert()` of no row) is written
- * `SELECT NULL::jsonb AS result WHERE false`, and the result is no no-op, so
+ * `SELECT NULL::jsonb AS result WHERE false` (`NULL::json` with
+ * `shortcutsUseJson`), and the result is no no-op, so
  * the CTEs run. A `selectExactlyOne()` that checks for a second row still does
  * at the top level, and a `select()` with `topLevelSelectAsRows` is still its
- * rows query there, a CTE keeping its `jsonb_agg`. The result is never
+ * rows query there, a CTE keeping its aggregate. The result is never
  * prepared, whatever `query` is, even by a `prepared()` called on `query` or a
  * CTE afterwards: call `prepared()` on it.
  * @param ctes The CTEs, keyed by name: a shortcut or a `sql` fragment each
