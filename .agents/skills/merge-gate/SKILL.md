@@ -19,7 +19,7 @@ The owner's attention goes where the risk is (Fowler, "Ship / Show / Ask"). The 
 - **`master` moved** since that run: `git fetch`, then `git merge-base --is-ancestor origin/master <head>` (a `git pull` that says "up to date" proves nothing; a stacked layer, against `origin/<base>`, before its review too: #539, #546); if behind, merge `origin/master` (skill `pr-shape` § Commits) and let CI run again. Checks across pages (anchors, pending names, a shared docs schema) and generated counts hold only on the merged result.
 - `high`: under the owner's standing delegation (since 2026-11-15) the Ask is answered in advance: a finished PR is merged, its choices recorded under **Decided alone** (label `decided-alone`).
 - **Releases** (tag, `npm` deployment) and a stop point the delegation does not cover always wait: `needs-owner`, then ask with the PR link and the verify verdicts; the OK is the owner's own message, an agent's never is.
-- **While a PR waits** for the owner, go on: the next step if it does not depend on it, otherwise the next step stacked on it (skill `pr-shape` § Stacking).
+- **While a PR waits** for the owner, go on: the next step if it does not depend on it, otherwise the next step stacked on it (skill `pr-shape` § Stacking). A wait for another PR to land reads `gh pr view <n> --json mergeStateStatus` first: polling `git log origin/master` while it is `BLOCKED` spends the whole wait (#975).
 
 ## Squash
 
