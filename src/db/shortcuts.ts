@@ -197,11 +197,12 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
 // with shortcutsUseJson (decision 018 § 2), json having no `||`, a row of `columns` takes its columns, extras and
 // lateral keys in one json_build_object(), whose arguments Postgres limits to 100 (max_function_args; 54023 beyond),
 // where each part takes a jsonb_build_object() of its own without the option; a write's `returning`, extras and
-// $action the same. A key is a parameter, but a fragment of ours (`'$action'`)
+// $action the same. A key is a parameter, every caller's key included (a fragment past the type), but one flagged as
+// ours (`$action`), written as a literal
 const maxJSONKeys = 50;
-function SQLForJSONObject(pairs: [string | SQLFragment<any>, SQL][], parts = 'columns, extras and lateral keys') {
+function SQLForJSONObject(pairs: [string, SQL, ours?: true][], parts = 'columns, extras and lateral keys') {
   return pairs.length > maxJSONKeys ? refusedSQL(`\`shortcutsUseJson\` builds this row with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${pairs.length} keys (${parts} together) take ${pairs.length * 2}. Give ${maxJSONKeys} keys at most, or set \`shortcutsUseJson: false\`, under which ${parts} take one \`jsonb_build_object()\` each.`) :
-    sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v]) => sql`${k instanceof SQLFragment ? k : sql`${param(k)}::text`}, ${v}`)})`;
+    sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v, ours]) => sql`${ours ? raw(`'${k}'`) : sql`${param(k)}::text`}, ${v}`)})`;
 }
 
 // with shortcutsUseJson, an extras or lateral key beside every column is a column alias, as to_json() names its keys
@@ -234,7 +235,7 @@ function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, 
       returning !== undefined ? SQLForJSONObject([
         ...returning.map((c): [string, SQL] => [c, c]),
         ...keys.map((k): [string, SQL] => [k, asScalar(extras![k])]),
-        ...(reportAction ? [[sql`'$action'`, action] as [SQLFragment, SQL]] : []),
+        ...(reportAction ? [['$action', action, true] as [string, SQL, true]] : []),
       ], '`returning`, `extras` and `$action`') :
       keys.length === 0 && !reportAction ? sql`to_json(${table}.*)` :
       sql`(SELECT to_json(${row}.*) FROM (SELECT ${table}.*${keys.map(k => sql`, ${asScalar(extras![k])} AS ${SQLForKeyAlias(k, 'returning')}`)}${reportAction ? sql`, ${action} AS "$action"` : []}) AS ${row})`;
