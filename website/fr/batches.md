@@ -1,5 +1,5 @@
 ---
-english: 879316085090
+english: 12a9b74c9254
 description: "Écrivez beaucoup de lignes d’un coup : découpez-les sous la limite de paramètres, ignorez celles déjà là, additionnez des comptes, ne récupérez que l’utile."
 ---
 
@@ -46,6 +46,7 @@ COMMIT
 - Si un chunk échoue, [`readCommitted()`](/fr/transaction#readCommitted) envoie `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> et est rejetée avec son erreur : aucun tag n’est conservé. Un deadlock (40P01) relance d’abord les chunks ([Retries](/fr/retries)).
 - Sur le pool, sans la transaction, chaque chunk est commité au fur et à mesure : les chunks passés avant celui qui a échoué restent en base.
 - Pour `upsert()`, le découpage est le même.
+- Ou envoyez toutes les lignes en un seul paramètre, sans limite de paramètres, dans un template `sql` : `json_populate_recordset(null::"tags", CAST($1 AS "json"))`<!-- probe: db.sql`INSERT INTO ${'tags'} (${db.cols(['film_id', 'tag'])}) SELECT ${db.cols(['film_id', 'tag'])} FROM json_populate_recordset(null::${'tags'}, ${db.param([], true)})` --> lit [`param(tags, true)`](/fr/sql-template#param) avec le type de ligne de la table. Une clé absente ou `undefined` y donne `NULL`, pas `DEFAULT`, et chaque valeur passe par `JSON.stringify` : une `Date` en UTC, un `Buffer` comme son objet JSON.
 
 ## Ignorer les lignes déjà présentes {#skip-the-rows-already-there}
 
