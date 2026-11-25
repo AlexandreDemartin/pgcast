@@ -68,9 +68,6 @@ describe('setConfig()', () => {
     transactionRetryDelay: { minMs: 25, maxMs: 250 },
     castArrayParamsToJson: false,
     castObjectParamsToJson: false,
-    transactionRequiresCommit: true,
-    transactionRequiresIdleClient: true,
-    transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: false,
     aggregatesTypedByColumn: true,
     shortcutsUseJson: false,
@@ -81,9 +78,6 @@ describe('setConfig()', () => {
     transactionRetryDelay: { minMs: 0, maxMs: 0 },
     castArrayParamsToJson: true,
     castObjectParamsToJson: true,
-    transactionRequiresCommit: false,
-    transactionRequiresIdleClient: false,
-    transactionRequiresSatisfyingLevel: false,
     selectExactlyOneChecksForSecondRow: true,
     aggregatesTypedByColumn: false,
     shortcutsUseJson: true,
@@ -92,7 +86,10 @@ describe('setConfig()', () => {
 
   // decision 019 § 4: a key 8.0 removed passes as the value 8.0 always behaves as, null or undefined, and is not kept;
   // any other value throws before the config changes
-  const removed = { undefinedMeansMissing: true, upsertRequiresSameKeys: true };
+  const removed = {
+    undefinedMeansMissing: true, upsertRequiresSameKeys: true,
+    transactionRequiresCommit: true, transactionRequiresIdleClient: true, transactionRequiresSatisfyingLevel: true,
+  };
   const set = (config: object) => db.setConfig(config as db.NewConfig);
   const message = (key: string, kept: boolean) => `${key} was removed in 8.0, which always does what ${key}: ${kept} ` +
     `did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-${key}`;

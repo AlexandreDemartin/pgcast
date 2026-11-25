@@ -35,9 +35,6 @@ export interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
-  transactionRequiresCommit?: boolean;  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
-  transactionRequiresIdleClient?: boolean;  // transaction() rejects a client already inside a transaction block, before its START TRANSACTION
-  transactionRequiresSatisfyingLevel?: boolean;  // transaction() rejects the client of a transaction at a level that doesn't satisfy its own
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
   aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value; declare false in ConfigTypes for the 6.x types
   shortcutsUseJson?: boolean;  // select() and its kin, and the writes' RETURNING, build their JSON with to_json, json_agg and json_build_object, not their jsonb twins
@@ -62,9 +59,6 @@ const defaults: Config = {
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
-  transactionRequiresCommit: true,
-  transactionRequiresIdleClient: true,
-  transactionRequiresSatisfyingLevel: true,
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
   aggregatesTypedByColumn: true,
   shortcutsUseJson: false,  // the only behaviour in 8.0 (decision 019)
@@ -78,6 +72,9 @@ let config: Config = { ...defaults };
 const removedOptions: { [key: string]: boolean } = {
   upsertRequiresSameKeys: true,  // a batch whose rows have different keys throws as it is built, unless updateColumns
   undefinedMeansMissing: true,  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
+  transactionRequiresCommit: true,  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
+  transactionRequiresIdleClient: true,  // transaction() rejects a client already inside a transaction block, before its START TRANSACTION
+  transactionRequiresSatisfyingLevel: true,  // transaction() rejects the client of a transaction at a level that doesn't satisfy its own
 };
 
 /**
