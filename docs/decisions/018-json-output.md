@@ -141,7 +141,7 @@ WITH "s" AS (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_j
 |---|---|---|
 | `shortcutsUseJson` | The values, after `pg` parses them: equal on the Epic's 45 cases and on the 33 of § 5, except two: `-0` in a `float8` (`-0`; `jsonb` gives `0`) and a `json` column's key order (kept as stored, not sorted) | code that tells `-0` from `0` (`Object.is`) |
 | | The key order of a row: the table's, then `extras`, then the sorted `lateral` keys (`id,name,founded,films`), not `jsonb`'s, shorter keys first (`id,name,films,founded`) | code that reads `Object.keys()` or compares `JSON.stringify()` |
-| | A nested result is `json` (type 114): a `jsonb` function fails on it (`jsonb_array_length(json)`, 42883), and so does anything that compares or sorts it (`=`, `IN`, `DISTINCT`, `UNION`, `GROUP BY`, `ORDER BY`), as `json` has no equality and no ordering; `::jsonb`, `->` and `->>` work | SQL around a nested shortcut |
+| | A nested result is `json` (type 114): a `jsonb` function or operator fails on it (`jsonb_array_length(json)`, `@>`, 42883), and so does anything that compares or sorts it (`=`, `IN`, `DISTINCT`, `UNION`, `GROUP BY`, `ORDER BY`), as `json` has no equality and no ordering; `::jsonb`, `->` and `->>` work | SQL around a nested shortcut |
 | | A type parser set for `jsonb` (3802) alone no longer applies; `enableCustomJSONParsingForLargeNumbers()` sets both | a custom `pg.types` setup |
 | | The SQL text, and the key refusals of § 2 | logs, SQL snapshots |
 | | Beside every column, a bare name in a `sql` fragment of `order.by` or `distinct` that equals an `extras` or `lateral` key is ambiguous, 42702; qualified, `"films"."title"`, it runs (#956) | `order` and `distinct` fragments |

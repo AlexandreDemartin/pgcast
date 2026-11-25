@@ -1,5 +1,5 @@
 ---
-english: cc00f3186f93
+english: 78d9e7bc4c31
 ---
 
 # Écritures
@@ -79,7 +79,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 - Une clé égale à une colonne, ou `$action` dans les `extras` d’`upsert()`, apparaît deux fois dans le JSON, et la dernière l’emporte, comme `||` la fait l’emporter.
 - Avec `returning`, un seul `json_build_object()` prend 100 arguments : au-delà de 50 clés, colonnes, `extras` et `$action` compris, une erreur est levée à la compilation.
 - À côté de toutes les colonnes, les `extras` s’exécutent dans une sous-requête sur la seule ligne, où Postgres accepte ce que `RETURNING` refuse : `count(*)` et `row_number() OVER ()` donnent 1, un agrégat d’une colonne échoue, et une fonction renvoyant un ensemble échoue sur deux lignes (21000) et donne une ligne `null` sur aucune. Un paramètre non typé, `extras: { u: db.param(5) }`, donne `"5"`, car la sous-requête le type en `text`. Pendant toute la 7.x sans `shortcutsUseJson`, un agrégat, une fonction de fenêtrage, une fonction renvoyant un ensemble ou un paramètre non typé y échouait (42803, 42P20, 0A000, 42P18).
-- Le `result` d’une écriture lu depuis une CTE ou un template `sql` est en `json` : une fonction `jsonb` appliquée dessus, ou tout ce qui le compare ou le trie, échoue avec 42883, là où son cast, `::jsonb`, ou un champ, `->>`, fonctionne ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
+- Le `result` d’une écriture lu depuis une CTE ou un template `sql` est en `json` : une fonction ou un opérateur `jsonb` appliqué dessus, ou tout ce qui le compare ou le trie, échoue avec 42883, là où son cast, `::jsonb`, ou un champ, `->>`, fonctionne ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
 
 <!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) -->
 ```sql

@@ -64,7 +64,7 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 From 8.0.0, each row and the array are built with `json` functions, which keep the text as Postgres writes it, where `jsonb` parses and sorts it: on 1000 studios with a `lateral` of 20 films each, 37 ms in place of 110 ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Through 7.x, they were `jsonb` unless [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson) was set ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
 - A row's keys come in the table's order, then `extras`, then the `lateral` keys.
-- A nested result is `json`: a `jsonb` function over it, or anything that compares or sorts it, fails with 42883, where its cast, `::jsonb`, or a field, `->>`, works ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
+- A nested result is `json`: a `jsonb` function or operator over it, or anything that compares or sorts it, fails with 42883, where its cast, `::jsonb`, or a field, `->>`, works ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
 | Option | SQL |
 |---|---|

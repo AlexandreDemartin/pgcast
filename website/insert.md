@@ -75,7 +75,7 @@ From 8.0.0, the `RETURNING` of `insert()`, `upsert()`, `update()` and `deletes()
 - A key equal to a column, or `$action` in `upsert()`'s `extras`, comes twice in the JSON, and the last wins, as `||` makes it win.
 - With `returning`, one `json_build_object()` takes 100 arguments: over 50 keys, columns, `extras` and `$action` together, throw while compiling.
 - Beside every column, `extras` run in a subquery over the one row, where Postgres takes what `RETURNING` refuses: `count(*)` and `row_number() OVER ()` give 1, an aggregate of a column fails, and a set-returning function fails over two rows (21000) and gives a `null` row over none. An untyped parameter, `extras: { u: db.param(5) }`, gives `"5"`, as the subquery types it `text`. Through 7.x without `shortcutsUseJson`, an aggregate, a window function, a set-returning function or an untyped parameter failed there (42803, 42P20, 0A000, 42P18).
-- A write's `result` read from a CTE or a `sql` template is `json`: a `jsonb` function over it, or anything that compares or sorts it, fails with 42883, where its cast, `::jsonb`, or a field, `->>`, works ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
+- A write's `result` read from a CTE or a `sql` template is `json`: a `jsonb` function or operator over it, or anything that compares or sorts it, fails with 42883, where its cast, `::jsonb`, or a field, `->>`, works ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
 <!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) -->
 ```sql
