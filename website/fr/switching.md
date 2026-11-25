@@ -1,5 +1,5 @@
 ---
-english: 3b569be9346e
+english: 6b469d1c5c1c
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -295,7 +295,7 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 
 :::
 
-Chaque option d’exécution ci-dessous a quitté `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable ou du JavaScript, `setConfig()` lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`, et la configuration n’en garde aucune. Un programme qui n’a jamais donné l’option ne voit aucun changement.
+Chaque option ci-dessous a quitté `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable, du JavaScript, `pgcastconfig.json`, `zapatosconfig.json` ou l’argument JSON de la CLI, une option d’exécution fait lever une erreur à `setConfig()`, et une option du générateur fait rejeter la promesse de `generate()` et de `check()`, et arrêter la CLI, avant la première requête et sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`, que la configuration écarte alors. Un programme ou une configuration qui n’a jamais donné l’option ne voit aucun changement.
 
 ### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
 
@@ -312,8 +312,6 @@ La 8.0 fait toujours ce que faisait `upsertRequiresSameKeys: true`, la valeur pa
 - **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `upsertRequiresSameKeys was removed in 8.0, which always does what upsertRequiresSameKeys: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-upsertRequiresSameKeys`<!-- message -->. Une fois l’option retirée, un tel lot lève "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->, là où la 7.x avec `false` mettait la cellule absente à `DEFAULT` par-dessus la valeur stockée.
 - **Trouver les appels** : `grep -rn upsertRequiresSameKeys`. Chaque lot aux clés différentes lève une erreur à l’appel, donc vos tests le trouvent.
 - **Avant → après** : `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])`<!-- tsc -->, avec `false`, devient soit chaque ligne avec chaque clé et la valeur voulue, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'])`<!-- tsc -->, soit un [`updateColumns`](/fr/insert#upsert-options) qui ne nomme que les clés que toutes les lignes donnent, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'], { updateColumns: ['votes'] })`<!-- tsc -->. Une clé absente d’une ligne met toujours la valeur stockée de cette ligne à `DEFAULT`, sans erreur, comme le faisait `false`.
-
-Chaque option du générateur ci-dessous a quitté sa `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable, `pgcastconfig.json`, `zapatosconfig.json` ou l’argument JSON de la CLI, la promesse de `generate()` ou de `check()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Une configuration qui n’a jamais donné l’option génère les mêmes fichiers.
 
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 

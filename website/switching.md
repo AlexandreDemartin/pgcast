@@ -294,7 +294,7 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 
 :::
 
-Each runtime option below has left `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable or JavaScript, `setConfig()` throws unless its value is the one 8.0 always behaves as, `null` or `undefined`, and the configuration keeps none of them. A program that never set the option sees no change.
+Each option below has left `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable, `pgcastconfig.json`, `zapatosconfig.json`, the CLI's JSON argument or JavaScript, a runtime option makes `setConfig()` throw, and a generator option makes `generate()`, `check()` and the CLI reject before any query and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`, which the configuration then drops. A program or config that never set the option sees no change.
 
 ### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
 
@@ -311,8 +311,6 @@ Each runtime option below has left `Config`. Setting it in an object literal no 
 - **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `upsertRequiresSameKeys was removed in 8.0, which always does what upsertRequiresSameKeys: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-upsertRequiresSameKeys`<!-- message -->. Once you delete it, such a batch throws "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->, where 7.x with `false` set the missing cell to `DEFAULT` over the stored value.
 - **Find the calls**: `grep -rn upsertRequiresSameKeys`. Each batch that differs throws as it is built, so your tests find it.
 - **Before → after**: `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])`<!-- tsc -->, with `false`, becomes either every row with each key and the value you mean, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'])`<!-- tsc -->, or [`updateColumns`](/insert#upsert-options) naming only the keys every row gives, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'], { updateColumns: ['votes'] })`<!-- tsc -->. A key a row lacks still sets that row's stored value to `DEFAULT`, with no error, as `false` did.
-
-Each generator option below has left its `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable, `pgcastconfig.json`, `zapatosconfig.json` or the CLI's JSON argument, `generate()`, `check()` and the CLI reject before any query, and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`. A config that never set the option generates the same files.
 
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 
