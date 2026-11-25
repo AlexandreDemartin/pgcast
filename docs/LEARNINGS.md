@@ -30,6 +30,9 @@ Candidates for a check, a rule or a skill line.
 - A `<!-- tsc -->` mark only checks a span whose tables exist in the docs schema; examples taken from the generator page (`prints`, `archive.*`) stay unchecked (#982).
 - `guard.mjs` refuses a plain `git merge origin/master`, a trial one too, since its commit has no trailer: `git merge --no-commit origin/master`, then `git commit -m "…" -m "Co-Authored-By: …"` (#982).
 - Two PRs adding entries to one docs section each with its own intro leave the second intro under the first PR's last `###`: one shared intro for the section, decided before the second PR opens (#982).
+- When a key is removed, `<!-- tsc -->` marks on old CHANGELOG lines that set it stop compiling: `git grep -nE 'transactionRequires[A-Za-z]*: [a-z]*[^`]*`<!-- (tsc|probe)'`, with the removed key (#983).
+- Removing an option can leave data that records the old behaviour with no test asserting it any more (the 6.6.1 `old` data of the block cases): keep it only as the record behind a docs table, and say so (#983).
+- `@ts-expect-error` proves that an error is there, not which one: when a criterion, a doc or a migration entry names a code (TS2353, not TS2559 for a weak type), compile the line once without the directive (#983).
 
 ## Minors kept
 
@@ -39,3 +42,8 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `form` `website/switching.md` § from 8.0, `upsertRequiresSameKeys` entry (#981): its `updateColumns: ['votes']` example has every row give `votes`, so it shows no difference; a table whose rows differ on one column and share another outside the target would show it.
 - `defect` `website/switching.md:313` and `fr/:314` (#981): "A key a row lacks still sets that row's stored value to `DEFAULT`" now stands alone and reads as true of any missing key; it holds only for a key `updateColumns` names.
 - `form` `src/generate/tables.ts:215-217` `keepsText` (#982): its comment describes a case no test reaches since the `placeholder_hues` test went (the mutant `keepsText = false` keeps the 367 codegen tests green); say it is unreachable from 8.0.0, or freeze a case.
+- `defect` `adapters/pglite/test/browser-bundle.mjs` (#983): its paths come from `new URL(…).pathname`, which keeps `%20`, so `check:browser` fails in any checkout whose path has a space; `fileURLToPath` fixes it.
+- `form` `website/transaction.md:~730` and FR (#983): "By default, a batch upsert…" / "Par défaut, un upsert de plusieurs lignes…" left over from #981, where 8.0 has no other behaviour.
+- `defect` `website/runtime-config.md:462` and FR `:467` (#983): "8.0 removes all but `aggregatesTypedByColumn`", but 019 § 3 removes it too; #968 rewrites the sentence to name what 8.0 removed.
+- `defect` `website/switching.md:357` and FR `:358` (#983): `grep -rn "'BEGIN"` misses `"BEGIN"`, `` sql`BEGIN` ``, lowercase `begin` and `START TRANSACTION`; `grep -rniE "[\"'\`](begin|start transaction)"`.
+- `form` `docs/CHARACTERISATION-REPORT.md:56` R10 and `:73` R22 (#983): "fixed" twice in one cell; one status per version, as R8 and R9.
