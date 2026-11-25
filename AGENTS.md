@@ -3,7 +3,7 @@
 > `CLAUDE.md` is a symbolic link to this file. Read it in full before any change.
 
 **pgcast** is a maintained fork of [Zapatos](https://github.com/jawj/zapatos) 6.6.1 (MIT, George MacKerron). Its TypeScript types are **cast from the database schema**, never written by hand.
-Goals: modernise, test, then extend, **without betraying the philosophy** and staying **backward compatible with Zapatos 6.6.1**. The roadmap is the GitHub issues, one Epic per chapter ([README](README.md#roadmap)); the decisions are in [docs/decisions/](docs/decisions/).
+Goals: modernise, test, then extend, **without betraying the philosophy**. **Compatibility is best effort**: 6.x is a drop-in for Zapatos 6.6.1, a minor or a patch keeps what working code relies on, and a major may change behaviour, SQL text or types when that buys better performance or typing, with a migration guide; the types stay derived from the database (decision [019](docs/decisions/019-one-behaviour.md)). The roadmap is the GitHub issues, one Epic per chapter ([README](README.md#roadmap)); the decisions are in [docs/decisions/](docs/decisions/).
 
 ## Philosophy (non-negotiable)
 
@@ -84,6 +84,8 @@ When the conversation is compacted, keep: the step and PR numbers in progress, t
 - **Tests first**, or with the implementation: runtime, compiled SQL (`text` and `values`) and types (positive **and** negative, `@ts-expect-error`).
 - **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small (skill `pr-shape`).
 - **No breaking change** to the public API: stop and ask (skill `backward-compat`).
+- **A breaking change ships with its migration entry**, in the same PR, in the major's guide (`website/switching.md` and `website/fr/switching.md`): before → after code, what the user sees change, how to find the calls (a grep, a type error). Without it, it is not merged (decision 019).
+- **A new opt-in names its exit**, the sole behaviour at the next major, or it is refused; configuration by nature (a fact the database cannot state, a listener) is not an opt-in (decision 019).
 - **`core.ts`**: never touch it without saying so; each change adds SQL injection tests (skill `sql-safety`).
 - Subject skills: `zero-abstraction` (a helper), `type-tests` (a type), `codegen-output`, `consumer-usage` (a need), `code-style`, `concise-docs`.
 - `CHANGELOG.md` and the docs in the same PR as the feature; the docs site in English and French (`website/README.md` § Languages).
