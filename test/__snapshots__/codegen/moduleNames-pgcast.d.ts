@@ -175,67 +175,67 @@ declare module 'pgcast/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('products_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **products.list_price**
       * - `price` in database
       * - Nullable, no default
       */
-      list_price?: c.PgPrice | db.Parameter<c.PgPrice> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPrice | db.Parameter<c.PgPrice> | db.SQLFragment | db.ParentColumn>;
+      list_price?: db.WhereableValue<c.PgPrice>;
       /**
       * **products.price_cents**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      price_cents?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      price_cents?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **products.price_with_vat_cents**
       * - `numeric` in database
       * - Generated column
       */
-      price_with_vat_cents?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      price_with_vat_cents?: db.WhereableValue<(number | db.NumericString)>;
       /**
       * **products.search**
       * - `tsvector` in database
       * - Generated column
       */
-      search?: c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn>;
+      search?: db.WhereableValue<c.PgTsvector>;
       /**
       * **products.sku**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      sku?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      sku?: db.WhereableValue<string>;
       /**
       * **products.status**
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.SQLFragment | db.ParentColumn>;
+      status?: db.WhereableValue<('draft' | 'published' | 'archived')>;
       /**
       * **products.title**
       * - `text` in database
       * - Nullable, no default
       */
-      title?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      title?: db.WhereableValue<string>;
       /**
       * **products.variant**
       * - `text` in database
       * - `NOT NULL`, default: `''::text`
       */
-      variant?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      variant?: db.WhereableValue<string>;
       /**
       * **products.vat_rate**
       * - `numeric` in database
       * - `NOT NULL`, default: `0.2`
       */
-      vat_rate?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      vat_rate?: db.WhereableValue<(number | db.NumericString)>;
       /**
       * **products.weight_kg**
       * - `float_range` in database
       * - Nullable, no default
       */
-      weight_kg?: c.PgFloat_range | db.Parameter<c.PgFloat_range> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgFloat_range | db.Parameter<c.PgFloat_range> | db.SQLFragment | db.ParentColumn>;
+      weight_kg?: db.WhereableValue<c.PgFloat_range>;
     }
     export interface Insertable {
       /**
@@ -243,55 +243,55 @@ declare module 'pgcast/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('products_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **products.list_price**
       * - `price` in database
       * - Nullable, no default
       */
-      list_price?: c.PgPrice | db.Parameter<c.PgPrice> | null | db.DefaultType | db.SQLFragment<any>;
+      list_price?: db.InsertableValue<c.PgPrice, null | db.DefaultType>;
       /**
       * **products.price_cents**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      price_cents: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment<any>;
+      price_cents: db.InsertableValue<(number | db.Int8String | bigint)>;
       /**
       * **products.sku**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      sku: string | db.Parameter<string> | db.SQLFragment<any>;
+      sku: db.InsertableValue<string>;
       /**
       * **products.status**
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment<any>;
+      status?: db.InsertableValue<('draft' | 'published' | 'archived'), db.DefaultType>;
       /**
       * **products.title**
       * - `text` in database
       * - Nullable, no default
       */
-      title?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      title?: db.InsertableValue<string, null | db.DefaultType>;
       /**
       * **products.variant**
       * - `text` in database
       * - `NOT NULL`, default: `''::text`
       */
-      variant?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment<any>;
+      variant?: db.InsertableValue<string, db.DefaultType>;
       /**
       * **products.vat_rate**
       * - `numeric` in database
       * - `NOT NULL`, default: `0.2`
       */
-      vat_rate?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment<any>;
+      vat_rate?: db.InsertableValue<(number | db.NumericString), db.DefaultType>;
       /**
       * **products.weight_kg**
       * - `float_range` in database
       * - Nullable, no default
       */
-      weight_kg?: c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment<any>;
+      weight_kg?: db.InsertableValue<c.PgFloat_range, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -299,55 +299,55 @@ declare module 'pgcast/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('products_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **products.list_price**
       * - `price` in database
       * - Nullable, no default
       */
-      list_price?: c.PgPrice | db.Parameter<c.PgPrice> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPrice | db.Parameter<c.PgPrice> | null | db.DefaultType | db.SQLFragment>;
+      list_price?: db.UpdatableValue<c.PgPrice, null | db.DefaultType>;
       /**
       * **products.price_cents**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      price_cents?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment>;
+      price_cents?: db.UpdatableValue<(number | db.Int8String | bigint)>;
       /**
       * **products.sku**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      sku?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      sku?: db.UpdatableValue<string>;
       /**
       * **products.status**
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment>;
+      status?: db.UpdatableValue<('draft' | 'published' | 'archived'), db.DefaultType>;
       /**
       * **products.title**
       * - `text` in database
       * - Nullable, no default
       */
-      title?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      title?: db.UpdatableValue<string, null | db.DefaultType>;
       /**
       * **products.variant**
       * - `text` in database
       * - `NOT NULL`, default: `''::text`
       */
-      variant?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.DefaultType | db.SQLFragment>;
+      variant?: db.UpdatableValue<string, db.DefaultType>;
       /**
       * **products.vat_rate**
       * - `numeric` in database
       * - `NOT NULL`, default: `0.2`
       */
-      vat_rate?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment>;
+      vat_rate?: db.UpdatableValue<(number | db.NumericString), db.DefaultType>;
       /**
       * **products.weight_kg**
       * - `float_range` in database
       * - Nullable, no default
       */
-      weight_kg?: c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment>;
+      weight_kg?: db.UpdatableValue<c.PgFloat_range, null | db.DefaultType>;
     }
     export type UniqueIndex = 'products_pkey' | 'products_sku_variant_key';
     export type Column = keyof Selectable;
@@ -486,31 +486,31 @@ declare module 'pgcast/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+      created_at?: db.WhereableValue<(db.TimestampTzString | Date)>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      display_name?: db.WhereableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn>;
+      email?: db.WhereableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn>;
+      home?: db.WhereableValue<c.PgAddress>;
       /**
       * **users.id**
       * - `int4` in database
       * - Generated column
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **users.manager_id**
       *
@@ -519,25 +519,25 @@ declare module 'pgcast/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      manager_id?: db.WhereableValue<number>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn>;
+      mood?: db.WhereableValue<mood>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      settings?: db.WhereableValue<db.JSONValue>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn>;
+      tags?: db.WhereableValue<c.PgTag_list>;
     }
     export interface Insertable {
       /**
@@ -545,25 +545,25 @@ declare module 'pgcast/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
+      created_at?: db.InsertableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name: string | db.Parameter<string> | db.SQLFragment<any>;
+      display_name: db.InsertableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment<any>;
+      email: db.InsertableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment<any>;
+      home?: db.InsertableValue<c.PgAddress, null | db.DefaultType>;
       /**
       * **users.manager_id**
       *
@@ -572,25 +572,25 @@ declare module 'pgcast/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+      manager_id?: db.InsertableValue<number, null | db.DefaultType>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
+      mood?: db.InsertableValue<mood, null | db.DefaultType>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
+      settings?: db.InsertableValue<db.JSONValue, db.DefaultType>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment<any>;
+      tags?: db.InsertableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -598,25 +598,25 @@ declare module 'pgcast/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment>;
+      created_at?: db.UpdatableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      display_name?: db.UpdatableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment>;
+      email?: db.UpdatableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment>;
+      home?: db.UpdatableValue<c.PgAddress, null | db.DefaultType>;
       /**
       * **users.manager_id**
       *
@@ -625,25 +625,25 @@ declare module 'pgcast/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+      manager_id?: db.UpdatableValue<number, null | db.DefaultType>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment>;
+      mood?: db.UpdatableValue<mood, null | db.DefaultType>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment>;
+      settings?: db.UpdatableValue<db.JSONValue, db.DefaultType>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment>;
+      tags?: db.UpdatableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export type UniqueIndex = 'users_email_key' | 'users_pkey';
     export type Column = keyof Selectable;
@@ -1206,253 +1206,253 @@ declare module 'pgcast/schema' {
         * - `bit` in database
         * - Nullable, no default
         */
-        c_bit?: c.PgBit | db.Parameter<c.PgBit> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgBit | db.Parameter<c.PgBit> | db.SQLFragment | db.ParentColumn>;
+        c_bit?: db.WhereableValue<c.PgBit>;
         /**
         * **extra.type_zoo.c_bool**
         * - `bool` in database
         * - Nullable, no default
         */
-        c_bool?: boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn>;
+        c_bool?: db.WhereableValue<boolean>;
         /**
         * **extra.type_zoo.c_bytea**
         * - `bytea` in database
         * - Nullable, no default
         */
-        c_bytea?: (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | db.SQLFragment | db.ParentColumn>;
+        c_bytea?: db.WhereableValue<(db.ByteArrayString | Buffer)>;
         /**
         * **extra.type_zoo.c_char**
         * - `bpchar` in database
         * - Nullable, no default
         */
-        c_char?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_char?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_cidr**
         * - `cidr` in database
         * - Nullable, no default
         */
-        c_cidr?: c.PgCidr | db.Parameter<c.PgCidr> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgCidr | db.Parameter<c.PgCidr> | db.SQLFragment | db.ParentColumn>;
+        c_cidr?: db.WhereableValue<c.PgCidr>;
         /**
         * **extra.type_zoo.c_citext**
         * - `citext` in database
         * - Nullable, no default
         */
-        c_citext?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_citext?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_date**
         * - `date` in database
         * - Nullable, no default
         */
-        c_date?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
+        c_date?: db.WhereableValue<(db.DateString | Date)>;
         /**
         * **extra.type_zoo.c_date_array**
         * - `_date` in database
         * - Nullable, no default
         */
-        c_date_array?: (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | db.SQLFragment | db.ParentColumn>;
+        c_date_array?: db.WhereableValue<(db.DateString | Date)[]>;
         /**
         * **extra.type_zoo.c_enum_array**
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | db.SQLFragment | db.ParentColumn>;
+        c_enum_array?: db.WhereableValue<('sad' | 'ok' | 'happy')[]>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
         * - Nullable, no default
         */
-        c_float4?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_float4?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_float8**
         * - `float8` in database
         * - Nullable, no default
         */
-        c_float8?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_float8?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_inet**
         * - `inet` in database
         * - Nullable, no default
         */
-        c_inet?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_inet?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_int2**
         * - `int2` in database
         * - Nullable, no default
         */
-        c_int2?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_int2?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_int4**
         * - `int4` in database
         * - Nullable, no default
         */
-        c_int4?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_int4?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_int4multirange**
         * - `int4multirange` in database
         * - Nullable, no default
         */
-        c_int4multirange?: c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | db.SQLFragment | db.ParentColumn>;
+        c_int4multirange?: db.WhereableValue<c.PgInt4multirange>;
         /**
         * **extra.type_zoo.c_int8**
         * - `int8` in database
         * - Nullable, no default
         */
-        c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+        c_int8?: db.WhereableValue<(number | db.Int8String | bigint)>;
         /**
         * **extra.type_zoo.c_int8_domain**
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | db.SQLFragment | db.ParentColumn>;
+        c_int8_domain?: db.WhereableValue<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | db.SQLFragment | db.ParentColumn>;
+        c_interval?: db.WhereableValue<(string | db.PostgresInterval)>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
         * - Nullable, no default
         */
-        c_json?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+        c_json?: db.WhereableValue<db.JSONValue>;
         /**
         * **extra.type_zoo.c_jsonb**
         * - `jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+        c_jsonb?: db.WhereableValue<db.JSONValue>;
         /**
         * **extra.type_zoo.c_jsonb_array**
         * - `_jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue[] | db.Parameter<db.JSONValue[]> | db.SQLFragment | db.ParentColumn>;
+        c_jsonb_array?: db.WhereableValue<db.JSONValue[]>;
         /**
         * **extra.type_zoo.c_jsonb_domain**
         * - `preferences` (base type: `jsonb`) in database
         * - Nullable, no default
         */
-        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPreferences | db.Parameter<c.PgPreferences> | db.SQLFragment | db.ParentColumn>;
+        c_jsonb_domain?: db.WhereableValue<c.PgPreferences>;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
         */
-        c_macaddr?: c.PgMacaddr | db.Parameter<c.PgMacaddr> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgMacaddr | db.Parameter<c.PgMacaddr> | db.SQLFragment | db.ParentColumn>;
+        c_macaddr?: db.WhereableValue<c.PgMacaddr>;
         /**
         * **extra.type_zoo.c_money**
         * - `money` in database
         * - Nullable, no default
         */
-        c_money?: (number | string) | db.Parameter<(number | string)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | string) | db.Parameter<(number | string)> | db.SQLFragment | db.ParentColumn>;
+        c_money?: db.WhereableValue<(number | string)>;
         /**
         * **extra.type_zoo.c_name**
         * - `name` in database
         * - Nullable, no default
         */
-        c_name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_name?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_numeric**
         * - `numeric` in database
         * - Nullable, no default
         */
-        c_numeric?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+        c_numeric?: db.WhereableValue<(number | db.NumericString)>;
         /**
         * **extra.type_zoo.c_oid**
         * - `oid` in database
         * - Nullable, no default
         */
-        c_oid?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_oid?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_point**
         * - `point` in database
         * - Nullable, no default
         */
-        c_point?: c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment | db.ParentColumn>;
+        c_point?: db.WhereableValue<c.PgPoint>;
         /**
         * **extra.type_zoo.c_text**
         * - `text` in database
         * - Nullable, no default
         */
-        c_text?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_text?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_text_array**
         * - `_text` in database
         * - Nullable, no default
         */
-        c_text_array?: string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn>;
+        c_text_array?: db.WhereableValue<string[]>;
         /**
         * **extra.type_zoo.c_time**
         * - `time` in database
         * - Nullable, no default
         */
-        c_time?: db.TimeString | db.Parameter<db.TimeString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.TimeString | db.Parameter<db.TimeString> | db.SQLFragment | db.ParentColumn>;
+        c_time?: db.WhereableValue<db.TimeString>;
         /**
         * **extra.type_zoo.c_timestamp**
         * - `timestamp` in database
         * - Nullable, no default
         */
-        c_timestamp?: (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | db.SQLFragment | db.ParentColumn>;
+        c_timestamp?: db.WhereableValue<(db.TimestampString | Date)>;
         /**
         * **extra.type_zoo.c_timestamptz**
         * - `timestamptz` in database
         * - Nullable, no default
         */
-        c_timestamptz?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+        c_timestamptz?: db.WhereableValue<(db.TimestampTzString | Date)>;
         /**
         * **extra.type_zoo.c_timetz**
         * - `timetz` in database
         * - Nullable, no default
         */
-        c_timetz?: db.TimeTzString | db.Parameter<db.TimeTzString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.TimeTzString | db.Parameter<db.TimeTzString> | db.SQLFragment | db.ParentColumn>;
+        c_timetz?: db.WhereableValue<db.TimeTzString>;
         /**
         * **extra.type_zoo.c_tsquery**
         * - `tsquery` in database
         * - Nullable, no default
         */
-        c_tsquery?: c.PgTsquery | db.Parameter<c.PgTsquery> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsquery | db.Parameter<c.PgTsquery> | db.SQLFragment | db.ParentColumn>;
+        c_tsquery?: db.WhereableValue<c.PgTsquery>;
         /**
         * **extra.type_zoo.c_tsvector**
         * - `tsvector` in database
         * - Nullable, no default
         */
-        c_tsvector?: c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn>;
+        c_tsvector?: db.WhereableValue<c.PgTsvector>;
         /**
         * **extra.type_zoo.c_uuid**
         * - `uuid` in database
         * - Nullable, no default
         */
-        c_uuid?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_uuid?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_uuid_array**
         * - `_uuid` in database
         * - Nullable, no default
         */
-        c_uuid_array?: string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn>;
+        c_uuid_array?: db.WhereableValue<string[]>;
         /**
         * **extra.type_zoo.c_varbit**
         * - `varbit` in database
         * - Nullable, no default
         */
-        c_varbit?: c.PgVarbit | db.Parameter<c.PgVarbit> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgVarbit | db.Parameter<c.PgVarbit> | db.SQLFragment | db.ParentColumn>;
+        c_varbit?: db.WhereableValue<c.PgVarbit>;
         /**
         * **extra.type_zoo.c_varchar**
         * - `varchar` in database
         * - Nullable, no default
         */
-        c_varchar?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_varchar?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_xml**
         * - `xml` in database
         * - Nullable, no default
         */
-        c_xml?: c.PgXml | db.Parameter<c.PgXml> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgXml | db.Parameter<c.PgXml> | db.SQLFragment | db.ParentColumn>;
+        c_xml?: db.WhereableValue<c.PgXml>;
         /**
         * **extra.type_zoo.id**
         * - `int4` in database
         * - Generated column
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
       }
       export interface Insertable {
         /**
@@ -1460,247 +1460,247 @@ declare module 'pgcast/schema' {
         * - `bit` in database
         * - Nullable, no default
         */
-        c_bit?: c.PgBit | db.Parameter<c.PgBit> | null | db.DefaultType | db.SQLFragment<any>;
+        c_bit?: db.InsertableValue<c.PgBit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bool**
         * - `bool` in database
         * - Nullable, no default
         */
-        c_bool?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment<any>;
+        c_bool?: db.InsertableValue<boolean, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bytea**
         * - `bytea` in database
         * - Nullable, no default
         */
-        c_bytea?: (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_bytea?: db.InsertableValue<(db.ByteArrayString | Buffer), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_char**
         * - `bpchar` in database
         * - Nullable, no default
         */
-        c_char?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_char?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_cidr**
         * - `cidr` in database
         * - Nullable, no default
         */
-        c_cidr?: c.PgCidr | db.Parameter<c.PgCidr> | null | db.DefaultType | db.SQLFragment<any>;
+        c_cidr?: db.InsertableValue<c.PgCidr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_citext**
         * - `citext` in database
         * - Nullable, no default
         */
-        c_citext?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_citext?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date**
         * - `date` in database
         * - Nullable, no default
         */
-        c_date?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_date?: db.InsertableValue<(db.DateString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date_array**
         * - `_date` in database
         * - Nullable, no default
         */
-        c_date_array?: (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_date_array?: db.InsertableValue<(db.DateString | Date)[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_enum_array**
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_enum_array?: db.InsertableValue<('sad' | 'ok' | 'happy')[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
         * - Nullable, no default
         */
-        c_float4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_float4?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float8**
         * - `float8` in database
         * - Nullable, no default
         */
-        c_float8?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_float8?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_inet**
         * - `inet` in database
         * - Nullable, no default
         */
-        c_inet?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_inet?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int2**
         * - `int2` in database
         * - Nullable, no default
         */
-        c_int2?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int2?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4**
         * - `int4` in database
         * - Nullable, no default
         */
-        c_int4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int4?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4multirange**
         * - `int4multirange` in database
         * - Nullable, no default
         */
-        c_int4multirange?: c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int4multirange?: db.InsertableValue<c.PgInt4multirange, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8**
         * - `int8` in database
         * - Nullable, no default
         */
-        c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int8?: db.InsertableValue<(number | db.Int8String | bigint), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8_domain**
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int8_domain?: db.InsertableValue<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_interval?: db.InsertableValue<(string | db.PostgresInterval), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
         * - Nullable, no default
         */
-        c_json?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+        c_json?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb**
         * - `jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+        c_jsonb?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_array**
         * - `_jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_jsonb_array?: db.InsertableValue<db.JSONValue[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_domain**
         * - `preferences` (base type: `jsonb`) in database
         * - Nullable, no default
         */
-        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment<any>;
+        c_jsonb_domain?: db.InsertableValue<c.PgPreferences, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
         */
-        c_macaddr?: c.PgMacaddr | db.Parameter<c.PgMacaddr> | null | db.DefaultType | db.SQLFragment<any>;
+        c_macaddr?: db.InsertableValue<c.PgMacaddr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_money**
         * - `money` in database
         * - Nullable, no default
         */
-        c_money?: (number | string) | db.Parameter<(number | string)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_money?: db.InsertableValue<(number | string), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_name**
         * - `name` in database
         * - Nullable, no default
         */
-        c_name?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_name?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_numeric**
         * - `numeric` in database
         * - Nullable, no default
         */
-        c_numeric?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_numeric?: db.InsertableValue<(number | db.NumericString), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_oid**
         * - `oid` in database
         * - Nullable, no default
         */
-        c_oid?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_oid?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_point**
         * - `point` in database
         * - Nullable, no default
         */
-        c_point?: c.PgPoint | db.Parameter<c.PgPoint> | null | db.DefaultType | db.SQLFragment<any>;
+        c_point?: db.InsertableValue<c.PgPoint, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text**
         * - `text` in database
         * - Nullable, no default
         */
-        c_text?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_text?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text_array**
         * - `_text` in database
         * - Nullable, no default
         */
-        c_text_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_text_array?: db.InsertableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_time**
         * - `time` in database
         * - Nullable, no default
         */
-        c_time?: db.TimeString | db.Parameter<db.TimeString> | null | db.DefaultType | db.SQLFragment<any>;
+        c_time?: db.InsertableValue<db.TimeString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamp**
         * - `timestamp` in database
         * - Nullable, no default
         */
-        c_timestamp?: (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_timestamp?: db.InsertableValue<(db.TimestampString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamptz**
         * - `timestamptz` in database
         * - Nullable, no default
         */
-        c_timestamptz?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_timestamptz?: db.InsertableValue<(db.TimestampTzString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timetz**
         * - `timetz` in database
         * - Nullable, no default
         */
-        c_timetz?: db.TimeTzString | db.Parameter<db.TimeTzString> | null | db.DefaultType | db.SQLFragment<any>;
+        c_timetz?: db.InsertableValue<db.TimeTzString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsquery**
         * - `tsquery` in database
         * - Nullable, no default
         */
-        c_tsquery?: c.PgTsquery | db.Parameter<c.PgTsquery> | null | db.DefaultType | db.SQLFragment<any>;
+        c_tsquery?: db.InsertableValue<c.PgTsquery, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsvector**
         * - `tsvector` in database
         * - Nullable, no default
         */
-        c_tsvector?: c.PgTsvector | db.Parameter<c.PgTsvector> | null | db.DefaultType | db.SQLFragment<any>;
+        c_tsvector?: db.InsertableValue<c.PgTsvector, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid**
         * - `uuid` in database
         * - Nullable, no default
         */
-        c_uuid?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_uuid?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid_array**
         * - `_uuid` in database
         * - Nullable, no default
         */
-        c_uuid_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_uuid_array?: db.InsertableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varbit**
         * - `varbit` in database
         * - Nullable, no default
         */
-        c_varbit?: c.PgVarbit | db.Parameter<c.PgVarbit> | null | db.DefaultType | db.SQLFragment<any>;
+        c_varbit?: db.InsertableValue<c.PgVarbit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varchar**
         * - `varchar` in database
         * - Nullable, no default
         */
-        c_varchar?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_varchar?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_xml**
         * - `xml` in database
         * - Nullable, no default
         */
-        c_xml?: c.PgXml | db.Parameter<c.PgXml> | null | db.DefaultType | db.SQLFragment<any>;
+        c_xml?: db.InsertableValue<c.PgXml, null | db.DefaultType>;
       }
       export interface Updatable {
         /**
@@ -1708,247 +1708,247 @@ declare module 'pgcast/schema' {
         * - `bit` in database
         * - Nullable, no default
         */
-        c_bit?: c.PgBit | db.Parameter<c.PgBit> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgBit | db.Parameter<c.PgBit> | null | db.DefaultType | db.SQLFragment>;
+        c_bit?: db.UpdatableValue<c.PgBit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bool**
         * - `bool` in database
         * - Nullable, no default
         */
-        c_bool?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment>;
+        c_bool?: db.UpdatableValue<boolean, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bytea**
         * - `bytea` in database
         * - Nullable, no default
         */
-        c_bytea?: (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | null | db.DefaultType | db.SQLFragment>;
+        c_bytea?: db.UpdatableValue<(db.ByteArrayString | Buffer), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_char**
         * - `bpchar` in database
         * - Nullable, no default
         */
-        c_char?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_char?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_cidr**
         * - `cidr` in database
         * - Nullable, no default
         */
-        c_cidr?: c.PgCidr | db.Parameter<c.PgCidr> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgCidr | db.Parameter<c.PgCidr> | null | db.DefaultType | db.SQLFragment>;
+        c_cidr?: db.UpdatableValue<c.PgCidr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_citext**
         * - `citext` in database
         * - Nullable, no default
         */
-        c_citext?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_citext?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date**
         * - `date` in database
         * - Nullable, no default
         */
-        c_date?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | null | db.DefaultType | db.SQLFragment>;
+        c_date?: db.UpdatableValue<(db.DateString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date_array**
         * - `_date` in database
         * - Nullable, no default
         */
-        c_date_array?: (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | null | db.DefaultType | db.SQLFragment>;
+        c_date_array?: db.UpdatableValue<(db.DateString | Date)[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_enum_array**
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment>;
+        c_enum_array?: db.UpdatableValue<('sad' | 'ok' | 'happy')[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
         * - Nullable, no default
         */
-        c_float4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_float4?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float8**
         * - `float8` in database
         * - Nullable, no default
         */
-        c_float8?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_float8?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_inet**
         * - `inet` in database
         * - Nullable, no default
         */
-        c_inet?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_inet?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int2**
         * - `int2` in database
         * - Nullable, no default
         */
-        c_int2?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_int2?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4**
         * - `int4` in database
         * - Nullable, no default
         */
-        c_int4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_int4?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4multirange**
         * - `int4multirange` in database
         * - Nullable, no default
         */
-        c_int4multirange?: c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | null | db.DefaultType | db.SQLFragment>;
+        c_int4multirange?: db.UpdatableValue<c.PgInt4multirange, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8**
         * - `int8` in database
         * - Nullable, no default
         */
-        c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment>;
+        c_int8?: db.UpdatableValue<(number | db.Int8String | bigint), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8_domain**
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment>;
+        c_int8_domain?: db.UpdatableValue<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment>;
+        c_interval?: db.UpdatableValue<(string | db.PostgresInterval), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
         * - Nullable, no default
         */
-        c_json?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+        c_json?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb**
         * - `jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+        c_jsonb?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_array**
         * - `_jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment>;
+        c_jsonb_array?: db.UpdatableValue<db.JSONValue[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_domain**
         * - `preferences` (base type: `jsonb`) in database
         * - Nullable, no default
         */
-        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment>;
+        c_jsonb_domain?: db.UpdatableValue<c.PgPreferences, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
         */
-        c_macaddr?: c.PgMacaddr | db.Parameter<c.PgMacaddr> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgMacaddr | db.Parameter<c.PgMacaddr> | null | db.DefaultType | db.SQLFragment>;
+        c_macaddr?: db.UpdatableValue<c.PgMacaddr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_money**
         * - `money` in database
         * - Nullable, no default
         */
-        c_money?: (number | string) | db.Parameter<(number | string)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | string) | db.Parameter<(number | string)> | null | db.DefaultType | db.SQLFragment>;
+        c_money?: db.UpdatableValue<(number | string), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_name**
         * - `name` in database
         * - Nullable, no default
         */
-        c_name?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_name?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_numeric**
         * - `numeric` in database
         * - Nullable, no default
         */
-        c_numeric?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | null | db.DefaultType | db.SQLFragment>;
+        c_numeric?: db.UpdatableValue<(number | db.NumericString), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_oid**
         * - `oid` in database
         * - Nullable, no default
         */
-        c_oid?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_oid?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_point**
         * - `point` in database
         * - Nullable, no default
         */
-        c_point?: c.PgPoint | db.Parameter<c.PgPoint> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPoint | db.Parameter<c.PgPoint> | null | db.DefaultType | db.SQLFragment>;
+        c_point?: db.UpdatableValue<c.PgPoint, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text**
         * - `text` in database
         * - Nullable, no default
         */
-        c_text?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_text?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text_array**
         * - `_text` in database
         * - Nullable, no default
         */
-        c_text_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment>;
+        c_text_array?: db.UpdatableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_time**
         * - `time` in database
         * - Nullable, no default
         */
-        c_time?: db.TimeString | db.Parameter<db.TimeString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.TimeString | db.Parameter<db.TimeString> | null | db.DefaultType | db.SQLFragment>;
+        c_time?: db.UpdatableValue<db.TimeString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamp**
         * - `timestamp` in database
         * - Nullable, no default
         */
-        c_timestamp?: (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | null | db.DefaultType | db.SQLFragment>;
+        c_timestamp?: db.UpdatableValue<(db.TimestampString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamptz**
         * - `timestamptz` in database
         * - Nullable, no default
         */
-        c_timestamptz?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | null | db.DefaultType | db.SQLFragment>;
+        c_timestamptz?: db.UpdatableValue<(db.TimestampTzString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timetz**
         * - `timetz` in database
         * - Nullable, no default
         */
-        c_timetz?: db.TimeTzString | db.Parameter<db.TimeTzString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.TimeTzString | db.Parameter<db.TimeTzString> | null | db.DefaultType | db.SQLFragment>;
+        c_timetz?: db.UpdatableValue<db.TimeTzString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsquery**
         * - `tsquery` in database
         * - Nullable, no default
         */
-        c_tsquery?: c.PgTsquery | db.Parameter<c.PgTsquery> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTsquery | db.Parameter<c.PgTsquery> | null | db.DefaultType | db.SQLFragment>;
+        c_tsquery?: db.UpdatableValue<c.PgTsquery, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsvector**
         * - `tsvector` in database
         * - Nullable, no default
         */
-        c_tsvector?: c.PgTsvector | db.Parameter<c.PgTsvector> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | null | db.DefaultType | db.SQLFragment>;
+        c_tsvector?: db.UpdatableValue<c.PgTsvector, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid**
         * - `uuid` in database
         * - Nullable, no default
         */
-        c_uuid?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_uuid?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid_array**
         * - `_uuid` in database
         * - Nullable, no default
         */
-        c_uuid_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment>;
+        c_uuid_array?: db.UpdatableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varbit**
         * - `varbit` in database
         * - Nullable, no default
         */
-        c_varbit?: c.PgVarbit | db.Parameter<c.PgVarbit> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgVarbit | db.Parameter<c.PgVarbit> | null | db.DefaultType | db.SQLFragment>;
+        c_varbit?: db.UpdatableValue<c.PgVarbit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varchar**
         * - `varchar` in database
         * - Nullable, no default
         */
-        c_varchar?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_varchar?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_xml**
         * - `xml` in database
         * - Nullable, no default
         */
-        c_xml?: c.PgXml | db.Parameter<c.PgXml> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgXml | db.Parameter<c.PgXml> | null | db.DefaultType | db.SQLFragment>;
+        c_xml?: db.UpdatableValue<c.PgXml, null | db.DefaultType>;
       }
       export type UniqueIndex = 'type_zoo_pkey';
       export type Column = keyof Selectable;

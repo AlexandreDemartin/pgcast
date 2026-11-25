@@ -294,7 +294,7 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 
 :::
 
-Each option below has left `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable, `pgcastconfig.json`, `zapatosconfig.json`, the CLI's JSON argument or JavaScript, a runtime option makes `setConfig()` throw, and a generator option makes `generate()`, `check()` and the CLI reject before any query and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`, which the configuration then drops. A program or config that never set the option sees no change.
+Each option below has left `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable, `pgcastconfig.json`, `zapatosconfig.json`, the CLI's JSON argument or JavaScript, a runtime option makes `setConfig()` throw, and a generator option makes `generate()`, `check()` and the CLI reject before any query and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`, which the configuration then drops. A program or config that never set the option sees no change, unless its entry opens with **Every program sees this change**: 8.0 then switches the 7.x default.
 
 ### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
 
@@ -454,6 +454,16 @@ try {
 - **What you see**: with `false`, or any value but `true`, `null` and `undefined`, the generator throws `rejectOnQueryError was removed in 8.0, which always does what rejectOnQueryError: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-rejectOnQueryError`, and so does the CLI given it in its config file or JSON argument, which 7.x ignored there. Once you delete it, a failed query rejects the promise, where 7.x with `false` printed it and ended the process. Left uncaught, Node prints the error on stderr and exits with code 1; caught, your program goes on. A CLI run without the key prints and exits as in 7.x.
 - **Find the calls**: `grep -rn rejectOnQueryError` over your config files and scripts; each `false` also throws as the generator starts, before any query.
 - **Before → after**: `await generate({ …, rejectOnQueryError: false })` becomes `await generate({ … }).catch(e => { console.error(e); process.exit(1); })`; in a config file, delete `"rejectOnQueryError": false`.
+
+### `valuesTypedAsAliases` {#from-8-0-valuesTypedAsAliases}
+
+**Every program sees this change.**
+
+8.0 always does what `valuesTypedAsAliases: true`, an opt-in of 7.2.0, did: each column's value in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, [`WhereableValue`](/value-types#WhereableValue), [`InsertableValue`](/value-types#InsertableValue) or [`UpdatableValue`](/value-types#UpdatableValue), where 7.x by default spelled out its union on each line ([`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases)). The types are the same: every call that compiled still does, and every call that failed still fails. The queries' SQL doesn't change.
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, the generator throws `valuesTypedAsAliases was removed in 8.0, which always does what valuesTypedAsAliases: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-valuesTypedAsAliases`. Without the key, your next run rewrites each value line of `schema.d.ts`, a smaller file. An editor's hover and an error name the alias on TypeScript 5.9, `Type 'string' is not assignable to type 'WhereableValue<number> | undefined'`, where 7.x listed the union; TypeScript 4.1 still shows the union. Compiled against a `zapatos/db` older than 7.2.0, after a downgrade, the schema fails on each value line (TS2694), and under `skipLibCheck` those values are `any`: regenerate with the version you install.
+- **Find the calls**: `grep -rn valuesTypedAsAliases` over your config files and scripts. A tool or test that reads `schema.d.ts` as text: `grep -rnF 'db.Parameter<' zapatos/schema.d.ts` finds the lines 7.x wrote, none once regenerated. A test that pins a TypeScript error message on a column's value: its expected text now names the alias.
+- **Before → after**: in `schema.d.ts`, `release_year?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, …>;` becomes `release_year?: db.WhereableValue<number>;`. A type of yours that spelled out that union can name it: `db.WhereableValue<number>`. In a config file, delete `"valuesTypedAsAliases": false`.
 
 ## Migrate from pgcast 6.x to 7.0 {#from-7-0}
 

@@ -83,13 +83,13 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - Materialized view column
       */
-      account_count?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      account_count?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **account_totals.owner_id**
       * - `int4` in database
       * - Materialized view column
       */
-      owner_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      owner_id?: db.WhereableValue<number>;
       /**
       * **account_totals.total_balance**
       *
@@ -97,7 +97,7 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - Materialized view column
       */
-      total_balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      total_balance?: db.WhereableValue<(number | db.NumericString)>;
     }
     export interface Insertable {
       [key: string]: never;
@@ -248,61 +248,61 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - `NOT NULL`, default: `0`
       */
-      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      balance?: db.WhereableValue<(number | db.NumericString)>;
       /**
       * **accounts.flags**
       * - `_bool` in database
       * - Nullable, no default
       */
-      flags?: boolean[] | db.Parameter<boolean[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, boolean[] | db.Parameter<boolean[]> | db.SQLFragment | db.ParentColumn>;
+      flags?: db.WhereableValue<boolean[]>;
       /**
       * **accounts.grid**
       * - `_int4` in database
       * - Nullable, no default
       */
-      grid?: number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn>;
+      grid?: db.WhereableValue<number[]>;
       /**
       * **accounts.id**
       * - `int8` in database
       * - `NOT NULL`, identity column
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **accounts.lifetime_ops**
       * - `int8` in database
       * - `NOT NULL`, default: `0`
       */
-      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      lifetime_ops?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **accounts.opened_on**
       * - `date` in database
       * - `NOT NULL`, default: `CURRENT_DATE`
       */
-      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
+      opened_on?: db.WhereableValue<(db.DateString | Date)>;
       /**
       * **accounts.overdraft_limit**
       * - `positive_int` (base type: `int4`) in database
       * - Nullable, no default
       */
-      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPositive_int | db.Parameter<c.PgPositive_int> | db.SQLFragment | db.ParentColumn>;
+      overdraft_limit?: db.WhereableValue<c.PgPositive_int>;
       /**
       * **accounts.owner_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      owner_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      owner_id?: db.WhereableValue<number>;
       /**
       * **accounts.ratio**
       * - `float8` in database
       * - Nullable, no default
       */
-      ratio?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      ratio?: db.WhereableValue<number>;
       /**
       * **accounts.scores**
       * - `_int4` in database
       * - `NOT NULL`, default: `'{}'::integer[]`
       */
-      scores?: number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number[] | db.Parameter<number[]> | db.SQLFragment | db.ParentColumn>;
+      scores?: db.WhereableValue<number[]>;
     }
     export interface Insertable {
       /**
@@ -310,61 +310,61 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - `NOT NULL`, default: `0`
       */
-      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment<any>;
+      balance?: db.InsertableValue<(number | db.NumericString), db.DefaultType>;
       /**
       * **accounts.flags**
       * - `_bool` in database
       * - Nullable, no default
       */
-      flags?: boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment<any>;
+      flags?: db.InsertableValue<boolean[], null | db.DefaultType>;
       /**
       * **accounts.grid**
       * - `_int4` in database
       * - Nullable, no default
       */
-      grid?: number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment<any>;
+      grid?: db.InsertableValue<number[], null | db.DefaultType>;
       /**
       * **accounts.id**
       * - `int8` in database
       * - `NOT NULL`, identity column
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **accounts.lifetime_ops**
       * - `int8` in database
       * - `NOT NULL`, default: `0`
       */
-      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
+      lifetime_ops?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **accounts.opened_on**
       * - `date` in database
       * - `NOT NULL`, default: `CURRENT_DATE`
       */
-      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment<any>;
+      opened_on?: db.InsertableValue<(db.DateString | Date), db.DefaultType>;
       /**
       * **accounts.overdraft_limit**
       * - `positive_int` (base type: `int4`) in database
       * - Nullable, no default
       */
-      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment<any>;
+      overdraft_limit?: db.InsertableValue<c.PgPositive_int, null | db.DefaultType>;
       /**
       * **accounts.owner_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      owner_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      owner_id: db.InsertableValue<number>;
       /**
       * **accounts.ratio**
       * - `float8` in database
       * - Nullable, no default
       */
-      ratio?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+      ratio?: db.InsertableValue<number, null | db.DefaultType>;
       /**
       * **accounts.scores**
       * - `_int4` in database
       * - `NOT NULL`, default: `'{}'::integer[]`
       */
-      scores?: number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment<any>;
+      scores?: db.InsertableValue<number[], db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -372,61 +372,61 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - `NOT NULL`, default: `0`
       */
-      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment>;
+      balance?: db.UpdatableValue<(number | db.NumericString), db.DefaultType>;
       /**
       * **accounts.flags**
       * - `_bool` in database
       * - Nullable, no default
       */
-      flags?: boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment>;
+      flags?: db.UpdatableValue<boolean[], null | db.DefaultType>;
       /**
       * **accounts.grid**
       * - `_int4` in database
       * - Nullable, no default
       */
-      grid?: number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment>;
+      grid?: db.UpdatableValue<number[], null | db.DefaultType>;
       /**
       * **accounts.id**
       * - `int8` in database
       * - `NOT NULL`, identity column
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **accounts.lifetime_ops**
       * - `int8` in database
       * - `NOT NULL`, default: `0`
       */
-      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
+      lifetime_ops?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **accounts.opened_on**
       * - `date` in database
       * - `NOT NULL`, default: `CURRENT_DATE`
       */
-      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment>;
+      opened_on?: db.UpdatableValue<(db.DateString | Date), db.DefaultType>;
       /**
       * **accounts.overdraft_limit**
       * - `positive_int` (base type: `int4`) in database
       * - Nullable, no default
       */
-      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment>;
+      overdraft_limit?: db.UpdatableValue<c.PgPositive_int, null | db.DefaultType>;
       /**
       * **accounts.owner_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      owner_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      owner_id?: db.UpdatableValue<number>;
       /**
       * **accounts.ratio**
       * - `float8` in database
       * - Nullable, no default
       */
-      ratio?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+      ratio?: db.UpdatableValue<number, null | db.DefaultType>;
       /**
       * **accounts.scores**
       * - `_int4` in database
       * - `NOT NULL`, default: `'{}'::integer[]`
       */
-      scores?: number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment>;
+      scores?: db.UpdatableValue<number[], db.DefaultType>;
     }
     export type UniqueIndex = 'accounts_pkey';
     export type Column = keyof Selectable;
@@ -505,25 +505,25 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - Nullable, no default
       */
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      display_name?: db.WhereableValue<string>;
       /**
       * **active_users.email**
       * - `email` (base type: `citext`) in database
       * - Nullable, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn>;
+      email?: db.WhereableValue<c.PgEmail>;
       /**
       * **active_users.id**
       * - `int4` in database
       * - Nullable, no default
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **active_users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn>;
+      mood?: db.WhereableValue<mood>;
     }
     export interface Insertable {
       /**
@@ -533,25 +533,25 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - Nullable, no default
       */
-      display_name?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      display_name?: db.InsertableValue<string, null | db.DefaultType>;
       /**
       * **active_users.email**
       * - `email` (base type: `citext`) in database
       * - Nullable, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | null | db.DefaultType | db.SQLFragment<any>;
+      email?: db.InsertableValue<c.PgEmail, null | db.DefaultType>;
       /**
       * **active_users.id**
       * - `int4` in database
       * - Nullable, no default
       */
-      id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, null | db.DefaultType>;
       /**
       * **active_users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
+      mood?: db.InsertableValue<mood, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -561,25 +561,25 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - Nullable, no default
       */
-      display_name?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      display_name?: db.UpdatableValue<string, null | db.DefaultType>;
       /**
       * **active_users.email**
       * - `email` (base type: `citext`) in database
       * - Nullable, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | null | db.DefaultType | db.SQLFragment>;
+      email?: db.UpdatableValue<c.PgEmail, null | db.DefaultType>;
       /**
       * **active_users.id**
       * - `int4` in database
       * - Nullable, no default
       */
-      id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, null | db.DefaultType>;
       /**
       * **active_users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment>;
+      mood?: db.UpdatableValue<mood, null | db.DefaultType>;
     }
     export type UniqueIndex = never;
     export type Column = keyof Selectable;
@@ -656,7 +656,7 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **events.kind**
       *
@@ -664,19 +664,19 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      kind?: db.WhereableValue<string>;
       /**
       * **events.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
+      occurred_on?: db.WhereableValue<(db.DateString | Date)>;
       /**
       * **events.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      payload?: db.WhereableValue<db.JSONValue>;
     }
     export interface Insertable {
       /**
@@ -684,7 +684,7 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events.kind**
       *
@@ -692,19 +692,19 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind: string | db.Parameter<string> | db.SQLFragment<any>;
+      kind: db.InsertableValue<string>;
       /**
       * **events.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment<any>;
+      occurred_on: db.InsertableValue<(db.DateString | Date)>;
       /**
       * **events.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+      payload?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -712,7 +712,7 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events.kind**
       *
@@ -720,19 +720,19 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      kind?: db.UpdatableValue<string>;
       /**
       * **events.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment>;
+      occurred_on?: db.UpdatableValue<(db.DateString | Date)>;
       /**
       * **events.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+      payload?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
     }
     export type UniqueIndex = 'events_pkey';
     export type Column = keyof Selectable;
@@ -805,25 +805,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **events_2025.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      kind?: db.WhereableValue<string>;
       /**
       * **events_2025.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
+      occurred_on?: db.WhereableValue<(db.DateString | Date)>;
       /**
       * **events_2025.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      payload?: db.WhereableValue<db.JSONValue>;
     }
     export interface Insertable {
       /**
@@ -831,25 +831,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events_2025.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind: string | db.Parameter<string> | db.SQLFragment<any>;
+      kind: db.InsertableValue<string>;
       /**
       * **events_2025.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment<any>;
+      occurred_on: db.InsertableValue<(db.DateString | Date)>;
       /**
       * **events_2025.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+      payload?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -857,25 +857,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events_2025.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      kind?: db.UpdatableValue<string>;
       /**
       * **events_2025.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment>;
+      occurred_on?: db.UpdatableValue<(db.DateString | Date)>;
       /**
       * **events_2025.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+      payload?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
     }
     export type UniqueIndex = 'events_2025_pkey';
     export type Column = keyof Selectable;
@@ -948,25 +948,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **events_2026.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      kind?: db.WhereableValue<string>;
       /**
       * **events_2026.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
+      occurred_on?: db.WhereableValue<(db.DateString | Date)>;
       /**
       * **events_2026.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      payload?: db.WhereableValue<db.JSONValue>;
     }
     export interface Insertable {
       /**
@@ -974,25 +974,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events_2026.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind: string | db.Parameter<string> | db.SQLFragment<any>;
+      kind: db.InsertableValue<string>;
       /**
       * **events_2026.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment<any>;
+      occurred_on: db.InsertableValue<(db.DateString | Date)>;
       /**
       * **events_2026.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+      payload?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -1000,25 +1000,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events_2026.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      kind?: db.UpdatableValue<string>;
       /**
       * **events_2026.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment>;
+      occurred_on?: db.UpdatableValue<(db.DateString | Date)>;
       /**
       * **events_2026.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+      payload?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
     }
     export type UniqueIndex = 'events_2026_pkey';
     export type Column = keyof Selectable;
@@ -1091,25 +1091,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **events_default.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      kind?: db.WhereableValue<string>;
       /**
       * **events_default.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
+      occurred_on?: db.WhereableValue<(db.DateString | Date)>;
       /**
       * **events_default.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      payload?: db.WhereableValue<db.JSONValue>;
     }
     export interface Insertable {
       /**
@@ -1117,25 +1117,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events_default.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind: string | db.Parameter<string> | db.SQLFragment<any>;
+      kind: db.InsertableValue<string>;
       /**
       * **events_default.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment<any>;
+      occurred_on: db.InsertableValue<(db.DateString | Date)>;
       /**
       * **events_default.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+      payload?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -1143,25 +1143,25 @@ declare module 'zapatos/schema' {
       * - `int8` in database
       * - `NOT NULL`, default: `nextval('events_id_seq'::regclass)`
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<(number | db.Int8String | bigint), db.DefaultType>;
       /**
       * **events_default.kind**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      kind?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      kind?: db.UpdatableValue<string>;
       /**
       * **events_default.occurred_on**
       * - `date` in database
       * - `NOT NULL`, no default
       */
-      occurred_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment>;
+      occurred_on?: db.UpdatableValue<(db.DateString | Date)>;
       /**
       * **events_default.payload**
       * - `jsonb` in database
       * - Nullable, no default
       */
-      payload?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+      payload?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
     }
     export type UniqueIndex = 'events_default_pkey';
     export type Column = keyof Selectable;
@@ -1246,31 +1246,31 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      org_code?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      org_code?: db.WhereableValue<string>;
       /**
       * **memberships.org_country**
       * - `bpchar` in database
       * - `NOT NULL`, no default
       */
-      org_country?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      org_country?: db.WhereableValue<string>;
       /**
       * **memberships.role**
       * - `text` in database
       * - `NOT NULL`, default: `'member'::text`
       */
-      role?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      role?: db.WhereableValue<string>;
       /**
       * **memberships.since**
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      since?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+      since?: db.WhereableValue<(db.TimestampTzString | Date)>;
       /**
       * **memberships.user_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      user_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      user_id?: db.WhereableValue<number>;
     }
     export interface Insertable {
       /**
@@ -1278,31 +1278,31 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      org_code: string | db.Parameter<string> | db.SQLFragment<any>;
+      org_code: db.InsertableValue<string>;
       /**
       * **memberships.org_country**
       * - `bpchar` in database
       * - `NOT NULL`, no default
       */
-      org_country: string | db.Parameter<string> | db.SQLFragment<any>;
+      org_country: db.InsertableValue<string>;
       /**
       * **memberships.role**
       * - `text` in database
       * - `NOT NULL`, default: `'member'::text`
       */
-      role?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment<any>;
+      role?: db.InsertableValue<string, db.DefaultType>;
       /**
       * **memberships.since**
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      since?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
+      since?: db.InsertableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **memberships.user_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      user_id: number | db.Parameter<number> | db.SQLFragment<any>;
+      user_id: db.InsertableValue<number>;
     }
     export interface Updatable {
       /**
@@ -1310,31 +1310,31 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      org_code?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      org_code?: db.UpdatableValue<string>;
       /**
       * **memberships.org_country**
       * - `bpchar` in database
       * - `NOT NULL`, no default
       */
-      org_country?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      org_country?: db.UpdatableValue<string>;
       /**
       * **memberships.role**
       * - `text` in database
       * - `NOT NULL`, default: `'member'::text`
       */
-      role?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.DefaultType | db.SQLFragment>;
+      role?: db.UpdatableValue<string, db.DefaultType>;
       /**
       * **memberships.since**
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      since?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment>;
+      since?: db.UpdatableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **memberships.user_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      user_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      user_id?: db.UpdatableValue<number>;
     }
     export type UniqueIndex = 'memberships_pkey';
     export type Column = keyof Selectable;
@@ -1419,31 +1419,31 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      "Product Id"?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      "Product Id"?: db.WhereableValue<number>;
       /**
       * **OrderLines.lineNo**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      lineNo?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      lineNo?: db.WhereableValue<number>;
       /**
       * **OrderLines.orderId**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      orderId?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      orderId?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **OrderLines.select**
       * - `text` in database
       * - Nullable, no default
       */
-      select?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      select?: db.WhereableValue<string>;
       /**
       * **OrderLines.unit-price**
       * - `numeric` in database
       * - `NOT NULL`, no default
       */
-      "unit-price"?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      "unit-price"?: db.WhereableValue<(number | db.NumericString)>;
     }
     export interface Insertable {
       /**
@@ -1451,31 +1451,31 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      "Product Id": number | db.Parameter<number> | db.SQLFragment<any>;
+      "Product Id": db.InsertableValue<number>;
       /**
       * **OrderLines.lineNo**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      lineNo: number | db.Parameter<number> | db.SQLFragment<any>;
+      lineNo: db.InsertableValue<number>;
       /**
       * **OrderLines.orderId**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      orderId: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment<any>;
+      orderId: db.InsertableValue<(number | db.Int8String | bigint)>;
       /**
       * **OrderLines.select**
       * - `text` in database
       * - Nullable, no default
       */
-      select?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      select?: db.InsertableValue<string, null | db.DefaultType>;
       /**
       * **OrderLines.unit-price**
       * - `numeric` in database
       * - `NOT NULL`, no default
       */
-      "unit-price": (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment<any>;
+      "unit-price": db.InsertableValue<(number | db.NumericString)>;
     }
     export interface Updatable {
       /**
@@ -1483,31 +1483,31 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      "Product Id"?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      "Product Id"?: db.UpdatableValue<number>;
       /**
       * **OrderLines.lineNo**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      lineNo?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+      lineNo?: db.UpdatableValue<number>;
       /**
       * **OrderLines.orderId**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      orderId?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment>;
+      orderId?: db.UpdatableValue<(number | db.Int8String | bigint)>;
       /**
       * **OrderLines.select**
       * - `text` in database
       * - Nullable, no default
       */
-      select?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      select?: db.UpdatableValue<string, null | db.DefaultType>;
       /**
       * **OrderLines.unit-price**
       * - `numeric` in database
       * - `NOT NULL`, no default
       */
-      "unit-price"?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment>;
+      "unit-price"?: db.UpdatableValue<(number | db.NumericString)>;
     }
     export type UniqueIndex = 'OrderLines_pkey';
     export type Column = keyof Selectable;
@@ -1592,31 +1592,31 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      code?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      code?: db.WhereableValue<string>;
       /**
       * **orgs.country**
       * - `bpchar` in database
       * - `NOT NULL`, no default
       */
-      country?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      country?: db.WhereableValue<string>;
       /**
       * **orgs.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      name?: db.WhereableValue<string>;
       /**
       * **orgs.parent_code**
       * - `text` in database
       * - Nullable, no default
       */
-      parent_code?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      parent_code?: db.WhereableValue<string>;
       /**
       * **orgs.parent_country**
       * - `bpchar` in database
       * - Nullable, no default
       */
-      parent_country?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      parent_country?: db.WhereableValue<string>;
     }
     export interface Insertable {
       /**
@@ -1624,31 +1624,31 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      code: string | db.Parameter<string> | db.SQLFragment<any>;
+      code: db.InsertableValue<string>;
       /**
       * **orgs.country**
       * - `bpchar` in database
       * - `NOT NULL`, no default
       */
-      country: string | db.Parameter<string> | db.SQLFragment<any>;
+      country: db.InsertableValue<string>;
       /**
       * **orgs.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment<any>;
+      name: db.InsertableValue<string>;
       /**
       * **orgs.parent_code**
       * - `text` in database
       * - Nullable, no default
       */
-      parent_code?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      parent_code?: db.InsertableValue<string, null | db.DefaultType>;
       /**
       * **orgs.parent_country**
       * - `bpchar` in database
       * - Nullable, no default
       */
-      parent_country?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      parent_country?: db.InsertableValue<string, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -1656,31 +1656,31 @@ declare module 'zapatos/schema' {
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      code?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      code?: db.UpdatableValue<string>;
       /**
       * **orgs.country**
       * - `bpchar` in database
       * - `NOT NULL`, no default
       */
-      country?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      country?: db.UpdatableValue<string>;
       /**
       * **orgs.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      name?: db.UpdatableValue<string>;
       /**
       * **orgs.parent_code**
       * - `text` in database
       * - Nullable, no default
       */
-      parent_code?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      parent_code?: db.UpdatableValue<string, null | db.DefaultType>;
       /**
       * **orgs.parent_country**
       * - `bpchar` in database
       * - Nullable, no default
       */
-      parent_country?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      parent_country?: db.UpdatableValue<string, null | db.DefaultType>;
     }
     export type UniqueIndex = 'orgs_pkey';
     export type Column = keyof Selectable;
@@ -1837,67 +1837,67 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('products_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **products.list_price**
       * - `price` in database
       * - Nullable, no default
       */
-      list_price?: c.PgPrice | db.Parameter<c.PgPrice> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPrice | db.Parameter<c.PgPrice> | db.SQLFragment | db.ParentColumn>;
+      list_price?: db.WhereableValue<c.PgPrice>;
       /**
       * **products.price_cents**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      price_cents?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      price_cents?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **products.price_with_vat_cents**
       * - `numeric` in database
       * - Generated column
       */
-      price_with_vat_cents?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      price_with_vat_cents?: db.WhereableValue<(number | db.NumericString)>;
       /**
       * **products.search**
       * - `tsvector` in database
       * - Generated column
       */
-      search?: c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn>;
+      search?: db.WhereableValue<c.PgTsvector>;
       /**
       * **products.sku**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      sku?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      sku?: db.WhereableValue<string>;
       /**
       * **products.status**
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.SQLFragment | db.ParentColumn>;
+      status?: db.WhereableValue<('draft' | 'published' | 'archived')>;
       /**
       * **products.title**
       * - `text` in database
       * - Nullable, no default
       */
-      title?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      title?: db.WhereableValue<string>;
       /**
       * **products.variant**
       * - `text` in database
       * - `NOT NULL`, default: `''::text`
       */
-      variant?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      variant?: db.WhereableValue<string>;
       /**
       * **products.vat_rate**
       * - `numeric` in database
       * - `NOT NULL`, default: `0.2`
       */
-      vat_rate?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      vat_rate?: db.WhereableValue<(number | db.NumericString)>;
       /**
       * **products.weight_kg**
       * - `float_range` in database
       * - Nullable, no default
       */
-      weight_kg?: c.PgFloat_range | db.Parameter<c.PgFloat_range> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgFloat_range | db.Parameter<c.PgFloat_range> | db.SQLFragment | db.ParentColumn>;
+      weight_kg?: db.WhereableValue<c.PgFloat_range>;
     }
     export interface Insertable {
       /**
@@ -1905,55 +1905,55 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('products_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<number, db.DefaultType>;
       /**
       * **products.list_price**
       * - `price` in database
       * - Nullable, no default
       */
-      list_price?: c.PgPrice | db.Parameter<c.PgPrice> | null | db.DefaultType | db.SQLFragment<any>;
+      list_price?: db.InsertableValue<c.PgPrice, null | db.DefaultType>;
       /**
       * **products.price_cents**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      price_cents: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment<any>;
+      price_cents: db.InsertableValue<(number | db.Int8String | bigint)>;
       /**
       * **products.sku**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      sku: string | db.Parameter<string> | db.SQLFragment<any>;
+      sku: db.InsertableValue<string>;
       /**
       * **products.status**
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment<any>;
+      status?: db.InsertableValue<('draft' | 'published' | 'archived'), db.DefaultType>;
       /**
       * **products.title**
       * - `text` in database
       * - Nullable, no default
       */
-      title?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      title?: db.InsertableValue<string, null | db.DefaultType>;
       /**
       * **products.variant**
       * - `text` in database
       * - `NOT NULL`, default: `''::text`
       */
-      variant?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment<any>;
+      variant?: db.InsertableValue<string, db.DefaultType>;
       /**
       * **products.vat_rate**
       * - `numeric` in database
       * - `NOT NULL`, default: `0.2`
       */
-      vat_rate?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment<any>;
+      vat_rate?: db.InsertableValue<(number | db.NumericString), db.DefaultType>;
       /**
       * **products.weight_kg**
       * - `float_range` in database
       * - Nullable, no default
       */
-      weight_kg?: c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment<any>;
+      weight_kg?: db.InsertableValue<c.PgFloat_range, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -1961,55 +1961,55 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('products_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<number, db.DefaultType>;
       /**
       * **products.list_price**
       * - `price` in database
       * - Nullable, no default
       */
-      list_price?: c.PgPrice | db.Parameter<c.PgPrice> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPrice | db.Parameter<c.PgPrice> | null | db.DefaultType | db.SQLFragment>;
+      list_price?: db.UpdatableValue<c.PgPrice, null | db.DefaultType>;
       /**
       * **products.price_cents**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      price_cents?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment>;
+      price_cents?: db.UpdatableValue<(number | db.Int8String | bigint)>;
       /**
       * **products.sku**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      sku?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      sku?: db.UpdatableValue<string>;
       /**
       * **products.status**
       * - `status` in database
       * - `NOT NULL`, default: `'draft'::extra.status`
       */
-      status?: ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, ('draft' | 'published' | 'archived') | db.Parameter<('draft' | 'published' | 'archived')> | db.DefaultType | db.SQLFragment>;
+      status?: db.UpdatableValue<('draft' | 'published' | 'archived'), db.DefaultType>;
       /**
       * **products.title**
       * - `text` in database
       * - Nullable, no default
       */
-      title?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      title?: db.UpdatableValue<string, null | db.DefaultType>;
       /**
       * **products.variant**
       * - `text` in database
       * - `NOT NULL`, default: `''::text`
       */
-      variant?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.DefaultType | db.SQLFragment>;
+      variant?: db.UpdatableValue<string, db.DefaultType>;
       /**
       * **products.vat_rate**
       * - `numeric` in database
       * - `NOT NULL`, default: `0.2`
       */
-      vat_rate?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment>;
+      vat_rate?: db.UpdatableValue<(number | db.NumericString), db.DefaultType>;
       /**
       * **products.weight_kg**
       * - `float_range` in database
       * - Nullable, no default
       */
-      weight_kg?: c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment>;
+      weight_kg?: db.UpdatableValue<c.PgFloat_range, null | db.DefaultType>;
     }
     export type UniqueIndex = 'products_pkey' | 'products_sku_variant_key';
     export type Column = keyof Selectable;
@@ -2142,55 +2142,55 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - `NOT NULL`, no default
       */
-      amount?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+      amount?: db.WhereableValue<(number | db.NumericString)>;
       /**
       * **transfers.batch_sizes**
       * - `int4range` in database
       * - Nullable, no default
       */
-      batch_sizes?: db.NumberRangeString | db.Parameter<db.NumberRangeString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.NumberRangeString | db.Parameter<db.NumberRangeString> | db.SQLFragment | db.ParentColumn>;
+      batch_sizes?: db.WhereableValue<db.NumberRangeString>;
       /**
       * **transfers.fee_band**
       * - `numrange` in database
       * - Nullable, no default
       */
-      fee_band?: db.NumberRangeString | db.Parameter<db.NumberRangeString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.NumberRangeString | db.Parameter<db.NumberRangeString> | db.SQLFragment | db.ParentColumn>;
+      fee_band?: db.WhereableValue<db.NumberRangeString>;
       /**
       * **transfers.from_account**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      from_account?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      from_account?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **transfers.id**
       * - `uuid` in database
       * - `NOT NULL`, default: `gen_random_uuid()`
       */
-      id?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<string>;
       /**
       * **transfers.note**
       * - `text` in database
       * - Nullable, no default
       */
-      note?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      note?: db.WhereableValue<string>;
       /**
       * **transfers.to_account**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      to_account?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+      to_account?: db.WhereableValue<(number | db.Int8String | bigint)>;
       /**
       * **transfers.valid_during**
       * - `tstzrange` in database
       * - Nullable, no default
       */
-      valid_during?: db.DateRangeString | db.Parameter<db.DateRangeString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DateRangeString | db.Parameter<db.DateRangeString> | db.SQLFragment | db.ParentColumn>;
+      valid_during?: db.WhereableValue<db.DateRangeString>;
       /**
       * **transfers.value_days**
       * - `daterange` in database
       * - Nullable, no default
       */
-      value_days?: db.DateRangeString | db.Parameter<db.DateRangeString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DateRangeString | db.Parameter<db.DateRangeString> | db.SQLFragment | db.ParentColumn>;
+      value_days?: db.WhereableValue<db.DateRangeString>;
     }
     export interface Insertable {
       /**
@@ -2198,55 +2198,55 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - `NOT NULL`, no default
       */
-      amount: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment<any>;
+      amount: db.InsertableValue<(number | db.NumericString)>;
       /**
       * **transfers.batch_sizes**
       * - `int4range` in database
       * - Nullable, no default
       */
-      batch_sizes?: db.NumberRangeString | db.Parameter<db.NumberRangeString> | null | db.DefaultType | db.SQLFragment<any>;
+      batch_sizes?: db.InsertableValue<db.NumberRangeString, null | db.DefaultType>;
       /**
       * **transfers.fee_band**
       * - `numrange` in database
       * - Nullable, no default
       */
-      fee_band?: db.NumberRangeString | db.Parameter<db.NumberRangeString> | null | db.DefaultType | db.SQLFragment<any>;
+      fee_band?: db.InsertableValue<db.NumberRangeString, null | db.DefaultType>;
       /**
       * **transfers.from_account**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      from_account: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment<any>;
+      from_account: db.InsertableValue<(number | db.Int8String | bigint)>;
       /**
       * **transfers.id**
       * - `uuid` in database
       * - `NOT NULL`, default: `gen_random_uuid()`
       */
-      id?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment<any>;
+      id?: db.InsertableValue<string, db.DefaultType>;
       /**
       * **transfers.note**
       * - `text` in database
       * - Nullable, no default
       */
-      note?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+      note?: db.InsertableValue<string, null | db.DefaultType>;
       /**
       * **transfers.to_account**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      to_account: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment<any>;
+      to_account: db.InsertableValue<(number | db.Int8String | bigint)>;
       /**
       * **transfers.valid_during**
       * - `tstzrange` in database
       * - Nullable, no default
       */
-      valid_during?: db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment<any>;
+      valid_during?: db.InsertableValue<db.DateRangeString, null | db.DefaultType>;
       /**
       * **transfers.value_days**
       * - `daterange` in database
       * - Nullable, no default
       */
-      value_days?: db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment<any>;
+      value_days?: db.InsertableValue<db.DateRangeString, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -2254,55 +2254,55 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - `NOT NULL`, no default
       */
-      amount?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment>;
+      amount?: db.UpdatableValue<(number | db.NumericString)>;
       /**
       * **transfers.batch_sizes**
       * - `int4range` in database
       * - Nullable, no default
       */
-      batch_sizes?: db.NumberRangeString | db.Parameter<db.NumberRangeString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.NumberRangeString | db.Parameter<db.NumberRangeString> | null | db.DefaultType | db.SQLFragment>;
+      batch_sizes?: db.UpdatableValue<db.NumberRangeString, null | db.DefaultType>;
       /**
       * **transfers.fee_band**
       * - `numrange` in database
       * - Nullable, no default
       */
-      fee_band?: db.NumberRangeString | db.Parameter<db.NumberRangeString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.NumberRangeString | db.Parameter<db.NumberRangeString> | null | db.DefaultType | db.SQLFragment>;
+      fee_band?: db.UpdatableValue<db.NumberRangeString, null | db.DefaultType>;
       /**
       * **transfers.from_account**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      from_account?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment>;
+      from_account?: db.UpdatableValue<(number | db.Int8String | bigint)>;
       /**
       * **transfers.id**
       * - `uuid` in database
       * - `NOT NULL`, default: `gen_random_uuid()`
       */
-      id?: string | db.Parameter<string> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.DefaultType | db.SQLFragment>;
+      id?: db.UpdatableValue<string, db.DefaultType>;
       /**
       * **transfers.note**
       * - `text` in database
       * - Nullable, no default
       */
-      note?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+      note?: db.UpdatableValue<string, null | db.DefaultType>;
       /**
       * **transfers.to_account**
       * - `int8` in database
       * - `NOT NULL`, no default
       */
-      to_account?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment>;
+      to_account?: db.UpdatableValue<(number | db.Int8String | bigint)>;
       /**
       * **transfers.valid_during**
       * - `tstzrange` in database
       * - Nullable, no default
       */
-      valid_during?: db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment>;
+      valid_during?: db.UpdatableValue<db.DateRangeString, null | db.DefaultType>;
       /**
       * **transfers.value_days**
       * - `daterange` in database
       * - Nullable, no default
       */
-      value_days?: db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment>;
+      value_days?: db.UpdatableValue<db.DateRangeString, null | db.DefaultType>;
     }
     export type UniqueIndex = 'transfers_pkey';
     export type Column = keyof Selectable;
@@ -2441,31 +2441,31 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+      created_at?: db.WhereableValue<(db.TimestampTzString | Date)>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      display_name?: db.WhereableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.ParentColumn>;
+      email?: db.WhereableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | db.SQLFragment | db.ParentColumn>;
+      home?: db.WhereableValue<c.PgAddress>;
       /**
       * **users.id**
       * - `int4` in database
       * - Generated column
       */
-      id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      id?: db.WhereableValue<number>;
       /**
       * **users.manager_id**
       *
@@ -2474,25 +2474,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      manager_id?: db.WhereableValue<number>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, mood | db.Parameter<mood> | db.SQLFragment | db.ParentColumn>;
+      mood?: db.WhereableValue<mood>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      settings?: db.WhereableValue<db.JSONValue>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | db.SQLFragment | db.ParentColumn>;
+      tags?: db.WhereableValue<c.PgTag_list>;
     }
     export interface Insertable {
       /**
@@ -2500,25 +2500,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
+      created_at?: db.InsertableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name: string | db.Parameter<string> | db.SQLFragment<any>;
+      display_name: db.InsertableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment<any>;
+      email: db.InsertableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment<any>;
+      home?: db.InsertableValue<c.PgAddress, null | db.DefaultType>;
       /**
       * **users.manager_id**
       *
@@ -2527,25 +2527,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+      manager_id?: db.InsertableValue<number, null | db.DefaultType>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
+      mood?: db.InsertableValue<mood, null | db.DefaultType>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
+      settings?: db.InsertableValue<db.JSONValue, db.DefaultType>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment<any>;
+      tags?: db.InsertableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export interface Updatable {
       /**
@@ -2553,25 +2553,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment>;
+      created_at?: db.UpdatableValue<(db.TimestampTzString | Date), db.DefaultType>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      display_name?: db.UpdatableValue<string>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email?: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment | db.SQLFragment<any, c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment>;
+      email?: db.UpdatableValue<c.PgEmail>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment>;
+      home?: db.UpdatableValue<c.PgAddress, null | db.DefaultType>;
       /**
       * **users.manager_id**
       *
@@ -2580,25 +2580,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+      manager_id?: db.UpdatableValue<number, null | db.DefaultType>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment>;
+      mood?: db.UpdatableValue<mood, null | db.DefaultType>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment>;
+      settings?: db.UpdatableValue<db.JSONValue, db.DefaultType>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment>;
+      tags?: db.UpdatableValue<c.PgTag_list, null | db.DefaultType>;
     }
     export type UniqueIndex = 'users_email_key' | 'users_pkey';
     export type Column = keyof Selectable;
@@ -2693,19 +2693,19 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - Nullable, no default
         */
-        article_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        article_id?: db.WhereableValue<number>;
         /**
         * **extra.article_authors.author**
         * - `text` in database
         * - Nullable, no default
         */
-        author?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        author?: db.WhereableValue<string>;
         /**
         * **extra.article_authors.status**
         * - `status` in database
         * - Nullable, no default
         */
-        status?: status | db.Parameter<status> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, status | db.Parameter<status> | db.SQLFragment | db.ParentColumn>;
+        status?: db.WhereableValue<status>;
       }
       export interface Insertable {
         [key: string]: never;
@@ -2796,31 +2796,31 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        author_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        author_id?: db.WhereableValue<number>;
         /**
         * **extra.articles.body**
         * - `text` in database
         * - `NOT NULL`, no default
         */
-        body?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        body?: db.WhereableValue<string>;
         /**
         * **extra.articles.id**
         * - `int4` in database
         * - Generated column
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
         /**
         * **extra.articles.reviewer_id**
         * - `int4` in database
         * - Nullable, no default
         */
-        reviewer_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        reviewer_id?: db.WhereableValue<number>;
         /**
         * **extra.articles.status**
         * - `status` in database
         * - `NOT NULL`, default: `'draft'::extra.status`
         */
-        status?: status | db.Parameter<status> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, status | db.Parameter<status> | db.SQLFragment | db.ParentColumn>;
+        status?: db.WhereableValue<status>;
       }
       export interface Insertable {
         /**
@@ -2828,25 +2828,25 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        author_id: number | db.Parameter<number> | db.SQLFragment<any>;
+        author_id: db.InsertableValue<number>;
         /**
         * **extra.articles.body**
         * - `text` in database
         * - `NOT NULL`, no default
         */
-        body: string | db.Parameter<string> | db.SQLFragment<any>;
+        body: db.InsertableValue<string>;
         /**
         * **extra.articles.reviewer_id**
         * - `int4` in database
         * - Nullable, no default
         */
-        reviewer_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        reviewer_id?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.articles.status**
         * - `status` in database
         * - `NOT NULL`, default: `'draft'::extra.status`
         */
-        status?: status | db.Parameter<status> | db.DefaultType | db.SQLFragment<any>;
+        status?: db.InsertableValue<status, db.DefaultType>;
       }
       export interface Updatable {
         /**
@@ -2854,25 +2854,25 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        author_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
+        author_id?: db.UpdatableValue<number>;
         /**
         * **extra.articles.body**
         * - `text` in database
         * - `NOT NULL`, no default
         */
-        body?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+        body?: db.UpdatableValue<string>;
         /**
         * **extra.articles.reviewer_id**
         * - `int4` in database
         * - Nullable, no default
         */
-        reviewer_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        reviewer_id?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.articles.status**
         * - `status` in database
         * - `NOT NULL`, default: `'draft'::extra.status`
         */
-        status?: status | db.Parameter<status> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, status | db.Parameter<status> | db.DefaultType | db.SQLFragment>;
+        status?: db.UpdatableValue<status, db.DefaultType>;
       }
       export type UniqueIndex = 'articles_pkey';
       export type Column = keyof Selectable;
@@ -2915,7 +2915,7 @@ declare module 'zapatos/schema' {
         * - `text` in database
         * - Nullable, no default
         */
-        line?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        line?: db.WhereableValue<string>;
       }
       export interface Insertable {
         [key: string]: never;
@@ -2982,19 +2982,19 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - Generated column
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
         /**
         * **extra.spools.label**
         * - `text` in database
         * - Nullable, no default
         */
-        label?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        label?: db.WhereableValue<string>;
         /**
         * **extra.spools.length**
         * - `int4` in database
         * - Nullable, no default
         */
-        length?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        length?: db.WhereableValue<number>;
       }
       export interface Insertable {
         /**
@@ -3002,13 +3002,13 @@ declare module 'zapatos/schema' {
         * - `text` in database
         * - Nullable, no default
         */
-        label?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        label?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.spools.length**
         * - `int4` in database
         * - Nullable, no default
         */
-        length?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        length?: db.InsertableValue<number, null | db.DefaultType>;
       }
       export interface Updatable {
         /**
@@ -3016,13 +3016,13 @@ declare module 'zapatos/schema' {
         * - `text` in database
         * - Nullable, no default
         */
-        label?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        label?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.spools.length**
         * - `int4` in database
         * - Nullable, no default
         */
-        length?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        length?: db.UpdatableValue<number, null | db.DefaultType>;
       }
       export type UniqueIndex = 'spools_pkey';
       export type Column = keyof Selectable;
@@ -3551,253 +3551,253 @@ declare module 'zapatos/schema' {
         * - `bit` in database
         * - Nullable, no default
         */
-        c_bit?: c.PgBit | db.Parameter<c.PgBit> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgBit | db.Parameter<c.PgBit> | db.SQLFragment | db.ParentColumn>;
+        c_bit?: db.WhereableValue<c.PgBit>;
         /**
         * **extra.type_zoo.c_bool**
         * - `bool` in database
         * - Nullable, no default
         */
-        c_bool?: boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn>;
+        c_bool?: db.WhereableValue<boolean>;
         /**
         * **extra.type_zoo.c_bytea**
         * - `bytea` in database
         * - Nullable, no default
         */
-        c_bytea?: (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | db.SQLFragment | db.ParentColumn>;
+        c_bytea?: db.WhereableValue<(db.ByteArrayString | Buffer)>;
         /**
         * **extra.type_zoo.c_char**
         * - `bpchar` in database
         * - Nullable, no default
         */
-        c_char?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_char?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_cidr**
         * - `cidr` in database
         * - Nullable, no default
         */
-        c_cidr?: c.PgCidr | db.Parameter<c.PgCidr> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgCidr | db.Parameter<c.PgCidr> | db.SQLFragment | db.ParentColumn>;
+        c_cidr?: db.WhereableValue<c.PgCidr>;
         /**
         * **extra.type_zoo.c_citext**
         * - `citext` in database
         * - Nullable, no default
         */
-        c_citext?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_citext?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_date**
         * - `date` in database
         * - Nullable, no default
         */
-        c_date?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.SQLFragment | db.ParentColumn>;
+        c_date?: db.WhereableValue<(db.DateString | Date)>;
         /**
         * **extra.type_zoo.c_date_array**
         * - `_date` in database
         * - Nullable, no default
         */
-        c_date_array?: (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | db.SQLFragment | db.ParentColumn>;
+        c_date_array?: db.WhereableValue<(db.DateString | Date)[]>;
         /**
         * **extra.type_zoo.c_enum_array**
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | db.SQLFragment | db.ParentColumn>;
+        c_enum_array?: db.WhereableValue<('sad' | 'ok' | 'happy')[]>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
         * - Nullable, no default
         */
-        c_float4?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_float4?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_float8**
         * - `float8` in database
         * - Nullable, no default
         */
-        c_float8?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_float8?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_inet**
         * - `inet` in database
         * - Nullable, no default
         */
-        c_inet?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_inet?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_int2**
         * - `int2` in database
         * - Nullable, no default
         */
-        c_int2?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_int2?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_int4**
         * - `int4` in database
         * - Nullable, no default
         */
-        c_int4?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_int4?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_int4multirange**
         * - `int4multirange` in database
         * - Nullable, no default
         */
-        c_int4multirange?: c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | db.SQLFragment | db.ParentColumn>;
+        c_int4multirange?: db.WhereableValue<c.PgInt4multirange>;
         /**
         * **extra.type_zoo.c_int8**
         * - `int8` in database
         * - Nullable, no default
         */
-        c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
+        c_int8?: db.WhereableValue<(number | db.Int8String | bigint)>;
         /**
         * **extra.type_zoo.c_int8_domain**
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | db.SQLFragment | db.ParentColumn>;
+        c_int8_domain?: db.WhereableValue<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | db.SQLFragment | db.ParentColumn>;
+        c_interval?: db.WhereableValue<(string | db.PostgresInterval)>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
         * - Nullable, no default
         */
-        c_json?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+        c_json?: db.WhereableValue<db.JSONValue>;
         /**
         * **extra.type_zoo.c_jsonb**
         * - `jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+        c_jsonb?: db.WhereableValue<db.JSONValue>;
         /**
         * **extra.type_zoo.c_jsonb_array**
         * - `_jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue[] | db.Parameter<db.JSONValue[]> | db.SQLFragment | db.ParentColumn>;
+        c_jsonb_array?: db.WhereableValue<db.JSONValue[]>;
         /**
         * **extra.type_zoo.c_jsonb_domain**
         * - `preferences` (base type: `jsonb`) in database
         * - Nullable, no default
         */
-        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPreferences | db.Parameter<c.PgPreferences> | db.SQLFragment | db.ParentColumn>;
+        c_jsonb_domain?: db.WhereableValue<c.PgPreferences>;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
         */
-        c_macaddr?: c.PgMacaddr | db.Parameter<c.PgMacaddr> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgMacaddr | db.Parameter<c.PgMacaddr> | db.SQLFragment | db.ParentColumn>;
+        c_macaddr?: db.WhereableValue<c.PgMacaddr>;
         /**
         * **extra.type_zoo.c_money**
         * - `money` in database
         * - Nullable, no default
         */
-        c_money?: (number | string) | db.Parameter<(number | string)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | string) | db.Parameter<(number | string)> | db.SQLFragment | db.ParentColumn>;
+        c_money?: db.WhereableValue<(number | string)>;
         /**
         * **extra.type_zoo.c_name**
         * - `name` in database
         * - Nullable, no default
         */
-        c_name?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_name?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_numeric**
         * - `numeric` in database
         * - Nullable, no default
         */
-        c_numeric?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment | db.ParentColumn>;
+        c_numeric?: db.WhereableValue<(number | db.NumericString)>;
         /**
         * **extra.type_zoo.c_oid**
         * - `oid` in database
         * - Nullable, no default
         */
-        c_oid?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        c_oid?: db.WhereableValue<number>;
         /**
         * **extra.type_zoo.c_point**
         * - `point` in database
         * - Nullable, no default
         */
-        c_point?: c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment | db.ParentColumn>;
+        c_point?: db.WhereableValue<c.PgPoint>;
         /**
         * **extra.type_zoo.c_text**
         * - `text` in database
         * - Nullable, no default
         */
-        c_text?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_text?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_text_array**
         * - `_text` in database
         * - Nullable, no default
         */
-        c_text_array?: string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn>;
+        c_text_array?: db.WhereableValue<string[]>;
         /**
         * **extra.type_zoo.c_time**
         * - `time` in database
         * - Nullable, no default
         */
-        c_time?: db.TimeString | db.Parameter<db.TimeString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.TimeString | db.Parameter<db.TimeString> | db.SQLFragment | db.ParentColumn>;
+        c_time?: db.WhereableValue<db.TimeString>;
         /**
         * **extra.type_zoo.c_timestamp**
         * - `timestamp` in database
         * - Nullable, no default
         */
-        c_timestamp?: (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | db.SQLFragment | db.ParentColumn>;
+        c_timestamp?: db.WhereableValue<(db.TimestampString | Date)>;
         /**
         * **extra.type_zoo.c_timestamptz**
         * - `timestamptz` in database
         * - Nullable, no default
         */
-        c_timestamptz?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+        c_timestamptz?: db.WhereableValue<(db.TimestampTzString | Date)>;
         /**
         * **extra.type_zoo.c_timetz**
         * - `timetz` in database
         * - Nullable, no default
         */
-        c_timetz?: db.TimeTzString | db.Parameter<db.TimeTzString> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.TimeTzString | db.Parameter<db.TimeTzString> | db.SQLFragment | db.ParentColumn>;
+        c_timetz?: db.WhereableValue<db.TimeTzString>;
         /**
         * **extra.type_zoo.c_tsquery**
         * - `tsquery` in database
         * - Nullable, no default
         */
-        c_tsquery?: c.PgTsquery | db.Parameter<c.PgTsquery> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsquery | db.Parameter<c.PgTsquery> | db.SQLFragment | db.ParentColumn>;
+        c_tsquery?: db.WhereableValue<c.PgTsquery>;
         /**
         * **extra.type_zoo.c_tsvector**
         * - `tsvector` in database
         * - Nullable, no default
         */
-        c_tsvector?: c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn>;
+        c_tsvector?: db.WhereableValue<c.PgTsvector>;
         /**
         * **extra.type_zoo.c_uuid**
         * - `uuid` in database
         * - Nullable, no default
         */
-        c_uuid?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_uuid?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_uuid_array**
         * - `_uuid` in database
         * - Nullable, no default
         */
-        c_uuid_array?: string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn>;
+        c_uuid_array?: db.WhereableValue<string[]>;
         /**
         * **extra.type_zoo.c_varbit**
         * - `varbit` in database
         * - Nullable, no default
         */
-        c_varbit?: c.PgVarbit | db.Parameter<c.PgVarbit> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgVarbit | db.Parameter<c.PgVarbit> | db.SQLFragment | db.ParentColumn>;
+        c_varbit?: db.WhereableValue<c.PgVarbit>;
         /**
         * **extra.type_zoo.c_varchar**
         * - `varchar` in database
         * - Nullable, no default
         */
-        c_varchar?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        c_varchar?: db.WhereableValue<string>;
         /**
         * **extra.type_zoo.c_xml**
         * - `xml` in database
         * - Nullable, no default
         */
-        c_xml?: c.PgXml | db.Parameter<c.PgXml> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgXml | db.Parameter<c.PgXml> | db.SQLFragment | db.ParentColumn>;
+        c_xml?: db.WhereableValue<c.PgXml>;
         /**
         * **extra.type_zoo.id**
         * - `int4` in database
         * - Generated column
         */
-        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        id?: db.WhereableValue<number>;
       }
       export interface Insertable {
         /**
@@ -3805,247 +3805,247 @@ declare module 'zapatos/schema' {
         * - `bit` in database
         * - Nullable, no default
         */
-        c_bit?: c.PgBit | db.Parameter<c.PgBit> | null | db.DefaultType | db.SQLFragment<any>;
+        c_bit?: db.InsertableValue<c.PgBit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bool**
         * - `bool` in database
         * - Nullable, no default
         */
-        c_bool?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment<any>;
+        c_bool?: db.InsertableValue<boolean, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bytea**
         * - `bytea` in database
         * - Nullable, no default
         */
-        c_bytea?: (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_bytea?: db.InsertableValue<(db.ByteArrayString | Buffer), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_char**
         * - `bpchar` in database
         * - Nullable, no default
         */
-        c_char?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_char?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_cidr**
         * - `cidr` in database
         * - Nullable, no default
         */
-        c_cidr?: c.PgCidr | db.Parameter<c.PgCidr> | null | db.DefaultType | db.SQLFragment<any>;
+        c_cidr?: db.InsertableValue<c.PgCidr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_citext**
         * - `citext` in database
         * - Nullable, no default
         */
-        c_citext?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_citext?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date**
         * - `date` in database
         * - Nullable, no default
         */
-        c_date?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_date?: db.InsertableValue<(db.DateString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date_array**
         * - `_date` in database
         * - Nullable, no default
         */
-        c_date_array?: (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_date_array?: db.InsertableValue<(db.DateString | Date)[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_enum_array**
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_enum_array?: db.InsertableValue<('sad' | 'ok' | 'happy')[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
         * - Nullable, no default
         */
-        c_float4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_float4?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float8**
         * - `float8` in database
         * - Nullable, no default
         */
-        c_float8?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_float8?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_inet**
         * - `inet` in database
         * - Nullable, no default
         */
-        c_inet?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_inet?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int2**
         * - `int2` in database
         * - Nullable, no default
         */
-        c_int2?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int2?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4**
         * - `int4` in database
         * - Nullable, no default
         */
-        c_int4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int4?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4multirange**
         * - `int4multirange` in database
         * - Nullable, no default
         */
-        c_int4multirange?: c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int4multirange?: db.InsertableValue<c.PgInt4multirange, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8**
         * - `int8` in database
         * - Nullable, no default
         */
-        c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int8?: db.InsertableValue<(number | db.Int8String | bigint), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8_domain**
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment<any>;
+        c_int8_domain?: db.InsertableValue<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_interval?: db.InsertableValue<(string | db.PostgresInterval), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
         * - Nullable, no default
         */
-        c_json?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+        c_json?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb**
         * - `jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment<any>;
+        c_jsonb?: db.InsertableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_array**
         * - `_jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_jsonb_array?: db.InsertableValue<db.JSONValue[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_domain**
         * - `preferences` (base type: `jsonb`) in database
         * - Nullable, no default
         */
-        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment<any>;
+        c_jsonb_domain?: db.InsertableValue<c.PgPreferences, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
         */
-        c_macaddr?: c.PgMacaddr | db.Parameter<c.PgMacaddr> | null | db.DefaultType | db.SQLFragment<any>;
+        c_macaddr?: db.InsertableValue<c.PgMacaddr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_money**
         * - `money` in database
         * - Nullable, no default
         */
-        c_money?: (number | string) | db.Parameter<(number | string)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_money?: db.InsertableValue<(number | string), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_name**
         * - `name` in database
         * - Nullable, no default
         */
-        c_name?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_name?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_numeric**
         * - `numeric` in database
         * - Nullable, no default
         */
-        c_numeric?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_numeric?: db.InsertableValue<(number | db.NumericString), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_oid**
         * - `oid` in database
         * - Nullable, no default
         */
-        c_oid?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+        c_oid?: db.InsertableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_point**
         * - `point` in database
         * - Nullable, no default
         */
-        c_point?: c.PgPoint | db.Parameter<c.PgPoint> | null | db.DefaultType | db.SQLFragment<any>;
+        c_point?: db.InsertableValue<c.PgPoint, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text**
         * - `text` in database
         * - Nullable, no default
         */
-        c_text?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_text?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text_array**
         * - `_text` in database
         * - Nullable, no default
         */
-        c_text_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_text_array?: db.InsertableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_time**
         * - `time` in database
         * - Nullable, no default
         */
-        c_time?: db.TimeString | db.Parameter<db.TimeString> | null | db.DefaultType | db.SQLFragment<any>;
+        c_time?: db.InsertableValue<db.TimeString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamp**
         * - `timestamp` in database
         * - Nullable, no default
         */
-        c_timestamp?: (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_timestamp?: db.InsertableValue<(db.TimestampString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamptz**
         * - `timestamptz` in database
         * - Nullable, no default
         */
-        c_timestamptz?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | null | db.DefaultType | db.SQLFragment<any>;
+        c_timestamptz?: db.InsertableValue<(db.TimestampTzString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timetz**
         * - `timetz` in database
         * - Nullable, no default
         */
-        c_timetz?: db.TimeTzString | db.Parameter<db.TimeTzString> | null | db.DefaultType | db.SQLFragment<any>;
+        c_timetz?: db.InsertableValue<db.TimeTzString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsquery**
         * - `tsquery` in database
         * - Nullable, no default
         */
-        c_tsquery?: c.PgTsquery | db.Parameter<c.PgTsquery> | null | db.DefaultType | db.SQLFragment<any>;
+        c_tsquery?: db.InsertableValue<c.PgTsquery, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsvector**
         * - `tsvector` in database
         * - Nullable, no default
         */
-        c_tsvector?: c.PgTsvector | db.Parameter<c.PgTsvector> | null | db.DefaultType | db.SQLFragment<any>;
+        c_tsvector?: db.InsertableValue<c.PgTsvector, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid**
         * - `uuid` in database
         * - Nullable, no default
         */
-        c_uuid?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_uuid?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid_array**
         * - `_uuid` in database
         * - Nullable, no default
         */
-        c_uuid_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment<any>;
+        c_uuid_array?: db.InsertableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varbit**
         * - `varbit` in database
         * - Nullable, no default
         */
-        c_varbit?: c.PgVarbit | db.Parameter<c.PgVarbit> | null | db.DefaultType | db.SQLFragment<any>;
+        c_varbit?: db.InsertableValue<c.PgVarbit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varchar**
         * - `varchar` in database
         * - Nullable, no default
         */
-        c_varchar?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        c_varchar?: db.InsertableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_xml**
         * - `xml` in database
         * - Nullable, no default
         */
-        c_xml?: c.PgXml | db.Parameter<c.PgXml> | null | db.DefaultType | db.SQLFragment<any>;
+        c_xml?: db.InsertableValue<c.PgXml, null | db.DefaultType>;
       }
       export interface Updatable {
         /**
@@ -4053,247 +4053,247 @@ declare module 'zapatos/schema' {
         * - `bit` in database
         * - Nullable, no default
         */
-        c_bit?: c.PgBit | db.Parameter<c.PgBit> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgBit | db.Parameter<c.PgBit> | null | db.DefaultType | db.SQLFragment>;
+        c_bit?: db.UpdatableValue<c.PgBit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bool**
         * - `bool` in database
         * - Nullable, no default
         */
-        c_bool?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment>;
+        c_bool?: db.UpdatableValue<boolean, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_bytea**
         * - `bytea` in database
         * - Nullable, no default
         */
-        c_bytea?: (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.ByteArrayString | Buffer) | db.Parameter<(db.ByteArrayString | Buffer)> | null | db.DefaultType | db.SQLFragment>;
+        c_bytea?: db.UpdatableValue<(db.ByteArrayString | Buffer), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_char**
         * - `bpchar` in database
         * - Nullable, no default
         */
-        c_char?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_char?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_cidr**
         * - `cidr` in database
         * - Nullable, no default
         */
-        c_cidr?: c.PgCidr | db.Parameter<c.PgCidr> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgCidr | db.Parameter<c.PgCidr> | null | db.DefaultType | db.SQLFragment>;
+        c_cidr?: db.UpdatableValue<c.PgCidr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_citext**
         * - `citext` in database
         * - Nullable, no default
         */
-        c_citext?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_citext?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date**
         * - `date` in database
         * - Nullable, no default
         */
-        c_date?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | null | db.DefaultType | db.SQLFragment>;
+        c_date?: db.UpdatableValue<(db.DateString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_date_array**
         * - `_date` in database
         * - Nullable, no default
         */
-        c_date_array?: (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.DateString | Date)[] | db.Parameter<(db.DateString | Date)[]> | null | db.DefaultType | db.SQLFragment>;
+        c_date_array?: db.UpdatableValue<(db.DateString | Date)[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_enum_array**
         * - `_mood` in database
         * - Nullable, no default
         */
-        c_enum_array?: ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, ('sad' | 'ok' | 'happy')[] | db.Parameter<('sad' | 'ok' | 'happy')[]> | null | db.DefaultType | db.SQLFragment>;
+        c_enum_array?: db.UpdatableValue<('sad' | 'ok' | 'happy')[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float4**
         * - `float4` in database
         * - Nullable, no default
         */
-        c_float4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_float4?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_float8**
         * - `float8` in database
         * - Nullable, no default
         */
-        c_float8?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_float8?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_inet**
         * - `inet` in database
         * - Nullable, no default
         */
-        c_inet?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_inet?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int2**
         * - `int2` in database
         * - Nullable, no default
         */
-        c_int2?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_int2?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4**
         * - `int4` in database
         * - Nullable, no default
         */
-        c_int4?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_int4?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int4multirange**
         * - `int4multirange` in database
         * - Nullable, no default
         */
-        c_int4multirange?: c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgInt4multirange | db.Parameter<c.PgInt4multirange> | null | db.DefaultType | db.SQLFragment>;
+        c_int4multirange?: db.UpdatableValue<c.PgInt4multirange, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8**
         * - `int8` in database
         * - Nullable, no default
         */
-        c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment>;
+        c_int8?: db.UpdatableValue<(number | db.Int8String | bigint), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_int8_domain**
         * - `ticket_no` (base type: `int8`) in database
         * - Nullable, no default
         */
-        c_int8_domain?: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)> | db.Parameter<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>> | null | db.DefaultType | db.SQLFragment>;
+        c_int8_domain?: db.UpdatableValue<db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String | bigint)>, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
         */
-        c_interval?: (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (string | db.PostgresInterval) | db.Parameter<(string | db.PostgresInterval)> | null | db.DefaultType | db.SQLFragment>;
+        c_interval?: db.UpdatableValue<(string | db.PostgresInterval), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_json**
         * - `json` in database
         * - Nullable, no default
         */
-        c_json?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+        c_json?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb**
         * - `jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb?: db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | null | db.DefaultType | db.SQLFragment>;
+        c_jsonb?: db.UpdatableValue<db.JSONValue, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_array**
         * - `_jsonb` in database
         * - Nullable, no default
         */
-        c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment>;
+        c_jsonb_array?: db.UpdatableValue<db.JSONValue[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_jsonb_domain**
         * - `preferences` (base type: `jsonb`) in database
         * - Nullable, no default
         */
-        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment>;
+        c_jsonb_domain?: db.UpdatableValue<c.PgPreferences, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
         */
-        c_macaddr?: c.PgMacaddr | db.Parameter<c.PgMacaddr> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgMacaddr | db.Parameter<c.PgMacaddr> | null | db.DefaultType | db.SQLFragment>;
+        c_macaddr?: db.UpdatableValue<c.PgMacaddr, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_money**
         * - `money` in database
         * - Nullable, no default
         */
-        c_money?: (number | string) | db.Parameter<(number | string)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | string) | db.Parameter<(number | string)> | null | db.DefaultType | db.SQLFragment>;
+        c_money?: db.UpdatableValue<(number | string), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_name**
         * - `name` in database
         * - Nullable, no default
         */
-        c_name?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_name?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_numeric**
         * - `numeric` in database
         * - Nullable, no default
         */
-        c_numeric?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | null | db.DefaultType | db.SQLFragment>;
+        c_numeric?: db.UpdatableValue<(number | db.NumericString), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_oid**
         * - `oid` in database
         * - Nullable, no default
         */
-        c_oid?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+        c_oid?: db.UpdatableValue<number, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_point**
         * - `point` in database
         * - Nullable, no default
         */
-        c_point?: c.PgPoint | db.Parameter<c.PgPoint> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPoint | db.Parameter<c.PgPoint> | null | db.DefaultType | db.SQLFragment>;
+        c_point?: db.UpdatableValue<c.PgPoint, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text**
         * - `text` in database
         * - Nullable, no default
         */
-        c_text?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_text?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_text_array**
         * - `_text` in database
         * - Nullable, no default
         */
-        c_text_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment>;
+        c_text_array?: db.UpdatableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_time**
         * - `time` in database
         * - Nullable, no default
         */
-        c_time?: db.TimeString | db.Parameter<db.TimeString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.TimeString | db.Parameter<db.TimeString> | null | db.DefaultType | db.SQLFragment>;
+        c_time?: db.UpdatableValue<db.TimeString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamp**
         * - `timestamp` in database
         * - Nullable, no default
         */
-        c_timestamp?: (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampString | Date) | db.Parameter<(db.TimestampString | Date)> | null | db.DefaultType | db.SQLFragment>;
+        c_timestamp?: db.UpdatableValue<(db.TimestampString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timestamptz**
         * - `timestamptz` in database
         * - Nullable, no default
         */
-        c_timestamptz?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | null | db.DefaultType | db.SQLFragment>;
+        c_timestamptz?: db.UpdatableValue<(db.TimestampTzString | Date), null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_timetz**
         * - `timetz` in database
         * - Nullable, no default
         */
-        c_timetz?: db.TimeTzString | db.Parameter<db.TimeTzString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.TimeTzString | db.Parameter<db.TimeTzString> | null | db.DefaultType | db.SQLFragment>;
+        c_timetz?: db.UpdatableValue<db.TimeTzString, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsquery**
         * - `tsquery` in database
         * - Nullable, no default
         */
-        c_tsquery?: c.PgTsquery | db.Parameter<c.PgTsquery> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTsquery | db.Parameter<c.PgTsquery> | null | db.DefaultType | db.SQLFragment>;
+        c_tsquery?: db.UpdatableValue<c.PgTsquery, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_tsvector**
         * - `tsvector` in database
         * - Nullable, no default
         */
-        c_tsvector?: c.PgTsvector | db.Parameter<c.PgTsvector> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | null | db.DefaultType | db.SQLFragment>;
+        c_tsvector?: db.UpdatableValue<c.PgTsvector, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid**
         * - `uuid` in database
         * - Nullable, no default
         */
-        c_uuid?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_uuid?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_uuid_array**
         * - `_uuid` in database
         * - Nullable, no default
         */
-        c_uuid_array?: string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string[] | db.Parameter<string[]> | null | db.DefaultType | db.SQLFragment>;
+        c_uuid_array?: db.UpdatableValue<string[], null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varbit**
         * - `varbit` in database
         * - Nullable, no default
         */
-        c_varbit?: c.PgVarbit | db.Parameter<c.PgVarbit> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgVarbit | db.Parameter<c.PgVarbit> | null | db.DefaultType | db.SQLFragment>;
+        c_varbit?: db.UpdatableValue<c.PgVarbit, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_varchar**
         * - `varchar` in database
         * - Nullable, no default
         */
-        c_varchar?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        c_varchar?: db.UpdatableValue<string, null | db.DefaultType>;
         /**
         * **extra.type_zoo.c_xml**
         * - `xml` in database
         * - Nullable, no default
         */
-        c_xml?: c.PgXml | db.Parameter<c.PgXml> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgXml | db.Parameter<c.PgXml> | null | db.DefaultType | db.SQLFragment>;
+        c_xml?: db.UpdatableValue<c.PgXml, null | db.DefaultType>;
       }
       export type UniqueIndex = 'type_zoo_pkey';
       export type Column = keyof Selectable;

@@ -76,9 +76,6 @@ const variants: [string, Config][] = [
   // the fixture's schema unions, which only this variant reads, beside public.users: a domains section in each schema,
   // the unions of unions.book_format, cover, edition, quirk and shelf, and their placeholders naming them
   ['domainsTypedAsUnions', { schemas: { public: only('users'), unions: all }, domainsTypedAsUnions: true }],
-  // main, every Whereable, Insertable and Updatable line naming an alias of zapatos/db; test/types-aliases compiles
-  // test/types against it, and the placeholders are test/generated's
-  ['valuesTypedAsAliases', { ...main, valuesTypedAsAliases: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -217,23 +214,6 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
     return ts.getPreEmitDiagnostics(program).map(d =>
       `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
   };
-
-  // with valuesTypedAsAliases, a second copy of the schema declared as 'aliased/schema', beside the default output
-  it('gives the same types with valuesTypedAsAliases', async () => {
-    const aliased = (await codegen({ ...main, valuesTypedAsAliases: true })).ts
-      .replace("declare module 'zapatos/schema' {", "declare module 'aliased/schema' {");
-    expect(aliased).toContain("declare module 'aliased/schema' {");
-    expect(await probeErrors(main, `
-      import type * as s from 'zapatos/schema';
-      import type * as a from 'aliased/schema';
-      type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
-      type Differing = { [T in s.Table]:
-        [Same<s.WhereableForTable<T>, a.WhereableForTable<T>>, Same<s.InsertableForTable<T>, a.InsertableForTable<T>>,
-          Same<s.UpdatableForTable<T>, a.UpdatableForTable<T>>] extends [true, true, true] ? never : T }[s.Table];
-      export const tables: Same<s.Table, a.Table> = true;
-      export const differing: [Differing] extends [never] ? true : Differing = true;
-    `, {}, {}, { 'aliased.d.ts': aliased })).toEqual([]);
-  });
 
   it.each([false, true])('checks foreign labels by default, skipLibCheck %s', async skipLibCheck => {
     expect(await probeErrors(main, `
@@ -563,11 +543,12 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
           "Type 'string' is not assignable to type 'genre[]'.",
         "probe.ts TS1360 Type 'number | null' does not satisfy the expected type '`${number}` | null'.   " +
           "Type 'number' is not assignable to type '`${number}`'.",
-        expect.stringContaining(`${gave}'"horror"' is not assignable to type 'unique symbol | SQLFragment<any, never> | genre`),
-        expect.stringContaining(`${gave}'string' is not assignable to type 'unique symbol | SQLFragment<any, never> | genre`),
-        expect.stringContaining(`${gave}'string' is not assignable to type 'unique symbol | SQLFragment<any, never> | (numb`),
-        expect.stringMatching(/^probe\.ts TS2322 Type '"abc"' is not assignable to type 'number \| bigint \| `\$\{number\}` \|/),
-        expect.stringMatching(/^probe\.ts TS2322 Type 'number' is not assignable to type 'Date \| `\$\{number\}-\$\{number\}-\$\{number\}` \|/),
+        // each message names the alias the generator writes (note 017)
+        expect.stringContaining(`${gave}'"horror"' is not assignable to type 'InsertableValue<genre, unique symbol | null>'.`),
+        expect.stringContaining(`${gave}'string' is not assignable to type 'InsertableValue<genre, unique symbol | null>'.`),
+        expect.stringContaining(`${gave}'string' is not assignable to type 'InsertableValue<(number | bigint | \`\${number}\`)[], unique symbol | null>'.`),
+        "probe.ts TS2322 Type '\"abc\"' is not assignable to type 'UpdatableValue<number | bigint | `${number}`, unique symbol | null>'.",
+        "probe.ts TS2322 Type 'number' is not assignable to type 'WhereableValue<Date | `${number}-${number}-${number}`> | undefined'.",
       ]);
     });
 
@@ -1698,18 +1679,13 @@ describe('a domain typed by context', () => {
     tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
 
   /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
-  const nullable = (column: string, selectable: string, json: string, input: string) => {
-    const where = `${input} | db.Parameter<${input}> | db.SQLFragment | db.ParentColumn`,
-      insert = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment<any>`,
-      write = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment`;
-    return [
-      `${column}: ${selectable} | null;`,
-      `${column}: ${json} | null;`,
-      `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
-      `${column}?: ${insert};`,
-      `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
-    ];
-  };
+  const nullable = (column: string, selectable: string, json: string, input: string) => [
+    `${column}: ${selectable} | null;`,
+    `${column}: ${json} | null;`,
+    `${column}?: db.WhereableValue<${input}>;`,
+    `${column}?: db.InsertableValue<${input}, null | db.DefaultType>;`,
+    `${column}?: db.UpdatableValue<${input}, null | db.DefaultType>;`,
+  ];
 
   it('types the four other contexts as the base type, unless the placeholder was edited', async () => {
     const { ts: schema } = await codegen(on);
@@ -1719,10 +1695,9 @@ describe('a domain typed by context', () => {
     expect(linesOf(schema, 'tickets', 'no')).toEqual([
       'no: c.PgTicket_no;',
       `no: ${no('number')};`,
-      `no?: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.ParentColumn | ` +
-        `db.SQLFragment<any, ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.ParentColumn>;`,
-      `no: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment<any>;`,
-      `no?: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.SQLFragment<any, ${noInput} | db.Parameter<${noInput}> | db.SQLFragment>;`,
+      `no?: db.WhereableValue<${noInput}>;`,
+      `no: db.InsertableValue<${noInput}>;`,
+      `no?: db.UpdatableValue<${noInput}>;`,
     ]);
     const cases: [string, string, string, string, string][] = [
       ['amount', 'c.PgAmount', 'db.NumericString', 'number', '(number | db.NumericString)'],
@@ -1758,11 +1733,9 @@ describe('a domain typed by context', () => {
       expect(linesOf(schema, 'nested', 'premium')).toEqual([
         `premium: ${premium('db.Int8String')};`,
         `premium: ${premium('number')};`,
-        `premium?: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | db.ParentColumn | ` +
-          `db.SQLFragment<any, ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | db.ParentColumn>;`,
-        `premium: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment<any>;`,
-        `premium?: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | ` +
-          `db.SQLFragment<any, ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment>;`,
+        `premium?: db.WhereableValue<${premiumInput}>;`,
+        `premium: db.InsertableValue<${premiumInput}>;`,
+        `premium?: db.UpdatableValue<${premiumInput}>;`,
       ]);
       // column, placeholder, Selectable, JSONSelectable, Whereable, Insertable and Updatable
       const cases: [string, string, string, string, string][] = [
@@ -1876,18 +1849,13 @@ describe('enumArraysTypedAsText', () => {
   const readsOf = (schema: string, table: string, column: string) => linesOf(schema, table, column).slice(0, 2);
 
   /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
-  const nullable = (column: string, selectable: string, other: string) => {
-    const where = `${other} | db.Parameter<${other}> | db.SQLFragment | db.ParentColumn`,
-      insert = `${other} | db.Parameter<${other}> | null | db.DefaultType | db.SQLFragment<any>`,
-      write = `${other} | db.Parameter<${other}> | null | db.DefaultType | db.SQLFragment`;
-    return [
-      `${column}: ${selectable} | null;`,
-      `${column}: ${other} | null;`,
-      `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
-      `${column}?: ${insert};`,
-      `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
-    ];
-  };
+  const nullable = (column: string, selectable: string, other: string) => [
+    `${column}: ${selectable} | null;`,
+    `${column}: ${other} | null;`,
+    `${column}?: db.WhereableValue<${other}>;`,
+    `${column}?: db.InsertableValue<${other}, null | db.DefaultType>;`,
+    `${column}?: db.UpdatableValue<${other}, null | db.DefaultType>;`,
+  ];
 
   it('with false: an array of an enum is an array in Selectable, as in Zapatos 6.6.1', async () => {
     const { ts: schema } = await codegen({ ...config, enumArraysTypedAsText: false });
@@ -2001,18 +1969,13 @@ describe('intervalsTypedAsObjects', () => {
   const linesOf = (schema: string, table: string, column: string) =>
     tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
   /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
-  const nullable = (column: string, selectable: string, json: string, input: string) => {
-    const where = `${input} | db.Parameter<${input}> | db.SQLFragment | db.ParentColumn`,
-      insert = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment<any>`,
-      write = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment`;
-    return [
-      `${column}: ${selectable} | null;`,
-      `${column}: ${json} | null;`,
-      `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
-      `${column}?: ${insert};`,
-      `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
-    ];
-  };
+  const nullable = (column: string, selectable: string, json: string, input: string) => [
+    `${column}: ${selectable} | null;`,
+    `${column}: ${json} | null;`,
+    `${column}?: db.WhereableValue<${input}>;`,
+    `${column}?: db.InsertableValue<${input}, null | db.DefaultType>;`,
+    `${column}?: db.UpdatableValue<${input}, null | db.DefaultType>;`,
+  ];
   const placeholder = (name: string, type: string) =>
     `${type.startsWith('db.') ? `  import type * as db from 'zapatos/db';\n` : ''}  export type ${name} = ${type};`;
   const object = 'db.PostgresInterval', input = '(string | db.PostgresInterval)';
@@ -3431,7 +3394,7 @@ describe('removed options', () => {
   const removed = [
     ['typeEnumsAcrossSchemas', false, true, 'true'], ['enumOrder', 'alphabetical', 'declared', '"declared"'],
     ['uniqueIndexConstraintsOnly', false, true, 'true'], ['domainsTypedByContext', false, true, 'true'],
-    ['rejectOnQueryError', false, true, 'true'],
+    ['rejectOnQueryError', false, true, 'true'], ['valuesTypedAsAliases', false, true, 'true'],
   ] as const;
   const messageOf = (key: string, kept: string) => `${key} was removed in 8.0, which always does what ${key}: ${kept} did; ` +
     `delete it from the generator's config: https://pgcast.dev/switching#from-8-0-${key}`;
@@ -3770,16 +3733,10 @@ describe('names that Object.prototype also has', () => {
     };
 
     /** The same, written out for nullable columns with no default, `[column, TS type]`, sorted by name. */
-    const writables = (columns: [string, string][], updatable = columns) => {
-      const
-        insertable = (type: string) => `${type} | db.Parameter<${type}> | null | db.DefaultType | db.SQLFragment<any>`,
-        writable = (type: string) => `${type} | db.Parameter<${type}> | null | db.DefaultType | db.SQLFragment`;
-      return [
-        ['export interface Insertable {', ...columns.map(([column, type]) => `      ${column}?: ${insertable(type)};`), '    }'],
-        ['export interface Updatable {', ...updatable.map(([column, type]) =>
-          `      ${column}?: ${writable(type)} | db.SQLFragment<any, ${writable(type)}>;`), '    }'],
-      ].map(lines => lines.join('\n'));
-    };
+    const writables = (columns: [string, string][], updatable = columns) => [
+      ['export interface Insertable {', ...columns.map(([column, type]) => `      ${column}?: db.InsertableValue<${type}, null | db.DefaultType>;`), '    }'],
+      ['export interface Updatable {', ...updatable.map(([column, type]) => `      ${column}?: db.UpdatableValue<${type}, null | db.DefaultType>;`), '    }'],
+    ].map(lines => lines.join('\n'));
 
     it.each(names)('applies the "*" entry to the columns of a table named %s', async name => {
       // name, length, keys and values: what the inherited Object.prototype.toString, Object… answered
