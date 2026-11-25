@@ -9,7 +9,7 @@ import { columnsForRelation } from './relations';
 import type { Relation } from './relations';
 import { tsTypeForPgType } from './pgTypes';
 import type { EnumData } from './enums';
-import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
+import { enumOrdersForSchema } from './enumOrder';
 import { domainRootsInDatabase } from './domainRoots';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
@@ -73,8 +73,8 @@ export const definitionForRelationInSchema = async (
   config: CompleteConfig,
   queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>,
   customTypeOrigins: CustomTypeOrigins = Object.create(null),  // an 'out' parameter too
-  enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
-  columnsTypedByEnumName?: string[],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
+  enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn)).declared,
+  columnsTypedByEnumName?: string[],  // never filled from 8.0.0: kept so that the parameters after it keep their place
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters?: string[],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
@@ -95,11 +95,10 @@ export const definitionForRelationInSchema = async (
     otherSchemas = [...new Set<string>(rows.map(row => row.udtSchema))].filter(schema => schema !== schemaName),
     otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
-    typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? true,
     enumArraysAsText = config.enumArraysTypedAsText ?? true,
     domainsByContext = config.domainsTypedByContext ?? true,
     valuesAsAliases = config.valuesTypedAsAliases ?? false,
-    inlineIn = (schema: string) => typeEnumsAcrossSchemas && schema !== schemaName,
+    inlineIn = (schema: string) => schema !== schemaName,
     // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
     // types it, read once per run if a column is `any`; an enum of another schema by its labels, never by its name in
     // this one, which may be another enum's
@@ -127,9 +126,9 @@ export const definitionForRelationInSchema = async (
   rows.forEach((row, index) => {
     const
       { column, isGenerated, isNullable, hasDefault, udtName, domainName, udtSchema, domainSchema } = row,
-      // with typeEnumsAcrossSchemas, an enum is looked up in the schema of its type; otherwise by name, in this one
+      // an enum is looked up in the schema of its type, and one of another schema written out by its labels
       acrossSchemas = udtSchema !== schemaName,
-      inlineEnums = typeEnumsAcrossSchemas && acrossSchemas,
+      inlineEnums = acrossSchemas,
       typeEnums = inlineEnums ? otherEnums[udtSchema] : enums,
       udtConfig = configIn(udtSchema);
     let
@@ -149,12 +148,6 @@ export const definitionForRelationInSchema = async (
       const type = domainName !== null ? `${domainSchema}.${domainName}` : udtName === 'interval' ? udtName :
         udtName === '_interval' ? 'interval[]' : `${udtSchema}.${udtName.slice(1)}[]`;
       intervalsAsText.push(`${schemaName}.${rel.name}.${column} (${type})`);
-    }
-
-    if (columnsTypedByEnumName && !typeEnumsAcrossSchemas && acrossSchemas &&
-      tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', udtConfig, true) !== selectableType) {
-      const isArray = udtName.charAt(0) === '_' && !Object.prototype.hasOwnProperty.call(otherEnums[udtSchema], udtName);
-      columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column} (${udtSchema}.${isArray ? udtName.slice(1) + '[]' : udtName})`);
     }
 
     // pg has no parser for the array type of an enum, whose OID is the database's own: it returns its text, '{a,b}'.
@@ -216,11 +209,11 @@ export const definitionForRelationInSchema = async (
         // relations that would import differently keep 6.6.1's text, with no import, in whichever order they are read
         agrees = (ownImport ?? imported) === imported,
         hasEnum = hasOwn(typeEnums, udtName) || udtName.charAt(0) === '_' && hasOwn(typeEnums, udtName.slice(1)),
-        // with typeEnumsAcrossSchemas, every relation reads the enum in its own schema: the labels that one of them
-        // writes out type them all, and a relation that names the enum never replaces them
+        // every relation reads the enum in its own schema: the labels that one of them writes out type them all,
+        // and a relation that names the enum never replaces them
         labelled = inlineEnums && hasEnum,
-        // without it, a relation of a schema with no enum of that name reads the type as `any`: that text wins, in
-        // whichever order the relations are read
+        // in the enum's own schema, a type already held as `any` keeps that text, in whichever order the relations
+        // are read
         keepsText = !inlineEnums && hasEnum && ownType === 'any';
 
       if (!keepsText && (labelled || ownImport !== null)) {

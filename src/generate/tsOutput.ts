@@ -9,12 +9,13 @@ import * as pg from 'pg';
 
 import { enumTypesForEnumData } from './enums';
 import type { EnumData } from './enums';
-import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
+import { enumOrdersForSchema } from './enumOrder';
 import { domainRootsInDatabase } from './domainRoots';
 import type { DomainRoots } from './domainRoots';
 import { domainUnionsInDatabase, unionTypesForDomains, warnAboutPlaceholdersOnDisk } from './domainUnions';
 import { header } from './header';
 import { moduleNamesOf } from './moduleNames';
+import { refuseRemovedOptions } from './removedOptions';
 import { jsdocText, tsIdentifier } from './quote';
 import type { CompleteConfig } from './config';
 import type { SchemaVersionCanary } from "../db/canary";
@@ -210,6 +211,7 @@ const unindented = (text: string) => {
 };
 
 export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => void) => {
+  refuseRemovedOptions(config);  // given a config finaliseConfig() never saw, too
   let querySeq = 0, ended = false;
   const
     pool = new pg.Pool(config.db),  // connects at its first query
@@ -241,8 +243,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
 const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>) => {
   const
     { schemas } = config,
-    enumOrder = enumOrderOf(config),  // throws before any query
-    names = moduleNamesOf(config),  // so does this
+    names = moduleNamesOf(config),  // throws before any query
     // Object.create(null): a schema or a type may be named constructor or __proto__
     customTypes: CustomTypes = Object.create(null),
     customTypeOrigins: CustomTypeOrigins = Object.create(null),
@@ -250,7 +251,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     customTypeHolders = Object.create(null),
     enumsBySchema: Record<string, Promise<EnumData>> = Object.create(null),
     enumsForSchema = (schema: string) => enumsBySchema[schema] ??=
-      enumOrdersForSchema(schema, queryFn).then(orders => orders[enumOrder]),
+      enumOrdersForSchema(schema, queryFn).then(orders => orders.declared),
     domainRootsOnce: Promise<DomainRoots>[] = [],
     domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
     schemaNames = Object.keys(schemas),
