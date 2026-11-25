@@ -1,5 +1,5 @@
 ---
-english: f5de4f454e19
+english: 82cb77c4b8c4
 ---
 
 # Pourquoi pgcast
@@ -94,7 +94,7 @@ Les corrections de sécurité sont venues d’abord, toutes dans la 6.6.2 ([Séc
 
 pgcast 6.x vous permet d’activer les corrections avant leur activation par défaut. En 7.0, six réglages du runtime et sept du générateur changent. Le [guide de migration](/fr/switching#from-7-0) précise quels anciens réglages disparaissent en 8.0 et lesquels restent disponibles pour un parser personnalisé.
 
-[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés ; l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) aussi, jusqu’à la 8.0. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
+[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés pendant toute la série 7.x, tout comme l’option [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) ; la 8.0 retire la première et ne garde que le comportement des deux autres ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)). Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 
 Zapatos 6.6.1 n’avait pas de suite de tests à lui (les tests de son premier utilisateur exerçaient « <span lang="en">most of the code base at least a little</span> ») ; sa CI faisait le lint et le build. Sa feuille de route en jugeait une « <span lang="en">kind of indispensable</span> », une qui teste « <span lang="en">not just returned values but also inferred types</span> ».
 

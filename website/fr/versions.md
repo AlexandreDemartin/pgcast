@@ -1,5 +1,5 @@
 ---
-english: 7740cb59162c
+english: 7c47b3348d1e
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -45,9 +45,9 @@ Environ la moitié ne peuvent pas être corrigées sans changer un résultat val
 
 Une correction peut tout de même casser un appel qui ne marchait que grâce au bug. Les corrections d’échappement de 6.6.2 en sont un exemple : un nom de colonne comme `id" AS "x` fermait ses guillemets et ajoutait un alias, et désigne maintenant une colonne qui n’existe pas. Le changelog liste chacun de ces appels, avec ce qu’il faut écrire à la place.
 
-Deux opt-ins resteront désactivés pour de bon : `selectExactlyOneChecksForSecondRow`, ci-dessous, et [`domainsTypedAsUnions`](#_7-0-and-8-0), l’option du générateur. Exécutée seule, la requête [`selectExactlyOne()`](/fr/select#selectExactlyOne) vérifie qu’elle renvoie au moins une ligne. Une fois imbriquée, elle donne `null` en l’absence de ligne. Zapatos l’imbrique dans un `lateral`. Avec `withTies: true`, les lignes ex æquo peuvent alors dupliquer la ligne parente.
+Deux opt-ins restent désactivés pendant toute la série 7.x : `selectExactlyOneChecksForSecondRow`, ci-dessous, et [`domainsTypedAsUnions`](#_7-0-and-8-0), l’option du générateur, qui devient le seul comportement en 8.0. Exécutée seule, la requête [`selectExactlyOne()`](/fr/select#selectExactlyOne) vérifie qu’elle renvoie au moins une ligne. Une fois imbriquée, elle donne `null` en l’absence de ligne. Zapatos l’imbrique dans un `lateral`. Avec `withTies: true`, les lignes ex æquo peuvent alors dupliquer la ligne parente.
 
-Son option, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), entraîne le rejet de la promesse si la requête, exécutée seule, trouve une deuxième ligne. Elle n’émet aucun avertissement et reste désactivée par défaut.
+Son option, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), entraîne le rejet de la promesse si la requête, exécutée seule, trouve une deuxième ligne. Elle n’émet aucun avertissement et reste désactivée pendant toute la série 7.x. La 8.0 la retire, et `selectExactlyOne()` ne demande plus que `LIMIT 1` : la clé réglée à `true` lève une erreur ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 ## Pourquoi un opt-in, pas une rupture {#why-an-opt-in-not-a-breaking-change}
 
@@ -108,7 +108,7 @@ Depuis la 7.0, les colonnes de type domaine sont typées selon le contexte. Dans
 
 De la 6.7 à la fin de la 6.x, si l’option `rejectOnQueryError` était omise ou valait `null` en JSON, `generate()` et `tsForConfig()` transmettaient `PGCAST_DEP006` à l’écouteur `warningListener` s’il était activé, avant d’arrêter le processus en cas d’échec de connexion ou de requête. À partir de la 7.0, si vous omettez l’option ou indiquez `null` en JSON, la promesse de chacune des deux fonctions est rejetée avec l’erreur d’origine, comme celle de [`check()`](/fr/generator#export-check). La note disparaît. En 7.x, réglez `rejectOnQueryError: false` pour quitter immédiatement avec le code 1 en cas d’échec de connexion ou de requête, comme la CLI. La 8.0 retire l’option : la promesse de `generate()` est toujours rejetée, et la CLI affiche elle-même l’erreur et se termine avec le code 1 ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
-[`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), à partir de la 6.10, type un domaine sur `text` par les valeurs que liste son `CHECK`. Il n’a pas de note et reste désactivé en 7.0 : un placeholder qui contient le type de base du domaine est la façon dont Zapatos type un domaine, plus large que les valeurs mais pas faux, puisque Postgres refuse le reste.
+[`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), à partir de la 6.10, type un domaine sur `text` par les valeurs que liste son `CHECK`. Il n’a pas de note et reste désactivé en 7.0 : un placeholder qui contient le type de base du domaine est la façon dont Zapatos type un domaine, plus large que les valeurs mais pas faux, puisque Postgres refuse le reste. La 8.0 ne garde que ce comportement : l’union de chaque domaine de ce type est déclarée, et un nouveau placeholder la nomme, tandis qu’un placeholder déjà sur le disque garde son `string`.
 
 [`valuesTypedAsAliases`](/fr/generator#generate.valuesTypedAsAliases) écrit le type de la valeur de chaque colonne dans `Whereable`, `Insertable` et `Updatable` comme un alias de `zapatos/db`, avec les mêmes types. L’option n’a pas de note, puisqu’il n’y a rien à migrer, et la 8.0 ne garde que ce comportement.
 
