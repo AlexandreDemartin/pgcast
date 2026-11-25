@@ -6,6 +6,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [7.3.0] - 2026-11-25
+
 ### Added
 
 - The runtime option `topLevelSelectAsRows` (`false` by default, optional in `Config`; the only behaviour in 8.0, decision 019): a `select()` run or compiled on its own, or as the main query of `withCTEs()`, sends `selectRows()`'s query, one row per result, rather than one `coalesce(jsonb_agg(result), '[]')` value, and `run()` gives the same array. No single value holds the whole result, so a large read costs less and passes `jsonb_agg`'s 256 MB cap. Nested (a `lateral`, `extras`, a `sql` template, a CTE), copied with `copy()`, and in `cursor()`, it keeps its aggregate. A single `lateral` passed through is converted above the rows query, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_…"` (`to_json(result)` with `shortcutsUseJson`), so its value stays JSON, ordered and made distinct by its raw value. The rows query runs with its own `runResultTransform`. The types don't change, and it never warns ([runtime config](https://pgcast.dev/runtime-config#Config.topLevelSelectAsRows), decision 018 § 3). [#940](https://github.com/AlexandreDemartin/pgcast/issues/940)
