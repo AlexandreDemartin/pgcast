@@ -11,6 +11,7 @@ import * as path from 'path';
 import { finaliseConfig } from './config';
 import type { Config } from './config';
 import { staleFiles, upToDate } from './outputFiles';
+import { failedQuerySeq } from './queryErrors';
 import { generate } from './write';
 
 // kept out of zapatos/generate's exports, like moduleNames.ts; moved here from cli.ts, to be tested
@@ -34,8 +35,7 @@ const recursivelyInterpolateEnvVars = (obj: any): any =>
 
 /**
  * The CLI's config: the file in `dir`, `pgcastconfig.json` else `zapatosconfig.json` else none, then `argsJSON`
- * merged over it, each with its environment variables filled in, then `rejectOnQueryError: false` over both, so a
- * failed query ends the process. With both files, a note through `warningListener`.
+ * merged over it, each with its environment variables filled in. With both files, a note through `warningListener`.
  */
 export const cliConfig = (argsJSON = '{}', dir = '.') => {
   const
@@ -59,8 +59,7 @@ export const cliConfig = (argsJSON = '{}', dir = '.') => {
     throw new Error(`If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: ${err.message}`);
   }
 
-  // the CLI exits on a failed query, printing it as Zapatos 6.6.1 does, whatever the file and the argument say
-  const config = { ...fileConfig, ...argsConfig, rejectOnQueryError: false } as Config;
+  const config = { ...fileConfig, ...argsConfig } as Config;
 
   if (configFiles.length > 1) {
     const
@@ -107,7 +106,8 @@ export const cliArgs = (args: string[]) => {
 /**
  * Run the CLI on its arguments in `dir`: `generate()`, or with `--check` the comparison of `check()`, after a note through
  * `warningListener` for each flag it ignores; or, before reading any config, the usage for `--help` and `-h`, on
- * stderr after the flag's name for any other flag. Resolve to its exit code.
+ * stderr after the flag's name for any other flag. Resolve to its exit code: 1 on a failed query, printed on stdout
+ * as Zapatos 6.6.1 prints it.
  */
 export const runCli = async (args: string[], dir = '.') => {
   const { check: checkOnly, argsJSON, flag, ignoredFlags } = cliArgs(args);
@@ -130,12 +130,23 @@ export const runCli = async (args: string[], dir = '.') => {
     for (const flag of ignoredFlags) warn(`Note: flag ${flag} ignored after the JSON argument: only --check may follow it.`);
   }
 
-  if (!checkOnly) {
-    await generate(config);
-    return 0;
-  }
+  try {
+    if (!checkOnly) {
+      await generate(config);
+      return 0;
+    }
+    return await printStaleFiles(config);
 
-  // what check() compares, printed whatever the listeners say, with how to write the files
+  } catch (e) {
+    const seq = failedQuerySeq(e);
+    if (seq === undefined) throw e;  // not a query's: its stack goes to stderr
+    console.log(`*** error ${seq} ***`, e);
+    return 1;
+  }
+};
+
+/** What `check()` compares, printed whatever the listeners say, with how to write the files; resolve to the exit code. */
+const printStaleFiles = async (config: Config) => {
   const { folderTargetPath, lines } = await staleFiles(config);
   if (lines.length === 0) {
     console.log(upToDate(folderTargetPath));

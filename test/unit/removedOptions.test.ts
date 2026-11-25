@@ -15,6 +15,7 @@ const removed: [string, unknown, string, unknown[]][] = [
   ['enumOrder', 'declared', '"declared"', ['alphabetical', 'declard', '', false, true, 0]],
   ['uniqueIndexConstraintsOnly', true, 'true', [false, 0, 1, '', 'yes', 'true', {}]],
   ['domainsTypedByContext', true, 'true', [false, 0, 1, '', 'yes', 'true', {}]],
+  ['rejectOnQueryError', true, 'true', [false, 0, 1, '', 'yes', 'true', {}]],
 ];
 
 const messageOf = (key: string, kept: string) => `${key} was removed in 8.0, which always does what ${key}: ${kept} did; ` +

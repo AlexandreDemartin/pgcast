@@ -11,7 +11,7 @@ import { outputFiles, staleFiles, upToDate, warnAfterOutput } from './outputFile
 
 /**
  * Generate a schema and supporting files and folders given a configuration.
- * A query or connection error rejects the promise before any file is written. Set `rejectOnQueryError: false` to print it and exit.
+ * A query or connection error rejects the promise before any file is written.
  * @param suppliedConfig An object approximately matching `zapatosconfig.json`.
  */
 export const generate = async (suppliedConfig: Config) => {
@@ -56,7 +56,7 @@ export const generate = async (suppliedConfig: Config) => {
  * Compare the files `generate()` would write with those on disk, writing nothing, as the CLI's `--check` does: each
  * that differs or is missing goes to `warningListener` (`Out of date: <path>`, `Missing: <path>`); none, one line to
  * `progressListener`. A placeholder counts only when missing: it is yours to edit. A failed query rejects with its
- * error unless `rejectOnQueryError: false` is set, as for `generate()`.
+ * error, as for `generate()`.
  * @param suppliedConfig An object approximately matching `zapatosconfig.json`.
  * @returns `true` when the files on disk are up to date.
  */
@@ -68,8 +68,7 @@ export const check = async (suppliedConfig: Config) => {
     warn = config.warningListener === true ? console.log :
       config.warningListener || (() => void 0),
 
-    rejectOnQueryError = suppliedConfig.rejectOnQueryError ?? true,
-    { folderTargetPath, lines } = await staleFiles({ ...suppliedConfig, rejectOnQueryError });
+    { folderTargetPath, lines } = await staleFiles(suppliedConfig);
 
   if (lines.length === 0) log(upToDate(folderTargetPath));
   for (const line of lines) warn(line);

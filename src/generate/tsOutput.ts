@@ -15,6 +15,7 @@ import type { DomainRoots } from './domainRoots';
 import { domainUnionsInDatabase, unionTypesForDomains, warnAboutPlaceholdersOnDisk } from './domainUnions';
 import { header } from './header';
 import { moduleNamesOf } from './moduleNames';
+import { noteFailedQuery } from './queryErrors';
 import { refuseRemovedOptions } from './removedOptions';
 import { jsdocText, tsIdentifier } from './quote';
 import type { CompleteConfig } from './config';
@@ -212,7 +213,7 @@ const unindented = (text: string) => {
 
 export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => void) => {
   refuseRemovedOptions(config);  // given a config finaliseConfig() never saw, too
-  let querySeq = 0, ended = false;
+  let querySeq = 0;
   const
     pool = new pg.Pool(config.db),  // connects at its first query
     queryFn = async (query: pg.QueryConfig, seq = querySeq++) => {
@@ -223,11 +224,8 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
         return result;
 
       } catch (e) {
-        // the run has thrown and ended the pool, which refuses a query still to come and never serves one still
-        // queued in it (with connectionTimeoutMillis, that one rejects later): reject into the run, not exit
-        if (ended || (config.rejectOnQueryError ?? true)) throw e;
-        console.log(`*** error ${seq} ***`, e);
-        process.exit(1);
+        noteFailedQuery(e, seq);  // for the CLI, which prints it
+        throw e;
       }
     };
 
@@ -235,7 +233,6 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
     return await tsForQueries(config, queryFn);
 
   } finally {
-    ended = true;
     await pool.end();  // whatever the outcome: an open connection would stop a DROP DATABASE
   }
 };

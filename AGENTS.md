@@ -45,7 +45,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
   - `write.ts` writes the files and their `check()`, `outputFiles.ts` builds them in memory, `header.ts` is their header.
   - `tsOutput.ts` assembles the `zapatos/schema` module, `moduleNames.ts` picks `zapatos/*` or `pgcast/*`.
   - `relations.ts` reads relations and their columns from the catalog, `tables.ts` produces their types, `quote.ts` writes a name or a text into the output.
-  - `enums.ts` and `pgTypes.ts` map Postgres types to TS, `enumOrder.ts`, `domainRoots.ts` and `domainUnions.ts` read enums and domains; `legacy.ts` prints the "srcMode" migration warning, `removedOptions.ts` refuses an option 8.0 removed before any query.
+  - `enums.ts` and `pgTypes.ts` map Postgres types to TS, `enumOrder.ts`, `domainRoots.ts` and `domainUnions.ts` read enums and domains; `legacy.ts` prints the "srcMode" migration warning, `removedOptions.ts` refuses an option 8.0 removed before any query, `queryErrors.ts` notes which query failed, for the CLI to print.
 - `src/db/`: the runtime (import `zapatos/db`).
   - `core.ts`: ⚠️ **sensitive zone**: `sql`, `SQLFragment`, compilation and escaping.
   - `shortcuts.ts` (`insert`, `upsert`, `update`, `select*`…), `conditions.ts`, `transaction.ts` (isolation levels, retries).

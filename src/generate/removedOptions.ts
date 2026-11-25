@@ -12,6 +12,7 @@ const removedOptions: { [key: string]: unknown } = {
   enumOrder: 'declared',
   uniqueIndexConstraintsOnly: true,
   domainsTypedByContext: true,
+  rejectOnQueryError: true,
 };
 
 /**
