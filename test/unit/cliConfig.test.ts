@@ -27,21 +27,19 @@ afterEach(() => {
 
 const write = (name: string, json: string) => fs.writeFileSync(path.join(dir, name), json);
 
-// the CLI exits on a failed query, whatever the file and the argument say (#183)
-const exits = { rejectOnQueryError: false };
 
 describe('cliConfig()', () => {
   it('takes the argument alone without a config file, and notes nothing', () => {
-    expect(cliConfig(undefined, dir)).toEqual({ ...exits });
-    expect(cliConfig('{"outDir": "./src"}', dir)).toEqual({ outDir: './src', ...exits });
+    expect(cliConfig(undefined, dir)).toEqual({});
+    expect(cliConfig('{"outDir": "./src"}', dir)).toEqual({ outDir: './src' });
     expect(log).not.toHaveBeenCalled();
   });
 
   it('reads zapatosconfig.json alone, as Zapatos 6.6.1 does', () => {
     write('zapatosconfig.json', '{"db": {"connectionString": "{{PGCAST_FILMS_URL}}"}, "outDir": "./src"}');
-    expect(cliConfig(undefined, dir)).toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './src', ...exits });
+    expect(cliConfig(undefined, dir)).toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './src' });
     expect(cliConfig('{"outDir": "./generated"}', dir))
-      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './generated', ...exits });
+      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './generated' });
     expect(log).not.toHaveBeenCalled();
   });
 
@@ -57,12 +55,12 @@ describe('cliConfig()', () => {
   it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays the parser settings by key in %s', name => {
     for (const key of ['enumArraysTypedAsText', 'intervalsTypedAsObjects']) {
       const setting = (value: boolean | null) => JSON.stringify({ [key]: value });
-      expect(cliConfig(setting(false), dir)).toEqual({ [key]: false, ...exits });
+      expect(cliConfig(setting(false), dir)).toEqual({ [key]: false });
       write(name, JSON.stringify({ [key]: true, schemaJSDoc: false }));
-      expect(cliConfig(undefined, dir)).toEqual({ [key]: true, schemaJSDoc: false, ...exits });
-      expect(cliConfig(setting(false), dir)).toEqual({ [key]: false, schemaJSDoc: false, ...exits });
+      expect(cliConfig(undefined, dir)).toEqual({ [key]: true, schemaJSDoc: false });
+      expect(cliConfig(setting(false), dir)).toEqual({ [key]: false, schemaJSDoc: false });
       write(name, JSON.stringify({ [key]: false, schemaJSDoc: false }));
-      expect(cliConfig(setting(null), dir)).toEqual({ [key]: null, schemaJSDoc: false, ...exits });
+      expect(cliConfig(setting(null), dir)).toEqual({ [key]: null, schemaJSDoc: false });
       fs.unlinkSync(path.join(dir, name));
     }
   });
@@ -70,14 +68,14 @@ describe('cliConfig()', () => {
   it('reads pgcastconfig.json alone', () => {
     write('pgcastconfig.json', '{"db": {"connectionString": "{{ PGCAST_FILMS_URL }}"}, "moduleNames": "pgcast"}');
     expect(cliConfig('{"outDir": "./src"}', dir))
-      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, moduleNames: 'pgcast', outDir: './src', ...exits });
+      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, moduleNames: 'pgcast', outDir: './src' });
     expect(log).not.toHaveBeenCalled();
   });
 
   it('reads pgcastconfig.json when zapatosconfig.json is there too, and notes it once', () => {
     write('pgcastconfig.json', '{"outDir": "./src", "moduleNames": "pgcast"}');
     write('zapatosconfig.json', '{"outDir": "./legacy", "schemas": {"archive": {"include": "*", "exclude": []}}}');
-    expect(cliConfig(undefined, dir)).toEqual({ outDir: './src', moduleNames: 'pgcast', ...exits });
+    expect(cliConfig(undefined, dir)).toEqual({ outDir: './src', moduleNames: 'pgcast' });
     expect(log.mock.calls).toEqual([[
       'Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. ' +
       'Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.',
@@ -87,9 +85,9 @@ describe('cliConfig()', () => {
   it('keeps that note quiet with warningListener false, from the file or the argument', () => {
     write('pgcastconfig.json', '{"warningListener": false}');
     write('zapatosconfig.json', '{}');
-    expect(cliConfig(undefined, dir)).toEqual({ warningListener: false, ...exits });
+    expect(cliConfig(undefined, dir)).toEqual({ warningListener: false });
     write('pgcastconfig.json', '{}');
-    expect(cliConfig('{"warningListener": false}', dir)).toEqual({ warningListener: false, ...exits });
+    expect(cliConfig('{"warningListener": false}', dir)).toEqual({ warningListener: false });
     expect(log).not.toHaveBeenCalled();
   });
 
@@ -100,7 +98,6 @@ describe('cliConfig()', () => {
         schemas: { '{{PGCAST_FILMS_URL}}': { include: ['postgresql://localhost/films'], exclude: [] } },
         schemaJSDoc: true,
         db: { connectionString: 'a postgresql://localhost/films b' },
-        ...exits,
       });
     }
   });
@@ -129,13 +126,14 @@ describe('cliConfig()', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])('forces the CLI exit over file and argument values, including %s', value => {
+  // 7.x set rejectOnQueryError: false over both; 8.0 passes the removed key on, for generate() to refuse
+  it.each([true, false])('keeps rejectOnQueryError as the file and the argument give it, including %s', value => {
     const file = { rejectOnQueryError: value, outDir: './file' };
     const arg = { rejectOnQueryError: !value, outDir: './argument' };
-    expect(cliConfig(JSON.stringify(arg), dir)).toEqual({ ...arg, ...exits });
+    expect(cliConfig(JSON.stringify(arg), dir)).toEqual(arg);
     write('pgcastconfig.json', JSON.stringify(file));
-    expect(cliConfig(undefined, dir)).toEqual({ ...file, ...exits });
-    expect(cliConfig(JSON.stringify(arg), dir)).toEqual({ ...arg, ...exits });
+    expect(cliConfig(undefined, dir)).toEqual(file);
+    expect(cliConfig(JSON.stringify(arg), dir)).toEqual(arg);
   });
 
   it('names the argument in its error', () => {

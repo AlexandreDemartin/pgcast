@@ -30,8 +30,7 @@ export interface OptionalConfig {
   customJSONParsingForLargeNumbers: boolean;
   // optional, so a CompleteConfig written for 6.6.1 still compiles; read it with ?? 'zapatos'
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
-  // optional for a CompleteConfig written for 6.6.1; the CLI sets false
-  rejectOnQueryError?: boolean;  // reject with the query or connection error by default; false prints it and exits
+  // optional for a CompleteConfig written for 6.6.1
   constraintNames?: boolean;  // true adds each relation's Constraint type, including all its unique indexes
   enumArraysTypedAsText?: boolean;  // pg returns an enum array as text in Selectable by default; false keeps the label array for a custom parser
   intervalsTypedAsObjects?: boolean;  // pg returns a PostgresInterval in Selectable by default; false keeps string for a custom parser

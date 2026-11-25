@@ -1,5 +1,5 @@
 ---
-english: 359086b9cd50
+english: 451d25a828e4
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -464,6 +464,14 @@ La 8.0 fait toujours ce que faisait `domainsTypedByContext: true`, la valeur par
 - **Trouver les appels** : `grep -rn domainsTypedByContext` dans vos fichiers de configuration et vos scripts, puis régénérez les types et lancez `tsc` : chaque lecture d’une ligne d’un raccourci qui attend la chaîne du placeholder, et chaque écriture que refuse le type de base, ne compile plus. `grep -rnE 'domainsNotByContext|domainsUnderDomains'` liste le code qui lit les paramètres de sortie.
 - **Avant → après** : retirez `"domainsTypedByContext": false`. Pour qu’une colonne garde le type de son placeholder dans les cinq interfaces, comme avec `false`, donnez au placeholder un autre type que celui généré, comme `export type PgTicket_no = number | db.Int8String` ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)), ou `unknown` pour un domaine sur un domaine : un placeholder modifié en `any` compte comme laissé tel que généré.
 
+### `rejectOnQueryError` {#from-8-0-rejectOnQueryError}
+
+La 8.0 fait toujours ce que faisait `rejectOnQueryError: true`, la valeur par défaut de la 7.x : en cas d’échec de connexion ou de requête, la promesse de `generate()`, de `tsForConfig()` ou de `check()` est rejetée avec l’erreur d’origine, avant toute écriture de fichier ([`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError)). La CLI l’affiche comme en 7.x, `*** error <n> ***` et l’erreur sur la sortie standard, et quitte avec le code 1, avec ou sans `--check` ([CLI](/fr/generator#cli)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `rejectOnQueryError was removed in 8.0, which always does what rejectOnQueryError: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-rejectOnQueryError`, et la CLI aussi quand son fichier de configuration ou son argument JSON la contient, alors que la 7.x l’y ignorait. Une fois l’option retirée, une requête qui échoue rejette la promesse, là où la 7.x avec `false` affichait l’erreur et arrêtait le processus. Si l’erreur n’est pas interceptée, Node l’affiche sur la sortie d’erreur et quitte avec le code 1 ; interceptée, votre programme continue. Sans la clé, la CLI affiche l’erreur et quitte comme en 7.x.
+- **Trouver les appels** : `grep -rn rejectOnQueryError` dans vos fichiers de configuration et vos scripts ; chaque `false` lève aussi une erreur dès le démarrage du générateur, avant la première requête.
+- **Avant → après** : `await generate({ …, rejectOnQueryError: false })` devient `await generate({ … }).catch(e => { console.error(e); process.exit(1); })` ; dans un fichier de configuration, retirez `"rejectOnQueryError": false`.
+
 ## Passer de pgcast 6.x à la 7.0 {#from-7-0}
 
 En 6.x, commencez par [repérer les avertissements](#read-the-warnings) et [activer les corrections](#turn-on-the-opt-ins). Pour installer la 7.x, conservez l’alias du paquet. Choisissez la commande qui correspond à vos imports.
@@ -544,7 +552,7 @@ Régénérez le schéma dès que vous changez de version du générateur ou d’
 | [`intervalsTypedAsObjects: true`](/fr/generator#generate.intervalsTypedAsObjects) | Dans une ligne brute, un intervalle possède la méthode `toPostgres()`. Le JSON d’un raccourci conserve le texte. Choisissez `false` si votre parser renvoie du texte. | `false` (permanent) |
 | [`rejectOnQueryError: true`](/fr/generator#generate.rejectOnQueryError) | Les promesses de `generate()` et de `tsForConfig()` sont rejetées avec l’erreur de connexion ou de requête d’origine. Relancez l’erreur ou définissez `process.exitCode = 1` si le script doit échouer. Une erreur synchrone d’un écouteur rejette aussi la promesse de génération. Gérez les promesses que renvoie l’écouteur. | `false` (arrêt immédiat, en 7.x) |
 
-Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de base de données. La fonction compare le contenu du schéma et, si le générateur produit un index des types personnalisés, celui de cet index. Elle vérifie aussi la présence de chaque placeholder. Si la vérification échoue, la promesse se résout avec `false`. Avec `rejectOnQueryError: false`, les trois fonctions arrêtent le processus en cas d’erreur de base de données. Les deux commandes, `pgcast` et `zapatos`, quittent avec le code 1 dans ce cas. Leur option `--check` renvoie aussi le code 1 quand cette vérification renvoie `false`. [Erreurs du générateur](/fr/generator#generate.rejectOnQueryError).
+Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de base de données. La fonction compare le contenu du schéma et, si le générateur produit un index des types personnalisés, celui de cet index. Elle vérifie aussi la présence de chaque placeholder. Si la vérification échoue, la promesse se résout avec `false`. En 7.x, avec `rejectOnQueryError: false`, les trois fonctions arrêtaient le processus en cas d’erreur de base de données ; la 8.0 retire l’option ([`rejectOnQueryError`](#from-8-0-rejectOnQueryError)). Les deux commandes, `pgcast` et `zapatos`, quittent avec le code 1 dans ce cas. Leur option `--check` renvoie aussi le code 1 quand cette vérification renvoie `false`. [Erreurs du générateur](/fr/generator#generate.rejectOnQueryError).
 
 La régénération conserve les placeholders existants dans `custom/`. Générez une seconde copie dans un `outDir` vide, hors de votre projet TypeScript. Comparez ses placeholders aux vôtres et intégrez les changements adaptés à vos parsers. Lancez ensuite `npx tsc` avec le schéma régénéré, puis vos tests.
 

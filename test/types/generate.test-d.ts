@@ -106,3 +106,28 @@ describe('the removed options uniqueIndexConstraintsOnly and domainsTypedByConte
     expectTypeOf(check).toBeCallableWith(legacy);
   });
 });
+
+describe('the removed option rejectOnQueryError', () => {
+  test('is no key of the config', () => {
+    expectTypeOf<'rejectOnQueryError' extends keyof OptionalConfig ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<'rejectOnQueryError' extends keyof CompleteConfig ? true : false>().toEqualTypeOf<false>();
+  });
+
+  test('fails to compile in a literal, old value or kept, alone or beside a kept key', () => {
+    // @ts-expect-error TS2353: removed in 8.0
+    void generate({ rejectOnQueryError: false });
+    // @ts-expect-error TS2353: removed in 8.0, even with the value 8.0 keeps
+    void generate({ outDir: './src', rejectOnQueryError: true });
+    // @ts-expect-error TS2353: removed in 8.0
+    void check({ outDir: './src', rejectOnQueryError: false });
+    // @ts-expect-error TS2353: removed in 8.0
+    const config: Config = { outDir: './src', rejectOnQueryError: false };
+    void config;
+  });
+
+  test('compiles in a variable with other keys, as any extra key does', () => {
+    const legacy = { outDir: './src', rejectOnQueryError: false };
+    expectTypeOf(generate).toBeCallableWith(legacy);
+    expectTypeOf(check).toBeCallableWith(legacy);
+  });
+});

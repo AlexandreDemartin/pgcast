@@ -15,6 +15,8 @@ import type { DomainRoots } from './domainRoots';
 import { domainUnionsInDatabase, unionTypesForDomains, warnAboutPlaceholdersOnDisk } from './domainUnions';
 import { header } from './header';
 import { moduleNamesOf } from './moduleNames';
+import { onFailedQuery } from './queryErrors';
+import type { ExitOnFailedQuery } from './queryErrors';
 import { refuseRemovedOptions } from './removedOptions';
 import { jsdocText, tsIdentifier } from './quote';
 import type { CompleteConfig } from './config';
@@ -223,11 +225,10 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
         return result;
 
       } catch (e) {
-        // the run has thrown and ended the pool, which refuses a query still to come and never serves one still
-        // queued in it (with connectionTimeoutMillis, that one rejects later): reject into the run, not exit
-        if (ended || (config.rejectOnQueryError ?? true)) throw e;
-        console.log(`*** error ${seq} ***`, e);
-        process.exit(1);
+        // the CLI's config exits here, as the pool's end waits for each query still running; not once the run has
+        // thrown and ended the pool, which refuses a query still to come: that one rejects into the run
+        if (!ended) (config as ExitOnFailedQuery)[onFailedQuery]?.(e, seq);
+        throw e;
       }
     };
 

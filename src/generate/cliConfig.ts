@@ -11,6 +11,8 @@ import * as path from 'path';
 import { finaliseConfig } from './config';
 import type { Config } from './config';
 import { staleFiles, upToDate } from './outputFiles';
+import { onFailedQuery } from './queryErrors';
+import type { ExitOnFailedQuery } from './queryErrors';
 import { generate } from './write';
 
 // kept out of zapatos/generate's exports, like moduleNames.ts; moved here from cli.ts, to be tested
@@ -34,8 +36,7 @@ const recursivelyInterpolateEnvVars = (obj: any): any =>
 
 /**
  * The CLI's config: the file in `dir`, `pgcastconfig.json` else `zapatosconfig.json` else none, then `argsJSON`
- * merged over it, each with its environment variables filled in, then `rejectOnQueryError: false` over both, so a
- * failed query ends the process. With both files, a note through `warningListener`.
+ * merged over it, each with its environment variables filled in. With both files, a note through `warningListener`.
  */
 export const cliConfig = (argsJSON = '{}', dir = '.') => {
   const
@@ -59,8 +60,7 @@ export const cliConfig = (argsJSON = '{}', dir = '.') => {
     throw new Error(`If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: ${err.message}`);
   }
 
-  // the CLI exits on a failed query, printing it as Zapatos 6.6.1 does, whatever the file and the argument say
-  const config = { ...fileConfig, ...argsConfig, rejectOnQueryError: false } as Config;
+  const config = { ...fileConfig, ...argsConfig } as Config;
 
   if (configFiles.length > 1) {
     const
@@ -107,7 +107,8 @@ export const cliArgs = (args: string[]) => {
 /**
  * Run the CLI on its arguments in `dir`: `generate()`, or with `--check` the comparison of `check()`, after a note through
  * `warningListener` for each flag it ignores; or, before reading any config, the usage for `--help` and `-h`, on
- * stderr after the flag's name for any other flag. Resolve to its exit code.
+ * stderr after the flag's name for any other flag. Resolve to its exit code; a failed query is printed on stdout, as
+ * Zapatos 6.6.1 prints it, and ends the process with code 1 at once, not once the queries still running have finished.
  */
 export const runCli = async (args: string[], dir = '.') => {
   const { check: checkOnly, argsJSON, flag, ignoredFlags } = cliArgs(args);
@@ -121,7 +122,13 @@ export const runCli = async (args: string[], dir = '.') => {
     return 1;
   }
 
-  const config = cliConfig(argsJSON, dir);
+  const config: Config & ExitOnFailedQuery = {
+    ...cliConfig(argsJSON, dir),
+    [onFailedQuery]: (e, seq) => {
+      console.log(`*** error ${seq} ***`, e);
+      process.exit(1);
+    },
+  };
   if (ignoredFlags.length > 0) {
     const
       { warningListener } = finaliseConfig(config),
