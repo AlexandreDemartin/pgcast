@@ -12,9 +12,9 @@ import type { Parameter, ParentColumn, SQLFragment } from './core';
 export type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/Microsoft/TypeScript/issues/14829
 
 /**
- * The type of a domain's column in one context of the generated schema, with the generator's `domainsTypedByContext`:
- * `InContext`, its base type's type there, while its placeholder `Custom` is still exactly `Generated`, the type the
- * generator wrote in it; otherwise `Custom`, in every context, as without the option. So an `any` stays `any`, and an
+ * The type of a domain's column in one context of the generated schema: `InContext`, its base type's type there, while
+ * its placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, in
+ * every context. So an `any` stays `any`, and an
  * `any[]` stays `any[]`, such as a placeholder Zapatos 6.6.1 wrote over `int8[]` with no import.
  */
 export type DomainInContext<Custom, Generated, InContext> =

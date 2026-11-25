@@ -172,7 +172,7 @@ describe('WhereableValue, InsertableValue and UpdatableValue, the types valuesTy
   });
 });
 
-describe('DomainInContext, the type domainsTypedByContext writes', () => {
+describe('DomainInContext, the type the generator writes for a domain typed by context', () => {
   test('a placeholder that holds what the generator wrote takes the type of the context', () => {
     expectTypeOf<db.DomainInContext<db.Int8String, db.Int8String, number>>().toEqualTypeOf<number>();
     expectTypeOf<db.DomainInContext<Date, Date, db.DateString | Date>>().toEqualTypeOf<db.DateString | Date>();
