@@ -1067,6 +1067,18 @@ describe('selectRows', () => {
         `${i >= 2 ? `/* marked no-op: won't hit DB unless forced -> */ ` : ''}SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "id" ASC`));
     });
 
+    it('a prepared copy keeps the name, not the text: on one connection the second to run throws, a copy named apart runs', async () => {
+      const unique = (name: string) => `Prepared statements must be unique - '${name}' was used for a different statement`;
+      const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_rows_first');
+      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
+      await expect(run(q.copy())).rejects.toThrow(unique('accounts_rows_first'));
+      expect(await run(q.copy({ preparedName: 'accounts_agg_apart' }))).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
+      const copiedFirst = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_agg_first');
+      expect(await run(copiedFirst.copy())).toEqual([{ id: 1 }, { id: 2 }]);
+      await expect(run(copiedFirst)).rejects.toThrow(unique('accounts_agg_first'));
+    });
+
     it('cursor() reads its one aggregate row, as nested', async () => {
       const read = async () => { const all: unknown[] = []; for await (const batch of db.cursor(t.client, db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }), { batchSize: 1 })) all.push(batch); return all; };
       expect(await read()).toEqual([[{ id: 1 }, { id: 2 }]]);
