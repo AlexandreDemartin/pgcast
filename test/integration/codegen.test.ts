@@ -3503,6 +3503,15 @@ describe('removed options', () => {
       expect(readdirSync(dir)).toEqual([]);
     });
 
+    it.each([old, 'yes', 0])('rejects definitionForRelationInSchema() on %j in a CompleteConfig, before any query', async value => {
+      const products = (await relationsInSchema('public', query => t.pool.query(query))).find(rel => rel.name === 'products')!;
+      const queries: pg.QueryConfig[] = [];
+      const q = (query: pg.QueryConfig) => { queries.push(query); return t.pool.query(query); };
+      const complete = { ...finaliseConfig(quiet), ...given(value) };  // in a variable, which finaliseConfig() never saw
+      await expect(definitionForRelationInSchema(products, 'public', {}, {}, complete, q)).rejects.toThrow(message);
+      expect(queries).toEqual([]);
+    });
+
     it.each(['pgcastconfig.json', 'zapatosconfig.json'])('rejects the CLI, with or without --check, on the key in %s', async file => {
       writeFileSync(join(dir, file), JSON.stringify({ db: unreachable, outDir: join(dir, 'src'), [key]: old }));
       await expect(runCli([], dir)).rejects.toThrow(message);
