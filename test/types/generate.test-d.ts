@@ -5,7 +5,7 @@
 // exported under their names so that a package's declarations can write them out (#584).
 
 import { describe, expectTypeOf, test } from 'vitest';
-import { check, generate, type ColumnOptions, type Config, type OptionalConfig, type SchemaRules } from 'zapatos/generate';
+import { check, generate, type ColumnOptions, type CompleteConfig, type Config, type OptionalConfig, type SchemaRules } from 'zapatos/generate';
 
 describe('check()', () => {
   test('takes the Config of generate() and resolves to a boolean', () => {
@@ -45,5 +45,35 @@ describe('SchemaRules and ColumnOptions', () => {
     void ({ public: { include: '*' } } satisfies SchemaRules);
     // @ts-expect-error insert is 'auto', 'excluded' or 'optional'
     void ({ users: { id: { insert: 'never' } } } satisfies ColumnOptions);
+  });
+});
+
+// decision 019 § 4: a key 8.0 removed leaves the config's type, its kept value included; a config built in a variable
+// with other keys still compiles, which is why the generator refuses the key at run time too
+describe('the removed options typeEnumsAcrossSchemas and enumOrder', () => {
+  test('are no keys of the config', () => {
+    expectTypeOf<'typeEnumsAcrossSchemas' extends keyof OptionalConfig ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<'enumOrder' extends keyof OptionalConfig ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<'typeEnumsAcrossSchemas' | 'enumOrder' extends keyof CompleteConfig ? true : false>().toEqualTypeOf<false>();
+  });
+
+  test('fail to compile in a literal, old value or kept, alone or beside a kept key', () => {
+    // @ts-expect-error TS2353: removed in 8.0
+    void generate({ typeEnumsAcrossSchemas: false });
+    // @ts-expect-error TS2353: removed in 8.0, even with the value 8.0 keeps
+    void generate({ outDir: './src', typeEnumsAcrossSchemas: true });
+    // @ts-expect-error TS2353: removed in 8.0
+    void check({ enumOrder: 'alphabetical' });
+    // @ts-expect-error TS2353: removed in 8.0, even with the value 8.0 keeps
+    void check({ outDir: './src', enumOrder: 'declared' });
+    // @ts-expect-error TS2353: removed in 8.0
+    const config: Config = { outDir: './src', enumOrder: 'declared' };
+    void config;
+  });
+
+  test('compile in a variable with other keys, as any extra key does', () => {
+    const legacy = { outDir: './src', typeEnumsAcrossSchemas: false, enumOrder: 'alphabetical' };
+    expectTypeOf(generate).toBeCallableWith(legacy);
+    expectTypeOf(check).toBeCallableWith(legacy);
   });
 });

@@ -45,13 +45,6 @@ describe('cliConfig()', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays enum settings by key in %s', name => {
-    write(name, '{"typeEnumsAcrossSchemas":false,"enumOrder":"alphabetical"}');
-    expect(cliConfig('{"enumOrder":null}', dir)).toEqual({ typeEnumsAcrossSchemas: false, enumOrder: null, ...exits });
-    expect(cliConfig('{"typeEnumsAcrossSchemas":null}', dir))
-      .toEqual({ typeEnumsAcrossSchemas: null, enumOrder: 'alphabetical', ...exits });
-  });
-
   it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays the arbiter setting by key in %s', name => {
     write(name, '{"uniqueIndexConstraintsOnly":false}');
     expect(cliConfig('{}', dir).uniqueIndexConstraintsOnly).toBe(false);

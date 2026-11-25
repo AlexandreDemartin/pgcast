@@ -66,8 +66,6 @@ const variants: [string, Config][] = [
   ['customTypesTransform-my_type', { schemas: customTypesSchemas, customTypesTransform: 'my_type' }],
   ['customTypesTransform-PgMyType', { schemas: customTypesSchemas, customTypesTransform: 'PgMyType' }],
   ['customTypesTransform-function', { schemas: customTypesSchemas, customTypesTransform: s => `Custom_${s}` }],
-  ['typeEnumsAcrossSchemas-false', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: false }],
-  ['enumOrder-alphabetical', { schemas: customTypesSchemas, enumOrder: 'alphabetical' }],
   // pgcast/schema, pgcast/custom and pgcast/db, and the zapatos/schema that src/db's declarations import
   ['moduleNames-pgcast', { schemas: customTypesSchemas, moduleNames: 'pgcast' }],
   // main, whose output is test/generated/: only the UniqueIndex of products, extra.articles and account_totals differ
@@ -327,8 +325,8 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       "probe.ts TS2578 Unused '@ts-expect-error' directive."));
   });
 
-  it('enumOrder-declared: every.<enum> takes the declared order, and only it', async () => {
-    expect(await probeErrors({ ...main, enumOrder: 'declared' }, `
+  it('every.<enum> takes the declared order, and only it', async () => {
+    expect(await probeErrors(main, `
       import type * as s from 'zapatos/schema';
       export const moods: s.every.mood = ['sad', 'ok', 'happy'];
       // @ts-expect-error the alphabetical order
@@ -666,8 +664,8 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
     });
   });
 
-  it('labels, index and column names take their quote and backslash, typeEnumsAcrossSchemas on or off', async () => {
-    // tone_types is never generated: its enum is written out label by label with typeEnumsAcrossSchemas
+  it('labels, index and column names take their quote and backslash', async () => {
+    // tone_types is never generated: its enum is written out label by label
     await t.pool.query(String.raw`
       CREATE SCHEMA quoting_probe;
       CREATE SCHEMA tone_types;
@@ -699,8 +697,7 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
         export const toneLost: s.quoting_probe.takes.Insertable['tone'] = 'backslash';
       `;
       const config = { schemas: { quoting_probe: all }, uniqueIndexConstraintsOnly: false };
-      expect.soft(await probeErrors({ ...config, typeEnumsAcrossSchemas: false }, probe)).toEqual([]);
-      expect.soft(await probeErrors({ ...config, typeEnumsAcrossSchemas: true }, probe + acrossSchemas)).toEqual([]);
+      expect(await probeErrors(config, probe + acrossSchemas)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA quoting_probe, tone_types CASCADE');
     }
@@ -901,8 +898,8 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       }
     });
 
-    it('with typeEnumsAcrossSchemas, still imports an enum that only its own schema uses', async () => {
-      const { customTypeSourceFiles: files } = await codegen({ ...sales, typeEnumsAcrossSchemas: true });
+    it('still imports an enum that only its own schema uses', async () => {
+      const { customTypeSourceFiles: files } = await codegen(sales);
       const schema = `import type { placeholder_imports } from 'zapatos/schema';`;
       expect.soft(files.PgGenre_d).toBe(placeholder('zapatos', [schema], 'PgGenre_d = placeholder_imports.genre'));
       expect.soft(files.PgGenres_d).toBe(placeholder('zapatos', [schema], 'PgGenres_d = placeholder_imports.genre[]'));
@@ -999,8 +996,8 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       });
     });
 
-    // with typeEnumsAcrossSchemas off, each relation reads `genre` in its own schema: an import would type one
-    // of them with the other's labels, and its text would hang on which relation is read last
+    // every relation reads placeholder_home.genre: the labels written out for placeholder_archive.reels type them all,
+    // and placeholder_home's relations, which name the enum, never replace them
     describe('a domain whose relations would import different enums', () => {
       beforeAll(() => t.pool.query(`
         CREATE SCHEMA placeholder_home;
@@ -1022,32 +1019,18 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         ],
         homeAndArchive = ['placeholder_home', 'placeholder_archive'];
 
-      it.each(unprefixed)("keeps 6.6.1's text, with no import, unprefixedSchema %s", async unprefixedSchema => {
-        for (const schemas of bothOrders) {
-          const { customTypeSourceFiles: files } = await codegen({ schemas, unprefixedSchema, typeEnumsAcrossSchemas: false });
-          expect(files.PgGenre_d).toBe(placeholder('zapatos', [], 'PgGenre_d = genre'));
-        }
-      });
-
-      it.each(unprefixed)('in whichever order the relations are read, unprefixedSchema %s', async unprefixedSchema => {
-        expectInEveryOrder(await placeholdersInEveryOrder(homeAndArchive, { unprefixedSchema, typeEnumsAcrossSchemas: false }, ['PgGenre_d']), 6,
-          { PgGenre_d: { type: 'genre', imports: null } });
-      });
-
-      // with it, every relation reads placeholder_home.genre: the labels written out for placeholder_archive.reels
-      // type them all, and placeholder_home's relations, which name the enum, never replace them
-      describe('with typeEnumsAcrossSchemas', () => {
+      describe('the labels of the domain\'s enum', () => {
         const labels = "('comedy' | 'drama')";
 
         it.each(unprefixed)('writes the labels, with no import, unprefixedSchema %s', async unprefixedSchema => {
           for (const schemas of bothOrders) {
             const { customTypeSourceFiles: files } =
-              await codegen({ schemas, unprefixedSchema, typeEnumsAcrossSchemas: true });
+              await codegen({ schemas, unprefixedSchema });
             expect.soft(files.PgGenre_d).toBe(placeholder('zapatos', [], `PgGenre_d = ${labels}`));
             expect.soft(files.PgGenres_d).toBe(placeholder('zapatos', [], `PgGenres_d = ${labels}[]`));
           }
           const reels = unprefixedSchema === 'placeholder_archive' ? 's.reels' : 's.placeholder_archive.reels';
-          expect(await probeErrors({ schemas: bothOrders[0], unprefixedSchema, typeEnumsAcrossSchemas: true }, `
+          expect(await probeErrors({ schemas: bothOrders[0], unprefixedSchema }, `
             import type * as s from 'zapatos/schema';
             export const genre: ${reels}.Selectable['genre'] = 'drama';
             // @ts-expect-error not a label of placeholder_home.genre
@@ -1059,52 +1042,11 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         });
 
         it.each(unprefixed)('in whichever order the relations are read, unprefixedSchema %s', async unprefixedSchema => {
-          const config = { unprefixedSchema, typeEnumsAcrossSchemas: true };
+          const config = { unprefixedSchema };
           expectInEveryOrder(await placeholdersInEveryOrder(homeAndArchive, config, ['PgGenre_d', 'PgGenres_d']), 6,
             { PgGenre_d: { type: labels, imports: null }, PgGenres_d: { type: `${labels}[]`, imports: null } });
         });
       });
-
-      // 6.6.1 wrote genre or any, by which of the relations it read last
-      describe('and by a relation of a schema with no genre', () => {
-        beforeAll(() => t.pool.query(`
-          CREATE SCHEMA placeholder_shelf;
-          CREATE TABLE placeholder_shelf.cans (genre placeholder_home.genre_d, genres placeholder_home.genres_d);
-        `));
-        afterAll(() => t.pool.query('DROP SCHEMA placeholder_shelf CASCADE'));
-
-        it.each(unprefixed)('gets any, with no import, in whichever order the relations are read, unprefixedSchema %s',
-          async unprefixedSchema => {
-            expectInEveryOrder(await placeholdersInEveryOrder([...homeAndArchive, 'placeholder_shelf'], { unprefixedSchema, typeEnumsAcrossSchemas: false },
-              ['PgGenre_d', 'PgGenres_d']), 24, { PgGenre_d: { type: 'any', imports: null }, PgGenres_d: { type: 'any', imports: null } });
-          });
-      });
-    });
-
-    // without typeEnumsAcrossSchemas, a relation of placeholder_lending finds no genre in its schema and reads the
-    // domain as `any`; 6.6.1 wrote genre or any, by which relation it read last
-    describe('a domain that a relation of a schema with no enum of that name uses too', () => {
-      beforeAll(() => t.pool.query(`
-        CREATE SCHEMA placeholder_lending;
-        CREATE TABLE placeholder_lending.loans (genre placeholder_imports.genre_d, genres placeholder_imports.genres_d);
-      `));
-      afterAll(() => t.pool.query('DROP SCHEMA placeholder_lending CASCADE'));
-
-      const unprefixed = ['placeholder_imports', 'placeholder_lending', null];
-
-      it.each(unprefixed)('gets any, with no import, in whichever order the relations are read, unprefixedSchema %s',
-        async unprefixedSchema => {
-          expectInEveryOrder(await placeholdersInEveryOrder(['placeholder_imports', 'placeholder_lending'],
-            { unprefixedSchema, typeEnumsAcrossSchemas: false }, ['PgGenre_d', 'PgGenres_d']), 2,
-          { PgGenre_d: { type: 'any', imports: null }, PgGenres_d: { type: 'any', imports: null } });
-          for (const schemas of [
-            { placeholder_imports: all, placeholder_lending: all }, { placeholder_lending: all, placeholder_imports: all },
-          ]) {
-            const { customTypeSourceFiles: files } = await codegen({ schemas, unprefixedSchema, typeEnumsAcrossSchemas: false });
-            expect.soft(files.PgGenre_d).toBe(placeholder('zapatos', [], 'PgGenre_d = any'));
-            expect.soft(files.PgGenres_d).toBe(placeholder('zapatos', [], 'PgGenres_d = any'));
-          }
-        });
     });
 
     // two types of one name share one placeholder (#42): the type of the column read last holds it, by schema, then
@@ -1128,19 +1070,8 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         CREATE DOMAIN placeholder_reels_m.cut_no AS integer;
         CREATE DOMAIN placeholder_reels_m."Cut_no" AS text;
         CREATE TABLE placeholder_reels_m.cuts (a placeholder_reels_m.cut_no, b placeholder_reels_m."Cut_no");
-        -- a domain over an enum that a relation of a schema with no enum of that name reads too, and another type
-        CREATE SCHEMA placeholder_hues_a;
-        CREATE SCHEMA placeholder_hues_z;
-        CREATE SCHEMA placeholder_hues_m;
-        CREATE TYPE placeholder_hues_z.hue AS ENUM ('red');
-        CREATE DOMAIN placeholder_hues_z.hue_d AS placeholder_hues_z.hue;
-        CREATE DOMAIN placeholder_hues_m.hue_d AS text;
-        CREATE TABLE placeholder_hues_z.prints (a placeholder_hues_z.hue_d);
-        CREATE TABLE placeholder_hues_a.prints (a placeholder_hues_z.hue_d);
-        CREATE TABLE placeholder_hues_m.prints (a placeholder_hues_m.hue_d);
       `));
-      afterAll(() => t.pool.query(`DROP SCHEMA placeholder_reels_a, placeholder_reels_b, placeholder_reels_m,
-        placeholder_hues_a, placeholder_hues_z, placeholder_hues_m CASCADE`));
+      afterAll(() => t.pool.query('DROP SCHEMA placeholder_reels_a, placeholder_reels_b, placeholder_reels_m CASCADE'));
 
       const only = (schema: string, ...include: string[]) => ({ schemas: { [schema]: { include, exclude: [] } } });
 
@@ -1167,11 +1098,6 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         `, { skipLibCheck: false })).toEqual([]);
       });
 
-      // placeholder_hues_z.prints holds it, last by schema; its type is `any` from placeholder_hues_a, which has no hue
-      it('reads each type by its own columns, in whichever order the relations are read', async () => {
-        expectInEveryOrder(await placeholdersInEveryOrder(['placeholder_hues_a', 'placeholder_hues_z', 'placeholder_hues_m'],
-          { typeEnumsAcrossSchemas: false }, ['PgHue_d']), 6, { PgHue_d: { type: 'any', imports: null } });
-      });
     });
 
     // a domain over an enum and a domain over text of one name (#42): the type whose "schema"."name" sorts last holds
@@ -1214,7 +1140,7 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         });
     });
 
-    // with typeEnumsAcrossSchemas, the relation of the enum's schema names it `string`, TypeScript's own type, and
+    // the relation of the enum's schema names it `string`, TypeScript's own type, and
     // imports nothing, as the relation that writes its labels out: their text differs, not their import
     describe('a domain over an enum that may name a global type, used by a relation of another schema', () => {
       beforeAll(() => t.pool.query(`
@@ -1224,9 +1150,9 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       afterAll(() => t.pool.query('DROP SCHEMA placeholder_loans CASCADE'));
 
       it.each(['placeholder_globals', 'placeholder_loans', null])(
-        'gets the labels with typeEnumsAcrossSchemas, in whichever order the relations are read, unprefixedSchema %s',
+        'gets the labels, in whichever order the relations are read, unprefixedSchema %s',
         async unprefixedSchema => {
-          const config = { unprefixedSchema, typeEnumsAcrossSchemas: true };
+          const config = { unprefixedSchema };
           expectInEveryOrder(await placeholdersInEveryOrder(['placeholder_globals', 'placeholder_loans'], config,
             ['PgDate_d', 'PgString_d']), 2,
           { PgDate_d: { type: "'d'", imports: null }, PgString_d: { type: "'s'", imports: null } });
@@ -1239,21 +1165,6 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
           }
         });
 
-      // without it, placeholder_loans finds no "Date" nor "string" in its schema: 6.6.1 wrote Date and string, or any
-      it.each(['placeholder_globals', 'placeholder_loans', null])(
-        'gets any without typeEnumsAcrossSchemas, in whichever order the relations are read, unprefixedSchema %s',
-        async unprefixedSchema => {
-          expectInEveryOrder(await placeholdersInEveryOrder(['placeholder_globals', 'placeholder_loans'],
-            { unprefixedSchema, typeEnumsAcrossSchemas: false }, ['PgDate_d', 'PgString_d']), 2,
-          { PgDate_d: { type: 'any', imports: null }, PgString_d: { type: 'any', imports: null } });
-          for (const schemas of [
-            { placeholder_globals: all, placeholder_loans: all }, { placeholder_loans: all, placeholder_globals: all },
-          ]) {
-            const { customTypeSourceFiles: files } = await codegen({ schemas, unprefixedSchema, typeEnumsAcrossSchemas: false });
-            expect.soft(files.PgDate_d).toBe(placeholder('zapatos', [], 'PgDate_d = any'));
-            expect.soft(files.PgString_d).toBe(placeholder('zapatos', [], 'PgString_d = any'));
-          }
-        });
     });
   });
 
@@ -1909,13 +1820,11 @@ describe('domainsTypedByContext', () => {
     it('types an enum of the relation\'s schema by its name, and one of another schema by its labels, never by its name', async () => {
       const box = { ...on, schemas: { ctx: all, ctx_box: all } };
       const tones = inAny('c.Pg_tone_d'), tone = inAny('c.PgVip_tone'), labels = "('warm' | 'dry')";
-      for (const typeEnumsAcrossSchemas of [false, true]) {
-        const { ts: schema } = await codegen({ ...box, typeEnumsAcrossSchemas });
-        // in a prefixed schema: its namespace's enum
-        expect(linesOf(schema, 'films', 'tones')).toEqual(nullable('tones', tones('string'), tones('tone[]'), tones('tone[]')));
-        // ctx_box.tone, not ctx.tone
-        expect(linesOf(schema, 'nested', 'tone')).toEqual(nullable('tone', tone(labels), tone(labels), tone(labels)));
-      }
+      const { ts: schema } = await codegen(box);
+      // in a prefixed schema: its namespace's enum
+      expect(linesOf(schema, 'films', 'tones')).toEqual(nullable('tones', tones('string'), tones('tone[]'), tones('tone[]')));
+      // ctx_box.tone, not ctx.tone
+      expect(linesOf(schema, 'nested', 'tone')).toEqual(nullable('tone', tone(labels), tone(labels), tone(labels)));
     });
 
     it('types what pg, the shortcuts and Postgres give: a domain over a domain parsed, an array of a domain as text', async () => {
@@ -1997,17 +1906,10 @@ describe('enumArraysTypedAsText', () => {
     CREATE TYPE arr_edge.int4 AS ENUM ('x', 'y');
     CREATE TYPE arr_edge.text AS ENUM ('p');
     CREATE TABLE arr_edge.films (id int PRIMARY KEY, nums int4[], words text[], own arr_edge.int4[]);
-    -- a domain over an array of an enum, also used in arr_none, which has no enum of that name: its placeholder is any
-    CREATE SCHEMA arr_dom;
-    CREATE TYPE arr_dom.mood AS ENUM ('sad', 'happy');
-    CREATE DOMAIN arr_dom.moods AS arr_dom.mood[];
-    CREATE TABLE arr_dom.films (id int PRIMARY KEY, moods arr_dom.mood[], dmoods arr_dom.moods);
-    CREATE SCHEMA arr_none;
-    CREATE TABLE arr_none.films (id int PRIMARY KEY, dmoods arr_dom.moods);
   `));
-  afterAll(() => t.pool.query('DROP SCHEMA arr, arr_box, arr_solo, arr_edge, arr_dom, arr_none CASCADE'));
+  afterAll(() => t.pool.query('DROP SCHEMA arr, arr_box, arr_solo, arr_edge CASCADE'));
 
-  const config = { schemas: { arr: all, arr_box: all, arr_solo: all }, schemaJSDoc: false, unprefixedSchema: 'arr', typeEnumsAcrossSchemas: false };
+  const config = { schemas: { arr: all, arr_box: all, arr_solo: all }, schemaJSDoc: false, unprefixedSchema: 'arr' };
   const on = { ...config, enumArraysTypedAsText: true };
   /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
   const linesOf = (schema: string, table: string, column: string) =>
@@ -2044,9 +1946,6 @@ describe('enumArraysTypedAsText', () => {
     expect(readsOf(schema, 'films', 'moods_nn')).toEqual(['moods_nn: string;', 'moods_nn: mood[];']);
     expect(readsOf(schema, 'films_v', 'moods')).toEqual(['moods: string | null;', 'moods: mood[] | null;']);
     expect(readsOf(schema, 'films_m', 'moods')).toEqual(['moods: string | null;', 'moods: mood[] | null;']);
-    // typed by name in arr_box, as without the option: both are arrays of an enum, whose text pg returns
-    expect(readsOf(tableBlock(schema, 'arr_box'), 'films', 'moods')).toEqual(['moods: string | null;', 'moods: mood[] | null;']);
-    expect(readsOf(tableBlock(schema, 'arr_box'), 'films', 'own')).toEqual(['own: string | null;', 'own: mood[] | null;']);
   });
 
   it('types a domain over an array of an enum as a string in Selectable while its placeholder holds what the generator wrote', async () => {
@@ -2056,8 +1955,8 @@ describe('enumArraysTypedAsText', () => {
     expect(customTypeSourceFiles.PgMoods).toContain('export type PgMoods = mood[];');
   });
 
-  it('types the labels\' array of an enum of another schema, with typeEnumsAcrossSchemas', async () => {
-    const { ts: schema } = await codegen({ ...on, typeEnumsAcrossSchemas: true });
+  it('types the labels\' array of an enum of another schema', async () => {
+    const { ts: schema } = await codegen(on);
     const labels = `('sad' | 'ok' | 'happy')[]`;
     expect(readsOf(tableBlock(schema, 'arr_box'), 'films', 'moods')).toEqual(['moods: string | null;', `moods: ${labels} | null;`]);
     expect(readsOf(tableBlock(schema, 'arr_solo'), 'films', 'moods')).toEqual(['moods: string | null;', `moods: ${labels} | null;`]);
@@ -2069,14 +1968,11 @@ describe('enumArraysTypedAsText', () => {
     for (const column of ['id', 'mood', 'texts', 'omoods']) {
       expect(linesOf(typed.ts, 'films', column)).toEqual(linesOf(off.ts, 'films', column));
     }
-    // an any custom type without typeEnumsAcrossSchemas
-    expect(tableBlock(typed.ts, 'arr_solo')).toBe(tableBlock(off.ts, 'arr_solo'));
-    expect(readsOf(tableBlock(typed.ts, 'arr_solo'), 'films', 'moods')).toEqual(['moods: c.Pg_mood | null;', 'moods: c.Pg_mood | null;']);
   });
 
   it('leaves an array of a built-in as it was, though its relation\'s schema has an enum of the built-in\'s name', async () => {
     const edge = { schemas: { arr_edge: all }, schemaJSDoc: false };
-    for (const given of [{}, { typeEnumsAcrossSchemas: true }, { unprefixedSchema: null }, { domainsTypedByContext: true }]) {
+    for (const given of [{}, { unprefixedSchema: null }, { domainsTypedByContext: true }]) {
       const off = (await codegen({ ...edge, ...given, enumArraysTypedAsText: false })).ts, typed = (await codegen({ ...edge, ...given, enumArraysTypedAsText: true })).ts;
       for (const column of ['id', 'nums', 'words']) {
         expect(linesOf(tableBlock(typed, 'arr_edge'), 'films', column)).toEqual(linesOf(tableBlock(off, 'arr_edge'), 'films', column));
@@ -2087,15 +1983,6 @@ describe('enumArraysTypedAsText', () => {
       expect(readsOf(tableBlock(typed, 'arr_edge'), 'films', 'own')).toEqual(['own: string | null;', 'own: number[] | null;']);
       expect(await warningsOf({ ...edge, ...given })).toEqual([]);
     }
-  });
-
-  it('keeps a shared any placeholder for a domain over an enum array', async () => {
-    const both = { schemas: { arr_dom: all, arr_none: all }, schemaJSDoc: false, typeEnumsAcrossSchemas: false };
-    const typed = await codegen({ ...both, enumArraysTypedAsText: true });
-    expect(typed.customTypeSourceFiles.PgMoods).toContain('export type PgMoods = any;');
-    expect(readsOf(tableBlock(typed.ts, 'arr_dom'), 'films', 'dmoods'))
-      .toEqual(['dmoods: db.DomainInContext<c.PgMoods, mood[], string> | null;', 'dmoods: c.PgMoods | null;']);
-    expect(await warningsOf(both)).toEqual([]);
   });
 
   it.each([{}, { enumArraysTypedAsText: true }, { enumArraysTypedAsText: false }, JSON.parse('{"enumArraysTypedAsText":null}')])(
@@ -3053,11 +2940,9 @@ describe('quotes and */', () => {
       CREATE TYPE octal.reels AS ENUM ('a\1', 'b\8');
       CREATE TABLE octal.takes (r octal.reels);`);
     try {
-      for (const typeEnumsAcrossSchemas of [false, true]) {
-        const { ts: schema } = await codegen({ schemas: { octal: all }, typeEnumsAcrossSchemas });
-        expect.soft(schema).toContain(`export type reels = 'a\\\\1' | 'b\\\\8';`);
-        expect.soft(syntaxErrors(schema)).toEqual([]);
-      }
+      const { ts: schema } = await codegen({ schemas: { octal: all } });
+      expect.soft(schema).toContain(`export type reels = 'a\\\\1' | 'b\\\\8';`);
+      expect.soft(syntaxErrors(schema)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA octal CASCADE');
     }
@@ -3449,7 +3334,7 @@ describe('custom types that share a placeholder name', () => {
   });
 });
 
-describe('typeEnumsAcrossSchemas', () => {
+describe('enums of another schema', () => {
   // schemas of their own, committed to this file's database: no other test configures them;
   // enum_y is never generated, and enum_x has an enum of the same name as one of enum_y
   beforeAll(() => t.pool.query(`
@@ -3465,25 +3350,6 @@ describe('typeEnumsAcrossSchemas', () => {
   afterAll(() => t.pool.query('DROP SCHEMA enum_x, enum_y CASCADE'));
 
   const enumX = { schemas: { enum_x: all }, schemaJSDoc: false };
-  it('with false: an enum of another schema is an `any` custom type', async () => {
-    const { ts: schema, customTypeSourceFiles } = await codegen({ ...main, typeEnumsAcrossSchemas: false });
-    expect(tableBlock(schema, 'products')).toContain('status: c.PgStatus;');  // extra.status
-    expect(customTypeSourceFiles.PgStatus).toContain('export type PgStatus = any;');
-    expect(customTypeSourceFiles.Pg_mood).toContain('export type Pg_mood = any;');  // public.mood[] in extra.type_zoo
-  });
-
-  it('with false: an enum of the same name in the relation\'s schema takes its place', async () => {
-    const { ts: schema, customTypeSourceFiles } = await codegen({ ...enumX, typeEnumsAcrossSchemas: false });
-    const block = tableBlock(schema, 't');
-    expect(block).toContain('a: st | null;');  // enum_y.st, typed as enum_x.st: 'mine'
-    expect(block).toContain('b: st[] | null;');
-    expect(block).toContain('o: c.PgSolo | null;');
-    // enum_x.st, as the columns are typed, imported since #184: 6.6.1's `st` failed with TS2304
-    expect(customTypeSourceFiles.PgSt_d).toContain(
-      `import type { enum_x } from 'zapatos/schema';\n  export type PgSt_d = enum_x.st;`);
-    expect(tableBlock(schema, 'mv')).toContain('a: st | null;');
-  });
-
   it('types an enum of another schema by its values, inlined', async () => {
     const { ts: schema, customTypeSourceFiles } = await codegen(main);
     expect(tableBlock(schema, 'products')).toContain(`status: ('draft' | 'published' | 'archived');`);
@@ -3507,28 +3373,7 @@ describe('typeEnumsAcrossSchemas', () => {
     expect(tableBlock(schema, 'mv')).toContain(`s: ('draft' | 'published' | 'archived') | null;`);
   });
 
-  it.each([{}, JSON.parse('{"typeEnumsAcrossSchemas":null}')])('uses the foreign labels with %j', async settings => {
-    const { ts } = await codegen({ ...main, enumOrder: 'alphabetical', ...settings });
-    expect(tableBlock(ts, 'products')).toContain(`status: ('archived' | 'draft' | 'published');`);
-  });
-
-  it.each([{}, JSON.parse('{"enumOrder":null}')])('uses the declared order with %j', async settings => {
-    const { ts } = await codegen({ ...main, typeEnumsAcrossSchemas: false, ...settings });
-    expect(ts).toContain(`export type mood = ['sad', 'ok', 'happy'];`);
-  });
-
-  for (const typeEnumsAcrossSchemas of [true, false]) {
-    it.each(['declared', 'alphabetical'] as const)(`typeEnumsAcrossSchemas: ${typeEnumsAcrossSchemas}, enumOrder: %s`, async enumOrder => {
-      const settings = { ...main, typeEnumsAcrossSchemas, enumOrder };
-      const { ts } = await codegen(settings);
-      const labels = enumOrder === 'declared' ? "'draft' | 'published' | 'archived'" : "'archived' | 'draft' | 'published'";
-      expect(tableBlock(ts, 'products')).toContain(`status: ${typeEnumsAcrossSchemas ? `(${labels})` : 'c.PgStatus'};`);
-      expect(ts).toContain(`export type mood = [${enumOrder === 'declared' ? "'sad', 'ok', 'happy'" : "'happy', 'ok', 'sad'"}];`);
-      expect((await warningsOf(settings)).filter(w => /typeEnumsAcrossSchemas|enumOrder/.test(w))).toEqual([]);
-    });
-  }
-
-  it('reads the enums of each schema once per run, however many columns use them, option on or off', async () => {
+  it('reads the enums of each schema once per run, however many columns use them', async () => {
     const enumQueriesFor = async (config: Config) => {
       const schemas: string[] = [];
       await tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), s => {
@@ -3537,26 +3382,14 @@ describe('typeEnumsAcrossSchemas', () => {
       });
       return schemas.sort();
     };
-    for (const on of [false, true]) {
-      // enum_y.st in t and mv, int4 in t (pg_catalog), extra.status in mv
-      expect(await enumQueriesFor({ ...enumX, typeEnumsAcrossSchemas: on }))
-        .toEqual(['enum_x', 'enum_y', 'extra', 'pg_catalog']);
-      // ext.citext, as in extra.type_zoo; pg_catalog in nearly every table
-      expect(await enumQueriesFor({ ...main, typeEnumsAcrossSchemas: on })).toEqual(['ext', 'extra', 'pg_catalog', 'public']);
-    }
-  });
-
-  it('is optional in Config', () => {
-    expect(finaliseConfig({}).typeEnumsAcrossSchemas).toBeUndefined();
-    const right: Config = { typeEnumsAcrossSchemas: true };
-    void right;
-    // @ts-expect-error a boolean
-    const wrong: Config = { typeEnumsAcrossSchemas: 'yes' };
-    void wrong;
+    // enum_y.st in t and mv, int4 in t (pg_catalog), extra.status in mv
+    expect(await enumQueriesFor(enumX)).toEqual(['enum_x', 'enum_y', 'extra', 'pg_catalog']);
+    // ext.citext, as in extra.type_zoo; pg_catalog in nearly every table
+    expect(await enumQueriesFor(main)).toEqual(['ext', 'extra', 'pg_catalog', 'public']);
   });
 });
 
-describe('enumOrder', () => {
+describe('the order of an enum\'s labels', () => {
   // schemas of their own, committed to this file's database: no other test configures them;
   // order_y is never generated; order_w.take has 42 labels added BEFORE 'cut', so float4 sortorders close in on 2
   beforeAll(() => t.pool.query(`
@@ -3578,16 +3411,8 @@ describe('enumOrder', () => {
 
   const orderX = { schemas: { order_x: all }, schemaJSDoc: false };
 
-  it('with alphabetical: labels in alphabetical order, every.<enum> included', async () => {
-    const { ts: schema } = await codegen({ ...main, enumOrder: 'alphabetical' });
-    expect(schema).toContain(`export type mood = 'happy' | 'ok' | 'sad';`);  // declared: 'sad', 'ok', 'happy'
-    expect(schema).toContain(`export type mood = ['happy', 'ok', 'sad'];`);
-    expect(schema).toContain(`export type status = 'archived' | 'draft' | 'published';`);  // 'draft', 'published', 'archived'
-    expect(schema).toContain(`export type status = ['archived', 'draft', 'published'];`);
-  });
-
-  it("keeps the declared order with enumOrder: 'declared', every.<enum> included", async () => {
-    const { ts: schema } = await codegen({ ...main, enumOrder: 'declared' });
+  it('keeps the declared order, every.<enum> included, not the alphabetical one', async () => {
+    const { ts: schema } = await codegen(main);
     expect(schema).toContain(`export type mood = 'sad' | 'ok' | 'happy';`);
     expect(schema).toContain(`export type mood = ['sad', 'ok', 'happy'];`);
     expect(schema).toContain(`export type status = 'draft' | 'published' | 'archived';`);
@@ -3601,7 +3426,6 @@ describe('enumOrder', () => {
     const { ts: schema } = await codegen(orderX);
     expect(schema).toContain(`export type reel = 'trailer' | 'credits' | 'feature';`);
     expect(schema).toContain(`export type reel = ['trailer', 'credits', 'feature'];`);
-    expect((await codegen({ ...orderX, enumOrder: 'alphabetical' })).ts).toContain(`export type reel = ['credits', 'feature', 'trailer'];`);
   });
 
   it('keeps the order of enum_range() when the session prints sortorders rounded (extra_float_digits=0)', async () => {
@@ -3621,53 +3445,92 @@ describe('enumOrder', () => {
     expect(schema).toContain(`export type take = [${labels.map((l: string) => `'${l}'`).join(', ')}];`);
   });
 
-  it('leaves enumDataForSchema() alphabetical; definitionForRelationInSchema() follows the config by default', async () => {
+  it('leaves enumDataForSchema() alphabetical; definitionForRelationInSchema() writes the declared order by default', async () => {
     const q = (query: pg.QueryConfig) => t.pool.query(query);
     const enums = await enumDataForSchema('public', q);
     expect(enums).toEqual({ mood: ['happy', 'ok', 'sad'] });  // as in Zapatos 6.6.1, whatever the config
     const products = (await relationsInSchema('public', q)).find(rel => rel.name === 'products')!;
-    const orders = [
-      [{ enumOrder: 'declared' }, `('draft' | 'published' | 'archived')`],
-      [{}, `('draft' | 'published' | 'archived')`],
-      [{ enumOrder: 'alphabetical' }, `('archived' | 'draft' | 'published')`],
-    ] as const;
-    for (const [order, union] of orders) {
-      const config = finaliseConfig({ ...quiet, ...order });
-      const def = await definitionForRelationInSchema(products, 'public', enums, {}, config, q);  // no enumsForSchema
-      expect(def).toContain(`status: ${union};`);
-    }
+    const config = finaliseConfig(quiet);
+    const def = await definitionForRelationInSchema(products, 'public', enums, {}, config, q);  // no enumsForSchema
+    expect(def).toContain(`status: ('draft' | 'published' | 'archived');`);
     const provider = async (schema: string): Promise<Record<string, string[]>> =>
       schema === 'extra' ? { status: ['published', 'draft', 'archived'] } : {};
     const columns: string[] = [];
-    for (const across of [true, false]) {
-      const def = await definitionForRelationInSchema(products, 'public', enums, {},
-        finaliseConfig({ ...quiet, typeEnumsAcrossSchemas: across }), q, undefined, provider, columns);
-      expect(def).toContain(across ? "status: ('published' | 'draft' | 'archived');" : 'status: c.PgStatus;');
-    }
-    expect(columns).toEqual(['public.products.status (extra.status)']);
+    expect(await definitionForRelationInSchema(products, 'public', enums, {}, config, q, undefined, provider, columns))
+      .toContain("status: ('published' | 'draft' | 'archived');");
+    expect(columns).toEqual([]);  // never filled from 8.0.0, which always writes a foreign enum's labels
   });
 
-  it('writes an enum of another schema in the same order, with typeEnumsAcrossSchemas', async () => {
-    for (const [order, union] of [[{ enumOrder: 'declared' }, `('yours' | 'theirs')`], [{ enumOrder: 'alphabetical' }, `('theirs' | 'yours')`]] as const) {
-      const { ts: schema, customTypeSourceFiles } = await codegen({ ...orderX, typeEnumsAcrossSchemas: true, ...order });
-      const block = tableBlock(schema, 't');
-      expect(block).toContain(`r: reel | null;`);
-      expect(block).toContain(`a: ${union} | null;`);
-      expect(block).toContain(`b: ${union}[] | null;`);
-      expect(block).toContain(`d: c.PgSt_d | null;`);
-      expect(customTypeSourceFiles.PgSt_d).toContain(`export type PgSt_d = ${union};`);
-      expect(tableBlock(schema, 'mv')).toContain(`a: ${union} | null;`);
-    }
+  it('writes an enum of another schema in the same order', async () => {
+    const { ts: schema, customTypeSourceFiles } = await codegen(orderX), union = `('yours' | 'theirs')`;
+    const block = tableBlock(schema, 't');
+    expect(block).toContain(`r: reel | null;`);
+    expect(block).toContain(`a: ${union} | null;`);
+    expect(block).toContain(`b: ${union}[] | null;`);
+    expect(block).toContain(`d: c.PgSt_d | null;`);
+    expect(customTypeSourceFiles.PgSt_d).toContain(`export type PgSt_d = ${union};`);
+    expect(tableBlock(schema, 'mv')).toContain(`a: ${union} | null;`);
   });
 
-  it("is optional in Config, read as 'declared' when absent; another value rejects before any query", async () => {
-    expect(finaliseConfig({}).enumOrder).toBeUndefined();
-    const right: Config = { enumOrder: 'declared' };
-    void right;
-    // @ts-expect-error 'alphabetical' or 'declared'
-    const wrong: Config = { enumOrder: 'declard' };
-    await expect(codegenWithoutQueries({ ...main, ...wrong })).rejects
-      .toThrow(`enumOrder must be 'declared' (the default) or 'alphabetical', not 'declard'`);
+});
+
+// decision 019 § 4: a key 8.0 removed, set to anything but the value it keeps, fails before the generator touches the
+// database, whichever way it comes in; the kept value and null ask for what 8.0 does
+describe('removed options', () => {
+  const removed = [['typeEnumsAcrossSchemas', false, true, 'true'], ['enumOrder', 'alphabetical', 'declared', '"declared"']] as const;
+  const messageOf = (key: string, kept: string) => `${key} was removed in 8.0, which always does what ${key}: ${kept} did; ` +
+    `delete it from the generator's config: https://pgcast.dev/switching#from-8-0-${key}`;
+
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgcast-removed-')); });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  describe.each(removed)('%s', (key, old, kept, written) => {
+    const message = messageOf(key, written);
+    // as a zapatosconfig.json or a variable gives it, past the types
+    const given = (value: unknown): Config => JSON.parse(JSON.stringify({ [key]: value }));
+
+    it.each([old, 'yes', 0])('rejects generate(), check() and tsForConfig() on %j before any query, writing nothing', async value => {
+      const queries: string[] = [];
+      const debugListener = (s: string) => { if (s.startsWith('>>> query')) queries.push(s); };
+      const config: Config = { ...main, ...quiet, debugListener, db: unreachable, outDir: dir, ...given(value) };
+      await expect(generate(config)).rejects.toThrow(message);
+      await expect(checkFiles(config)).rejects.toThrow(message);
+      // a CompleteConfig made by hand, which finaliseConfig() never saw
+      const complete = { ...finaliseConfig({ ...main, ...quiet, debugListener, db: unreachable }), ...given(value) };
+      await expect(tsForConfig(complete, debugListener)).rejects.toThrow(message);
+      expect(queries).toEqual([]);
+      expect(readdirSync(dir)).toEqual([]);
+    });
+
+    it.each([old, 'yes', 0])('rejects definitionForRelationInSchema() on %j in a CompleteConfig, before any query', async value => {
+      const products = (await relationsInSchema('public', query => t.pool.query(query))).find(rel => rel.name === 'products')!;
+      const queries: pg.QueryConfig[] = [];
+      const q = (query: pg.QueryConfig) => { queries.push(query); return t.pool.query(query); };
+      const complete = { ...finaliseConfig(quiet), ...given(value) };  // in a variable, which finaliseConfig() never saw
+      await expect(definitionForRelationInSchema(products, 'public', {}, {}, complete, q)).rejects.toThrow(message);
+      expect(queries).toEqual([]);
+    });
+
+    it.each(['pgcastconfig.json', 'zapatosconfig.json'])('rejects the CLI, with or without --check, on the key in %s', async file => {
+      writeFileSync(join(dir, file), JSON.stringify({ db: unreachable, outDir: join(dir, 'src'), [key]: old }));
+      await expect(runCli([], dir)).rejects.toThrow(message);
+      await expect(runCli(['--check'], dir)).rejects.toThrow(message);
+      expect(readdirSync(dir)).toEqual([file]);
+    });
+
+    it('rejects the CLI on the key in its JSON argument, over a file that lacks it', async () => {
+      writeFileSync(join(dir, 'pgcastconfig.json'), JSON.stringify({ db: unreachable, outDir: join(dir, 'src') }));
+      await expect(runCli([JSON.stringify({ [key]: old })], dir)).rejects.toThrow(message);
+      await expect(runCli(['--check', JSON.stringify({ [key]: old })], dir)).rejects.toThrow(message);
+      expect(readdirSync(dir)).toEqual(['pgcastconfig.json']);
+    });
+
+    it.each([kept, null])('generates what it generates without the key, given %j', async value => {
+      const without = await codegen(main), withKey = await codegen({ ...main, ...given(value) });
+      expect(withKey.ts).toBe(without.ts);
+      expect(customFiles(withKey.customTypeSourceFiles)).toBe(customFiles(without.customTypeSourceFiles));
+    });
   });
 });
 
@@ -3905,10 +3768,9 @@ describe('names that Object.prototype also has', () => {
     return added;
   };
 
-  it.each(names)('generates an enum named %s, in either order', async name => {
+  it.each(names)('generates an enum named %s, in its declared order', async name => {
     const schemas = { [`enum_${name}`]: all };
-    expect((await codegen({ schemas, enumOrder: 'alphabetical' })).ts).toContain(`export type ${name} = ['a', 'b'];`);
-    expect((await codegen({ schemas, enumOrder: 'declared' })).ts).toContain(`export type ${name} = ['b', 'a'];`);
+    expect((await codegen({ schemas })).ts).toContain(`export type ${name} = ['b', 'a'];`);
   });
 
   it.each(names)('gives enumDataForSchema() an enum named %s, in an object of Object.prototype as in Zapatos 6.6.1', async name => {
@@ -4143,13 +4005,6 @@ describe('generate()', () => {
     ]);
     for (const file of written) await expect(read(outDir, file)).toMatchFileSnapshot(join('../generated', file));
     expect(files(generatedDir).filter(f => f.startsWith('zapatos/'))).toEqual(written);  // no stale file
-  });
-
-  it('writes nothing for an invalid enumOrder', async () => {
-    const invalid = JSON.parse('{"enumOrder":"declard"}');
-    await expect(generate({ ...main, ...quiet, ...invalid, db: unreachable, outDir })).rejects
-      .toThrow("enumOrder must be 'declared' (the default) or 'alphabetical', not 'declard'");
-    expect(readdirSync(outDir)).toEqual([]);
   });
 
   it('keeps an existing placeholder, but overwrites the schema and custom/index.d.ts', async () => {
@@ -4398,15 +4253,12 @@ describe('the CLI with --check (#556)', () => {
     return { code, printed: printed() };
   };
 
-  it('checks the enum defaults and the explicit 6.x settings against the files on disk', async () => {
-    const legacy = { ...main, typeEnumsAcrossSchemas: false, enumOrder: 'alphabetical' as const };
-    writeFileSync(join(dir, 'pgcastconfig.json'), json(legacy));
+  // decision 019 § 4: what 8.0 does, asked for by the removed enum options' kept values and by JSON null
+  it('checks files generated with the removed enum options at their kept values against those generated without', async () => {
+    writeFileSync(join(dir, 'pgcastconfig.json'), json({ ...main, ...JSON.parse('{"typeEnumsAcrossSchemas":true,"enumOrder":"declared"}') }));
     expect(await runCli([], dir)).toBe(0);
     expect((await check(['--check'])).code).toBe(0);
-    const defaults = '{"typeEnumsAcrossSchemas":null,"enumOrder":null}';
-    expect((await check(['--check', defaults])).code).toBe(1);
-    expect(await runCli([defaults], dir)).toBe(0);
-    expect((await check(['--check', defaults])).code).toBe(0);
+    expect((await check(['--check', '{"typeEnumsAcrossSchemas":null,"enumOrder":null}'])).code).toBe(0);
     expect(await checkFiles({ ...main, ...quiet, db: db(), outDir })).toBe(true);
     expect(readFileSync(join(outDir, schemaFile), 'utf8')).toContain("status: ('draft' | 'published' | 'archived');");
   });
