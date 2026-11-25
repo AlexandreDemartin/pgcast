@@ -1,5 +1,5 @@
 ---
-english: d98e9ea0aa2d
+english: 4708cdc02b57
 ---
 
 # Écritures
@@ -80,7 +80,8 @@ Avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), le `RETUR
 - À côté de toutes les colonnes, chaque clé d’`extras` est un identifiant, chaque `"` doublé. Une clé vide, avec un NUL ou de plus de 63 octets en UTF-8, que Postgres refuserait ou tronquerait, lève une erreur à la compilation : passez `returning`, dont les clés restent des paramètres.
 - Une clé égale à une colonne, ou `$action` dans les `extras` d’`upsert()`, apparaît deux fois dans le JSON, et la dernière l’emporte, comme `||` la fait l’emporter.
 - Avec `returning`, un seul `json_build_object()` prend 100 arguments : au-delà de 50 clés, colonnes, `extras` et `$action` compris, une erreur est levée à la compilation.
-- À côté de toutes les colonnes, les `extras` s’exécutent dans une sous-requête sur la seule ligne, où Postgres accepte ce que `RETURNING` refuse. Option désactivée, un agrégat, une fonction de fenêtrage ou une fonction renvoyant un ensemble échoue (42803, 42P20, 0A000) ; activée, `count(*)` et `row_number() OVER ()` donnent 1, un agrégat d’une colonne échoue toujours, et une fonction renvoyant un ensemble échoue sur deux lignes (21000) et donne une ligne `null` sur aucune. Une écriture qui fonctionne option désactivée donne les mêmes valeurs une fois activée.
+- À côté de toutes les colonnes, les `extras` s’exécutent dans une sous-requête sur la seule ligne, où Postgres accepte ce que `RETURNING` refuse. Option désactivée, un agrégat, une fonction de fenêtrage ou une fonction renvoyant un ensemble échoue (42803, 42P20, 0A000) ; activée, `count(*)` et `row_number() OVER ()` donnent 1, un agrégat d’une colonne échoue toujours, et une fonction renvoyant un ensemble échoue sur deux lignes (21000) et donne une ligne `null` sur aucune. Un paramètre non typé, `extras: { u: db.param(5) }`, échoue option désactivée (42P18) et donne `"5"` une fois activée, car la sous-requête le type en `text`. Une écriture qui fonctionne option désactivée donne les mêmes valeurs une fois activée.
+- Le `result` d’une écriture lu depuis une CTE ou un template `sql` est en `json` : `DISTINCT`, `UNION` ou une fonction `jsonb` appliqués dessus demandent `::jsonb` ([Configuration](/fr/runtime-config#Config.shortcutsUseJson)).
 
 <!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'])) -->
 ```sql

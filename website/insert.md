@@ -76,7 +76,8 @@ With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), the `RETURNI
 - Beside every column, each `extras` key is one identifier, any `"` doubled. An empty key, one with a NUL, or one over 63 bytes in UTF-8, which Postgres would refuse or truncate, throws while compiling: give `returning`, whose keys stay parameters.
 - A key equal to a column, or `$action` in `upsert()`'s `extras`, comes twice in the JSON, and the last wins, as `||` makes it win.
 - With `returning`, one `json_build_object()` takes 100 arguments: over 50 keys, columns, `extras` and `$action` together, throw while compiling.
-- Beside every column, `extras` run in a subquery over the one row, where Postgres takes what `RETURNING` refuses. Off, an aggregate, a window function or a set-returning function fails (42803, 42P20, 0A000); on, `count(*)` and `row_number() OVER ()` give 1, an aggregate of a column still fails, and a set-returning function fails over two rows (21000) and gives a `null` row over none. A write that runs off gives the same values on.
+- Beside every column, `extras` run in a subquery over the one row, where Postgres takes what `RETURNING` refuses. Off, an aggregate, a window function or a set-returning function fails (42803, 42P20, 0A000); on, `count(*)` and `row_number() OVER ()` give 1, an aggregate of a column still fails, and a set-returning function fails over two rows (21000) and gives a `null` row over none. An untyped parameter, `extras: { u: db.param(5) }`, fails off (42P18) and gives `"5"` on, as the subquery types it `text`. A write that runs off gives the same values on.
+- A write's `result` read from a CTE or a `sql` template is `json`, so `DISTINCT`, `UNION` or a `jsonb` function over it needs `::jsonb` ([Configuration](/runtime-config#Config.shortcutsUseJson)).
 
 <!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'])) -->
 ```sql
