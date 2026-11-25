@@ -5,7 +5,7 @@
 - **In short**:
   - `valuesTypedAsAliases: true` writes each column's value in `Whereable`, `Insertable` and `Updatable` as an alias exported by `zapatos/db`, in place of the union written out on each line.
   - Three aliases: `WhereableValue<T>`, `InsertableValue<T, Extra>` and `UpdatableValue<T, Extra>`. `Extra` is `null | db.DefaultType` for a nullable column and `db.DefaultType` for one with a default.
-  - The types are the same; off, the output is unchanged. It becomes the default in 8.0, and `false` stays a choice.
+  - The types are the same; off, the output is unchanged. It becomes the default in 8.0, and `false` stays a choice: superseded by decision [019](./019-one-behaviour.md), where it is 8.0's only behaviour.
 
 ## Context
 
