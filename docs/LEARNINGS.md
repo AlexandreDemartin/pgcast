@@ -22,6 +22,14 @@ Candidates for a check, a rule or a skill line.
 - A test moved from a removed option to `updateColumns` "with the same SQL" is diffed against master's compiled text: the injection matrix compares rows with each other, never with master, so a lost hostile `EXCLUDED."…"` failed nothing (#981).
 - A migration entry's "Before → after" can hold only an "after": a review checks both code spans, in both languages (#981).
 - A `<!-- tsc -->` mark proves something only if the checker reads the span: break each new span in a scratch copy and see the check fail at its line and column; a passing count does not show it (#981).
+- A docs test of a migration entry (its heading, its quoted message) goes in the docs commit, not the code commit, so each commit stays green (#982).
+- A "PR #n" in a characterisation report row is committed after the PR opens, never as a placeholder (#982).
+- A refusal placed at entry points covers every exported function that read the key on master: `git grep <key> origin/master -- src`, each read traced up to its exported caller (`definitionForRelationInSchema()` was missed, #982).
+- A guard calling `Object.prototype.hasOwnProperty.call(arg, …)` on a public function's argument throws on `undefined`/`null` where the old `{ ...arg }` did not: replay `f(undefined)` on master and the branch (#982).
+- On the docs schema, `every.<enum>` is a type namespace, not a value: a migration example reads it at type level (`type X = s.every.crew_job[0]`) or as a tuple annotation (#982).
+- A `<!-- tsc -->` mark only checks a span whose tables exist in the docs schema; examples taken from the generator page (`prints`, `archive.*`) stay unchecked (#982).
+- `guard.mjs` refuses a plain `git merge origin/master`, a trial one too, since its commit has no trailer: `git merge --no-commit origin/master`, then `git commit -m "…" -m "Co-Authored-By: …"` (#982).
+- Two PRs adding entries to one docs section each with its own intro leave the second intro under the first PR's last `###`: one shared intro for the section, decided before the second PR opens (#982).
 
 ## Minors kept
 
@@ -30,3 +38,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `form` `README.md:87-88` (#981): the opt-ins table rows of `upsertRequiresSameKeys` and `undefinedMeansMissing` do not say "always on in 8.0, the key removed", as the other rows do; for #977 if not before.
 - `form` `website/switching.md` § from 8.0, `upsertRequiresSameKeys` entry (#981): its `updateColumns: ['votes']` example has every row give `votes`, so it shows no difference; a table whose rows differ on one column and share another outside the target would show it.
 - `defect` `website/switching.md:313` and `fr/:314` (#981): "A key a row lacks still sets that row's stored value to `DEFAULT`" now stands alone and reads as true of any missing key; it holds only for a key `updateColumns` names.
+- `form` `src/generate/tables.ts:215-217` `keepsText` (#982): its comment describes a case no test reaches since the `placeholder_hues` test went (the mutant `keepsText = false` keeps the 367 codegen tests green); say it is unreachable from 8.0.0, or freeze a case.
