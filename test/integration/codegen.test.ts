@@ -3671,6 +3671,57 @@ describe('enumOrder', () => {
   });
 });
 
+// decision 019 § 4: a key 8.0 removed, set to anything but the value it keeps, fails before the generator touches the
+// database, whichever way it comes in; the kept value and null ask for what 8.0 does
+describe('removed options', () => {
+  const removed = [['typeEnumsAcrossSchemas', false, true, 'true'], ['enumOrder', 'alphabetical', 'declared', '"declared"']] as const;
+  const messageOf = (key: string, kept: string) => `${key} was removed in 8.0, which always does what ${key}: ${kept} did; ` +
+    `delete it from the generator's config: https://pgcast.dev/switching#from-8-0-${key}`;
+
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgcast-removed-')); });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  describe.each(removed)('%s', (key, old, kept, written) => {
+    const message = messageOf(key, written);
+    // as a zapatosconfig.json or a variable gives it, past the types
+    const given = (value: unknown): Config => JSON.parse(JSON.stringify({ [key]: value }));
+
+    it.each([old, 'yes', 0])('rejects generate(), check() and tsForConfig() on %j before any query, writing nothing', async value => {
+      const queries: string[] = [];
+      const debugListener = (s: string) => { if (s.startsWith('>>> query')) queries.push(s); };
+      const config: Config = { ...main, ...quiet, debugListener, db: unreachable, outDir: dir, ...given(value) };
+      await expect(generate(config)).rejects.toThrow(message);
+      await expect(checkFiles(config)).rejects.toThrow(message);
+      // a CompleteConfig made by hand, which finaliseConfig() never saw
+      const complete = { ...finaliseConfig({ ...main, ...quiet, debugListener, db: unreachable }), ...given(value) };
+      await expect(tsForConfig(complete, debugListener)).rejects.toThrow(message);
+      expect(queries).toEqual([]);
+      expect(readdirSync(dir)).toEqual([]);
+    });
+
+    it.each(['pgcastconfig.json', 'zapatosconfig.json'])('rejects the CLI, with or without --check, on the key in %s', async file => {
+      writeFileSync(join(dir, file), JSON.stringify({ db: unreachable, outDir: join(dir, 'src'), [key]: old }));
+      await expect(runCli([], dir)).rejects.toThrow(message);
+      await expect(runCli(['--check'], dir)).rejects.toThrow(message);
+      expect(readdirSync(dir)).toEqual([file]);
+    });
+
+    it('rejects the CLI on the key in its JSON argument, over a file that lacks it', async () => {
+      writeFileSync(join(dir, 'pgcastconfig.json'), JSON.stringify({ db: unreachable, outDir: join(dir, 'src') }));
+      await expect(runCli([JSON.stringify({ [key]: old })], dir)).rejects.toThrow(message);
+      await expect(runCli(['--check', JSON.stringify({ [key]: old })], dir)).rejects.toThrow(message);
+      expect(readdirSync(dir)).toEqual(['pgcastconfig.json']);
+    });
+
+    it.each([kept, null])('generates what it generates without the key, given %j', async value => {
+      const without = await codegen(main), withKey = await codegen({ ...main, ...given(value) });
+      expect(withKey.ts).toBe(without.ts);
+      expect(customFiles(withKey.customTypeSourceFiles)).toBe(customFiles(without.customTypeSourceFiles));
+    });
+  });
+});
+
 describe('include entries that match no relation', () => {
   const unmatched = (name: string, schema: string) =>
     `Note: the include entry "${name}" of schema "${schema}" matches no relation there, so it generates nothing. ` +
