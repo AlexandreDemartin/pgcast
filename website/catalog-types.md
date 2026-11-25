@@ -117,7 +117,7 @@ In a session whose `TimeZone` is `UTC`, the first is the `Date` `2030-03-01T19:3
 
 ## Why the shortcuts return JSON
 
-Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_json()` or `json_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `jsonb_agg()`.
+Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_json()` or `json_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `json_agg()`.
 
 That's how `select()` brings back films with their cast already in place, in one round trip, with nothing to assemble in JavaScript afterwards.
 

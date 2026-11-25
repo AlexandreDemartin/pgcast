@@ -9,7 +9,7 @@ Choose the columns the index needs and order the films by ID. Inside the transac
 
 <<< ./examples/plain/cursors_films.ts{ts twoslash}
 
-Hover over `films` for its type, `{ id: number; title: string }[]`. It’s the type [`select()`](/select#select) gives for the same columns. Use [`selectRows()`](/select#selectRows) here so Postgres returns one row per film. A cursor over `select()` would fetch its single aggregate row (`jsonb_agg`) and give the index all four films at once.
+Hover over `films` for its type, `{ id: number; title: string }[]`. It’s the type [`select()`](/select#select) gives for the same columns. Use [`selectRows()`](/select#selectRows) here so Postgres returns one row per film. A cursor over `select()` would fetch its single aggregate row (`json_agg`) and give the index all four films at once.
 
 The example index logs IDs 1000 and 1001 together, then 1002 and 1003. With a batch size of three, the second batch holds just the fourth film. The values in the declaration are `['id', 'title']`.
 

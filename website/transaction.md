@@ -468,7 +468,7 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-- After `CURSOR FOR` comes the fragment's own text, with its values, as a `sql` template nests a fragment. A `select()` passed as is sends its `json_agg` query, so it reads in one batch, the whole array, as its type says. For its rows one by one, typed as `select()` types them, give [`selectRows()`](/select#selectRows), the same query without `jsonb_agg`.
+- After `CURSOR FOR` comes the fragment's own text, with its values, as a `sql` template nests a fragment. A `select()` passed as is sends its `json_agg` query, so it reads in one batch, the whole array, as its type says. For its rows one by one, typed as `select()` types them, give [`selectRows()`](/select#selectRows), the same query without `json_agg`.
 - `pgcast_cursor_<n>` takes the lowest number that no other `cursor()` still running on that client holds: nested loops get 1, then 2; a loop after another gets 1 again; two at once get two names. Don't name a cursor of yours `pgcast_cursor_<n>`.
 - `NO SCROLL`: it only fetches forward. Without it, whether Postgres could fetch backward would depend on the plan. It is also the form a `FOR UPDATE` query needs, whose rows are locked as each batch is fetched, not before.
 - Postgres takes no parameter in `FETCH FORWARD`, so the size is written into the SQL once it has been checked.
