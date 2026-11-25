@@ -134,6 +134,7 @@ The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin
 9. Done: [Show what pgcast can do in its docs](https://github.com/AlexandreDemartin/pgcast/issues/891).
 10. Done: [Keep type-checking cheap on large schemas](https://github.com/AlexandreDemartin/pgcast/issues/919).
 11. Done: [Make large and nested reads and writes cheap, with the same types](https://github.com/AlexandreDemartin/pgcast/issues/942).
+12. [Ship 8.0 with one behaviour per option, the best](https://github.com/AlexandreDemartin/pgcast/issues/963).
 
 ## Relationship with Zapatos
 
