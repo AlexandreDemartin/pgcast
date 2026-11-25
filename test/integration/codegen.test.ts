@@ -13,7 +13,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { constants, tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -4472,6 +4472,35 @@ describe('the CLI with --check (#556)', () => {
       if (code === 'P0001') expect(result.stdout).toContain('introspection fails on purpose');
       expect(result.stdout).not.toMatch(/PGCAST_DEP006|handler ran/);
     };
+
+    // what the CLI prints on a failed query, pinned as 7.x printed it, but the error's stack frames
+    const frameless = (stdout: string) => stdout.replace(/(\n {4}at [^\n]*)+ \{\n/, '\n    at … {\n');
+    const refused = [
+      '*** error 0 *** Error: connect ECONNREFUSED 127.0.0.1:1', '    at … {', `  errno: -${constants.errno.ECONNREFUSED},`,
+      "  code: 'ECONNREFUSED',", "  syscall: 'connect',", "  address: '127.0.0.1',", '  port: 1', '}', '',
+    ].join('\n');
+
+    it.each(['pgcast', 'zapatos'])('%s prints a failed query on stdout, *** error <seq> *** and the error, and exits with code 1', name => {
+      for (const flags of [[], ['--check']]) {
+        const result = child([join(build, name), ...flags, json({ db: unreachable })]);
+        expect({ ...result, stdout: frameless(result.stdout) }).toEqual({ status: 1, stdout: refused, stderr: '' });
+        const trapped = child([join(build, name), ...flags, json({ db: { connectionString: '{{PGCAST_CHECK_URL}}', options: trapPath } })]);
+        expect(trapped).toMatchObject({ status: 1, stderr: '' });
+        expect(trapped.stdout.split('\n')[0]).toBe('*** error 0 *** error: introspection fails on purpose');
+        expect(trapped.stdout).toMatch(/\n {2}code: 'P0001',\n/);
+        expect(existsSync(outDir)).toBe(false);
+      }
+    }, 30_000);
+
+    // a query still waiting for one of the pool's connections never holds the process once the run has failed
+    it.each([{}, { max: 1, connectionTimeoutMillis: 20_000 }])('exits on a refused connection within 10 s, with the pool options %j', pool => {
+      const started = Date.now();
+      const { status, signal, stdout } = spawnSync(process.execPath, [join(build, 'pgcast'), json({ db: { ...unreachable, ...pool } })], {
+        cwd: dir, encoding: 'utf8', env: { ...process.env, NODE_PATH: join(root, 'node_modules') }, timeout: 10_000,
+      });
+      expect({ status, signal, stdout: frameless(stdout) }).toEqual({ status: 1, signal: null, stdout: refused });
+      expect(Date.now() - started).toBeLessThan(10_000);
+    }, 15_000);
 
     describe.each(['generate', 'tsForConfig', 'check'])('%s on a failed query', method => {
       it.each([undefined, null, true, false])('preserves the driver error or exits with rejectOnQueryError = %s', option => {
