@@ -1,5 +1,5 @@
 ---
-english: 451d25a828e4
+english: 8d5a20d9c5e7
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -295,7 +295,7 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 
 :::
 
-Chaque option ci-dessous a quitté `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable, du JavaScript, `pgcastconfig.json`, `zapatosconfig.json` ou l’argument JSON de la CLI, une option d’exécution fait lever une erreur à `setConfig()`, et une option du générateur fait rejeter la promesse de `generate()` et de `check()`, et arrêter la CLI, avant la première requête et sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`, que la configuration écarte alors. Un programme ou une configuration qui n’a jamais donné l’option ne voit aucun changement.
+Chaque option ci-dessous a quitté `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable, du JavaScript, `pgcastconfig.json`, `zapatosconfig.json` ou l’argument JSON de la CLI, une option d’exécution fait lever une erreur à `setConfig()`, et une option du générateur fait rejeter la promesse de `generate()` et de `check()`, et arrêter la CLI, avant la première requête et sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`, que la configuration écarte alors. Un programme ou une configuration qui n’a jamais donné l’option ne voit aucun changement, sauf si son entrée commence par **Tout programme voit ce changement** : la 8.0 change alors la valeur par défaut de la 7.x.
 
 ### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
 
@@ -417,6 +417,8 @@ La 8.0 supprime l’interface `ConfigTypes` avec `aggregatesTypedByColumn`, la s
 - **Avant → après** : supprimez la déclaration, et le fichier s’il ne contenait rien d’autre. Si elle contenait `false`, lisez d’abord [`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn).
 
 ### `shortcutsUseJson` {#from-8-0-shortcutsUseJson}
+
+**Tout programme voit ce changement.**
 
 La 8.0 fait toujours ce que faisait `shortcutsUseJson: true` : [`select()`](/fr/select#json-functions) et ses semblables, et le `RETURNING` des [écritures](/fr/insert#json-functions), construisent leur JSON avec `to_json`, `json_build_object` et `json_agg`, là où la valeur par défaut de la 7.x, `false`, utilisait leurs équivalents `jsonb`. Les valeurs sont les mêmes, et un `lateral` de 20 films sous chacun de 1000 studios prend un tiers du temps ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)).
 

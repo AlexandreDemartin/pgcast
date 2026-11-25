@@ -294,7 +294,7 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 
 :::
 
-Each option below has left `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable, `pgcastconfig.json`, `zapatosconfig.json`, the CLI's JSON argument or JavaScript, a runtime option makes `setConfig()` throw, and a generator option makes `generate()`, `check()` and the CLI reject before any query and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`, which the configuration then drops. A program or config that never set the option sees no change.
+Each option below has left `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable, `pgcastconfig.json`, `zapatosconfig.json`, the CLI's JSON argument or JavaScript, a runtime option makes `setConfig()` throw, and a generator option makes `generate()`, `check()` and the CLI reject before any query and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`, which the configuration then drops. A program or config that never set the option sees no change, unless its entry opens with **Every program sees this change**: 8.0 then switches the 7.x default.
 
 ### `undefinedMeansMissing` {#from-8-0-undefinedMeansMissing}
 
@@ -416,6 +416,8 @@ try {
 - **Before → after**: delete the declaration, and the file if it held nothing else. With `false` in it, read [`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn) first.
 
 ### `shortcutsUseJson` {#from-8-0-shortcutsUseJson}
+
+**Every program sees this change.**
 
 8.0 always does what `shortcutsUseJson: true` did: [`select()`](/select#json-functions) and its kin, and the `RETURNING` of [the writes](/insert#json-functions), build their JSON with `to_json`, `json_build_object` and `json_agg`, where the 7.x default, `false`, used their `jsonb` twins. The values are the same, and a `lateral` of 20 films under each of 1000 studios takes a third of the time ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)).
 
