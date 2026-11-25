@@ -41,21 +41,24 @@ It uses the `zapatos/*` names. Installed under the `pgcast` alias, with `moduleN
 The SQL it runs, in one round trip:
 
 ```sql
-SELECT coalesce(jsonb_agg(result), '[]') AS result
+SELECT coalesce(json_agg(result), '[]') AS result
 FROM (
-  SELECT to_jsonb("films".*) || jsonb_build_object($1::text, "lateral_cast".result) AS result
-  FROM "films"
-  LEFT JOIN LATERAL (
-    SELECT coalesce(jsonb_agg(result), '[]') AS result
-    FROM (
-      SELECT to_jsonb("roles".*) AS result
-      FROM "roles"
-      WHERE ("film_id" = "films"."id")
-      ORDER BY "billing" ASC
-    ) AS "sq_roles"
-  ) AS "lateral_cast" ON true
+  SELECT to_json("row_films".*) AS result
+  FROM (
+    SELECT "films".*, "lateral_cast".result AS "cast"
+    FROM "films"
+    LEFT JOIN LATERAL (
+      SELECT coalesce(json_agg(result), '[]') AS result
+      FROM (
+        SELECT to_json("roles".*) AS result
+        FROM "roles"
+        WHERE ("film_id" = "films"."id")
+        ORDER BY "billing" ASC
+      ) AS "sq_roles"
+    ) AS "lateral_cast" ON true
+  ) AS "row_films"
 ) AS "sq_films"
--- values: ["cast"]
+-- values: []
 ```
 
 The type you get, with no annotation (`s` is `zapatos/schema`, the generated module):
@@ -100,8 +103,8 @@ What pgcast adds, one line each, with its version: [What's new](https://pgcast.d
 | `intervalsTypedAsObjects` (generator): an `interval` is typed in `Selectable` as `pg`'s default type parser returns it, a `db.PostgresInterval`, which a write takes back ([generator](https://pgcast.dev/generator#generate.intervalsTypedAsObjects)), rather than as its text; `false` keeps the text, for a type parser of your own | a note through `warningListener` | 6.7.0 |
 | `domainsTypedAsUnions` (generator): a domain over `text` whose `CHECK` lists its values, `CHECK (VALUE IN ('U', 'PG'))`, is declared as their union, which a new placeholder names ([generator](https://pgcast.dev/generator#generate.domainsTypedAsUnions)), rather than typed by a placeholder that holds `string`; one already on disk stays yours | none | 6.10.0 |
 | `valuesTypedAsAliases` (generator): each column's value type in `Whereable`, `Insertable` and `Updatable` names an alias of `zapatos/db`, `db.WhereableValue<number>`, with the same types ([generator](https://pgcast.dev/generator#generate.valuesTypedAsAliases)), rather than spelling out its union; the only behaviour in 8.0 | none | 7.2.0 |
-| [`topLevelSelectAsRows`](https://pgcast.dev/runtime-config#Config.topLevelSelectAsRows): a `select()` run or compiled on its own sends `selectRows()`'s query, one row per result, rather than one `jsonb_agg` value; nested, it keeps the aggregate; the only behaviour in 8.0 | none | 7.3.0 |
-| [`shortcutsUseJson`](https://pgcast.dev/runtime-config#Config.shortcutsUseJson): `select()` and its kin, and the `RETURNING` of the writes, build their JSON with `to_json`, `json_build_object` and `json_agg` rather than their `jsonb` twins, with the same values but for a row's key order, a nested result's type, `json`, and a `float8` `-0`, which stays `-0`; the only behaviour in 8.0 | none | 7.3.0 |
+| [`topLevelSelectAsRows`](https://pgcast.dev/runtime-config#Config.topLevelSelectAsRows): a `select()` run or compiled on its own sends `selectRows()`'s query, one row per result, rather than one `json_agg` value; nested, it keeps the aggregate; the only behaviour in 8.0 | none | 7.3.0 |
+| [`shortcutsUseJson`](https://pgcast.dev/runtime-config#Config.shortcutsUseJson), through 7.x: `select()` and its kin, and the `RETURNING` of the writes, build their JSON with `to_json`, `json_build_object` and `json_agg` rather than their `jsonb` twins, with the same values but for a row's key order, a nested result's type, `json`, and a `float8` `-0`, which stays `-0`; the only behaviour in 8.0 | none | 7.3.0 |
 
 Everything else: the [changelog](https://pgcast.dev/changelog); what the characterisation of 6.6.1 found: [its report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md).
 
@@ -112,7 +115,7 @@ Everything else: the [changelog](https://pgcast.dev/changelog); what the charact
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
 - **7.0** switches the opt-in defaults of decision 003, except `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in through 7.x; the [migration guide](https://pgcast.dev/switching#from-7-0) also covers changes without a 6.x warning.
   In 7.x, set `undefinedMeansMissing: false` or `upsertRequiresSameKeys: false` independently to keep the corresponding 6.x write behaviour without a warning. The three transaction checks also default to `true`. Set any one to `false` for its 6.x behaviour without a warning through 7.x.
-- **8.0** keeps one behaviour per option, the best ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)): it removes the 7.x old values, `rejectOnQueryError: false` included, and makes [`shortcutsUseJson`](https://pgcast.dev/runtime-config#Config.shortcutsUseJson), [`topLevelSelectAsRows`](https://pgcast.dev/runtime-config#Config.topLevelSelectAsRows) and the generator's [`valuesTypedAsAliases`](https://pgcast.dev/generator#generate.valuesTypedAsAliases) and `domainsTypedAsUnions` the only behaviour; `selectExactlyOneChecksForSecondRow` goes, `selectExactlyOne()` always `LIMIT 1`. A removed key throws, unless set to the value 8.0 always behaves as, `null` or `undefined` ([8.0 migration](https://pgcast.dev/switching#from-8-0)). `enumArraysTypedAsText` and `intervalsTypedAsObjects` stay, as they say how your `pg` parses, and so does the generator's addition `constraintNames`, off by default.
+- **8.0** keeps one behaviour per option, the best ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)): it removes the 7.x old values, `rejectOnQueryError: false` included, and makes [`shortcutsUseJson`](https://pgcast.dev/switching#from-8-0-shortcutsUseJson), [`topLevelSelectAsRows`](https://pgcast.dev/runtime-config#Config.topLevelSelectAsRows) and the generator's [`valuesTypedAsAliases`](https://pgcast.dev/generator#generate.valuesTypedAsAliases) and `domainsTypedAsUnions` the only behaviour; `selectExactlyOneChecksForSecondRow` goes, `selectExactlyOne()` always `LIMIT 1`. A removed key throws, unless set to the value 8.0 always behaves as, `null` or `undefined` ([8.0 migration](https://pgcast.dev/switching#from-8-0)). `enumArraysTypedAsText` and `intervalsTypedAsObjects` stay, as they say how your `pg` parses, and so does the generator's addition `constraintNames`, off by default.
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
 
 ## Documentation

@@ -217,7 +217,7 @@ const word = bytes.toString();  // 'Larkspur'
 
 ## Dates and times {#dates-and-times}
 
-A date or time in a `JSONSelectable` is the string `to_jsonb()` writes, ISO 8601. A `timestamptz` carries the session's `TimeZone` offset: `'2030-03-01T19:30:00+00:00'` in `UTC`, `'2030-03-02T01:00:00+05:30'` in `Asia/Kolkata`.
+A date or time in a `JSONSelectable` is the string `to_json()` writes, ISO 8601. A `timestamptz` carries the session's `TimeZone` offset: `'2030-03-01T19:30:00+00:00'` in `UTC`, `'2030-03-02T01:00:00+05:30'` in `Asia/Kolkata`.
 
 <CastPanel example="toDate">
 

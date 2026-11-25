@@ -18,7 +18,7 @@ Builds one `SELECT` of the rows of `table` that match `where`. It returns a [`SQ
 - `options`: the [options](#options) below, all optional.
 - `mode` and `aggregate`: what `selectOne()`, `count()` and the others pass; see [`SelectResultMode`](#SelectResultMode).
 
-For its rows one by one, as [`cursor()`](/transaction#cursor) reads them, the same query without `jsonb_agg`: [`selectRows()`](#selectRows).
+For its rows one by one, as [`cursor()`](/transaction#cursor) reads them, the same query without `json_agg`: [`selectRows()`](#selectRows).
 
 <CastPanel example="select">
 
@@ -28,9 +28,9 @@ For its rows one by one, as [`cursor()`](/transaction#cursor) reads them, the sa
 
 ### The SQL it writes
 
-- Each row is one `jsonb` value, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, so dates and times come back as strings and `bigint` as a number: the `JSONSelectable` types say so ([The catalog](/catalog-types)).
-- The rows are gathered into one array, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, around a subquery aliased `"sq_<alias or table>"`, so `ORDER BY` and `LIMIT` apply to the rows. One query, one value back. On large values, many rows or nested laterals, that JSON costs: [Performance](/performance), and [With `shortcutsUseJson`](#shortcutsUseJson).
-  - From 7.3.0, with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), a `select()` run or compiled on its own sends the rows themselves, `SELECT to_jsonb("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all)) -->, [`selectRows()`](#selectRows)'s query, and `.run()` gives the same array; nested, it keeps the aggregate.
+- Each row is one `json` value, `to_json("films".*)`<!-- probe: examples/select.ts -->, so dates and times come back as strings and `bigint` as a number: the `JSONSelectable` types say so ([The catalog](/catalog-types)).
+- The rows are gathered into one array, `coalesce(json_agg(result), '[]')`<!-- probe: examples/select.ts -->, around a subquery aliased `"sq_<alias or table>"`, so `ORDER BY` and `LIMIT` apply to the rows. One query, one value back. On large values, many rows or nested laterals, that JSON costs: [Performance](/performance), and [The JSON it builds](#json-functions).
+  - From 7.3.0, with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), a `select()` run or compiled on its own sends the rows themselves, `SELECT to_json("films".*) AS result FROM "films"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', db.all)) -->, [`selectRows()`](#selectRows)'s query, and `.run()` gives the same array; nested, it keeps the aggregate.
 - Inside, the clauses come in this order: `SELECT [DISTINCT …]` · the columns `AS result` · `FROM` the table `[AS alias]` · each `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` or `FETCH FIRST … WITH TIES` · `OFFSET` · each `FOR …` lock.
 - Every value is a parameter (`$1`, `$2`); every name is quoted as Postgres quotes it, any `"` in it doubled. Zapatos 6.6.1 let a name that held a `"` close its quotes; pgcast fixed this ([changelog](/changelog#6.6.2-security)).
 
@@ -40,13 +40,13 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| `columns: ['title']` | `jsonb_build_object($1::text, "title")`<!-- probe: db.select('films', db.all, { columns: ['title'] }) --> in place of `to_jsonb("films".*)` | only those keys (`JSONOnlyColsForTable`) |
+| `columns: ['title']` | `json_build_object($1::text, "title")`<!-- probe: db.select('films', db.all, { columns: ['title'] }) --> in place of `to_json("films".*)` | only those keys (`JSONOnlyColsForTable`) |
 | `order: { by: 'title', direction: 'ASC' }` | `ORDER BY "title" ASC`<!-- probe: db.select('films', db.all, { order: { by: 'title', direction: 'ASC' } }) --> | none |
 | `limit: 2` | `LIMIT $1`<!-- probe: db.select('films', db.all, { limit: 2 }) --> | none |
 | `offset: 2` | `OFFSET $1`<!-- probe: db.select('films', db.all, { offset: 2 }) --> | none |
 | `withTies: true` | `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, limit: 2, withTies: true }) --> in place of `LIMIT $1` | none |
-| `extras: { cinema: 'name' }` | `\|\| jsonb_build_object($1::text, "name")`<!-- probe: db.select('cinemas', db.all, { extras: { cinema: 'name' } }) --> | a key per extra (`ExtrasResult`) |
-| `lateral: { cast: … }` | `LEFT JOIN LATERAL (…) AS "lateral_cast" ON true`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) -->, read by `\|\| jsonb_build_object($1::text, "lateral_cast".result)`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> | a key per subquery (`LateralResult`) |
+| `extras: { cinema: 'name' }` | `"name" AS "cinema"`<!-- probe: db.select('cinemas', db.all, { extras: { cinema: 'name' } }) --> beside the columns ([below](#json-functions)) | a key per extra (`ExtrasResult`) |
+| `lateral: { cast: … }` | `LEFT JOIN LATERAL (…) AS "lateral_cast" ON true`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) -->, read by `"lateral_cast".result AS "cast"`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> | a key per subquery (`LateralResult`) |
 | `lateral: …`, one subquery | `"lateral_passthru".result`<!-- probe: db.select('films', db.all, { lateral: db.select('roles', { film_id: db.parent('id') }) }) --> in place of the columns, and its `LEFT JOIN LATERAL` | the subquery's result, in place of the row |
 | `alias: 'mentor'` | `FROM "crew" AS "mentor"`<!-- probe: db.select('crew', db.all, { alias: 'mentor' }) -->, then `"mentor"` for the table | none |
 | `distinct: true` | `SELECT DISTINCT`<!-- probe: db.select('films', db.all, { distinct: true }) --> | none |
@@ -59,24 +59,26 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 `columns`, `extras` and `lateral` change the type only with `strictNullChecks` (or `strict`) on. Without it, the result stays the full `JSONSelectable` and an extra or a lateral key is not in the type; the type refuses nothing, not even `columns` beside one `lateral` subquery, and one subquery is typed as the table's row while its own result comes back.
 :::
 
-### With `shortcutsUseJson` {#shortcutsUseJson}
+### The JSON it builds {#json-functions}
 
-From 7.3.0. With [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), each row and the array are built with `json` functions, in place of their `jsonb` twins. The values and the types are the same, but for a row's key order and a nested result's type, `json`.
+From 8.0.0, each row and the array are built with `json` functions, which keep the text as Postgres writes it, where `jsonb` parses and sorts it: on 1000 studios with a `lateral` of 20 films each, 37 ms in place of 110 ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Through 7.x, they were `jsonb` unless [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson) was set ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
-| Option | SQL with `shortcutsUseJson` |
+- A row's keys come in the table's order, then `extras`, then the `lateral` keys.
+- A nested result is `json`: a `jsonb` function over it fails with 42883, and so do `DISTINCT` and `UNION`; `->` and `->>` work, and so does a cast, `::jsonb`.
+
+| Option | SQL |
 |---|---|
-| none | `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->, and the array `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> |
-| `columns`, with or without `extras` and `lateral` | one `json_build_object($1::text, "title", $2::text, upper("title"))`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { columns: ['title'], extras: { upper: db.sql`upper(${'title'})` } })) -->, its keys parameters |
-| `extras` or `lateral`, beside every column | `to_json("row_films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) --> of the row with its keys as aliases, `"lateral_cast".result AS "cast"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) -->, in a subquery `AS "row_films"`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } })) --> |
-| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { distinct: true })) -->, as `json` has no equality, under `json_agg`; over a passed-through `select()`, `selectOne()` or `selectExactlyOne()`, `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) })) --> |
+| `columns`, with or without `extras` and `lateral` | one `json_build_object($1::text, "title", $2::text, upper("title"))`<!-- probe: db.select('films', db.all, { columns: ['title'], extras: { upper: db.sql`upper(${'title'})` } }) -->, its keys parameters |
+| `extras` or `lateral`, beside every column | `to_json("row_films".*)`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> of the row with its keys as aliases, `"lateral_cast".result AS "cast"`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) -->, in a subquery `AS "row_films"`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> |
+| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: db.select('films', db.all, { distinct: true }) -->, as `json` has no equality, under `json_agg`; over a passed-through `select()`, `selectOne()` or `selectExactlyOne()`, `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) }) --> |
 
 - Beside every column, each key is one identifier, any `"` doubled. An empty key, one with a NUL, or one over 63 bytes in UTF-8, which Postgres would refuse or truncate, throws while compiling: give `columns`, whose keys stay parameters.
-- There, a string `order.by` or `distinct` is written after the table, `ORDER BY "films"."title" ASC`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all, { order: { by: 'title', direction: 'ASC' }, extras: { upper: db.sql`upper(${'title'})` } })) -->, unless it holds a `.`: a bare name would also match a key of that name (42702). So `by: 'result'` names the table's column. A `sql` fragment is written as given, so a bare name in it that equals a key fails with 42702: `` by: db.sql`${'title'}` `` beside `extras: { title: … }`, and the same in `distinct` or beside a `lateral` key. Write it qualified, `` db.sql`${'films'}.${'title'}` ``.
+- There, a string `order.by` or `distinct` is written after the table, `ORDER BY "films"."title" ASC`<!-- probe: db.select('films', db.all, { order: { by: 'title', direction: 'ASC' }, extras: { upper: db.sql`upper(${'title'})` } }) -->, unless it holds a `.`: a bare name would also match a key of that name (42702). So `by: 'result'` names the table's column. A `sql` fragment is written as given, so a bare name in it that equals a key fails with 42702: `` by: db.sql`${'title'}` `` beside `extras: { title: … }`, and the same in `distinct` or beside a `lateral` key. Write it qualified, `` db.sql`${'films'}.${'title'}` ``.
 - A key equal to a column comes twice in the JSON, and the last wins, as `||` makes it win.
 - With `columns`, one `json_build_object()` takes 100 arguments: over 50 keys, columns, `extras` and `lateral` keys together, throw while compiling.
 - A passed-through `lateral`, but under `distinct: true`, and the [aggregates](/aggregates) keep their SQL; the subquery builds its own with `json`.
 
-<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } })) -->
+<!-- probe: db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } }) -->
 ```sql
 SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_films".*) AS result FROM (SELECT "films".*, "lateral_cast".result AS "cast" FROM "films" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "character") AS result FROM "roles" WHERE ("film_id" = "films"."id")) AS "sq_roles") AS "lateral_cast" ON true WHERE ("studio_id" = $2) ORDER BY "films"."title" ASC) AS "row_films") AS "sq_films"
 -- ["character", 1000]
@@ -151,7 +153,7 @@ Give the count a key to read it as JSON. The ungrouped count below returns one r
 
 <!-- probe: db.selectExactlyOne('studios', { id: 1000 }, { columns: [], lateral: { n: db.count('films', { studio_id: db.parent('id') }) } }) -->
 ```sql
-SELECT jsonb_build_object() || jsonb_build_object($1::text, "lateral_n".result) AS result FROM "studios" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_n" ON true WHERE ("id" = $2) LIMIT $3
+SELECT json_build_object($1::text, "lateral_n".result) AS result FROM "studios" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_n" ON true WHERE ("id" = $2) LIMIT $3
 -- ["n", 1000, 1]
 ```
 
@@ -161,7 +163,7 @@ For a string with each selector, convert the timestamp to JSON in the subquery a
 
 <!-- probe: db.select('studios', { id: 1000 }, { lateral: db.sql`SELECT to_jsonb(now()) AS result` }) -->
 ```sql
-SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "studios" LEFT JOIN LATERAL (SELECT to_jsonb(now()) AS result) AS "lateral_passthru" ON true WHERE ("id" = $1)) AS "sq_studios"
+SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "studios" LEFT JOIN LATERAL (SELECT to_jsonb(now()) AS result) AS "lateral_passthru" ON true WHERE ("id" = $1)) AS "sq_studios"
 -- [1000]
 ```
 
@@ -242,7 +244,7 @@ A `null` that gets past the type, from JavaScript or JSON: `null` options are no
 db.selectOne(table, where, options?)
 ```
 
-As [`select()`](#select), with `LIMIT $1`<!-- probe: db.selectOne('films', db.all) -->, its value `1`, and no `jsonb_agg`: `.run(pool)` gives the first row, or `undefined` when none matches. Any `limit` you pass is replaced by `1`; `offset` and the other options are kept. In a `lateral`, its key holds the row or `null`.
+As [`select()`](#select), with `LIMIT $1`<!-- probe: db.selectOne('films', db.all) -->, its value `1`, and no `json_agg`: `.run(pool)` gives the first row, or `undefined` when none matches. Any `limit` you pass is replaced by `1`; `offset` and the other options are kept. In a `lateral`, its key holds the row or `null`.
 
 With `withTies`, it writes `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, here and in `selectExactlyOne()`; Postgres refuses it without `order` (42601). `.run()` then gives one of the tied rows; in a `lateral` under an outer `select()`, the parent row comes back once per tie.
 
@@ -286,13 +288,13 @@ Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran, or, for 
 db.selectRows(table, where, options?)
 ```
 
-From 6.12.0. The query [`select()`](#select) wraps in `jsonb_agg`, as a fragment of its own, one row per result: for [`cursor()`](/transaction#cursor), which runs exactly the fragment it is given, and so reads a `select()` as one row, its whole array. It takes `select()`'s `table`, `where` and [options](#options), and `.run(pool)` returns an array with one element per result row, or `[]` when none match.
+From 6.12.0. The query [`select()`](#select) wraps in `json_agg`, as a fragment of its own, one row per result: for [`cursor()`](/transaction#cursor), which runs exactly the fragment it is given, and so reads a `select()` as one row, its whole array. It takes `select()`'s `table`, `where` and [options](#options), and `.run(pool)` returns an array with one element per result row, or `[]` when none match.
 
 | Call | SQL |
 |---|---|
-| `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
-| `db.select(…)`, the same arguments | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, the same query inside, with the same values |
-| `db.select(…)` with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0 | `selectRows()`'s query, run or compiled on its own; a single `lateral` passed through is converted above it, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
+| `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
+| `db.select(…)`, the same arguments | `SELECT coalesce(json_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, the same query inside, with the same values |
+| `db.select(…)` with [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0 | `selectRows()`'s query, run or compiled on its own; a single `lateral` passed through is converted above it, `SELECT to_json(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> |
 
 A studio's films, read 100 at a time:
 
@@ -301,7 +303,7 @@ A studio's films, read 100 at a time:
 <!-- probe: db.readCommitted(pool, async txnClient => { for await (const _ of db.cursor(txnClient, db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }), { batchSize: 100 })) { } }) -->
 ```sql
 START TRANSACTION ISOLATION LEVEL READ COMMITTED
-DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC
+DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC
 FETCH FORWARD 100 FROM pgcast_cursor_1
 -- the same FETCH again, until one returns no row
 CLOSE pgcast_cursor_1

@@ -25,7 +25,7 @@ db.setConfig({
   - Zapatos 6.6.1 set the key to `undefined`. After `transactionAttemptsMax: undefined`, `transaction()` gave up after its first attempt ("… on attempt 1 of undefined, giving up"); after `transactionRetryDelay: undefined`, every `transaction()` rejected with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined." and never released the client it took from a pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - It returns a copy of the new configuration, as `getConfig()` does: changing that object changes nothing. Zapatos 6.6.1 returned the configuration itself ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - It keeps the `transactionRetryDelay` object you give it, not a copy: changing its `minMs` or `maxMs` afterwards changes the configuration.
-- A key 8.0 removed, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient), [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) or [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), does not compile (TS2353). Given anyway, from a variable or JavaScript, it throws unless its value is the one 8.0 always behaves as (`true`), `null` or `undefined`, and the configuration keeps none of them. Error: `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
+- A key 8.0 removed, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient), [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) or [`shortcutsUseJson`](#Config.shortcutsUseJson), does not compile (TS2353). Given anyway, from a variable or JavaScript, it throws unless its value is the one 8.0 always behaves as (`true`), `null` or `undefined`, and the configuration keeps none of them. Error: `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
 - An unknown key does not compile (TS2353), and neither does a value of the wrong type (TS2322):
 
 ```ts twoslash
@@ -69,7 +69,6 @@ interface Config {
   castArrayParamsToJson: boolean;
   castObjectParamsToJson: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
-  shortcutsUseJson?: boolean;
   topLevelSelectAsRows?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
@@ -89,7 +88,6 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | an array parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> in place of `$1` | at each `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | a plain object parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> in place of `$1` | at each `compile()` |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a standalone `selectExactlyOne()` requests two rows and rejects on a second | at each `selectExactlyOne()` |
-| [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` and its kin, and the writes' `RETURNING`, build their JSON with `json` functions: `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | at each `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()`, `withCTEs()`, `insert()`, `upsert()`, `update()` and `deletes()` |
 | [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) | `false` | a standalone `select()` sends `selectRows()`'s query, one row per result, in place of one aggregate value | at each `select()` |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
@@ -253,23 +251,11 @@ Through 7.x, `false` applied `Number()` to the result, without a warning: an emp
 
 ### `shortcutsUseJson` {#Config.shortcutsUseJson}
 
-```ts
-shortcutsUseJson?: boolean  // default: false; true in 8.0
-```
+From 7.3.0 through 7.x, the default was `false`. From 8.0.0, the key is removed and pgcast always behaves as `true` ([8.0 migration](/switching#from-8-0-shortcutsUseJson)).
 
-From 7.3.0. With `true`, [`select()`](/select#select), [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) and [`selectRows()`](/select#selectRows) build each row with `to_json` and `json_build_object`, and `select()` its array with `json_agg`, in place of their `jsonb` twins: `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. So do [`insert()`](/insert#insert), [`upsert()`](/insert#upsert), [`update()`](/insert#update) and [`deletes()`](/insert#deletes) in their `RETURNING`. `json` keeps the text as Postgres writes it, where `jsonb` parses and sorts it: on 1000 studios with a `lateral` of 20 films each, 37 ms in place of 110 ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). The SQL of each option: [reads](/select#shortcutsUseJson) and [writes](/insert#shortcutsUseJson).
+[`select()`](/select#select), [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) and [`selectRows()`](/select#selectRows) build each row with `to_json` and `json_build_object`, and `select()` its array with `json_agg`: `to_json("films".*)`<!-- probe: db.select('films', db.all) -->. So do [`insert()`](/insert#insert), [`upsert()`](/insert#upsert), [`update()`](/insert#update) and [`deletes()`](/insert#deletes) in their `RETURNING`. The SQL of each: [reads](/select#json-functions) and [writes](/insert#json-functions).
 
-The values and the types are the same, except:
-
-- A row's keys come in the table's order, then `extras`, then the `lateral` keys or `upsert()`'s `$action`, not `jsonb`'s shorter keys first: code that reads `Object.keys()` or compares `JSON.stringify()` sees it. A `json` column keeps its keys as stored, and a `float8` `-0` stays `-0`.
-- A nested result is `json`: a `jsonb` function over it fails, `jsonb_typeof((…))` gives 42883, and so do `DISTINCT` and `UNION`; `->` and `->>` work, and so does a cast, `::jsonb`.
-- A type parser set for `jsonb` (3802) alone no longer applies; [`enableCustomJSONParsingForLargeNumbers()`](/value-types#enableCustomJSONParsingForLargeNumbers) sets both.
-- Beside every column, each `extras` or `lateral` key is a column alias. A key Postgres would refuse or truncate, empty, with a NUL or over 63 bytes in UTF-8, throws while compiling, so `.run()` rejects before any query: give `columns`, or a write's `returning`, whose keys stay parameters.
-- Beside every column, a write's `extras` run in a subquery over its row, which takes some that `RETURNING` refuses off: `count(*)` gives 1 there ([Writes](/insert#shortcutsUseJson)).
-- With `columns` or `returning`, the columns, `extras`, `lateral` keys and `$action` share one `json_build_object()`, which Postgres limits to 100 arguments: over 50 keys throw while compiling, where each part had 50 of its own.
-- `select()`'s array may reach a value's 1 GB, where `jsonb_agg` stops at 256 MB (54000).
-
-[The aggregates](/aggregates) keep their SQL, as they build no JSON. Read when the shortcut is called, not at `.run()`. Off, the SQL is unchanged; it stays off, with no warning, through 7.x. 8.0 removes the option and keeps `json` alone ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
+Through 7.x, `false` built them with their `jsonb` twins, which parse and sort the JSON: on 1000 studios with a `lateral` of 20 films each, 110 ms in place of 37 ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). What code written for `false` sees change: [8.0 migration](/switching#from-8-0-shortcutsUseJson).
 
 ### `topLevelSelectAsRows` {#Config.topLevelSelectAsRows}
 
@@ -277,16 +263,16 @@ The values and the types are the same, except:
 topLevelSelectAsRows?: boolean  // default: false; true in 8.0
 ```
 
-From 7.3.0. With it on, a [`select()`](/select#select) run or compiled on its own sends [`selectRows()`](/select#selectRows)'s query, one row per result, and `.run()` gives the same array, `[]` when none match. No single value holds the whole result, so a large read costs less, and `jsonb_agg`'s 256 MB [limit](/performance#limits) no longer applies to it.
+From 7.3.0. With it on, a [`select()`](/select#select) run or compiled on its own sends [`selectRows()`](/select#selectRows)'s query, one row per result, and `.run()` gives the same array, `[]` when none match. No single value holds the whole result, so a large read costs less, and `json_agg`'s 1 GB [limit](/performance#limits) no longer applies to it.
 
 | Call | `.compile().text` |
 |---|---|
-| `db.select('films', { studio_id: 1000 })` | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }) --> |
-| the same, with the option | `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', { studio_id: 1000 })) --> |
+| `db.select('films', { studio_id: 1000 })` | `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }) --> |
+| the same, with the option | `SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('films', { studio_id: 1000 })) --> |
 
 - `.compile()` shows the rows query: code that runs its text with a client of its own and reads `rows[0].result` gets the first row alone: read `rows.map(r => r.result)`, or call `.run()`. 8.0 removes the option and keeps the rows query alone ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 - As the main query of [`withCTEs()`](/sql-template#withCTEs), the same. Nested in a `lateral`, `extras`, a `sql` template or a CTE, copied with [`.copy()`](/sql-template#copy), and in [`cursor()`](/transaction#cursor), `select()` keeps its aggregate: its parent reads it as one value.
-- A single [`lateral` passed through](/select#lateral) is converted above the rows query, `SELECT to_jsonb(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) --> (`to_json` with [`shortcutsUseJson`](#Config.shortcutsUseJson)), so a `count()` stays a number, as in `select()`'s array, where `selectRows()` gives the string `pg` parses, and `order` and `distinct` act on its raw value, as in the aggregate.
+- A single [`lateral` passed through](/select#lateral) is converted above the rows query, `SELECT to_json(result) AS result FROM (…) AS "sq_studios"`<!-- probe: (db.setConfig({ topLevelSelectAsRows: true }), db.select('studios', db.all, { lateral: db.count('films', { studio_id: db.parent('id') }) })) -->, so a `count()` stays a number, as in `select()`'s array, where `selectRows()` gives the string `pg` parses, and `order` and `distinct` act on its raw value, as in the aggregate.
 - The rows query runs with a `runResultTransform` of its own: one you set on the query applies only to its copies and to the query nested.
 - [`prepared()`](/sql-template#prepared), `noop` and the listeners work as before: [`queryListener`](#Config.queryListener) gets the rows query.
 - `selectOne()`, `selectExactlyOne()`, `selectRows()`, `count()` and the other aggregates don't change, nor do the types.
@@ -437,7 +423,7 @@ From 6.12.0. What [`transactionEventListener`](#Config.transactionEventListener)
 
 In 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) and [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) were opt-ins whose old behaviour triggered warnings. In 7.0, all six are on by default and none warns. An explicit `false` keeps the old behaviour without warnings through 7.x; 8.0 removes all six, and always behaves as `true` (see [Versions](/versions) and the [7.0 migration](/switching#from-7-0)).
 
-One opt-in stays off by default in 7.0 and emits no warning: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents; 8.0 removes it, `LIMIT 1` alone. Nor does [`shortcutsUseJson`](#Config.shortcutsUseJson), from 7.3.0, warn, as its values are the same: it is off in 7.x, and 8.0 keeps `json` alone.
+One opt-in stays off by default in 7.0 and emits no warning: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents; 8.0 removes it, `LIMIT 1` alone. Nor did [`shortcutsUseJson`](#Config.shortcutsUseJson), from 7.3.0 through 7.x, as its values are the same; 8.0 removes it and keeps `json` alone.
 
 [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows), from 7.3.0, emits no warning either, as its values are the same: off through 7.x; 8.0 removes it and keeps the rows query alone ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 

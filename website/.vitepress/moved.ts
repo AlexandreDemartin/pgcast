@@ -6,6 +6,9 @@ import { langs, prefixOf } from './words.ts';
 
 /** Each anchor that left its page: `old page#id` → `new page#id`, English paths; a French page reads it under `/fr/`. */
 export const moved: Record<string, string> = {
+  // #969: the option's sections, once 8.0 builds every shortcut's JSON with json
+  '/select#shortcutsUseJson': '/select#json-functions',
+  '/insert#shortcutsUseJson': '/insert#json-functions',
   // #904: select.md, then aggregates.md
   '/select#count': '/aggregates#count',
   '/select#sum': '/aggregates#sum',
