@@ -11,7 +11,8 @@ import * as path from 'path';
 import { finaliseConfig } from './config';
 import type { Config } from './config';
 import { staleFiles, upToDate } from './outputFiles';
-import { failedQuerySeq } from './queryErrors';
+import { onFailedQuery } from './queryErrors';
+import type { ExitOnFailedQuery } from './queryErrors';
 import { generate } from './write';
 
 // kept out of zapatos/generate's exports, like moduleNames.ts; moved here from cli.ts, to be tested
@@ -106,8 +107,8 @@ export const cliArgs = (args: string[]) => {
 /**
  * Run the CLI on its arguments in `dir`: `generate()`, or with `--check` the comparison of `check()`, after a note through
  * `warningListener` for each flag it ignores; or, before reading any config, the usage for `--help` and `-h`, on
- * stderr after the flag's name for any other flag. Resolve to its exit code: 1 on a failed query, printed on stdout
- * as Zapatos 6.6.1 prints it.
+ * stderr after the flag's name for any other flag. Resolve to its exit code; a failed query is printed on stdout, as
+ * Zapatos 6.6.1 prints it, and ends the process with code 1 at once, not once the queries still running have finished.
  */
 export const runCli = async (args: string[], dir = '.') => {
   const { check: checkOnly, argsJSON, flag, ignoredFlags } = cliArgs(args);
@@ -121,7 +122,13 @@ export const runCli = async (args: string[], dir = '.') => {
     return 1;
   }
 
-  const config = cliConfig(argsJSON, dir);
+  const config: Config & ExitOnFailedQuery = {
+    ...cliConfig(argsJSON, dir),
+    [onFailedQuery]: (e, seq) => {
+      console.log(`*** error ${seq} ***`, e);
+      process.exit(1);
+    },
+  };
   if (ignoredFlags.length > 0) {
     const
       { warningListener } = finaliseConfig(config),
@@ -130,23 +137,12 @@ export const runCli = async (args: string[], dir = '.') => {
     for (const flag of ignoredFlags) warn(`Note: flag ${flag} ignored after the JSON argument: only --check may follow it.`);
   }
 
-  try {
-    if (!checkOnly) {
-      await generate(config);
-      return 0;
-    }
-    return await printStaleFiles(config);
-
-  } catch (e) {
-    const seq = failedQuerySeq(e);
-    if (seq === undefined) throw e;  // not a query's: its stack goes to stderr
-    console.log(`*** error ${seq} ***`, e);
-    return 1;
+  if (!checkOnly) {
+    await generate(config);
+    return 0;
   }
-};
 
-/** What `check()` compares, printed whatever the listeners say, with how to write the files; resolve to the exit code. */
-const printStaleFiles = async (config: Config) => {
+  // what check() compares, printed whatever the listeners say, with how to write the files
   const { folderTargetPath, lines } = await staleFiles(config);
   if (lines.length === 0) {
     console.log(upToDate(folderTargetPath));

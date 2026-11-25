@@ -12,5 +12,5 @@ import { runCli } from './cliConfig';
 
 void (async () => {
   const exitCode = await runCli(process.argv.slice(2));
-  if (exitCode !== 0) process.exitCode = exitCode;  // a failed query, --check on a file out of date, or an unknown flag
+  if (exitCode !== 0) process.exitCode = exitCode;  // --check, on a file out of date, or an unknown flag
 })();

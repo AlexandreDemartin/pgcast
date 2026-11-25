@@ -4336,15 +4336,16 @@ describe('the CLI with --check (#556)', () => {
     ]);
   });
 
-  it.each([[[]], [['--check']]])('prints a failed query and resolves to 1 with flags %j, with no note and no process.exit()', async flags => {
-    const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw new Error('process.exit() called'); }) as () => never);
+  it.each([[[]], [['--check']]])('prints a failed query and ends with process.exit(1) with flags %j, with no note', async flags => {
+    const exited = new Error('process.exit() called');
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never);
     const query = pg.Pool.prototype.query, failures: unknown[] = [];
     vi.spyOn(pg.Pool.prototype, 'query').mockImplementation(function (this: pg.Pool, ...args: any[]) {
       return (query as any).apply(this, args).catch((e: unknown) => { failures.push(e); throw e; });
     } as any);
     const args = [...flags, JSON.stringify({ db: unreachable, outDir, warningListener: true })];
-    expect(await runCli(args, dir)).toBe(1);
-    expect(exit).not.toHaveBeenCalled();
+    await expect(runCli(args, dir)).rejects.toBe(exited);
+    expect(exit.mock.calls).toEqual([[1]]);
     expect(log.mock.calls).toEqual([['*** error 0 ***', failures[0]]]);
     expect(failures[0]).toMatchObject({ code: 'ECONNREFUSED' });
     expect(existsSync(outDir)).toBe(false);
