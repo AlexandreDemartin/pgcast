@@ -1089,6 +1089,13 @@ describe('selectRows', () => {
       expect((await t.client.query(none.compile())).rows.map(r => r.result)).toEqual([]);
     });
 
+    it('a runResultTransform you set applies to its copies only: run on its own, it transforms its rows with its own', async () => {
+      const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId });
+      q.runResultTransform = () => 'mine';
+      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await run(q.copy())).toBe('mine');
+    });
+
     it('cursor() reads its one aggregate row, as nested', async () => {
       const read = async () => { const all: unknown[] = []; for await (const batch of db.cursor(t.client, db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }), { batchSize: 1 })) all.push(batch); return all; };
       expect(await read()).toEqual([[{ id: 1 }, { id: 2 }]]);
