@@ -37,6 +37,10 @@ Candidates for a check, a rule or a skill line.
 - `git diff -- 'website/*.md'` matches `website/fr/` too, as the pathspec `*` crosses `/`: `-- website ':!website/fr'` gives the English pages alone (#984).
 - A replay of `tsForConfig()` compares `customTypeSourceFiles` with sorted keys: their order follows query completion (#984).
 - A PR that removes an option greps `.agents/` and `AGENTS.md` for the key too, not only `website`, `README.md` and `tools`: a skill kept citing a removed option as its rule's example (`git grep -n <key> -- .agents AGENTS.md`, #984).
+- A removal step checks how master read each key: by spread (own keys only) or by property access (inherited too); the refusal reads the same way, or a 7.x reader switches without a word (#974).
+- A test that the CLI exits at once on a closed port says nothing of queries in flight, as every connection fails together: keep one in flight while another fails (a trap that sleeps, or an ACCESS EXCLUSIVE lock held by another session on a table with a column `DEFAULT`, which blocks the columns query) (#986).
+- Removing a read of the caller's config (`suppliedConfig.key`, `{ ...suppliedConfig, key }`) also removes the TypeError it threw on `null` or `undefined`: replay both on master and branch (#986).
+- To stop a run as soon as a query fails, act where it fails, not in a catch around the run: a `finally` that ends a pool, a stream or a server waits for the work in flight first (#986).
 
 ## Minors kept
 
@@ -54,3 +58,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/switching.md:424` and FR (#984): the `uniqueIndexConstraintsOnly` entry gives after code for a `WITHOUT OVERLAPS` key under `DO NOTHING`, not for a deferrable parent key on a partitioned table with immediate partition keys (TS2345 after regenerating); point to the same explicit `sql` statement.
 - `form` `.agents/skills/codegen-output/SKILL.md:16` (#984): the rule's only example, `domainsTypedByContext`, is a removed key.
 - `form` `src/db/utils.ts:17` (#984): a short line mid-paragraph in the rewrapped JSDoc.
+- `form` `CHANGELOG.md:15` (#986): "refused too, as 7.x's `tsForConfig()` read it" does not name the one config that goes from working to refused: `generate()` with an inherited removed key, which 7.x's `finaliseConfig()` spread dropped.
