@@ -365,4 +365,31 @@ describe('shortcutsUseJson in the writes\' RETURNING: the same results both ways
     expect(await both(sql`count(${'code'})`)).toEqual(['42803', '42803']);
     expect(await both(sql`count(*)`, { returning: ['code'] })).toEqual(['42803', '42803']);
   });
+  it('with topLevelSelectAsRows too: a write as a CTE or the main query of withCTEs() gives the same results each way', async () => {
+    const
+      combinations = [[false, false], [true, false], [false, true], [true, true]] as const,
+      builds = [
+        () => db.withCTEs({ w: db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: upperName }) }, db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } })),
+        () => db.withCTEs({ s: db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } }) }, db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: { s: sql`(SELECT result FROM "s")` } })),
+      ];
+    for (const build of builds) {
+      const results = [];
+      for (const [shortcutsUseJson, topLevelSelectAsRows] of combinations) {
+        db.setConfig({ shortcutsUseJson, topLevelSelectAsRows });
+        await t.client.query('SAVEPOINT each_way');
+        results.push(await build().run(t.client));
+        await t.client.query('ROLLBACK TO SAVEPOINT each_way');
+      }
+      for (const result of results.slice(1)) expect(result).toEqual(results[0]);
+    }
+  });
+
+  it('a write nested in a read\'s lateral or extras is refused by Postgres both ways (42601)', async () => {
+    for (const value of [false, true]) {
+      db.setConfig({ shortcutsUseJson: value });
+      const w = () => db.insert('orgs', newOrg);
+      expect(await pgError(t.client, () => db.select('users', all, { extras: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
+      expect(await pgError(t.client, () => db.select('users', all, { lateral: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
+    }
+  });
 });
