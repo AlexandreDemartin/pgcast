@@ -415,6 +415,22 @@ try {
 - **Find the calls**: `grep -rn ConfigTypes`.
 - **Before → after**: delete the declaration, and the file if it held nothing else. With `false` in it, read [`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn) first.
 
+### `shortcutsUseJson` {#from-8-0-shortcutsUseJson}
+
+8.0 always does what `shortcutsUseJson: true` did: [`select()`](/select#json-functions) and its kin, and the `RETURNING` of [the writes](/insert#json-functions), build their JSON with `to_json`, `json_build_object` and `json_agg`, where the 7.x default, `false`, used their `jsonb` twins. The values are the same, and a `lateral` of 20 films under each of 1000 studios takes a third of the time ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `shortcutsUseJson was removed in 8.0, which always does what shortcutsUseJson: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-shortcutsUseJson`<!-- message -->. Once you delete it, code written for `false` sees:
+  - a row's keys in the table's order, then `extras`, then the `lateral` keys or `$action`, where `jsonb` put shorter keys first: `Object.keys()` and `JSON.stringify()` of a row show it. A `json` column keeps its keys as stored, and a `float8` `-0` stays `-0`.
+  - a nested result is `json`: a `jsonb` function over it fails with 42883, and so do `DISTINCT` and `UNION`; `->`, `->>` and a cast, `::jsonb`, work. A result stored in a `text` column keeps `json`'s text, `{"balance" : 20.00}` where `jsonb` wrote `{"balance": 20.00}`.
+  - a type parser set for `jsonb` (3802) alone no longer applies: set it for `json` (114) too, as [`enableCustomJSONParsingForLargeNumbers()`](/value-types#enableCustomJSONParsingForLargeNumbers) does.
+  - beside every column, each `extras` or `lateral` key is a column alias, no longer a parameter. An empty key, one with a NUL, or one over 63 bytes in UTF-8 throws while compiling, so `.run()` rejects before any query: give `columns`, or a write's `returning`, whose keys stay parameters. A bare name in a `sql` fragment of `order.by` or `distinct` that equals such a key is ambiguous, 42702.
+  - beside every column, a write's `extras` run in a subquery over its row, which takes some that `RETURNING` refused: `count(*)` gives 1 there, where 7.x failed with 42803.
+  - with `columns` or `returning`, the columns, `extras`, `lateral` keys and `$action` share one `json_build_object()`: over 50 keys throw while compiling, where each part had 50 of its own.
+  - `select()`'s array may reach a value's 1 GB, where `jsonb_agg` stopped at 256 MB (54000).
+  - the SQL text: `to_json`, `json_agg`, `json_build_object` and `NULL::json` in place of `to_jsonb`, `jsonb_agg`, `jsonb_build_object` and `NULL::jsonb`. `distinct: true` keeps `SELECT DISTINCT to_jsonb(…)`, as `json` has no equality.
+- **Find the calls**: `grep -rn shortcutsUseJson`; `grep -rnE 'jsonb_\w+\('` around a nested shortcut or a write in a CTE; `grep -rn 'setTypeParser(3802'`; the `order` and `distinct` fragments beside `extras` or `lateral`; and the tests that compare SQL text or `JSON.stringify()` of rows.
+- **Before → after**: `` db.sql`SELECT jsonb_array_length((${db.select('films', db.all)}))` ``<!-- tsc -->, which Postgres now refuses (42883), becomes `` db.sql`SELECT jsonb_array_length((${db.select('films', db.all)})::jsonb)` ``<!-- tsc -->. Beside `extras: { title: … }`, `` order: { by: db.sql`${'title'}`, direction: 'ASC' } ``, ambiguous (42702), becomes `` order: { by: db.sql`${'films'}.${'title'}`, direction: 'ASC' } ``<!-- tsc: db.select('films', db.all, { extras: { title: db.sql`upper(${'title'})` }, … }) -->.
+
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 
 8.0 always does what `typeEnumsAcrossSchemas: true`, the 7.x default, did: an enum of another schema is looked up in its own schema and written out by its labels ([`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas)).
