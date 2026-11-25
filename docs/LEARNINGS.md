@@ -14,7 +14,9 @@ Candidates for a check, a rule or a skill line.
 - #960 — Decision 019 § 3 and § 6 changed what 8.0 does with two opt-ins, yet `versions.md`, `why.md` and two option entries, EN and FR, kept "for good" and "stays off in 7.0": a decision PR greps the site for each promise it overturns — range review
 - #960 — `shortcutsUseJson`'s entry, the `select.md` and `insert.md` sections and `performance.md` named a 7.3.0 option with no version while the site deploys master: an option's PR opens every section that advises it with "From x.y.z." — audit
 - #960 — #959 merged item 5's roadmap line while this step was being built: a fix step rereads `origin/master` before an item that an open PR may already cover — builder
+- A U+00A0 typed through the Edit tool lands as a plain space: check a French edit's bytes, or insert it with a scripted replace (#980).
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
+
