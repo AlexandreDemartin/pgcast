@@ -23,3 +23,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [017](./017-value-aliases.md) | Value aliases: each column's value type named in the generated schema | accepted (2026-11-23), by delegation: `valuesTypedAsAliases`, three aliases of `zapatos/db`, the default in 8.0 |
 | [018](./018-json-output.md) | How the shortcuts write their JSON: `json` functions and rows at the top level | accepted (2026-11-24), by delegation: `shortcutsUseJson`, `topLevelSelectAsRows`, the default in 8.0; their `false` superseded by 019 |
 | [019](./019-one-behaviour.md) | 8.0 keeps one behaviour per option, the best, with no permanent opt-in | accepted (2026-11-25) by the owner, its inventory and three points included |
+| [020](./020-bulk-insert.md) | One JSON parameter for `insert()` of many rows | accepted (2026-11-25), by delegation: ruled out; the `sql` form documented in `website/batches.md` |
