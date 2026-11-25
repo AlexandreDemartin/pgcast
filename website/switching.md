@@ -280,6 +280,22 @@ db.setConfig({
 
 Run `npx zapatos` on 6.x to see which generator settings would change your schema. Generator migration notes go through `warningListener`.
 
+## Migrate from pgcast 7.x to 8.0 {#from-8-0}
+
+8.0.0 is not published yet: this section lists its changes as they land. Until it is out, 7.x is the version to install ([7.0 migration](#from-7-0)). Once 8.0.0 is out, keep your package alias and choose the command that matches your imports.
+
+::: code-group
+
+```sh [zapatos/db]
+npm install zapatos@npm:@pgcast/pgcast@^8
+```
+
+```sh [pgcast/db]
+npm install pgcast@npm:@pgcast/pgcast@^8
+```
+
+:::
+
 ## Migrate from pgcast 6.x to 7.0 {#from-7-0}
 
 On 6.x, [trace the warnings](#read-the-warnings) and [enable the fixes](#turn-on-the-opt-ins) first. Keep your existing package alias when installing 7.x. Choose the command that matches your imports.
