@@ -85,7 +85,7 @@ Where `undefined` meant "clear it", `null` says so under either setting, and nev
 
 ## 7.0 and 8.0
 
-Throughout 7.x, `aggregatesTypedByColumn: false` in both `db.setConfig()` and `ConfigTypes` restores numeric 6.x results without a warning. 8.0 removes this behaviour. [Migrating aggregates](/switching#from-7-0).
+Throughout 7.x, `aggregatesTypedByColumn: false` in both `db.setConfig()` and `ConfigTypes` restores numeric 6.x results without a warning. 8.0 removes the key, and `ConfigTypes` with it ([8.0 migration](/switching#from-8-0-aggregatesTypedByColumn)). [Migrating aggregates](/switching#from-7-0).
 
 7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` and the generator's (below), except `selectExactlyOneChecksForSecondRow`, which stays off.
 

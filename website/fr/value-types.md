@@ -1,5 +1,5 @@
 ---
-english: 67a8c504c405
+english: 2b81f96f41ac
 ---
 
 # Types de valeurs
@@ -162,7 +162,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | un `numeric` au-delà de `Number.MAX_VALUE` | `Infinity` | ses chiffres, sous forme de chaîne |
 
-- Appelés directement, [`count()`](/fr/aggregates#count), `sum()` et `avg()` convertissent les valeurs non nulles avec `Number()`. Les appels directs à `min()` et `max()` donnent par défaut la valeur lue par `pg` et la convertissent avec `Number()` si `aggregatesTypedByColumn` vaut `false` à l’exécution. Sous une clé de `lateral`, c’est le parseur JSON de la requête extérieure qui s’applique. Activez le parseur personnalisé pour y préserver les grands nombres.
+- Appelés directement, [`count()`](/fr/aggregates#count), `sum()` et `avg()` convertissent les valeurs non nulles avec `Number()`. Les appels directs à `min()` et `max()` donnent la valeur lue par `pg`, là où `aggregatesTypedByColumn: false` la convertissait avec `Number()` pendant toute la 7.x. Sous une clé de `lateral`, c’est le parseur JSON de la requête extérieure qui s’applique. Activez le parseur personnalisé pour y préserver les grands nombres.
 - Elle règle les parsers de types du module `pg` que vous donnez, donc de chaque pool et chaque client de ce module, à partir de là, requêtes de pgcast ou non.
 - Elle ne change pas les types : c’est l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur qui le fait.
 - Une colonne `int8` ou `numeric` hors JSON est déjà une chaîne, par le parser de `pg` lui-même.

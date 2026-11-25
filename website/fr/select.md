@@ -1,5 +1,5 @@
 ---
-english: dc63dacc7d04
+english: 2048ef2d9e1d
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -315,7 +315,7 @@ COMMIT
 ```
 
 - Par défaut, le résultat transmis d’un `min()` sur une colonne de type `date` est typé `Date | null` pour chaque ligne. Si le minimum est une date finie, le parseur par défaut renvoie un `Date`.
-- Un `lateral` transmis et typé `number` ne compile pas : `count()`, `sum()`, `avg()`, et `min()` ou `max()` sauf typés par colonne, seuls ou dans une union, `cond ? count() : select()`. L’erreur est TS2322 sur `lateral`, `… is not assignable to type 'undefined'.` Un template `sql` typé `number` est refusé avec eux, car son type ne se distingue pas du leur. Placez un [compte sans `groupBy`](#lateral) sous une clé, comme dans `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Si la sous-requête de compte ne renvoie aucune ligne, la valeur de cette clé en JSON est `null`. Un `lateral` dont le type est un paramètre de type, objet de sous-requêtes compris, ou un fragment typé par un paramètre de type sans contrainte, `db.SQLFragment<R>`, ne compile pas non plus : `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` donne TS2345. La fonction qui transmet cette valeur peut appeler `select()` ou caster l’objet de sous-requêtes avec `l as db.SQLFragmentMap`. Pour un fragment de type `db.SQLFragment<R>`, utilisez `l as db.SQLFragment<any>` (le cast en `db.SQLFragmentMap` donne l’erreur TS2352).
+- Un `lateral` transmis et typé `number` ne compile pas : `count()`, seul ou dans une union, `cond ? count() : select()`. L’erreur est TS2322 sur `lateral`, `… is not assignable to type 'undefined'.` Un template `sql` typé `number` est refusé avec eux, car son type ne se distingue pas du leur. Placez un [compte sans `groupBy`](#lateral) sous une clé, comme dans `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Si la sous-requête de compte ne renvoie aucune ligne, la valeur de cette clé en JSON est `null`. Un `lateral` dont le type est un paramètre de type, objet de sous-requêtes compris, ou un fragment typé par un paramètre de type sans contrainte, `db.SQLFragment<R>`, ne compile pas non plus : `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` donne TS2345. La fonction qui transmet cette valeur peut appeler `select()` ou caster l’objet de sous-requêtes avec `l as db.SQLFragmentMap`. Pour un fragment de type `db.SQLFragment<R>`, utilisez `l as db.SQLFragment<any>` (le cast en `db.SQLFragmentMap` donne l’erreur TS2352).
 - Un `lock` verrouille chaque ligne quand son batch est lu, pas avant.
 - Imbriquée, c’est un ensemble de lignes, pas une valeur. Un template `sql` la prend, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, de même que [`withCTEs()`](/fr/sql-template#withCTEs) et `cursor()`. Comme `lateral`, valeur d’`extras`, `where` ou valeur Whereable d’une colonne typée, elle ne compile pas : son type, un [`RowsQuery`](#RowsQuery), le dit. Son type la prend comme `order.by`, et comme valeur Whereable d’une colonne typée `any`, où Postgres la refuse. Hors du type, en JavaScript, une clé `lateral` répète la ligne parente une fois par ligne, et une valeur d’`extras` reçoit l’erreur 21000 de Postgres.
 
@@ -438,11 +438,11 @@ La signature d’appel de `select()` : `table`, `where`, `options?`, `mode?` (`
 
 ### `SelectOneSignatures` {#SelectOneSignatures}
 
-La signature d’appel de `selectOne()` : `table`, `where`, `options?`, avec le mode `One`. Par défaut, elle renvoie un [`ColumnAggregateFragment`](/fr/aggregates#ColumnAggregateFragment) quand son unique `lateral` est un `min()` ou un `max()` typé par colonne, même transmis par un autre `selectOne()` ou `selectExactlyOne()`, et un `SQLFragment` dans les autres cas ([Typé par colonne](/fr/aggregates#typed-by-column)). Une fonction typée `SelectOneSignatures` reprend ainsi le type de retour de `selectOne()`.
+La signature d’appel de `selectOne()` : `table`, `where`, `options?`, avec le mode `One`. Elle renvoie un [`ColumnAggregateFragment`](/fr/aggregates#ColumnAggregateFragment) quand son unique `lateral` est un `min()` ou un `max()` typé par colonne, même transmis par un autre `selectOne()` ou `selectExactlyOne()`, et un `SQLFragment` dans les autres cas ([Typé par colonne](/fr/aggregates#typed-by-column)). Une fonction typée `SelectOneSignatures` reprend ainsi le type de retour de `selectOne()`.
 
 ### `SelectExactlyOneSignatures` {#SelectExactlyOneSignatures}
 
-La signature d’appel de `selectExactlyOne()` : `table`, `where`, `options?`, avec le mode `ExactlyOne`. Par défaut, elle renvoie un `ColumnAggregateFragment` dans le même cas que [`SelectOneSignatures`](#SelectOneSignatures). Une fonction typée `SelectExactlyOneSignatures` reprend ainsi le type de retour de `selectExactlyOne()`.
+La signature d’appel de `selectExactlyOne()` : `table`, `where`, `options?`, avec le mode `ExactlyOne`. Elle renvoie un `ColumnAggregateFragment` dans le même cas que [`SelectOneSignatures`](#SelectOneSignatures). Une fonction typée `SelectExactlyOneSignatures` reprend ainsi le type de retour de `selectExactlyOne()`.
 
 ### `SelectRowsSignatures` {#SelectRowsSignatures}
 
