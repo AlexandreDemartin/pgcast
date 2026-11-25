@@ -47,6 +47,9 @@ Candidates for a check, a rule or a skill line.
 - #953 — `release.yml` only releases a tag on a master commit carrying its version PR: a plan that announces a minor must release it before its first breaking merge, or name a branch — branch-reviewer
 - #953 — `updateColumns: []` compiles to `ON CONFLICT … DO NOTHING`, which leaves alone the conflicting rows that did give the key — builder
 - #953 — a reusable probe left in a review's scratch takes the database URL from the environment, not an argument, so the fix round can rerun it as is — builder
+- #955 — before a note cites an issue's figure, rerun it like for like: #941's "9.5 → 2.2 ms" set `insert()` with every column back against JSON with `RETURNING id`; on equal returns, 4.5–5.0 → 3.2–3.3 ms — builder
+- #955 — a timing on this machine quotes its load average: a probe at load 30 ran 10 to 20 times slower, and two runs at load 10–11 differ by up to 25 % — builder
+- #955 — a probe database named `pgcast_test_<n>_…` with a number that is not a live pid is dropped by `npm test`'s cleanup mid-run: put the probe's pid first, `pgcast_test_<pid>_<step>_…` — builder
 
 ## Minors kept
 
