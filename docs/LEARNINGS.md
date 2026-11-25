@@ -50,6 +50,10 @@ Candidates for a check, a rule or a skill line.
 - #955 — before a note cites an issue's figure, rerun it like for like: #941's "9.5 → 2.2 ms" set `insert()` with every column back against JSON with `RETURNING id`; on equal returns, 4.5–5.0 → 3.2–3.3 ms — builder
 - #955 — a timing on this machine quotes its load average: a probe at load 30 ran 10 to 20 times slower, and two runs at load 10–11 differ by up to 25 % — builder
 - #955 — a probe database named `pgcast_test_<n>_…` with a number that is not a live pid is dropped by `npm test`'s cleanup mid-run: put the probe's pid first, `pgcast_test_<pid>_<step>_…` — builder
+- #957 — a decision note that withdraws a promise the docs made greps the site, EN and FR, for it (`after 8\.0|beyond 8\.0|permanent|and later`) in the same PR: #953 rewrote the README and left about 12 site lines saying the opposite — branch-reviewer
+- #957 — a new option's PR finds every page that lists options by grepping a sibling's name (`grep -l topLevelSelectAsRows website website/fr README.md`): `shortcutsUseJson` missed four pages and their twins — branch-reviewer
+- #957 — a rewrite that adds output columns to a SELECT level makes a bare name in ORDER BY or DISTINCT ON match them first, a caller's fragment included (42702): replay both forms — branch-reviewer
+- #957 — `node --env-file=src/.env` hands `TEST_DATABASE_URL` to a probe without printing it or passing it as an argument; `docs:build` takes about 6 minutes here — builder
 
 ## Minors kept
 
