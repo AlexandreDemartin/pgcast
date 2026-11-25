@@ -1079,6 +1079,16 @@ describe('selectRows', () => {
       await expect(run(copiedFirst)).rejects.toThrow(unique('accounts_agg_first'));
     });
 
+    it('a runner of your own that pairs its compile() and runResultTransform gets the first result alone, where the rows give the array', async () => {
+      const
+        q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }),
+        none = db.select('accounts', { owner_id: -1 });
+      expect(q.runResultTransform(await t.client.query(q.compile()))).toEqual({ id: 1 });
+      expect(none.runResultTransform(await t.client.query(none.compile()))).toBeUndefined();
+      expect((await t.client.query(q.compile())).rows.map(r => r.result)).toEqual([{ id: 1 }, { id: 2 }]);
+      expect((await t.client.query(none.compile())).rows.map(r => r.result)).toEqual([]);
+    });
+
     it('cursor() reads its one aggregate row, as nested', async () => {
       const read = async () => { const all: unknown[] = []; for await (const batch of db.cursor(t.client, db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }), { batchSize: 1 })) all.push(batch); return all; };
       expect(await read()).toEqual([[{ id: 1 }, { id: 2 }]]);
