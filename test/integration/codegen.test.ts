@@ -4496,6 +4496,43 @@ describe('the CLI with --check (#556)', () => {
       expect(Date.now() - started).toBeLessThan(10_000);
     }, 15_000);
 
+    // nor a query still running on the server: here the columns query of cli_locked waits on the lock a migration left
+    // open would hold, while the relations query of cli_failing fails at 0.2 s
+    it('prints a failed query and exits at once while another query waits on a lock, including with --check', async () => {
+      await t.pool.query(`
+        CREATE SCHEMA cli_failing; CREATE TABLE cli_failing.bad (id int);
+        CREATE SCHEMA cli_locked; CREATE TABLE cli_locked.films (id int PRIMARY KEY, n int DEFAULT 1);
+        CREATE SCHEMA query_trap_slow;
+        CREATE FUNCTION query_trap_slow.lower(n name) RETURNS text LANGUAGE plpgsql AS $$ BEGIN
+          IF n = 'bad' THEN PERFORM pg_sleep(0.2); RAISE EXCEPTION 'introspection fails on purpose'; END IF;
+          RETURN pg_catalog.lower(n::text);
+        END $$;
+      `);
+      const holder = await t.pool.connect();
+      try {
+        await holder.query('BEGIN; LOCK TABLE cli_locked.films IN ACCESS EXCLUSIVE MODE');
+        const config = json({
+          db: { connectionString: '{{PGCAST_CHECK_URL}}', options: '-c search_path=query_trap_slow,pg_catalog' },
+          schemas: { cli_failing: all, cli_locked: all },
+        });
+        for (const flags of [[], ['--check']]) {
+          const started = Date.now();
+          const { status, signal, stdout } = spawnSync(process.execPath, [join(build, 'pgcast'), ...flags, config], {
+            cwd: dir, encoding: 'utf8', env: { ...process.env, NODE_PATH: join(root, 'node_modules') }, timeout: 5_000,
+          });
+          expect({ flags, status, signal, first: stdout.split('\n')[0] }).toEqual({
+            flags, status: 1, signal: null, first: expect.stringMatching(/^\*\*\* error \d+ \*\*\* error: introspection fails on purpose$/),
+          });
+          expect(Date.now() - started).toBeLessThan(5_000);
+          expect(existsSync(outDir)).toBe(false);
+        }
+      } finally {
+        await holder.query('ROLLBACK');
+        holder.release();
+        await t.pool.query('DROP SCHEMA cli_failing, cli_locked, query_trap_slow CASCADE');
+      }
+    }, 20_000);
+
     describe.each(['generate', 'tsForConfig', 'check'])('%s on a failed query', method => {
       it.each([undefined, null, true])('rejects with the driver error with rejectOnQueryError = %s', option => {
         mkdirSync(dirname(join(outDir, schemaFile)), { recursive: true });
