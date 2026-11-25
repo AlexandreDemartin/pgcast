@@ -1,5 +1,5 @@
 ---
-english: 8ec00c9f23f8
+english: 606ca431f40d
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -304,16 +304,16 @@ Chaque option du générateur ci-dessous a quitté sa `Config`. La donner dans u
 La 8.0 fait toujours ce que faisait `typeEnumsAcrossSchemas: true`, la valeur par défaut de la 7.x : un enum d’un autre schéma est cherché dans son propre schéma et écrit par ses labels ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)).
 
 - **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`. Une fois l’option retirée et les types régénérés, une colonne d’un enum d’un autre schéma prend les labels de cet enum : dans l’exemple du générateur, écrire `'director'` dans `prints.keeper` ne compile plus, et plus aucune colonne n’utilise les placeholders `any` comme `PgPrint_format` (leurs fichiers restent).
-- **Trouver les appels** : `grep -rn typeEnumsAcrossSchemas` dans vos fichiers de configuration et vos scripts, puis régénérez les types et lancez `tsc` : chaque écriture d’un label que l’enum de l’autre schéma n’a pas ne compile plus. Remplacez chaque import d’un placeholder devenu inutile par le type de la colonne, par exemple `prints.Selectable['format']`.
-- **Avant → après** : retirez `"typeEnumsAcrossSchemas": false` de `pgcastconfig.json`, ou `typeEnumsAcrossSchemas: false` de la configuration passée à `generate()`.
+- **Trouver les appels** : `grep -rn typeEnumsAcrossSchemas` dans vos fichiers de configuration et vos scripts, puis régénérez les types et lancez `tsc` : chaque écriture d’un label que l’enum de l’autre schéma n’a pas ne compile plus. L’import d’un placeholder qu’aucune colonne n’utilise compile toujours, puisque son fichier reste : `grep -rnE "(zapatos|pgcast)/custom"` les liste.
+- **Avant → après** : retirez `"typeEnumsAcrossSchemas": false` de `pgcastconfig.json`, ou `typeEnumsAcrossSchemas: false` de la configuration passée à `generate()`. Ensuite, `import type { PgPrint_format } from 'zapatos/custom'` devient `import type { prints } from 'zapatos/schema'`, et `PgPrint_format` devient `prints.Selectable['format']`, `('nitrate' | 'safety' | 'digital')`. `db.update('prints', { keeper: 'director' }, { id: 1 })`, qui compilait avec `public.crew_job` et que Postgres refusait, prend un label d’`archive.crew_job` : `db.update('prints', { keeper: 'archivist' }, { id: 1 })`.
 
 ### `enumOrder` {#from-8-0-enumOrder}
 
 La 8.0 fait toujours ce que faisait `enumOrder: "declared"`, la valeur par défaut de la 7.x : les labels d’un enum suivent leur ordre de déclaration, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()` ([`enumOrder`](/fr/generator#generate.enumOrder)).
 
 - **Ce que vous voyez** : avec `"alphabetical"`, ou toute valeur autre que `"declared"`, `null` et `undefined`, le générateur lève `enumOrder was removed in 8.0, which always does what enumOrder: "declared" did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-enumOrder`. Une fois l’option retirée et les types régénérés, seul `every.<name>` change, puisqu’une union est le même type dans n’importe quel ordre : `every.crew_job[0]` vaut `'director'`, et non `'cinematographer'`.
-- **Trouver les appels** : `grep -rn enumOrder` dans vos fichiers de configuration et vos scripts, puis `grep -rnE 'every\.\w+\['` pour le code qui lit un label par sa position.
-- **Avant → après** : retirez `"enumOrder": "alphabetical"`, et lisez un label par sa valeur, et non par son index dans `every.crew_job`.
+- **Trouver les appels** : `grep -rn enumOrder` dans vos fichiers de configuration et vos scripts, puis `grep -rnE 'every\.\w+\['` pour le code qui lit un label par sa position ; `tsc` trouve un tuple de tous les labels écrit dans l’ordre alphabétique.
+- **Avant → après** : retirez `"enumOrder": "alphabetical"`. Un label lu par sa position, `type Lead = s.every.crew_job[0]`<!-- tsc: import type * as s from 'zapatos/schema'; … -->, `'cinematographer'` en 7.x avec `"alphabetical"`, devient ce label écrit tel quel, `type Lead = 'cinematographer'`<!-- tsc -->. Un tuple de tous les labels, `const jobs: s.every.crew_job = ['cinematographer', 'composer', 'director', 'editor', 'writer']`, prend l’ordre de déclaration, `const jobs: s.every.crew_job = ['director', 'writer', 'editor', 'cinematographer', 'composer']`<!-- tsc: import type * as s from 'zapatos/schema'; … -->.
 
 ## Passer de pgcast 6.x à la 7.0 {#from-7-0}
 
