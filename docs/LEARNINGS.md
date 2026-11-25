@@ -37,6 +37,12 @@ Candidates for a check, a rule or a skill line.
 - `git diff -- 'website/*.md'` matches `website/fr/` too, as the pathspec `*` crosses `/`: `-- website ':!website/fr'` gives the English pages alone (#984).
 - A replay of `tsForConfig()` compares `customTypeSourceFiles` with sorted keys: their order follows query completion (#984).
 - A PR that removes an option greps `.agents/` and `AGENTS.md` for the key too, not only `website`, `README.md` and `tools`: a skill kept citing a removed option as its rule's example (`git grep -n <key> -- .agents AGENTS.md`, #984).
+- A skill or `docs/WORKFLOW.md` that names a test project goes stale when a step deletes it: grep `.agents/` and `docs/WORKFLOW.md` for every path a step removes (`test/types-opt-in/legacy`, #985).
+- A leftover 7.x `ConfigTypes` augmentation makes `db.ConfigTypes` resolve again: a type error a doc names holds only for the case a probe compiled (#985).
+- `<!-- tsc -->` spans compile as modules, so a migration's top-level `await` compiles as written (#985).
+- A removal that edits a docs sentence listing the cases a type refuses compiles each case kept and each taken out; diffing the sentence against its JSDoc twin is the cheap check ("X, Y, and Z unless <option>" lost X and Y with Z, #985).
+- A docs fact the page leaves out, which the JSDoc and tests state, has no check to fail on: its red step is a scratch probe, quoted in the PR (#985).
+- A type harness outside the checkout compiled against `test/generated/tsconfig.json` sets `rootDir: "/"` (else TS6059 stops tsc before any check, and a per-line grep reports "compiles" for every case) and includes `test/types/custom/PgPreferences.d.ts` when it excludes the generated one (#985).
 
 ## Minors kept
 
@@ -54,3 +60,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/switching.md:424` and FR (#984): the `uniqueIndexConstraintsOnly` entry gives after code for a `WITHOUT OVERLAPS` key under `DO NOTHING`, not for a deferrable parent key on a partitioned table with immediate partition keys (TS2345 after regenerating); point to the same explicit `sql` statement.
 - `form` `.agents/skills/codegen-output/SKILL.md:16` (#984): the rule's only example, `domainsTypedByContext`, is a removed key.
 - `form` `src/db/utils.ts:17` (#984): a short line mid-paragraph in the rewrapped JSDoc.
+- `defect` `website/switching.md:407` and FR `:408` (#985): "arithmetic on a sum is TS18047" holds with `strictNullChecks` from TypeScript 4.9; TS2531 on 4.1, compiles with `strict: false`.
+- `form` `website/aggregates.md:3`, `website/select.md:143`, `:311` and FR twins (#985): "By default" / "Par défaut" where 8.0 has no other typing.

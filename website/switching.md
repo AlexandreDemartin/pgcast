@@ -399,6 +399,22 @@ try {
 - **Find the calls**: `grep -rn transactionRequiresSatisfyingLevel`, then each transaction helper given a client rather than a pool. TypeScript accepts the client of any level there, so the error, which names both levels, is how your tests find each one.
 - **Before → after**: `db.readCommitted(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc --> ran its `insert()` at `READ COMMITTED` with `false`. Open the outer transaction at the level the nested one needs: `db.serializable(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc -->.
 
+### `aggregatesTypedByColumn` {#from-8-0-aggregatesTypedByColumn}
+
+8.0 always does what `aggregatesTypedByColumn: true`, the 7.x default, did: [`sum()`](/aggregates#sum), [`avg()`](/aggregates#avg), [`min()`](/aggregates#min) and [`max()`](/aggregates#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it, where `false` gave `Number()` of it ([Typed by column](/aggregates#typed-by-column)). The SQL and `count()` don't change.
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `aggregatesTypedByColumn was removed in 8.0, which always does what aggregatesTypedByColumn: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-aggregatesTypedByColumn`<!-- message -->. Once you delete it, an empty `sum()` gives `null` where 7.x with `false` gave `0`, a `min()` of a `timestamptz` a `Date` where it gave milliseconds, and a `max()` of a `text` the text where it gave `NaN`.
+- **Find the calls**: `grep -rn aggregatesTypedByColumn`. Then `tsc`: whatever a leftover [`ConfigTypes`](#from-8-0-ConfigTypes) holds, the four are typed by column, so arithmetic on a sum is TS18047 and a minimum date given to a `number` is TS2322.
+- **Before → after**: `const total = await db.sum('films', db.all, { columns: ['runtime_minutes'] }).run(pool)`<!-- tsc --> gave `0` on an empty set with `false`. For the same `number`, `const total = (await db.sum('films', db.all, { columns: ['runtime_minutes'] }).run(pool)) ?? 0`<!-- tsc -->.
+
+### `ConfigTypes` {#from-8-0-ConfigTypes}
+
+8.0 removes the `ConfigTypes` interface with `aggregatesTypedByColumn`, the only key it read: the aggregates are typed by column, as an empty `ConfigTypes` typed them in 7.x.
+
+- **What you see**: a `declare module 'zapatos/db' { interface ConfigTypes { … } }` left from 7.x still compiles and changes no type, `aggregatesTypedByColumn: false` included. With the declaration gone, naming `db.ConfigTypes` is TS2694.
+- **Find the calls**: `grep -rn ConfigTypes`.
+- **Before → after**: delete the declaration, and the file if it held nothing else. With `false` in it, read [`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn) first.
+
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 
 8.0 always does what `typeEnumsAcrossSchemas: true`, the 7.x default, did: an enum of another schema is looked up in its own schema and written out by its labels ([`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas)).
@@ -468,11 +484,9 @@ All six settings below now default to `true`. To keep one 6.x behaviour, set the
 
 </CastPanel>
 
-For numeric results from a direct aggregate call through 7.x, set the literal `false` in both places. Augment the module you import (`pgcast/db` if you use that name).
+Through 7.x, numeric results from a direct aggregate call needed the literal `false` in both places, in the module you import (`pgcast/db` if you use that name); 8.0 removes both ([`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn), [`ConfigTypes`](#from-8-0-ConfigTypes)).
 
-```ts twoslash
-import * as db from 'zapatos/db';
-
+```ts
 declare module 'zapatos/db' {
   interface ConfigTypes { aggregatesTypedByColumn: false }
 }

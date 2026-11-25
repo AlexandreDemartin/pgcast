@@ -1,9 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
-// The types of sum(), avg(), min() and max() with aggregatesTypedByColumn declared in ConfigTypes,
-// on the fixture schema: null on an empty set, and min / max typed by their column, as pg parses it
-// at top level, as JSON nested in a query. Declared in ./pgcast.d.ts, as the docs say to; without the
-// declaration: ../types/shortcuts.test-d.ts.
+// The types of sum(), avg(), min() and max(), typed by column, on the fixture schema: null on an empty
+// set, and min / max typed by their column, as pg parses it at top level, as JSON nested in a query.
+// The only types from 8.0, which removed aggregatesTypedByColumn and ConfigTypes (decision 019 § 3).
 
 import { describe, expectTypeOf, test } from 'vitest';
 import * as db from 'zapatos/db';
@@ -14,7 +13,7 @@ declare const pool: db.Queryable;
 /** RunResult of a SQLFragment. */
 type Run<Q> = Q extends db.SQLFragment<infer R, any> ? R : never;
 
-describe('with aggregatesTypedByColumn declared', () => {
+describe('aggregates typed by column', () => {
   test('sum and avg: a number or null; count: a number', () => {
     const total = db.sum('accounts', db.all, { columns: ['balance'] });
     expectTypeOf(total.run(pool)).resolves.toEqualTypeOf<number | null>();
@@ -27,6 +26,9 @@ describe('with aggregatesTypedByColumn declared', () => {
     expectTypeOf(db.count('accounts', db.all, { offset: 1 }).run(pool)).resolves.toEqualTypeOf<number>();
     // @ts-expect-error the sum of no row is null, not a number
     total.run(pool).then((n): number => n);
+    // @ts-expect-error TS18047: arithmetic on the sum needs its null handled first, `?? 0`
+    total.run(pool).then(n => n + 1);
+    expectTypeOf(total.run(pool).then(n => (n ?? 0) + 1)).resolves.toEqualTypeOf<number>();
   });
 
   test('min and max at top level: the Selectable type of their column, or null', () => {

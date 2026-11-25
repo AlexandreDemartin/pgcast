@@ -1,5 +1,5 @@
 ---
-english: fb4a0f9e4789
+english: 094ff8059936
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -86,7 +86,7 @@ Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l
 
 ## 7.0 et 8.0 {#_7-0-and-8-0}
 
-Tout au long de la série 7.x, `aggregatesTypedByColumn: false` dans `db.setConfig()` et dans `ConfigTypes` rétablit les résultats numériques de la 6.x sans avertissement. La 8.0 supprime ce comportement. [Migrer les agrégats](/fr/switching#from-7-0).
+Tout au long de la série 7.x, `aggregatesTypedByColumn: false` dans `db.setConfig()` et dans `ConfigTypes` rétablit les résultats numériques de la 6.x sans avertissement. La 8.0 supprime la clé, et `ConfigTypes` avec elle ([migration vers la 8.0](/fr/switching#from-8-0-aggregatesTypedByColumn)). [Migrer les agrégats](/fr/switching#from-7-0).
 
 La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux du générateur (plus bas), sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 

@@ -1,5 +1,5 @@
 ---
-english: e24d3e5a5d16
+english: 7a10f96d4aa5
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -400,6 +400,22 @@ La 8.0 fait toujours ce que faisait `transactionRequiresSatisfyingLevel: true`, 
 - **Trouver les appels** : `grep -rn transactionRequiresSatisfyingLevel`, puis chaque raccourci de transaction qui reçoit un client plutôt qu’un pool. TypeScript y accepte le client de n’importe quel niveau : c’est l’erreur, qui nomme les deux niveaux, qui permet à vos tests de trouver chacun d’eux.
 - **Avant → après** : avec `false`, `db.readCommitted(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc --> exécutait son `insert()` en `READ COMMITTED`. Ouvrez la transaction extérieure au niveau dont l’appel imbriqué a besoin : `db.serializable(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc -->.
 
+### `aggregatesTypedByColumn` {#from-8-0-aggregatesTypedByColumn}
+
+La 8.0 fait toujours ce que faisait `aggregatesTypedByColumn: true`, la valeur par défaut de la 7.x : [`sum()`](/fr/aggregates#sum), [`avg()`](/fr/aggregates#avg), [`min()`](/fr/aggregates#min) et [`max()`](/fr/aggregates#max) donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit, là où `false` en donnait `Number()` ([Typé par colonne](/fr/aggregates#typed-by-column)). Le SQL et `count()` ne changent pas.
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `aggregatesTypedByColumn was removed in 8.0, which always does what aggregatesTypedByColumn: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-aggregatesTypedByColumn`<!-- message -->. Une fois l’option retirée, un `sum()` sur un ensemble vide donne `null` là où la 7.x avec `false` donnait `0`, un `min()` d’un `timestamptz` un `Date` là où elle donnait des millisecondes, et un `max()` d’un `text` le texte là où elle donnait `NaN`.
+- **Trouver les appels** : `grep -rn aggregatesTypedByColumn`. Puis `tsc` : quoi que contienne un [`ConfigTypes`](#from-8-0-ConfigTypes) resté de la 7.x, les quatre agrégats sont typés par colonne, donc un calcul sur une somme donne TS18047, et une date minimale passée à un `number` TS2322.
+- **Avant → après** : avec `false`, `const total = await db.sum('films', db.all, { columns: ['runtime_minutes'] }).run(pool)`<!-- tsc --> donnait `0` sur un ensemble vide. Pour obtenir le même `number` : `const total = (await db.sum('films', db.all, { columns: ['runtime_minutes'] }).run(pool)) ?? 0`<!-- tsc -->.
+
+### `ConfigTypes` {#from-8-0-ConfigTypes}
+
+La 8.0 supprime l’interface `ConfigTypes` avec `aggregatesTypedByColumn`, la seule clé qu’elle lisait : les agrégats sont typés par colonne, comme une interface `ConfigTypes` vide les typait en 7.x.
+
+- **Ce que vous voyez** : une déclaration `declare module 'zapatos/db' { interface ConfigTypes { … } }` restée de la 7.x compile toujours et ne change aucun type, `aggregatesTypedByColumn: false` compris. Une fois la déclaration retirée, nommer `db.ConfigTypes` donne TS2694.
+- **Trouver les appels** : `grep -rn ConfigTypes`.
+- **Avant → après** : supprimez la déclaration, et le fichier s’il ne contenait rien d’autre. Si elle contenait `false`, lisez d’abord [`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn).
+
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 
 La 8.0 fait toujours ce que faisait `typeEnumsAcrossSchemas: true`, la valeur par défaut de la 7.x : un enum d’un autre schéma est cherché dans son propre schéma et écrit par ses labels ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)).
@@ -469,11 +485,9 @@ Les six options ci-dessous valent désormais `true` par défaut. Pour conserver 
 
 </CastPanel>
 
-Pour conserver les résultats numériques d’un appel direct à un agrégat pendant la 7.x, indiquez le littéral `false` aux deux endroits. Complétez la déclaration du module que vous importez (`pgcast/db` si vous utilisez ce nom).
+Pendant toute la 7.x, conserver les résultats numériques d’un appel direct à un agrégat demandait le littéral `false` aux deux endroits, dans le module que vous importez (`pgcast/db` si vous utilisez ce nom) ; la 8.0 supprime les deux ([`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn), [`ConfigTypes`](#from-8-0-ConfigTypes)).
 
-```ts twoslash
-import * as db from 'zapatos/db';
-
+```ts
 declare module 'zapatos/db' {
   interface ConfigTypes { aggregatesTypedByColumn: false }
 }
