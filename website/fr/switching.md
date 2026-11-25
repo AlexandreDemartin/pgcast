@@ -1,5 +1,5 @@
 ---
-english: 5506895693b0
+english: f059c5190548
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -447,8 +447,9 @@ La 8.0 fait toujours ce que faisait `topLevelSelectAsRows: true` : un [`select(
   - un `runResultTransform` que vous définissez sur la requête ne façonne plus ce que donne `.run()` : la requête des lignes s’exécute avec le sien, et `.run()` donne le tableau. La transformation s’applique toujours à une copie, qui exécute l’agrégat.
   - un `compile` que vous enveloppez sur la requête n’est pas ce qu’appelle `.run()` : l’enveloppe ne voit rien.
   - [`queryListener`](/fr/runtime-config#Config.queryListener) reçoit la requête des lignes, avec son nom [`prepared()`](/fr/sql-template#prepared) si elle en a un.
+  - une copie d’un `select()` préparé garde son nom, pas son texte : la requête envoie la requête des lignes, et la copie l’agrégat. Sur une même connexion, celle d’un pool quand les deux y tombent, celle des deux qui s’exécute en second lève `Prepared statements must be unique - 'films_p' was used for a different statement`, avec le nom par défaut `_zapatos_prepared_<n>` aussi. Donnez son propre nom à la copie, `q.copy({ preparedName: 'films_agg' })`<!-- tsc: (q => …)(db.select('films', db.all).prepared('films_p')) -->.
   - un faux [`Queryable`](/fr/testing#fake-a-result-typed-from-the-schema) de test qui répond la seule ligne de l’agrégat, `[{ result: films }]`, fait donner à `.run()` `[films]`, un tableau qui contient le tableau, et `[{ result: [] }]` donne `[[]]`. Il répond une ligne par résultat, `films.map(result => ({ result }))`, et `[]` pour aucune.
-- **Trouver les appels** : `grep -rn topLevelSelectAsRows` ; `grep -rn 'result: \['` dans les fakes de vos tests ; chaque `.compile()` d’un `select()` dont vous envoyez le texte vous-même ou que vous comparez dans un test ; `grep -rnE 'runResultTransform =|\.compile ='` sur un `select()` ; `grep -rn 'setTypeParser(114'`.
+- **Trouver les appels** : `grep -rn topLevelSelectAsRows` ; `grep -rn 'result: \['` dans les fakes de vos tests ; chaque `.compile()` d’un `select()` dont vous envoyez le texte vous-même ou que vous comparez dans un test ; `grep -rnE 'runResultTransform =|\.compile ='` sur un `select()` ; `grep -rn '\.prepared('`, puis un `.copy(` de la même requête ; `grep -rn 'setTypeParser(114'`.
 - **Avant → après** : `(await pool.query(q.compile())).rows[0].result` devient `(await pool.query(q.compile())).rows.map(r => r.result)`<!-- tsc: async () => { const q = db.select('films', db.all); return …; } -->, ou `await q.run(pool)`. Une transformation définie sur la requête, `q.runResultTransform = qr => qr.rows[0].result.map(titleOf)`, devient un appel sur ce que donne `.run()`, `(await q.run(pool)).map(titleOf)`<!-- tsc: async () => { const q = db.select('films', db.all), titleOf = (film: { title: string }) => film.title; return …; } -->. Un `compile` enveloppé pour logger chaque requête devient un écouteur, `db.setConfig({ queryListener: query => console.log(query.text) })`<!-- tsc -->, qui reçoit le texte qu’envoie `.run()`.
 
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}

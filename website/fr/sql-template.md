@@ -1,5 +1,5 @@
 ---
-english: 88aaa716b10e
+english: 0dc73e8cba1c
 ---
 
 # Template SQL
@@ -596,7 +596,7 @@ fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?,
 
 Un nouveau fragment sur les mêmes littéraux et expressions. Il garde `runResultTransform`, `parentTable`, `preparedName`, `noop` et `noopResult`, sauf ceux que donne `override`. Un raccourci copié se résout donc en ce que donne le raccourci, comme le dit son type : `count('films', all).copy().run(pool)` donne `4` sur le schéma de la doc, là où Zapatos 6.6.1 donnait à la copie la transformation par défaut, donc les lignes : `[{ result: '4' }]`.
 
-Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de `selectExactlyOne()` garde `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). La promesse d’une copie exécutée seule est rejetée en l’absence de lignes. Avec la vérification et `withTies` activés, une deuxième ligne ex æquo entraîne aussi le rejet de la promesse. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent. Une copie de `select()` garde son `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', db.all).copy() -->, là où le `select()` exécuté seul envoie une ligne par résultat ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)).
+Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de `selectExactlyOne()` garde `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). La promesse d’une copie exécutée seule est rejetée en l’absence de lignes. Avec la vérification et `withTies` activés, une deuxième ligne ex æquo entraîne aussi le rejet de la promesse. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent. Une copie de `select()` garde son `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', db.all).copy() -->, là où le `select()` exécuté seul envoie une ligne par résultat ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)). Une copie d’un `select()` préparé garde donc son nom, pas son texte : donnez son propre nom à la copie, `q.copy({ preparedName: 'films_agg' })`<!-- tsc: (q => …)(db.select('films', db.all).prepared('films_p')) -->, sinon, sur une même connexion, `pg` rejette celle des deux qui s’exécute en second, comme [plus haut](#prepared).
 
 ## `withCTEs()` {#withCTEs}
 
