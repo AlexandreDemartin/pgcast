@@ -136,7 +136,8 @@ await generate({
 - A connection or query error rejects the promise before any files are written. You can catch the original `pg` error or set [`rejectOnQueryError: false`](#generate.rejectOnQueryError) to keep the 6.x exit.
 - Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2353, or TS2561 with a suggestion for a near-miss such as `outdir`).
-- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others). `definitionForRelationInSchema()` fills the `columnsTypedByEnumName` array only with `typeEnumsAcrossSchemas: false`. `tsTypeForPgType()` maps a type name in one context, so an enum array maps to an array. `definitionForRelationInSchema()` applies `enumArraysTypedAsText` to raw reads. See the [relation helper's out-parameters](/switching#domain-and-parser-types).
+- A key 8.0 removed, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) or [`enumOrder`](#generate.enumOrder), fails to compile too (TS2353). Given anyway, from a variable, a config file or the CLI's JSON argument, `generate()`, `check()` and the CLI reject before any query, and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`. Error: `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
+- `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others). `definitionForRelationInSchema()` leaves its `columnsTypedByEnumName` array empty from 8.0.0; through 7.x, only `typeEnumsAcrossSchemas: false` filled it. `tsTypeForPgType()` maps a type name in one context, so an enum array maps to an array. `definitionForRelationInSchema()` applies `enumArraysTypedAsText` to raw reads. See the [relation helper's out-parameters](/switching#domain-and-parser-types).
 
 ## Options {#options}
 
@@ -327,7 +328,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-From 7.0.0. The default, `true`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. The generator looks up an enum in its own schema and writes its labels. Set `false` for the 6.x lookup by name in the relation's schema.
+From 7.0.0, the default was `true`. From 8.0.0, the key is removed and the generator always behaves as `true` ([8.0 migration](/switching#from-8-0-typeEnumsAcrossSchemas)): it looks up an enum in its own schema and writes its labels. Through 7.x, `false` kept the 6.x lookup by name in the relation's schema.
 
 ```sql
 CREATE SCHEMA archive;
@@ -336,33 +337,33 @@ CREATE TYPE archive.crew_job AS ENUM ('projectionist', 'archivist');  -- public 
 CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, formats archive.print_format[], keeper archive.crew_job);
 ```
 
-| Column of `prints` | `false` | `true` |
+| Column of `prints` | 7.x with `false` | 8.0 |
 |---|---|---|
 | `format` | `c.PgPrint_format`, an `any` placeholder | `('nitrate' \| 'safety' \| 'digital')` |
 | `formats` (`Selectable`) | `c.Pg_print_format \| null`, an `any` placeholder | `string \| null` by default, the label array below with `enumArraysTypedAsText: false` |
 | `formats` (`JSONSelectable`) | `c.Pg_print_format \| null`, an `any` placeholder | `('nitrate' \| 'safety' \| 'digital')[] \| null` |
 | `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
-- The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In the order of [`enumOrder`](#generate.enumOrder), as for every enum.
+- The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In their declared order, as for every enum ([`enumOrder`](#generate.enumOrder)).
 - The generator matches foreign enums by name. An enum named like a built-in type (`int4`) gets that type instead of its labels. An enum named as Postgres would normally name another type's array (`_tag` for `tag`) gives its labels to columns of that array type.
 - A domain over such an enum stays a custom type, `c.<name>`. Unless another type shares its placeholder name, a fresh placeholder gets the labels without an import, even when a relation of the enum's own schema uses the domain as well. An existing placeholder is never overwritten.
 
 ### `enumOrder` {#generate.enumOrder}
 
-From 7.0.0. The default, `"declared"`, applies if the key is missing or `null` in the merged config. The JSON argument inherits omitted keys from the file. Labels follow the declaration order that Postgres uses for `ORDER BY`, comparisons and `enum_range()`. Set `"alphabetical"` for the 6.x sort order.
+From 7.0.0, the default was `"declared"`. From 8.0.0, the key is removed and the generator always behaves as `"declared"` ([8.0 migration](/switching#from-8-0-enumOrder)): labels follow the declaration order that Postgres uses for `ORDER BY`, comparisons and `enum_range()`. Through 7.x, `"alphabetical"` kept the 6.x sort order.
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
 ```
 
-| Type | `"alphabetical"` | `"declared"` |
+| Type | 7.x with `"alphabetical"` | 8.0 |
 |---|---|---|
 | `crew_job` | `'cinematographer' \| 'composer' \| 'director' \| 'editor' \| 'writer'` | `'director' \| 'writer' \| 'editor' \| 'cinematographer' \| 'composer'` |
 | `every.crew_job` | `['cinematographer', 'composer', 'director', 'editor', 'writer']` | `['director', 'writer', 'editor', 'cinematographer', 'composer']` |
 
 - A label added by `ALTER TYPE … ADD VALUE … BEFORE` or `AFTER` takes its place in that order, as `enum_range()` gives it.
-- For TypeScript, only `every.<name>` changes: a union is the same type in any order. With [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), the labels written out for a foreign enum follow that order, including in a fresh domain placeholder unless another type shares its name.
-- Another value stops the generator before any query, and writes nothing: `enumOrder must be 'declared' (the default) or 'alphabetical', not 'declard'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
+- For TypeScript, only `every.<name>` changes: a union is the same type in any order. The labels written out for an enum of another schema follow that order too, including in a fresh domain placeholder unless another type shares its name.
+- The key, given anyway with any value but `"declared"`, `null` and `undefined`, stops the generator before any query, and writes nothing: `enumOrder was removed in 8.0, which always does what enumOrder: "declared" did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-enumOrder`.
 
 ### `moduleNames` {#generate.moduleNames}
 
@@ -505,7 +506,7 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 - In 7.x, `false` quietly restores the placeholder type, `any`, in all five interfaces for both columns. This override goes in 8.0.
 - `pg` parses a domain over a domain as its innermost domain's base type, but returns an array of a domain as its text, since it doesn't know that array's type: so does a domain over such an array, directly or through other domains. An array of a domain over an array stays `any`, and so does a domain over one, or a base type the generator can't map, such as `point`.
-- An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another, with or without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas): never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a fresh placeholder with an unshared name follows `typeEnumsAcrossSchemas`: the enum's labels by default; with `false`, the enum of the same name in the relation's schema, or `any` if that schema has none.
+- An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another: never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a fresh placeholder with an unshared name holds the enum's labels.
 - A placeholder you edit keeps its type in all five, `unknown` included. One you edit to `any` counts as left as generated: write `unknown`, or set the option to `false`, to keep such a column untyped.
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
@@ -526,7 +527,7 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COL
 - `false`: the array, with no note, including beyond 8.0: the right type for a project that parses it with `pg.types.setTypeParser`, given the array type's OID (`SELECT 'crew_job[]'::regtype::oid`) and the parser of `text[]`. Declare `const textArrayOid: number = 1009`, then pass `pg.types.getTypeParser(textArrayOid)`.
 - `true`: `string`, the text `pg` returns. The writes still take an array, so a `sql` row's text isn't written back as it is: `insert()` and `update()` refuse it (TS2769, TS2322), though Postgres would take it.
 - A domain over such an array, as `crew.past_jobs`, takes `db.DomainInContext<c.PgJob_list, crew_job[], string>` in `Selectable` ([`DomainInContext`](/value-types#DomainInContext)): `string` while its placeholder matches the current generated type, even if edited. A different placeholder type is preserved in all five interfaces.
-- An array of an enum of another schema, typed by its labels with [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) or else as the enum of the same name in the relation's schema, is a `string` in `Selectable` too. Without either, it's an `any` placeholder, and stays one. An array of a domain over an enum is [`domainsTypedByContext`](#generate.domainsTypedByContext)'s.
+- An array of an enum of another schema, typed by its labels, is a `string` in `Selectable` too. An array of a domain over an enum is [`domainsTypedByContext`](#generate.domainsTypedByContext)'s.
 
 ### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
 

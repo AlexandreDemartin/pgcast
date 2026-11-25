@@ -296,6 +296,24 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 
 :::
 
+Each generator option below has left its `Config`. Setting it in an object literal no longer compiles (TS2353). Given anyway, from a variable, `pgcastconfig.json`, `zapatosconfig.json` or the CLI's JSON argument, `generate()`, `check()` and the CLI reject before any query, and write nothing, unless its value is the one 8.0 always behaves as, `null` or `undefined`. A config that never set the option generates the same files.
+
+### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
+
+8.0 always does what `typeEnumsAcrossSchemas: true`, the 7.x default, did: an enum of another schema is looked up in its own schema and written out by its labels ([`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, the generator throws `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`. Once you delete it and regenerate, a column of an enum of another schema takes that enum's labels: in the generator's example, a write of `'director'` to `prints.keeper` no longer compiles, and no column uses the `any` placeholders such as `PgPrint_format` any more (their files remain).
+- **Find the calls**: `grep -rn typeEnumsAcrossSchemas` over your config files and scripts, then regenerate and run `tsc`: each write of a label the foreign enum lacks fails to compile. Replace each import of an unused placeholder with the column type, such as `prints.Selectable['format']`.
+- **Before → after**: delete `"typeEnumsAcrossSchemas": false` from `pgcastconfig.json`, or `typeEnumsAcrossSchemas: false` from the config given to `generate()`.
+
+### `enumOrder` {#from-8-0-enumOrder}
+
+8.0 always does what `enumOrder: "declared"`, the 7.x default, did: an enum's labels follow their declared order, the one Postgres uses for `ORDER BY`, comparisons and `enum_range()` ([`enumOrder`](/generator#generate.enumOrder)).
+
+- **What you see**: with `"alphabetical"`, or any value but `"declared"`, `null` and `undefined`, the generator throws `enumOrder was removed in 8.0, which always does what enumOrder: "declared" did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-enumOrder`. Once you delete it and regenerate, only `every.<name>` changes, as a union is the same type in any order: `every.crew_job[0]` is `'director'`, not `'cinematographer'`.
+- **Find the calls**: `grep -rn enumOrder` over your config files and scripts, then `grep -rnE 'every\.\w+\['` for code that reads a label by its position.
+- **Before → after**: delete `"enumOrder": "alphabetical"`, and read a label by its value, not by its index in `every.crew_job`.
+
 ## Migrate from pgcast 6.x to 7.0 {#from-7-0}
 
 On 6.x, [trace the warnings](#read-the-warnings) and [enable the fixes](#turn-on-the-opt-ins) first. Keep your existing package alias when installing 7.x. Choose the command that matches your imports.
@@ -390,11 +408,11 @@ In 7.0, `prints.keeper` uses the foreign enum's labels. Check the generator's [n
 
 - Fresh output omits foreign enum placeholders such as `PgStatus` and `Pg_mood` from `zapatos/custom`. Existing files remain, but their columns no longer use them. Replace each import with the column type, such as `products.Selectable['status']`, or set `typeEnumsAcrossSchemas: false` in 7.x.
 - A foreign composite column previously typed as the local enum of the same name now gets its own placeholder. Type it for your parser, or set `typeEnumsAcrossSchemas: false` in 7.x.
-- If you pass `columnsTypedByEnumName` to `definitionForRelationInSchema()`, only `typeEnumsAcrossSchemas: false` fills it.
+- If you pass `columnsTypedByEnumName` to `definitionForRelationInSchema()`, only `typeEnumsAcrossSchemas: false` fills it, through 7.x; 8.0 leaves it empty.
 
 For an existing domain placeholder over a foreign enum, [compare the fresh placeholder](#regenerate-for-7-0) and merge its new labels.
 
-Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0.
+Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsAcrossSchemas) restores lookup in the relation's schema and [`enumOrder: 'alphabetical'`](/generator#generate.enumOrder) restores sorted labels. Each works independently without a migration note. Both legacy behaviours go in 8.0 ([`typeEnumsAcrossSchemas`](#from-8-0-typeEnumsAcrossSchemas), [`enumOrder`](#from-8-0-enumOrder)).
 
 ### Named conflict targets in 7.0 {#named-conflict-targets}
 
