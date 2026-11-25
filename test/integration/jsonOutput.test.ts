@@ -1,7 +1,9 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
-// shortcutsUseJson (decision 018 § 2) in select() and its kin, run on the fixture: each shape gives the same
-// result both ways, key order aside (toEqual ignores it). Compiled SQL: test/unit/shortcutsUseJson.test.ts.
+// The JSON of select() and its kin, and of the writes' RETURNING, built with json functions (decision 018 § 2, the
+// only behaviour from 8.0, decision 019), run on the fixture: each shape gives the same result as its own SQL with
+// each json function swapped for its jsonb twin, key order aside (toEqual ignores it). Compiled SQL:
+// test/unit/jsonOutput.test.ts.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
@@ -18,16 +20,21 @@ const
   order = { by: 'id', direction: 'ASC' } as const,
   count = () => db.count('accounts', { owner_id: parent('id') }),
   ofUser = { owner_id: sql`${db.self} = "users"."id"` },
-  /** The query built and run with the option off, then on. */
+  /** The text of a query with to_json, json_agg, json_build_object and NULL::json swapped for their jsonb twins. */
+  toJsonb = (text: string) => text.replace(/\b(to_json|json_agg|json_build_object)\(/g, name => name.replace('json', 'jsonb')).replace(/\bNULL::json\b/g, 'NULL::jsonb'),
+  /** The query run with the jsonb twins of its json functions, its result through the query's own transform. */
+  runAsJsonb = async (q: db.SQLFragment<any, any>) => {
+    if (q.noop) return q.noopResult;
+    const { text, values } = q.compile();
+    return q.runResultTransform(await t.client.query({ text: toJsonb(text), values }));
+  },
+  /** The query built and run as it is, then with the jsonb twins of its json functions. */
   bothWays = async (build: () => db.SQLFragment<any, any>) => {
-    db.setConfig({ shortcutsUseJson: false });
-    const jsonb = await build().run(t.client);
-    db.setConfig({ shortcutsUseJson: true });
-    const json = await build().run(t.client);
+    const json = await build().run(t.client), jsonb = await runAsJsonb(build());
     return { jsonb, json };
   };
 
-describe('shortcutsUseJson: the same results both ways', () => {
+describe('select() and its kin: the same results as their jsonb twins', () => {
   const shapes: Record<string, () => db.SQLFragment<any, any>> = {
     // every type of the fixture's users and accounts: jsonb, a composite, a domain over an array, timestamptz,
     // numeric, int8 beyond 2^53, float8, arrays of each dimension, date
@@ -78,12 +85,11 @@ describe('shortcutsUseJson: the same results both ways', () => {
   });
 
   it('selectExactlyOne() checking for a second row still finds it', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true, shortcutsUseJson: true });
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     await expect(db.selectExactlyOne('users', { manager_id: 1 }, { extras: { e: 'email' } }).run(t.client)).rejects.toThrow('One result expected but more returned');
   });
 
   it('a nested result is json', async () => {
-    db.setConfig({ shortcutsUseJson: true });
     const q = db.selectOne('users', { id: 1 }, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } });
     expect(await sql`SELECT json_typeof((${q})) AS v`.run(t.client)).toEqual([{ v: 'object' }]);
     // characterization: a jsonb function over the nested json fails (42883), as note 018 § 4 says
@@ -92,7 +98,7 @@ describe('shortcutsUseJson: the same results both ways', () => {
   });
 });
 
-describe('shortcutsUseJson: distinct: true over a passed-through lateral', () => {
+describe('distinct: true over a passed-through lateral', () => {
   const
     owner = () => db.selectOne('users', { id: parent('owner_id') }),
     byId = (rows: any[]) => [...rows].sort((a, b) => a.id - b.id);
@@ -129,7 +135,7 @@ describe('shortcutsUseJson: distinct: true over a passed-through lateral', () =>
   });
 });
 
-describe('shortcutsUseJson: a key equal to a column', () => {
+describe('a key equal to a column', () => {
   it('is written twice, and the key last written wins, as || makes it win', async () => {
     const { jsonb, json } = await bothWays(() => db.select('users', all, { extras: { email: sql`upper(${'email'})` }, order: { by: 'email', direction: 'ASC' } }));
     expect(json.map((u: any) => u.email)).toEqual(['ADA@EXAMPLE.COM', 'BOB@EXAMPLE.COM', 'CYD@EXAMPLE.COM']);
@@ -137,13 +143,12 @@ describe('shortcutsUseJson: a key equal to a column', () => {
   });
 
   it('a string order.by is written after the alias, where a bare name would be ambiguous (42702)', async () => {
-    db.setConfig({ shortcutsUseJson: true });
     const bare = db.select('users', all, { extras: { email: sql`upper(${'email'})` }, order: { by: sql`${'email'}`, direction: 'ASC' } });
     expect(await pgError(t.client, () => bare.run(t.client))).toEqual({ code: '42702', message: 'ORDER BY "email" is ambiguous' });
   });
 });
 
-describe('shortcutsUseJson: json_build_object() and 100 arguments', () => {
+describe('json_build_object() and 100 arguments', () => {
   it('Postgres takes 100 arguments and refuses 102 (54023)', async () => {
     const pairs = (n: number) => Array.from({ length: n }, (_, i) => `'k${i}', ${i}`).join(', ');
     expect(Object.keys((await t.client.query(`SELECT json_build_object(${pairs(50)}) AS r`)).rows[0].r)).toHaveLength(50);
@@ -151,23 +156,23 @@ describe('shortcutsUseJson: json_build_object() and 100 arguments', () => {
       .toEqual({ code: '54023', message: 'cannot pass more than 100 arguments to a function' });
   });
 
-  it('50 keys run; 51 are refused before any query, and with the option off they run', async () => {
+  it('50 keys run; 51 are refused before any query, and run with columns left out', async () => {
     const
       extras = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, 'id'])),
       q = () => db.selectOne('users', { id: 1 }, { columns: ['id', 'email'], extras: extras(49) }),
       sent: unknown[] = [];
-    db.setConfig({ shortcutsUseJson: true });
     expect(Object.keys(await db.selectOne('users', { id: 1 }, { columns: ['id', 'email'], extras: extras(48) }).run(t.client) ?? {})).toHaveLength(50);
     db.setConfig({ queryListener: query => sent.push(query) });
     await expect(q().run(t.client)).rejects.toThrow('its 51 keys (columns, extras and lateral keys together) take 102');
     expect(sent).toHaveLength(0);
-    db.setConfig({ shortcutsUseJson: false });
-    expect(Object.keys(await q().run(t.client) ?? {})).toHaveLength(51);
+    const everyColumn = await db.selectOne('users', { id: 1 }, { extras: extras(49) }).run(t.client);
+    expect(Object.keys(everyColumn ?? {}).filter(k => /^k\d+$/.test(k))).toHaveLength(49);
+    expect(everyColumn).toMatchObject({ id: 1, display_name: 'Ada' });
   });
 
   it('a key a row level cannot alias is refused before any query', async () => {
     const sent: unknown[] = [];
-    db.setConfig({ shortcutsUseJson: true, queryListener: query => sent.push(query) });
+    db.setConfig({ queryListener: query => sent.push(query) });
     for (const key of ['', 'a\0b', 'x'.repeat(64)]) {
       await expect(db.select('users', all, { extras: { [key]: 'email' } }).run(t.client)).rejects.toThrow('cannot be a column alias');
     }
@@ -175,15 +180,13 @@ describe('shortcutsUseJson: json_build_object() and 100 arguments', () => {
   });
 });
 
-describe('shortcutsUseJson with topLevelSelectAsRows (note 018 § 3): the same results each way', () => {
+describe('with topLevelSelectAsRows (note 018 § 3): the same results each way', () => {
   const
     combinations = {
-      off: { shortcutsUseJson: false, topLevelSelectAsRows: false },
-      json: { shortcutsUseJson: true, topLevelSelectAsRows: false },
-      rows: { shortcutsUseJson: false, topLevelSelectAsRows: true },
-      both: { shortcutsUseJson: true, topLevelSelectAsRows: true },
+      aggregate: { topLevelSelectAsRows: false },
+      rows: { topLevelSelectAsRows: true },
     },
-    /** The query built and run under each combination of the two options. */
+    /** The query built and run under each value of the option. */
     eachWay = async (build: () => db.SQLFragment<any, any>) => {
       const results: Record<string, any> = {};
       for (const [name, config] of Object.entries(combinations)) {
@@ -210,7 +213,7 @@ describe('shortcutsUseJson with topLevelSelectAsRows (note 018 § 3): the same r
 
   it.each(Object.keys(shapes))('%s', async name => {
     const results = await eachWay(shapes[name]);
-    for (const combination of ['json', 'rows', 'both']) expect(results[combination], combination).toEqual(results.off);
+    expect(results.rows).toEqual(results.aggregate);
   });
 
   it('distinct: true, its jsonb rows compared as today, over a passed-through json child too: the same distinct rows', async () => {
@@ -218,31 +221,28 @@ describe('shortcutsUseJson with topLevelSelectAsRows (note 018 § 3): the same r
       byManager = (rows: any[]) => [...rows].sort((a, b) => (a.manager_id ?? 0) - (b.manager_id ?? 0)),
       managers = await eachWay(() => db.select('users', all, { columns: ['manager_id'], distinct: true })),
       owners = await eachWay(() => db.select('accounts', all, { distinct: true, lateral: owner() }));
-    expect(byManager(managers.off)).toEqual([{ manager_id: null }, { manager_id: 1 }]);
-    expect(owners.off.map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
-    for (const combination of ['json', 'rows', 'both']) {
-      expect(byManager(managers[combination]), combination).toEqual(byManager(managers.off));
-      expect(byId(owners[combination]), combination).toEqual(byId(owners.off));
-    }
+    expect(byManager(managers.aggregate)).toEqual([{ manager_id: null }, { manager_id: 1 }]);
+    expect(owners.aggregate.map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
+    expect(byManager(managers.rows)).toEqual(byManager(managers.aggregate));
+    expect(byId(owners.rows)).toEqual(byId(owners.aggregate));
   });
 
-  it('both keep the json key order of a row, a passed-through child\'s included', async () => {
+  it('rows keep the json key order of a row, a passed-through child\'s included', async () => {
     for (const build of [shapes.users, shapes.lateral, shapes.passthrough]) {
       const results = await eachWay(build);
-      expect(Object.keys(results.both[0])).toEqual(Object.keys(results.json[0]));
+      expect(Object.keys(results.rows[0])).toEqual(Object.keys(results.aggregate[0]));
     }
   });
 });
 
-describe('shortcutsUseJson in the writes\' RETURNING: the same results both ways', () => {
+describe('the writes\' RETURNING: the same results as their jsonb twins', () => {
   const
-    /** The write built and run with the option off, then on, each in a savepoint rolled back, so both see the same rows. */
+    /** The write built and run as it is, then with the jsonb twins of its json functions, each in a savepoint rolled back, so both see the same rows. */
     bothWrites = async <R>(build: () => db.SQLFragment<R, any>) => {
       const results: Record<string, any> = {};
-      for (const [name, value] of [['jsonb', false], ['json', true]] as const) {
-        db.setConfig({ shortcutsUseJson: value });
+      for (const [name, run] of [['json', (q: db.SQLFragment<R, any>) => q.run(t.client)], ['jsonb', runAsJsonb]] as const) {
         await t.client.query('SAVEPOINT both_ways');
-        results[name] = await build().run(t.client);
+        results[name] = await run(build());
         await t.client.query('ROLLBACK TO SAVEPOINT both_ways');
       }
       return results as { jsonb: R; json: R };
@@ -317,26 +317,21 @@ describe('shortcutsUseJson in the writes\' RETURNING: the same results both ways
   });
 
   it('a write\'s result read from a CTE is json: DISTINCT over it fails (42883), as note 018 § 4 says, and ::jsonb works', async () => {
-    db.setConfig({ shortcutsUseJson: true });
     const w = () => db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { returning: ['code'] });
     expect(await pgError(t.client, () => db.withCTEs({ w: w() }, sql`SELECT DISTINCT result FROM "w"`).run(t.client))).toMatchObject({ code: '42883' });
     expect(await db.withCTEs({ w: w() }, sql`SELECT DISTINCT result::jsonb ->> 'code' AS code FROM "w" ORDER BY code`).run(t.client)).toEqual([{ code: 'acme' }, { code: 'acme-berlin' }]);
   });
 
-  it('a partition whose columns sit where the table\'s do still refuses $action (0A000), both ways', async () => {
-    for (const value of [false, true]) {
-      db.setConfig({ shortcutsUseJson: value });
-      expect(await pgError(t.client, () => db.upsert('events', { id: 1000, occurred_on: '2025-06-02', kind: 'k' }, ['id', 'occurred_on']).run(t.client)))
-        .toMatchObject({ code: '0A000', message: 'cannot retrieve a system column in this context' });
-    }
+  it('a partition whose columns sit where the table\'s do still refuses $action (0A000)', async () => {
+    expect(await pgError(t.client, () => db.upsert('events', { id: 1000, occurred_on: '2025-06-02', kind: 'k' }, ['id', 'occurred_on']).run(t.client)))
+      .toMatchObject({ code: '0A000', message: 'cannot retrieve a system column in this context' });
   });
 
-  it('50 keys run, $action included; 51 are refused before any query, and off they run', async () => {
+  it('50 keys run, $action included; 51 are refused before any query, and run with returning left out', async () => {
     const
       extras = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, 'code'])),
       q = (n: number) => db.upsert('orgs', oldOrg, [...orgKey], { returning: ['code'], extras: extras(n) }),
       sent: unknown[] = [];
-    db.setConfig({ shortcutsUseJson: true });
     expect(Object.keys(await q(48).run(t.client) ?? {})).toHaveLength(50);
     db.setConfig({ queryListener: query => sent.push(query) });
     await expect(q(49).run(t.client)).rejects.toThrow('its 51 keys (`returning`, `extras` and `$action` together) take 102');
@@ -344,38 +339,43 @@ describe('shortcutsUseJson in the writes\' RETURNING: the same results both ways
       await expect(db.insert('accounts', account, { extras: { [key]: 'id' } }).run(t.client)).rejects.toThrow('cannot be a column alias');
     }
     expect(sent).toHaveLength(0);
-    db.setConfig({ shortcutsUseJson: false });
-    expect(Object.keys(await q(49).run(t.client) ?? {})).toHaveLength(51);
+    const everyColumn = await db.upsert('orgs', oldOrg, [...orgKey], { extras: extras(49) }).run(t.client);
+    expect(Object.keys(everyColumn).filter(k => /^k\d+$/.test(k))).toHaveLength(49);
+    expect(everyColumn).toMatchObject({ code: 'acme', $action: 'UPDATE' });
   });
   it('characterisation: beside every column, what RETURNING refuses may run in the subquery, where Postgres no longer sees it in RETURNING', async () => {
     const
-      outcome = async (value: boolean, extra: db.SQLFragment<any>, options = {}) => {
-        db.setConfig({ shortcutsUseJson: value });
+      outcome = async (extra: db.SQLFragment<any>, options = {}) => {
         await t.client.query('SAVEPOINT refused');
         try { return (await db.upsert('orgs', oldOrg, [...orgKey], { ...options, extras: { x: extra } }).run(t.client))?.x ?? null; }
         catch (err) { return (err as { code?: string }).code; }
         finally { await t.client.query('ROLLBACK TO SAVEPOINT refused'); }
       },
-      both = async (extra: db.SQLFragment<any>, options = {}) => [await outcome(false, extra, options), await outcome(true, extra, options)];
-    // an aggregate of no column, a window function and a set-returning one take the subquery's one row
-    expect(await both(sql`count(*)`)).toEqual(['42803', 1]);
-    expect(await both(sql`row_number() OVER ()`)).toEqual(['42P20', 1]);
-    expect(await both(sql`generate_series(1, 2)`)).toEqual(['0A000', '21000']);
+      refusedInReturning = async (extra: db.SQLFragment<any>) => (await pgError(t.client, () =>
+        t.client.query(sql`INSERT INTO "orgs" ("country", "code", "name") VALUES ('FR', 'acme', 'Acme') ON CONFLICT ("country", "code") DO UPDATE SET "name" = EXCLUDED."name" RETURNING ${extra}`.compile()))).code;
+    // RETURNING refuses an aggregate (42803), a window function (42P20) and a set-returning function (0A000), as
+    // jsonb_build_object() there, through 7.x, refused them; in the subquery, the first two take its one row
+    expect(await refusedInReturning(sql`count(*)`)).toBe('42803');
+    expect(await refusedInReturning(sql`row_number() OVER ()`)).toBe('42P20');
+    expect(await refusedInReturning(sql`generate_series(1, 2)`)).toBe('0A000');
+    expect(await outcome(sql`count(*)`)).toBe(1);
+    expect(await outcome(sql`row_number() OVER ()`)).toBe(1);
+    expect(await outcome(sql`generate_series(1, 2)`)).toBe('21000');
     // an aggregate of a column stays at its level, and beside returning the extras stay in RETURNING
-    expect(await both(sql`count(${'code'})`)).toEqual(['42803', '42803']);
-    expect(await both(sql`count(*)`, { returning: ['code'] })).toEqual(['42803', '42803']);
+    expect(await outcome(sql`count(${'code'})`)).toBe('42803');
+    expect(await outcome(sql`count(*)`, { returning: ['code'] })).toBe('42803');
   });
   it('with topLevelSelectAsRows too: a write as a CTE or the main query of withCTEs() gives the same results each way', async () => {
     const
-      combinations = [[false, false], [true, false], [false, true], [true, true]] as const,
+      combinations = [false, true],
       builds = [
         () => db.withCTEs({ w: db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: upperName }) }, db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } })),
         () => db.withCTEs({ s: db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } }) }, db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: { s: sql`(SELECT result FROM "s")` } })),
       ];
     for (const build of builds) {
       const results = [];
-      for (const [shortcutsUseJson, topLevelSelectAsRows] of combinations) {
-        db.setConfig({ shortcutsUseJson, topLevelSelectAsRows });
+      for (const topLevelSelectAsRows of combinations) {
+        db.setConfig({ topLevelSelectAsRows });
         await t.client.query('SAVEPOINT each_way');
         results.push(await build().run(t.client));
         await t.client.query('ROLLBACK TO SAVEPOINT each_way');
@@ -384,12 +384,9 @@ describe('shortcutsUseJson in the writes\' RETURNING: the same results both ways
     }
   });
 
-  it('a write nested in a read\'s lateral or extras is refused by Postgres both ways (42601)', async () => {
-    for (const value of [false, true]) {
-      db.setConfig({ shortcutsUseJson: value });
-      const w = () => db.insert('orgs', newOrg);
-      expect(await pgError(t.client, () => db.select('users', all, { extras: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
-      expect(await pgError(t.client, () => db.select('users', all, { lateral: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
-    }
+  it('a write nested in a read\'s lateral or extras is refused by Postgres (42601)', async () => {
+    const w = () => db.insert('orgs', newOrg);
+    expect(await pgError(t.client, () => db.select('users', all, { extras: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
+    expect(await pgError(t.client, () => db.select('users', all, { lateral: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
   });
 });
