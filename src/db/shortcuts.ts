@@ -196,24 +196,50 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
 
 // with shortcutsUseJson (decision 018 § 2), json having no `||`, a row of `columns` takes its columns, extras and
 // lateral keys in one json_build_object(), whose arguments Postgres limits to 100 (max_function_args; 54023 beyond),
-// where each part takes a jsonb_build_object() of its own without the option
+// where each part takes a jsonb_build_object() of its own without the option; a write's `returning`, extras and
+// $action the same. A key is a parameter, every caller's key included (a fragment past the type), but one flagged as
+// ours (`$action`), written as a literal
 const maxJSONKeys = 50;
-function SQLForJSONObject(pairs: [string, SQL][]) {
-  return pairs.length > maxJSONKeys ? refusedSQL(`\`shortcutsUseJson\` builds this row with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${pairs.length} keys (columns, extras and lateral keys together) take ${pairs.length * 2}. Give ${maxJSONKeys} keys at most, or set \`shortcutsUseJson: false\`, under which columns, extras and lateral keys take one \`jsonb_build_object()\` each.`) :
-    sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v]) => sql`${param(k)}::text, ${v}`)})`;
+function SQLForJSONObject(pairs: [string, SQL, ours?: true][], parts = 'columns, extras and lateral keys') {
+  return pairs.length > maxJSONKeys ? refusedSQL(`\`shortcutsUseJson\` builds this row with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${pairs.length} keys (${parts} together) take ${pairs.length * 2}. Give ${maxJSONKeys} keys at most, or set \`shortcutsUseJson: false\`, under which ${parts} take one \`jsonb_build_object()\` each.`) :
+    sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v, ours]) => sql`${ours ? raw(`'${k}'`) : sql`${param(k)}::text`}, ${v}`)})`;
 }
 
 // with shortcutsUseJson, an extras or lateral key beside every column is a column alias, as to_json() names its keys
 // after the columns: one quoted identifier, every `"` doubled, so that it comes back as given (SQLForAlias keeps a
 // hand-escaped `a""b`, which would come back as `a"b`), never split on `.`. Postgres refuses an empty one (42601) and
 // a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles
-function SQLForKeyAlias(key: string) {
+function SQLForKeyAlias(key: string, list: 'columns' | 'returning' = 'columns') {
   const
     text = `${key}`,
     bytes = Buffer.byteLength(text),
     problem = text === '' ? 'it is empty' : text.includes('\0') ? 'it holds a NUL' : bytes > 63 ? `it takes ${bytes} bytes in UTF-8, over Postgres's 63` : undefined;
   return problem === undefined ? raw(`"${text.replace(/"/g, '""')}"`) :
-    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` or \`lateral\` key beside every column: ${problem}. Give \`columns\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.`);
+    refusedSQL(`The key ${JSON.stringify(text)} cannot be a column alias, which \`shortcutsUseJson\` makes of an ${list === 'columns' ? '`extras` or `lateral` key' : '`extras` key'} beside every column: ${problem}. Give \`${list}\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.`);
+}
+
+// the RETURNING list of insert(), upsert() (with `$action`, unless suppressed), update() and deletes(), `… AS result`.
+// With shortcutsUseJson (decision 018 § 2), json having no `||`, every column beside extras or $action is to_json() of
+// a scalar subquery's row, whose column aliases name the keys, and `returning` beside them one json_build_object()
+function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, ColumnsOption<Table>, ExtrasOption<Table>> | undefined, reportAction = false) {
+  const
+    returning = callerValue(options, 'returning'),
+    extras = callerValue(options, 'extras'),
+    action = sql`CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END`;
+  if (!(getConfig().shortcutsUseJson ?? false)) return sql`${SQLForColumnsOfTable(returning, table, returningNull)}${SQLForExtras(extras)}${reportAction ? sql` || jsonb_build_object('$action', ${action})` : []} AS result`;
+  const
+    keys = extras == null ? [] : Object.keys(extras),
+    row = SQLForAlias('row_', table),
+    json = returning === null ? refusedSQL(returningNull) :
+      extras === null ? refusedSQL(extrasNull) :
+      returning !== undefined ? SQLForJSONObject([
+        ...returning.map((c): [string, SQL] => [c, c]),
+        ...keys.map((k): [string, SQL] => [k, asScalar(extras![k])]),
+        ...(reportAction ? [['$action', action, true] as [string, SQL, true]] : []),
+      ], '`returning`, `extras` and `$action`') :
+      keys.length === 0 && !reportAction ? sql`to_json(${table}.*)` :
+      sql`(SELECT to_json(${row}.*) FROM (SELECT ${table}.*${keys.map(k => sql`, ${asScalar(extras![k])} AS ${SQLForKeyAlias(k, 'returning')}`)}${reportAction ? sql`, ${action} AS "$action"` : []}) AS ${row})`;
+  return sql`${json} AS result`;
 }
 
 
@@ -342,13 +368,12 @@ export const insert: {
       valuesSQL = Array.isArray(completedValues) ?
         mapWithSeparator(completedValues as Insertable[], sql`, `, v => sql`(${vals(v)})`) :
         sql`(${vals(completedValues)})`,
-      returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-      extrasSQL = SQLForExtras(callerValue(options, 'extras'));
+      returningSQL = SQLForReturning(table, options);
 
     // a null row on its own, or a primitive row anywhere, fails in compile(), in cols() or vals(), so run() rejects;
     // so does a built-in row completeKeysWithDefaultValue leaves, unless no row has a key
     if (firstRow != null && !anyPrimitive && !(Array.isArray(completedValues) ? completedValues : [firstRow]).some(row => hasOwnKey(row))) throw new Error(nothingToInsert);
-    query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}${extrasSQL} AS result`;
+    query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}`;
   }
 
   query.runResultTransform = Array.isArray(values) ?
@@ -605,9 +630,8 @@ export const upsert: {
       callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c), c) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c as Column)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
-    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
-    suppressReport = callerValue(options, 'reportAction') === 'suppress';
+    suppressReport = callerValue(options, 'reportAction') === 'suppress',
+    returningSQL = SQLForReturning(table, options, !suppressReport);
 
   if (colNames.length === 0) throw new Error(nothingToInsert);
 
@@ -627,8 +651,7 @@ export const upsert: {
     insertPart = sql`INSERT INTO ${table} (${insertColsSQL}) VALUES ${insertValuesSQL}`,
     conflictPart = sql`ON CONFLICT ${conflictTargetSQL} DO`,
     conflictActionPart = updateColsSQL.length > 0 ? sql`UPDATE SET (${updateColsSQL}) = ROW(${updateValuesSQL})` : sql`NOTHING`,
-    reportPart = sql` || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`,
-    returningPart = sql`RETURNING ${returningSQL}${extrasSQL}${suppressReport ? [] : reportPart} AS result`,
+    returningPart = sql`RETURNING ${returningSQL}`,
     query = sql`${insertPart} ${conflictPart} ${conflictActionPart} ${returningPart}`;
 
   query.runResultTransform = Array.isArray(values) ?
@@ -679,9 +702,8 @@ export const update: {
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
 
   const
-    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
-    query = sql`UPDATE ${table} SET (${cols(values)}) = ROW(${vals(values)}) WHERE ${writeFilter(where)} RETURNING ${returningSQL}${extrasSQL} AS result`;
+    returningSQL = SQLForReturning(table, options),
+    query = sql`UPDATE ${table} SET (${cols(values)}) = ROW(${vals(values)}) WHERE ${writeFilter(where)} RETURNING ${returningSQL}`;
 
   query.runResultTransform = (qr) => qr.rows.map(r => r.result);
   return query;
@@ -712,9 +734,8 @@ export const deletes: DeleteSignatures = function (
 ): SQLFragment {
 
   const
-    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
-    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
-    query = sql`DELETE FROM ${table} WHERE ${writeFilter(where)} RETURNING ${returningSQL}${extrasSQL} AS result`;
+    returningSQL = SQLForReturning(table, options),
+    query = sql`DELETE FROM ${table} WHERE ${writeFilter(where)} RETURNING ${returningSQL}`;
 
   query.runResultTransform = (qr) => qr.rows.map(r => r.result);
   return query;

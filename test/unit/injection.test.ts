@@ -9,7 +9,7 @@
 // Inputs are cast to `any`: at run time they may come from untyped data (req.body).
 
 import { runInNewContext } from 'node:vm';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
 import { builtinObjects } from '../helpers/builtinObjects';
@@ -1003,6 +1003,22 @@ describe('shortcut options', () => {
         "unicodeEscaped": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS result",
       }
     `);
+  });
+
+  it('a fragment in columns or returning, past the type, keeps its key a parameter with shortcutsUseJson, as off', () => {
+    onTestFinished(resetConfig);
+    db.setConfig({ shortcutsUseJson: true });
+    const now = sql`now()`;
+    expect(db.select('users', all, { columns: [now] } as any).compile()).toEqual({
+      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, now()) AS result FROM "users") AS "sq_users"`,
+      values: [now],
+    });
+    expect(db.insert('users', { email: 'a', display_name: 'b' }, { returning: [now] } as any).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING json_build_object($3::text, now()) AS result',
+      values: ['b', 'a', now],
+    });
+    expect(db.upsert('users', { email: 'a', display_name: 'b' }, 'email', { returning: [now] } as any).compile().text)
+      .toMatch(/ RETURNING json_build_object\(\$3::text, now\(\), '\$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END\) AS result$/);
   });
 
   it('order.by', () => {
@@ -3224,6 +3240,184 @@ describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every
           "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""s"".U&""a"" UESCAPE '!' || ""b""".*) AS result FROM (SELECT """s"""."U&""a"" UESCAPE '!' || ""b""".*, "id" AS "e" FROM "users" AS """s"""."U&""a"" UESCAPE '!' || ""b""") AS "row_""s"".U&""a"" UESCAPE '!' || ""b""") AS "sq_""s"".U&""a"" UESCAPE '!' || ""b"""",
           "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""s"".U&""a\\"" OR TRUE OR \\""b""".*) AS result FROM (SELECT """s"""."U&""a\\"" OR TRUE OR \\""b""".*, "id" AS "e" FROM "users" AS """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "row_""s"".U&""a\\"" OR TRUE OR \\""b""") AS "sq_""s"".U&""a\\"" OR TRUE OR \\""b"""",
           "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""".*) AS result FROM (SELECT "s".U&"a\\0022"" OR TRUE OR ""\\0022b".*, "id" AS "e" FROM "users" AS "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "row_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""") AS "sq_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b"""",
+        }
+      `);
+  });
+});
+
+describe('shortcutsUseJson: an extras key, and a table, in a write\'s RETURNING beside every column', () => {
+  const
+    payloads: Record<string, string> = { ...hostile, newline: 'a\nb', closes: 'x") AS "row_users") AS result; DROP TABLE users; --', dollarQuote: '$$a$$' },
+    // the RETURNING list alone, where the key is written as an alias
+    returning = (build: () => db.SQLFragment<any, any>) => {
+      const result = compiled(build);
+      if (typeof result === 'string') return result;
+      return `${visible(result.text.slice(result.text.indexOf(' RETURNING ') + 1))} [${result.values.length} values]`;
+    },
+    where = sql`"id" = 1`;
+
+  afterEach(resetConfig);
+
+  it('each key is one quoted identifier, every " doubled, in each write, with no parameter of its own', () => {
+    db.setConfig({ shortcutsUseJson: true });
+    const outcomes = Object.fromEntries(Object.entries(payloads).map(([name, v]) => {
+      const
+        extras = { [v]: sql`1` } as any,
+        insert = returning(() => db.insert('users', { display_name: sql`'x'` } as any, { extras })),
+        others = [
+          returning(() => db.update('users', { display_name: sql`'x'` } as any, where, { extras })),
+          returning(() => db.deletes('users', where, { extras })),
+        ];
+      // update() and deletes() write the RETURNING of insert()
+      for (const other of others) expect(other, name).toBe(insert);
+      return [name, { insert, upsert: returning(() => db.upsert('users', { email: sql`'x'` } as any, 'email', { extras })) }];
+    }));
+    expect(outcomes).toMatchInlineSnapshot(`
+      {
+        "backslash": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a\\b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a\\b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "closes": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "x"") AS ""row_users"") AS result; DROP TABLE users; --") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "x"") AS ""row_users"") AS result; DROP TABLE users; --", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "comment": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a/*b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a/*b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "dashes": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a--b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a--b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "dollar": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a$1b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a$1b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "dollarQuote": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "$$a$$") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "$$a$$", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "dot": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a.b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a.b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "dquote": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a""b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a""b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "escapedCloses": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a"""" OR TRUE OR """"b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a"""" OR TRUE OR """"b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "escapedDot": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a"".""b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a"".""b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "escapedNul": {
+          "insert": "throws: The key "a\\"\\"\\u0000\\"\\"b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` key beside every column: it holds a NUL. Give \`returning\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+          "upsert": "throws: The key "a\\"\\"\\u0000\\"\\"b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` key beside every column: it holds a NUL. Give \`returning\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+        },
+        "escapedOdd": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a""""""b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a""""""b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "lone": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "mixedEscaped": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".a$1.""b"""" OR TRUE OR """"c""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".a$1.""b"""" OR TRUE OR """"c""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "newline": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a
+      b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a
+      b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "nul": {
+          "insert": "throws: The key "a\\u0000b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` key beside every column: it holds a NUL. Give \`returning\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+          "upsert": "throws: The key "a\\u0000b" cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` key beside every column: it holds a NUL. Give \`returning\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.",
+        },
+        "prequoted": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """a""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """a""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "prequotedCloses": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """a"" OR TRUE OR ""b""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """a"" OR TRUE OR ""b""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "prequotedEmpty": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "prequotedEscaped": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """a"""" OR TRUE OR """"b""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """a"""" OR TRUE OR """"b""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "qualifiedEscaped": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "s.a"""" OR TRUE OR """"b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "s.a"""" OR TRUE OR """"b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "semicolon": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a;b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a;b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "squote": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a'b") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS "a'b", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "uescape": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".U&""a"" UESCAPE '!' || ""b""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".U&""a"" UESCAPE '!' || ""b""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "unicodeCloses": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".U&""a\\"" OR TRUE OR \\""b""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".U&""a\\"" OR TRUE OR \\""b""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+        "unicodeEscaped": {
+          "insert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""") AS "row_users") AS result [0 values]",
+          "upsert": "RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, 1 AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""", CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END AS "$action") AS "row_users") AS result [0 values]",
+        },
+      }
+    `);
+  });
+
+  it('a table is one identifier in "row_<table>", as in "sq_<alias>"', () => {
+    db.setConfig({ shortcutsUseJson: true });
+    expect(Object.fromEntries(Object.entries(payloads).map(([name, v]) => [name,
+      returning(() => db.deletes(v as any, where, { extras: { e: sql`1` } }))]))).toMatchInlineSnapshot(`
+        {
+          "backslash": "RETURNING (SELECT to_json("row_a\\b".*) FROM (SELECT "a\\b".*, 1 AS "e") AS "row_a\\b") AS result [0 values]",
+          "closes": "RETURNING (SELECT to_json("row_x"") AS ""row_users"") AS result; DROP TABLE users; --".*) FROM (SELECT "x"") AS ""row_users"") AS result; DROP TABLE users; --".*, 1 AS "e") AS "row_x"") AS ""row_users"") AS result; DROP TABLE users; --") AS result [0 values]",
+          "comment": "RETURNING (SELECT to_json("row_a/*b".*) FROM (SELECT "a/*b".*, 1 AS "e") AS "row_a/*b") AS result [0 values]",
+          "dashes": "RETURNING (SELECT to_json("row_a--b".*) FROM (SELECT "a--b".*, 1 AS "e") AS "row_a--b") AS result [0 values]",
+          "dollar": "RETURNING (SELECT to_json("row_a$1b".*) FROM (SELECT "a$1b".*, 1 AS "e") AS "row_a$1b") AS result [0 values]",
+          "dollarQuote": "RETURNING (SELECT to_json("row_$$a$$".*) FROM (SELECT "$$a$$".*, 1 AS "e") AS "row_$$a$$") AS result [0 values]",
+          "dot": "RETURNING (SELECT to_json("row_a.b".*) FROM (SELECT "a"."b".*, 1 AS "e") AS "row_a.b") AS result [0 values]",
+          "dquote": "RETURNING (SELECT to_json("row_a""b".*) FROM (SELECT "a""b".*, 1 AS "e") AS "row_a""b") AS result [0 values]",
+          "escapedCloses": "RETURNING (SELECT to_json("row_a"" OR TRUE OR ""b".*) FROM (SELECT "a"" OR TRUE OR ""b".*, 1 AS "e") AS "row_a"" OR TRUE OR ""b") AS result [0 values]",
+          "escapedDot": "RETURNING (SELECT to_json("row_a"".""b".*) FROM (SELECT "a"".""b".*, 1 AS "e") AS "row_a"".""b") AS result [0 values]",
+          "escapedNul": "RETURNING (SELECT to_json("row_a""""<NUL>""""b".*) FROM (SELECT "a""""<NUL>""""b".*, 1 AS "e") AS "row_a""""<NUL>""""b") AS result [0 values]",
+          "escapedOdd": "RETURNING (SELECT to_json("row_a""""""b".*) FROM (SELECT "a""""""b".*, 1 AS "e") AS "row_a""""""b") AS result [0 values]",
+          "lone": "RETURNING (SELECT to_json("row_""".*) FROM (SELECT """".*, 1 AS "e") AS "row_""") AS result [0 values]",
+          "mixedEscaped": "RETURNING (SELECT to_json("row_""s"".a$1.""b"""" OR TRUE OR """"c""".*) FROM (SELECT "s".a$1."b"" OR TRUE OR ""c".*, 1 AS "e") AS "row_""s"".a$1.""b"""" OR TRUE OR """"c""") AS result [0 values]",
+          "newline": "RETURNING (SELECT to_json("row_a
+        b".*) FROM (SELECT "a
+        b".*, 1 AS "e") AS "row_a
+        b") AS result [0 values]",
+          "nul": "RETURNING (SELECT to_json("row_a<NUL>b".*) FROM (SELECT "a<NUL>b".*, 1 AS "e") AS "row_a<NUL>b") AS result [0 values]",
+          "prequoted": "RETURNING (SELECT to_json("row_""a""".*) FROM (SELECT "a".*, 1 AS "e") AS "row_""a""") AS result [0 values]",
+          "prequotedCloses": "RETURNING (SELECT to_json("row_""a"" OR TRUE OR ""b""".*) FROM (SELECT """a"" OR TRUE OR ""b""".*, 1 AS "e") AS "row_""a"" OR TRUE OR ""b""") AS result [0 values]",
+          "prequotedEmpty": "RETURNING (SELECT to_json("row_""".*) FROM (SELECT """".*, 1 AS "e") AS "row_""") AS result [0 values]",
+          "prequotedEscaped": "RETURNING (SELECT to_json("row_""a"""" OR TRUE OR """"b""".*) FROM (SELECT "a"" OR TRUE OR ""b".*, 1 AS "e") AS "row_""a"""" OR TRUE OR """"b""") AS result [0 values]",
+          "qualifiedEscaped": "RETURNING (SELECT to_json("row_s.a"" OR TRUE OR ""b".*) FROM (SELECT "s"."a"" OR TRUE OR ""b".*, 1 AS "e") AS "row_s.a"" OR TRUE OR ""b") AS result [0 values]",
+          "semicolon": "RETURNING (SELECT to_json("row_a;b".*) FROM (SELECT "a;b".*, 1 AS "e") AS "row_a;b") AS result [0 values]",
+          "squote": "RETURNING (SELECT to_json("row_a'b".*) FROM (SELECT "a'b".*, 1 AS "e") AS "row_a'b") AS result [0 values]",
+          "uescape": "RETURNING (SELECT to_json("row_""s"".U&""a"" UESCAPE '!' || ""b""".*) FROM (SELECT """s"""."U&""a"" UESCAPE '!' || ""b""".*, 1 AS "e") AS "row_""s"".U&""a"" UESCAPE '!' || ""b""") AS result [0 values]",
+          "unicodeCloses": "RETURNING (SELECT to_json("row_""s"".U&""a\\"" OR TRUE OR \\""b""".*) FROM (SELECT """s"""."U&""a\\"" OR TRUE OR \\""b""".*, 1 AS "e") AS "row_""s"".U&""a\\"" OR TRUE OR \\""b""") AS result [0 values]",
+          "unicodeEscaped": "RETURNING (SELECT to_json("row_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""".*) FROM (SELECT "s".U&"a\\0022"" OR TRUE OR ""\\0022b".*, 1 AS "e") AS "row_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""") AS result [0 values]",
         }
       `);
   });

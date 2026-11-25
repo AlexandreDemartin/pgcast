@@ -1796,3 +1796,46 @@ describe('shortcutsUseJson: an extras or lateral key, and an alias, beside every
     `);
   });
 });
+
+describe('shortcutsUseJson: an extras key in a write\'s RETURNING beside every column', () => {
+  // compiled text: test/unit/injection.test.ts; every value a fragment, so with no parameter, through the simple
+  // protocol, which would run a second statement; the key must come back as given, as the one key it is
+  const
+    shortUpdate = `UPDATE users SET display_name='i'`,
+    payloads = {
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b', backslash: 'a\\b',
+      dot: 'a.b', newline: 'a\nb', escaped: 'a""b', film: 'année 🎬', dollarQuote: '$$a$$', action: '$action',
+      // under 63 bytes, which a key may not pass
+      closes: `x" FROM "orgs"; ${shortUpdate}; --`, closesParen: `x")"r")a; ${shortUpdate};--`, longest: 'k'.repeat(63),
+    },
+    org = { country: sql`'DE'`, code: sql`'k'`, name: sql`'K'` },
+    // each write, savepointed, so that each sees the fixture's rows
+    writes = {
+      insert: (extras: object) => db.insert('orgs', org as any, { extras } as any),
+      upsert: (extras: object) => db.upsert('orgs', { ...org, country: sql`'FR'`, code: sql`'acme'` } as any, ['country', 'code'], { extras } as any),
+      update: (extras: object) => db.update('orgs', { name: sql`'N'` } as any, sql`"code" = 'acme'`, { extras } as any),
+      deletes: (extras: object) => db.deletes('memberships', sql`"user_id" = 2`, { extras } as any),
+    };
+
+  afterEach(resetConfig);
+
+  it('comes back as given in each write, and nothing else runs', async () => {
+    db.setConfig({ shortcutsUseJson: true });
+    const outcomes: Record<string, unknown[]> = {};
+    for (const [name, key] of Object.entries(payloads)) {
+      outcomes[name] = [];
+      for (const write of Object.values(writes)) {
+        const q = write({ [key]: sql`'v'` });
+        expect(q.compile().values, key).toEqual([]);
+        await t.client.query('SAVEPOINT write');
+        const result = await q.run(t.client), row = Array.isArray(result) ? result[0] : result;
+        await t.client.query('ROLLBACK TO SAVEPOINT write');
+        // upsert()'s own $action is written last, and wins
+        outcomes[name].push(Object.keys(row).includes(key) ? row[key] : row);
+      }
+      outcomes[name].push(await adaName());
+    }
+    expect(outcomes).toEqual(Object.fromEntries(Object.keys(payloads).map(name =>
+      [name, name === 'action' ? ['v', 'UPDATE', 'v', 'v', 'Ada'] : ['v', 'v', 'v', 'v', 'Ada']])));
+  });
+});
