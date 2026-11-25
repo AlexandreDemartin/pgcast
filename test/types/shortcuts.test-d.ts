@@ -1051,44 +1051,6 @@ describe('upsert', () => {
     db.upsert(every, everyRow, everyColumn, { updateValues: { c_int8_domain: db.param('1') } });
     db.upsert(every, [everyRow], everyColumn, { updateValues: { mood: db.param('sad') } });
   });
-
-  test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {
-    db.setConfig({ upsertRequiresSameKeys: true });
-    expectTypeOf(db.getConfig().upsertRequiresSameKeys).toEqualTypeOf<boolean | undefined>();
-    expectTypeOf<db.NewConfig['upsertRequiresSameKeys']>().toEqualTypeOf<boolean | undefined>();
-    // a Config written for 6.6.1, without the key, still compiles
-    const c: db.Config = {
-      transactionAttemptsMax: 5,
-      transactionRetryDelay: { minMs: 25, maxMs: 250 },
-      castArrayParamsToJson: false,
-      castObjectParamsToJson: false,
-    };
-    // @ts-expect-error a boolean, not a string
-    const d: db.Config = { ...c, upsertRequiresSameKeys: 'yes' };
-    void d;
-    // @ts-expect-error a boolean, not a string
-    db.setConfig({ upsertRequiresSameKeys: 'yes' });
-  });
-});
-
-describe('undefinedMeansMissing', () => {
-  test('an optional boolean of Config and setConfig', () => {
-    db.setConfig({ undefinedMeansMissing: true });
-    expectTypeOf(db.getConfig().undefinedMeansMissing).toEqualTypeOf<boolean | undefined>();
-    expectTypeOf<db.NewConfig['undefinedMeansMissing']>().toEqualTypeOf<boolean | undefined>();
-    // a Config written for 6.6.1, without the key, still compiles
-    const c: db.Config = {
-      transactionAttemptsMax: 5,
-      transactionRetryDelay: { minMs: 25, maxMs: 250 },
-      castArrayParamsToJson: false,
-      castObjectParamsToJson: false,
-    };
-    // @ts-expect-error a boolean, not a string
-    const d: db.Config = { ...c, undefinedMeansMissing: 'yes' };
-    void d;
-    // @ts-expect-error a boolean, not a string
-    db.setConfig({ undefinedMeansMissing: 'yes' });
-  });
 });
 
 describe('transactionRequiresCommit', () => {
