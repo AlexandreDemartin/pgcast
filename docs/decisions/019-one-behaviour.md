@@ -128,20 +128,22 @@ Run on 2026-11-25 on master's build (`d9cfd72b`), Node 22, Postgres on `TEST_DAT
 
 ## 9. The order of the 8.0 work
 
-Each removal PR carries its migration entries, English and French (§ 1); runtime and generator apart (skill `pr-shape`).
+- Each removal PR carries its migration entries, English and French (§ 1); runtime and generator apart (skill `pr-shape`).
+- **Docs**: each removal PR changes its key's pages, English and French, and its migration entry in `website/switching.md` and `website/fr/switching.md`, in the same PR (`AGENTS.md` § Working rules). The docs site deploys master on every push (`docs.yml`), so the pages of a removed key change only once 7.3.0 is out (step 4).
 
 1. Decide that 8.0 keeps one behaviour per option, the best, with no permanent opt-in (closes #952): this note.
 2. Build the JSON of insert() and its kin with json functions under shortcutsUseJson (closes #939).
 3. Decide on one JSON parameter for insert() of many rows (closes #941), judged under § 8.
-4. Update skill backward-compat to the compatibility of decision 019.
-5. Open the 8.0 migration guide in English and French: `switching.md` § from 8.0, empty but for its install line.
-6. Refuse a removed runtime option in setConfig(), and remove undefinedMeansMissing and upsertRequiresSameKeys.
-7. Remove transactionRequiresCommit, transactionRequiresIdleClient and transactionRequiresSatisfyingLevel.
-8. Remove aggregatesTypedByColumn and ConfigTypes: the aggregates are always typed by column.
-9. Make json functions and rows at the top level the only output of select() and its kin (shortcutsUseJson, topLevelSelectAsRows).
-10. selectExactlyOneChecksForSecondRow, as § 6 settles it.
-11. Refuse a removed generator option before any query, and remove typeEnumsAcrossSchemas, enumOrder, uniqueIndexConstraintsOnly and domainsTypedByContext.
-12. Make generate() always reject on a failed query; the CLI prints it and exits.
-13. Always name each column's value type with an alias (valuesTypedAsAliases); domainsTypedAsUnions and constraintNames, as § 6 settles them.
-14. Rewrite Versions, Configuration and Generator for 8.0's one behaviour per option, in English and French.
-15. 8.0.0: its range review, then the release (a stop point).
+4. Release 7.3.0 (a stop point: the owner starts it), after the last 7.x addition (step 2 and anything else § 8 places in 7.x) and before the first removal.
+5. Update skill backward-compat to the compatibility of decision 019.
+6. Open the 8.0 migration guide in English and French: `switching.md` § from 8.0, empty but for its install line.
+7. Refuse a removed runtime option in setConfig(), and remove undefinedMeansMissing and upsertRequiresSameKeys.
+8. Remove transactionRequiresCommit, transactionRequiresIdleClient and transactionRequiresSatisfyingLevel.
+9. Remove aggregatesTypedByColumn and ConfigTypes: the aggregates are always typed by column.
+10. Make json functions and rows at the top level the only output of select() and its kin (shortcutsUseJson, topLevelSelectAsRows).
+11. selectExactlyOneChecksForSecondRow, as § 6 settles it.
+12. Refuse a removed generator option before any query, and remove typeEnumsAcrossSchemas, enumOrder, uniqueIndexConstraintsOnly and domainsTypedByContext.
+13. Make generate() always reject on a failed query; the CLI prints it and exits.
+14. Always name each column's value type with an alias (valuesTypedAsAliases); domainsTypedAsUnions and constraintNames, as § 6 settles them.
+15. Rewrite Versions, and the introductions of Configuration and Generator, for 8.0's one behaviour per option, in English and French; each key's own entry has changed in its removal PR.
+16. 8.0.0: its range review, then the release (a stop point).
