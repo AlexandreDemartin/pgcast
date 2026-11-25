@@ -1235,7 +1235,7 @@ describe('update', () => {
     expect({
       fragment: db.update('accounts', { balance: 10 }, sql`TRUE`).compile(),
       empty: db.update('accounts', { balance: 10 }, {}).compile(),
-    }).toEqual({ fragment: { text: 'UPDATE "accounts" SET ("balance") = ROW($1) WHERE TRUE RETURNING to_json("accounts".*) AS result', values: [10] }, empty: { text: 'UPDATE "accounts" SET ("balance") = ROW($1) WHERE TRUE RETURNING to_json("accounts".*) AS result', values: [10] } });
+    }).toEqual({ fragment: { text, values: [10] }, empty: { text, values: [10] } });
   });
 
   it('an undefined value: its key is left out', () => {
@@ -2359,14 +2359,14 @@ describe('a built-in row among several in insert() and upsert()', () => {
       noPrototype: compiled(Object.create(null)),
       subclass: compiled(new Premiere(0)),
     }).toEqual({
-      dated: { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, $3) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org', 'b@x.org'] },
-      systemError: { text: 'INSERT INTO "users" ("code", "display_name", "email") VALUES (DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org', 'ENOENT'] },
-      typedArray: { text: 'INSERT INTO "users" ("0", "display_name", "email") VALUES (DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org', 7] },
-      proxy: { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, $3) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org', 'b@x.org'] },
-      proxyBuffer: { text: 'INSERT INTO "users" ("0", "display_name", "email") VALUES (DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org', 97] },
-      classInstance: { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org'] },
-      noPrototype: { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org'] },
-      subclass: { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) RETURNING to_json("users".*) AS result', values: ['A', 'a@x.org'] },
+      dated: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, $3)'), values: ['A', 'a@x.org', 'b@x.org'] },
+      systemError: { text: insertSQL('"code", "display_name", "email"', '(DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT)'), values: ['A', 'a@x.org', 'ENOENT'] },
+      typedArray: { text: insertSQL('"0", "display_name", "email"', '(DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT)'), values: ['A', 'a@x.org', 7] },
+      proxy: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, $3)'), values: ['A', 'a@x.org', 'b@x.org'] },
+      proxyBuffer: { text: insertSQL('"0", "display_name", "email"', '(DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT)'), values: ['A', 'a@x.org', 97] },
+      classInstance: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, DEFAULT)'), values: ['A', 'a@x.org'] },
+      noPrototype: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, DEFAULT)'), values: ['A', 'a@x.org'] },
+      subclass: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, DEFAULT)'), values: ['A', 'a@x.org'] },
     });
   });
 
@@ -2980,7 +2980,12 @@ describe('a shortcut option added to Object.prototype by something else is no op
       // a Proxy answering through `get` alone owns no key, so what it answers is none
       answering: deleted(counting(counts.answering, {}, { returning: ['display_name'] })),
     }))).toEqual({
-      result: { created: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "display_name") AS result', classed: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "mood") AS result', owning: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "display_name") AS result', answering: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_json("users".*) AS result' },
+      result: {
+        created: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "display_name") AS result',
+        classed: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "mood") AS result',
+        owning: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING json_build_object($2::text, "display_name") AS result',
+        answering: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_json("users".*) AS result',
+      },
       reads: 0,
     });
     expect(counts).toEqual({

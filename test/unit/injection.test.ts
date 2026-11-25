@@ -9,7 +9,7 @@
 // Inputs are cast to `any`: at run time they may come from untyped data (req.body).
 
 import { runInNewContext } from 'node:vm';
-import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
 import { builtinObjects } from '../helpers/builtinObjects';
