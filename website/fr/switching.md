@@ -1,5 +1,5 @@
 ---
-english: c46d4fa5ce1e
+english: 8ec00c9f23f8
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -297,6 +297,24 @@ npm install pgcast@npm:@pgcast/pgcast@^8
 
 :::
 
+Chaque option du générateur ci-dessous a quitté sa `Config`. La donner dans un objet littéral ne compile plus (TS2353). Donnée quand même, depuis une variable, `pgcastconfig.json`, `zapatosconfig.json` ou l’argument JSON de la CLI, la promesse de `generate()` ou de `check()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Une configuration qui n’a jamais donné l’option génère les mêmes fichiers.
+
+### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
+
+La 8.0 fait toujours ce que faisait `typeEnumsAcrossSchemas: true`, la valeur par défaut de la 7.x : un enum d’un autre schéma est cherché dans son propre schéma et écrit par ses labels ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, le générateur lève `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`. Une fois l’option retirée et les types régénérés, une colonne d’un enum d’un autre schéma prend les labels de cet enum : dans l’exemple du générateur, écrire `'director'` dans `prints.keeper` ne compile plus, et plus aucune colonne n’utilise les placeholders `any` comme `PgPrint_format` (leurs fichiers restent).
+- **Trouver les appels** : `grep -rn typeEnumsAcrossSchemas` dans vos fichiers de configuration et vos scripts, puis régénérez les types et lancez `tsc` : chaque écriture d’un label que l’enum de l’autre schéma n’a pas ne compile plus. Remplacez chaque import d’un placeholder devenu inutile par le type de la colonne, par exemple `prints.Selectable['format']`.
+- **Avant → après** : retirez `"typeEnumsAcrossSchemas": false` de `pgcastconfig.json`, ou `typeEnumsAcrossSchemas: false` de la configuration passée à `generate()`.
+
+### `enumOrder` {#from-8-0-enumOrder}
+
+La 8.0 fait toujours ce que faisait `enumOrder: "declared"`, la valeur par défaut de la 7.x : les labels d’un enum suivent leur ordre de déclaration, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()` ([`enumOrder`](/fr/generator#generate.enumOrder)).
+
+- **Ce que vous voyez** : avec `"alphabetical"`, ou toute valeur autre que `"declared"`, `null` et `undefined`, le générateur lève `enumOrder was removed in 8.0, which always does what enumOrder: "declared" did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-enumOrder`. Une fois l’option retirée et les types régénérés, seul `every.<name>` change, puisqu’une union est le même type dans n’importe quel ordre : `every.crew_job[0]` vaut `'director'`, et non `'cinematographer'`.
+- **Trouver les appels** : `grep -rn enumOrder` dans vos fichiers de configuration et vos scripts, puis `grep -rnE 'every\.\w+\['` pour le code qui lit un label par sa position.
+- **Avant → après** : retirez `"enumOrder": "alphabetical"`, et lisez un label par sa valeur, et non par son index dans `every.crew_job`.
+
 ## Passer de pgcast 6.x à la 7.0 {#from-7-0}
 
 En 6.x, commencez par [repérer les avertissements](#read-the-warnings) et [activer les corrections](#turn-on-the-opt-ins). Pour installer la 7.x, conservez l’alias du paquet. Choisissez la commande qui correspond à vos imports.
@@ -391,11 +409,11 @@ En 7.0, `prints.keeper` utilise les labels de l’enum de l’autre schéma. Vé
 
 - Lorsque vous générez les types dans un nouveau dossier, les placeholders d’enums d’autres schémas, comme `PgStatus` et `Pg_mood`, sont absents de `zapatos/custom`. Les fichiers existants restent sur disque. Les colonnes concernées sont désormais typées à partir de l’enum de l’autre schéma. Remplacez chaque import par le type de la colonne, par exemple `products.Selectable['status']`, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
 - Si une colonne de type composite d’un autre schéma était typée avec l’enum local du même nom, elle a désormais son propre placeholder. Indiquez-y le type renvoyé par votre parser, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
-- Si vous passez le tableau `columnsTypedByEnumName` à `definitionForRelationInSchema()`, seul le réglage `typeEnumsAcrossSchemas: false` le remplit.
+- Si vous passez le tableau `columnsTypedByEnumName` à `definitionForRelationInSchema()`, seul le réglage `typeEnumsAcrossSchemas: false` le remplit, en 7.x ; la 8.0 le laisse vide.
 
 Pour un domaine sur un enum d’un autre schéma, [comparez le placeholder existant au nouveau](#regenerate-for-7-0) et intégrez les nouveaux labels.
 
-Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements.
+Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#generate.typeEnumsAcrossSchemas) rétablit la recherche dans le schéma de la relation et [`enumOrder: 'alphabetical'`](/fr/generator#generate.enumOrder) rétablit le tri alphabétique des labels. Vous pouvez régler ces options indépendamment, sans note de migration. La 8.0 supprime ces deux anciens comportements ([`typeEnumsAcrossSchemas`](#from-8-0-typeEnumsAcrossSchemas), [`enumOrder`](#from-8-0-enumOrder)).
 
 ### Cibles de conflit nommées en 7.0 {#named-conflict-targets}
 

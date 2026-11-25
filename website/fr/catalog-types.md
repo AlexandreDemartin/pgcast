@@ -1,5 +1,5 @@
 ---
-english: d0484ad6e894
+english: b838ca8f4e5a
 ---
 
 # Le catalogue
@@ -35,7 +35,7 @@ Quand vous lancez `npx pgcast`, le générateur pose à ces tables quelques ques
 | avec [`constraintNames`](/fr/generator#generate.constraintNames), pour chaque relation, les noms des clés primaires, des contraintes uniques, des clés étrangères, des contraintes `CHECK` et d’exclusion, ainsi que des index uniques | `pg_constraint` et les index uniques ci-dessus | le type `Constraint` de la relation |
 | avec [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), chaque domaine sur `text`, son `CHECK` et son `COMMENT ON DOMAIN` | `pg_type`, `pg_constraint`, `pg_description` | l’union des valeurs que liste le `CHECK`, et le tuple `every.<name>` |
 
-Avec les réglages par défaut de la 7.0, le générateur lit chaque enum dans son propre schéma. Le premier label de `every.crew_job` est `director`, comme dans la déclaration `CREATE TYPE crew_job`. Voir [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder).
+Le générateur lit chaque enum dans son propre schéma, et le premier label de `every.crew_job` est `director`, comme dans la déclaration `CREATE TYPE crew_job` : ce sont les réglages par défaut de la 7.0, et le seul comportement à partir de la 8.0. Voir [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder).
 
 Pour voir les requêtes elles-mêmes, réglez [`debugListener`](/fr/generator#generate.debugListener). Un domaine, comme `seat_label`, et un type que le générateur ne sait pas traduire, comme `point`, reçoivent chacun un placeholder dans `zapatos/custom/`, à vous de le remplir ([Types personnalisés](/fr/custom-types)).
 
@@ -168,7 +168,7 @@ Le générateur est celui de Zapatos 6.6.1, son canary de version toujours à 10
 
 Les changements qu’apporte pgcast sont dans le runtime, pas dans les types générés. [`raw()`](/fr/sql-template#raw), [`cols()`](/fr/sql-template#cols) et [`vals()`](/fr/sql-template#vals) ne passent plus la vérification de types comme valeur d’un `Whereable`, d’un `Insertable` ou d’un `Updatable`, là où 6.6.1 les prenait pour un `Parameter`, un objet de même forme (`{ value }`).
 
-En 7.0, les écritures traitent par défaut une valeur `undefined` comme une clé absente. Voir [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ([Une valeur `undefined`](/fr/insert#undefined-values)). Avec `typeEnumsAcrossSchemas: false` et `enumOrder: 'alphabetical'`, le générateur cherche les enums dans le schéma de la relation et trie leurs labels par ordre alphabétique, comme dans pgcast 6.x ([Versions](/fr/versions)).
+En 7.0, les écritures traitent par défaut une valeur `undefined` comme une clé absente. Voir [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ([Une valeur `undefined`](/fr/insert#undefined-values)). En 7.x, `typeEnumsAcrossSchemas: false` et `enumOrder: 'alphabetical'` faisaient chercher les enums dans le schéma de la relation et trier leurs labels par ordre alphabétique, comme dans pgcast 6.x ; la 8.0 retire les deux ([Versions](/fr/versions)).
 
 Ce que pgcast refuse, c’est une seconde source de vérité : une classe modèle, un schéma écrit en TypeScript, un type déclaré à côté de la table qu’il décrit. La base a le dernier mot, et le prix est une habitude : relancez le générateur après chaque migration, et laissez TypeScript vous signaler les requêtes qui ne collent plus ([Première requête](/fr/first-query#when-the-schema-changes)).
 
