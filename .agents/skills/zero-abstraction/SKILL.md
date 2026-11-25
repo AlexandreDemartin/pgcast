@@ -23,7 +23,7 @@ A pgcast helper is a writing shortcut to SQL you would have written by hand; not
   - a bare name in `ORDER BY` or `DISTINCT ON` matches the new output columns first, a caller's fragment included (42702, #957);
   - a scalar subquery binds an aggregate, window or set-returning function to itself, and types an untyped `$n` as `text`: each refusal of the outer clause is probed both ways, 42803, 42P20, 0A000 and 42P18 (#954).
 - **Minimal surface**: one more option only if real usage asks for it (skill `consumer-usage`); otherwise a `sql` fragment is enough.
-- **Opt-in**: anything that changes the default output or adds a dependency sits behind an option (skill `backward-compat`).
+- **Opt-in**: anything that changes the default output or adds a dependency sits behind an option (skill `backward-compat`). An option that switches between two behaviours of pgcast names its exit, the sole behaviour at the next major, in its decision note and its docs entry, or it is refused; an addition that changes nothing while off stays opt-in (decision 019 § 1).
 - **Valid empty case**: a variadic or array helper produces valid SQL with no argument (`and()` → `TRUE`, `or()` → `FALSE`), never `()`. A path that forces or wraps a no-op runs on a `GENERATED ALWAYS` column and on a view (the fixture's `users`, `active_users`): an empty `insert()`'s text is refused there (428C9, #673). A condition that picks its SQL when built and reads its values when compiled is probed from each initial length: an `isIn([])` given `db.all` later compiled to `((false))` (#755).
 
 ## Shape of a condition

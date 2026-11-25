@@ -76,7 +76,7 @@ Ritual of a step: skill `run-step`; on one page for a human: [docs/WORKFLOW.md](
 
 ## Self-improvement
 
-- **Invariants**, never questioned alone: the 6 principles of `AGENTS.md` § Philosophy, 6.6.1 backward compatibility, the accepted decisions of `docs/decisions/`.
+- **Invariants**, never questioned alone: the 6 principles of `AGENTS.md` § Philosophy, 6.6.1 backward compatibility as decision 019 § 2 scopes it, the accepted decisions of `docs/decisions/`.
 - **Criterion**: a review remark enters a skill if it prevents a real bug that recurs or has cost dearly, and is general and verifiable. A preference of form does not.
 - **Preference**: an automatic check (ESLint, test, `check:agents`); otherwise an existing rule amended; last, a skill line.
 - **As soon as ready**: a method change goes out at once, whether the owner asks for it, the watch of Epic #836 shows it or a tool brings a new feature, so that pgcast uses it now.

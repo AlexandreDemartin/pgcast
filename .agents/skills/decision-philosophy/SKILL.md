@@ -33,7 +33,7 @@ In this order, stopping as soon as the answer is written:
 - The SQL closest to what you would write by hand.
 - The cheaper SQL for the same result, measured (`AGENTS.md` § Philosophy, point 6).
 - The type derived from the database rather than written by hand.
-- Opt-in rather than default; a separate package rather than the core.
+- An addition opt-in rather than default, and a switch between two behaviours only with its exit, the sole behaviour at the next major (decision 019); a separate package rather than the core.
 - The one a test or the compiler checks rather than review.
 - The one that costs the least compile time (`bench:types`).
 - The most reversible.
