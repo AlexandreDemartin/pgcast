@@ -1,5 +1,5 @@
 ---
-english: f8ea178f6dcd
+english: 9c4058311ec4
 ---
 
 # Nouveautés
@@ -15,7 +15,7 @@ Ce que pgcast ajoute à Zapatos 6.6.1, une ligne par ajout : la version qui l�
 | [`selectRows()`](/fr/select#selectRows) : la requête de `select()` comme fragment, une ligne par résultat, pour un [curseur](/fr/cursors) | 6.12.0 |
 | [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) : `selectExactlyOne()` lève une erreur sur une deuxième ligne, en opt-in | 6.7.0 |
 | [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) : `select()` exécuté seul envoie une ligne par résultat, le même tableau, en opt-in | 7.3.0 |
-| [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson) : `select()` et ses semblables, et le `RETURNING` des écritures, construisent leur JSON avec les fonctions `json`, les mêmes valeurs, en opt-in | 7.3.0 |
+| [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson) : `select()` et ses semblables, et le `RETURNING` des écritures, construisent leur JSON avec les fonctions `json`, les mêmes valeurs, en opt-in pendant toute la 7.x, toujours à partir de la 8.0.0 | 7.3.0 |
 | [`ReturningTypeForTable`](/fr/insert#ReturningTypeForTable) et [`UpsertReturnableForTable`](/fr/insert#UpsertReturnableForTable), exportés : la ligne que renvoie une écriture, pour typer un faux résultat | 6.7.0 |
 | [`UpsertOptions`](/fr/insert#UpsertOptions) et [`OrderSpecForTable`](/fr/select#OrderSpecForTable), exportés, pour que les déclarations d’un paquet puissent les nommer | 6.9.0 |
 

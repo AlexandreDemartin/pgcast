@@ -1,5 +1,5 @@
 ---
-english: 7a10f96d4aa5
+english: 359086b9cd50
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -415,6 +415,22 @@ La 8.0 supprime l’interface `ConfigTypes` avec `aggregatesTypedByColumn`, la s
 - **Ce que vous voyez** : une déclaration `declare module 'zapatos/db' { interface ConfigTypes { … } }` restée de la 7.x compile toujours et ne change aucun type, `aggregatesTypedByColumn: false` compris. Une fois la déclaration retirée, nommer `db.ConfigTypes` donne TS2694.
 - **Trouver les appels** : `grep -rn ConfigTypes`.
 - **Avant → après** : supprimez la déclaration, et le fichier s’il ne contenait rien d’autre. Si elle contenait `false`, lisez d’abord [`aggregatesTypedByColumn`](#from-8-0-aggregatesTypedByColumn).
+
+### `shortcutsUseJson` {#from-8-0-shortcutsUseJson}
+
+La 8.0 fait toujours ce que faisait `shortcutsUseJson: true` : [`select()`](/fr/select#json-functions) et ses semblables, et le `RETURNING` des [écritures](/fr/insert#json-functions), construisent leur JSON avec `to_json`, `json_build_object` et `json_agg`, là où la valeur par défaut de la 7.x, `false`, utilisait leurs équivalents `jsonb`. Les valeurs sont les mêmes, et un `lateral` de 20 films sous chacun de 1000 studios prend un tiers du temps ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)).
+
+- **Ce que vous voyez** : avec `false`, ou toute valeur autre que `true`, `null` et `undefined`, `setConfig()` lève `shortcutsUseJson was removed in 8.0, which always does what shortcutsUseJson: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-shortcutsUseJson`<!-- message -->. Une fois l’option retirée, un code écrit pour `false` voit :
+  - les clés d’une ligne dans l’ordre de la table, puis `extras`, puis les clés de `lateral` ou `$action`, là où `jsonb` mettait d’abord les clés les plus courtes : `Object.keys()` et `JSON.stringify()` d’une ligne le montrent. Une colonne `json` garde ses clés telles qu’elles sont stockées, et un `-0` de type `float8` reste `-0`.
+  - un résultat imbriqué en `json` : une fonction `jsonb` appliquée dessus échoue avec 42883, de même que `DISTINCT` et `UNION` ; `->`, `->>` et un cast, `::jsonb`, fonctionnent. Un résultat stocké dans une colonne `text` garde le texte de `json`, `{"balance" : 20.00}` là où `jsonb` écrivait `{"balance": 20.00}`.
+  - un parseur de type réglé pour `jsonb` (3802) seul, qui ne s’applique plus : réglez-le aussi pour `json` (114), comme le fait [`enableCustomJSONParsingForLargeNumbers()`](/fr/value-types#enableCustomJSONParsingForLargeNumbers).
+  - à côté de toutes les colonnes, chaque clé d’`extras` ou de `lateral` devenue un alias de colonne, et non plus un paramètre. Une clé vide, qui contient un NUL ou qui dépasse 63 octets en UTF-8, lève une erreur à la compilation, donc `.run()` est rejetée avant toute requête : passez `columns`, ou le `returning` d’une écriture, dont les clés restent des paramètres. Un nom seul, dans un fragment `sql` de `order.by` ou de `distinct`, qui égale une telle clé est ambigu, 42702.
+  - à côté de toutes les colonnes, les `extras` d’une écriture exécutés dans une sous-requête sur sa ligne, qui en accepte certains que `RETURNING` refusait : `count(*)` y donne 1, là où la 7.x échouait avec 42803.
+  - avec `columns` ou `returning`, les colonnes, les clés d’`extras` et de `lateral` et `$action` réunis dans un seul `json_build_object()` : au-delà de 50 clés, une erreur est levée à la compilation, là où chaque partie en avait 50 pour elle.
+  - le tableau de `select()`, qui peut atteindre le 1 Go d’une valeur, là où `jsonb_agg` s’arrêtait à 256 Mo (54000).
+  - le texte SQL : `to_json`, `json_agg`, `json_build_object` et `NULL::json` à la place de `to_jsonb`, `jsonb_agg`, `jsonb_build_object` et `NULL::jsonb`. `distinct: true` garde `SELECT DISTINCT to_jsonb(…)`, car `json` n’a pas d’égalité.
+- **Trouver les appels** : `grep -rn shortcutsUseJson` ; `grep -rnE 'jsonb_\w+\('` autour d’un raccourci imbriqué ou d’une écriture dans une CTE ; `grep -rn 'setTypeParser(3802'` ; les fragments `order` et `distinct` à côté d’`extras` ou de `lateral` ; et les tests qui comparent le texte SQL ou le `JSON.stringify()` des lignes.
+- **Avant → après** : `` db.sql`SELECT jsonb_array_length((${db.select('films', db.all)}))` ``<!-- tsc -->, que Postgres refuse maintenant (42883), devient `` db.sql`SELECT jsonb_array_length((${db.select('films', db.all)})::jsonb)` ``<!-- tsc -->. À côté de `extras: { title: … }`, `` order: { by: db.sql`${'title'}`, direction: 'ASC' } ``, ambigu (42702), devient `` order: { by: db.sql`${'films'}.${'title'}`, direction: 'ASC' } ``<!-- tsc: db.select('films', db.all, { extras: { title: db.sql`upper(${'title'})` }, … }) -->.
 
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 

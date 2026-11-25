@@ -1,5 +1,5 @@
 ---
-english: 26493af8f437
+english: 8adb3739f07d
 ---
 
 # Performance
@@ -9,11 +9,11 @@ Garder rapide la lecture de lignes volumineuses ou nombreuses. Chaque raccourci 
 
 ## Quand le JSON coûte {#when-the-json-costs}
 
-Chaque ligne est `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, et `select()` rassemble les lignes en une seule valeur, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->. Trois cas font apparaître ce coût :
+Chaque ligne est `to_json("films".*)`<!-- probe: examples/select.ts -->, et `select()` rassemble les lignes en une seule valeur, `coalesce(json_agg(result), '[]')`<!-- probe: examples/select.ts -->. Trois cas font apparaître ce coût :
 
-- **Les grandes valeurs** : `to_jsonb` lit chaque valeur en entier, y compris un gros `jsonb` stocké hors de la ligne, et la reconstruit. Sur 10 000 lignes avec un `jsonb` de 4 Ko, `select()` prend environ 0,6 s, `SELECT *` environ 0,2 s.
-- **Un grand nombre de lignes** : `jsonb_agg` construit tout le résultat en une seule valeur dans la mémoire de Postgres, envoyée et parsée d’un bloc, jusqu’à une [limite](#limits).
-- **Les laterals imbriqués** : chaque niveau construit le `jsonb` de ses lignes et le fusionne dans celui de son parent. 1 000 studios de 20 films chacun prennent environ 0,1 s, contre 50 ms pour une simple jointure imbriquée en JavaScript. À partir de la 7.3.0, avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), chaque niveau construit du `json`, que Postgres ne parse pas de nouveau : un tiers du temps dans ce cas.
+- **Les grandes valeurs** : `to_json` lit chaque valeur en entier, y compris un gros `jsonb` stocké hors de la ligne, et l’écrit de nouveau. Sur 10 000 lignes avec un `jsonb` de 4 Ko, `select()` prend environ 0,4 s, `SELECT *` environ 0,2 s.
+- **Un grand nombre de lignes** : `json_agg` construit tout le résultat en une seule valeur dans la mémoire de Postgres, envoyée et parsée d’un bloc, jusqu’à une [limite](#limits).
+- **Les laterals imbriqués** : chaque niveau construit le `json` de ses lignes, que son parent prend tel quel. 1 000 studios de 20 films chacun prennent environ 20 ms, un tiers de ce que prenait le `jsonb` de la 7.x, que Postgres parsait de nouveau à chaque niveau ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
 
 Une page de 50 petites lignes prend de 0,1 à 0,2 ms sous toutes les formes mesurées, environ un aller-retour vers un Postgres local : là, le JSON ne vaut pas la peine d’être évité. Ces chiffres sont des ordres de grandeur, mesurés depuis le client sur Postgres 17.3 en local.
 
@@ -27,7 +27,7 @@ Les films d’un studio sans leurs `details`, une colonne `jsonb` :
 
 </CastPanel>
 
-- `jsonb_build_object($1::text, "id", $2::text, "title", $3::text, "release_year")`<!-- probe: examples/performance.ts --> remplace `to_jsonb("films".*)`, donc `details` n’est jamais converti en JSON. Sur les 10 000 lignes ci-dessus, la requête passe d’environ 0,6 s à 20 ms.
+- `json_build_object($1::text, "id", $2::text, "title", $3::text, "release_year")`<!-- probe: examples/performance.ts --> remplace `to_json("films".*)`, donc `details` n’est jamais converti en JSON. Sur les 10 000 lignes ci-dessus, la requête passe d’environ 0,4 s à moins de 20 ms.
 - Le type ne garde que ces clés, `{ id: number; title: string; release_year: number }[]`.
 - Un champ de la grosse colonne s’obtient par un fragment [`extras`](/fr/select#extras) : [Champs JSON](/fr/json-fields).
 
@@ -39,7 +39,7 @@ Les films d’un studio sans leurs `details`, une colonne `jsonb` :
 
 </CastPanel>
 
-- `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/performance_select_rows.ts --> : pas de `jsonb_agg`, donc chaque ligne est une valeur à part. Sur les 10 000 lignes de 4 Ko, environ 0,3 s contre 0,6 s. Sur 2 000 lignes de 100 Ko, environ 1,6 s, là où `select()` échoue.
+- `SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/performance_select_rows.ts --> : pas de `json_agg`, donc chaque ligne est une valeur à part, et aucune valeur unique ne contient tout le résultat.
 - Le type est celui de `select()`, `s.films.JSONSelectable[]`.
 - À partir de la 7.3.0, pour chaque `select()` exécuté seul, activez [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) : chacun envoie cette requête, et ceux qui sont imbriqués gardent leur agrégat.
 
@@ -71,12 +71,12 @@ Le template [`sql`](/fr/sql-template#sql) ne construit aucun JSON :
 
 </CastPanel>
 
-- `SELECT * FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/performance_sql.ts -->, tel qu’écrit. Sur les 10 000 lignes de 4 Ko, environ 0,2 s contre 0,6 s avec `select()`.
+- `SELECT * FROM "films" WHERE ("studio_id" = $1)`<!-- probe: examples/performance_sql.ts -->, tel qu’écrit. Sur les 10 000 lignes de 4 Ko, environ 0,2 s contre 0,4 s avec `select()`.
 - Le type est celui que vous donnez, `s.films.Selectable[]` : les valeurs telles que `pg` les parse, un `timestamptz` en `Date` là où `JSONSelectable` a une chaîne ([Une colonne, cinq types](/fr/catalog-types#one-column-five-types)). Rien ne le vérifie par rapport à la requête ; [SQL typé](/fr/typed-sql) le génère.
 
 ## Limites {#limits}
 
-- `select()` échoue dès que son `jsonb_agg` dépasse 256 Mo, avec l’erreur 54000 de Postgres, `total size of jsonb array elements exceeds the maximum of 268435455 bytes`. `columns`, `selectRows()` ou un `cursor()` restent en dessous, de même que [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), à partir de la 7.3.0, pour un `select()` exécuté seul. À partir de la 7.3.0, avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), `json_agg` peut atteindre le 1 Go d’une valeur.
+- Le `json_agg` de `select()` peut atteindre le 1 Go d’une valeur : 2 000 lignes de 115 Ko prennent environ 1,5 s. Pendant toute la 7.x, `jsonb_agg` échouait au-delà de 256 Mo, avec l’erreur 54000 de Postgres, `total size of jsonb array elements exceeds the maximum of 268435455 bytes`. `columns`, `selectRows()` ou un `cursor()` restent en dessous, de même que [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), à partir de la 7.3.0, pour un `select()` exécuté seul.
 - `pg` lit chaque valeur dans une seule chaîne JavaScript, et Node limite une chaîne à environ 512 Mo ([node-postgres#2653](https://github.com/brianc/node-postgres/issues/2653)).
 
 ## Mesurer {#measure}

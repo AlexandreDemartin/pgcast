@@ -1,5 +1,5 @@
 ---
-english: eda734f36a0d
+english: 98c22d8c5543
 ---
 
 # Curseurs
@@ -13,14 +13,14 @@ Choisissez les colonnes dont l’index a besoin et triez les films par identifia
 
 <<< ../examples/plain/cursors_films.ts{ts twoslash}
 
-Survolez `films` pour voir son type, `{ id: number; title: string }[]`. C’est le type que donne [`select()`](/fr/select#select) pour les mêmes colonnes. Utilisez ici [`selectRows()`](/fr/select#selectRows) pour que Postgres renvoie une ligne par film. Avec `select()`, le curseur lirait l’unique ligne produite par l’agrégat (`jsonb_agg`) et transmettrait les quatre films à l’index en une seule fois.
+Survolez `films` pour voir son type, `{ id: number; title: string }[]`. C’est le type que donne [`select()`](/fr/select#select) pour les mêmes colonnes. Utilisez ici [`selectRows()`](/fr/select#selectRows) pour que Postgres renvoie une ligne par film. Avec `select()`, le curseur lirait l’unique ligne produite par l’agrégat (`json_agg`) et transmettrait les quatre films à l’index en une seule fois.
 
 Dans ses logs, l’index de l’exemple regroupe les identifiants 1000 et 1001, puis 1002 et 1003. Si vous fixez la taille du batch à trois films, le second batch ne contient que le quatrième film. Les valeurs de la déclaration sont `['id', 'title']`.
 
 <!-- probe: db.repeatableReadRO(pool, async txnClient => { for await (const films of db.cursor(txnClient, db.selectRows('films', db.all, { columns: ['id', 'title'], order: { by: 'id', direction: 'ASC' } }), { batchSize: 2 })) { } }) -->
 ```sql
 START TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY
-DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "id" ASC
+DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "id" ASC
 FETCH FORWARD 2 FROM pgcast_cursor_1
 -- The second FETCH returns the last two films. A third returns no rows.
 CLOSE pgcast_cursor_1

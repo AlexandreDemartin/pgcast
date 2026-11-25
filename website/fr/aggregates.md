@@ -1,5 +1,5 @@
 ---
-english: 09d2f93a3d22
+english: ae28c9b17975
 ---
 
 # Agrégats
@@ -13,7 +13,7 @@ english: 09d2f93a3d22
 db.count(table, where, options?)
 ```
 
-`SELECT count(*) AS result`<!-- probe: db.count('films', db.all) -->, sans `jsonb_agg` : `.run(pool)` donne un `number`, `0` quand aucune ligne ne correspond au `where`. Le `bigint` que renvoie Postgres passe par `Number()`.
+`SELECT count(*) AS result`<!-- probe: db.count('films', db.all) -->, sans `json_agg` : `.run(pool)` donne un `number`, `0` quand aucune ligne ne correspond au `where`. Le `bigint` que renvoie Postgres passe par `Number()`.
 
 <CastPanel example="count">
 
@@ -158,7 +158,7 @@ const firstShow = await db.min('screenings', db.all, {
 - Le SQL est le même dans les deux cas : `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: db.min('screenings', db.all, { columns: ['starts_at'] }) -->.
 - `min()` et `max()` donnent un `bigint` ou un `numeric` sous forme de chaîne avec le parseur par défaut de `pg`. Sous une clé de `lateral`, le parseur JSON de la requête extérieure lit le nombre et peut conserver les grandes valeurs sous forme de chaînes.
 - `count()` n’est pas typé par colonne : `0` au premier niveau, et `null` imbriqué dans un `lateral` ou comme valeur d’`extras` quand sa requête ne renvoie aucune ligne.
-- Passé comme unique `lateral`, l’agrégat est typé comme au premier niveau par `selectOne()` et `selectExactlyOne()`, qui rendent sa colonne telle quelle, et comme imbriqué par `select()`, qui enveloppe ses lignes dans `jsonb_agg()`. Ce `selectOne()` ou ce `selectExactlyOne()`, imbriqué à son tour, est typé comme imbriqué.
+- Passé comme unique `lateral`, l’agrégat est typé comme au premier niveau par `selectOne()` et `selectExactlyOne()`, qui rendent sa colonne telle quelle, et comme imbriqué par `select()`, qui enveloppe ses lignes dans `json_agg()`. Ce `selectOne()` ou ce `selectExactlyOne()`, imbriqué à son tour, est typé comme imbriqué.
 - `.copy()` renvoie un simple `SQLFragment`. Dans `extras` ou sous une clé de `lateral`, imbriquez le fragment d’origine de `min()` ou de `max()`. La copie d’un agrégat sur une colonne de type date conserve le type du résultat direct, `Date | null`. En JSON, Postgres renvoie les dates non nulles sous forme de chaînes.
 
 ## Types {#types}

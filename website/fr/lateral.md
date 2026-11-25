@@ -1,5 +1,5 @@
 ---
-english: 9d50276eb192
+english: 34083d198eec
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -90,7 +90,7 @@ Le mentor d’un membre de l’équipe est une autre ligne de `crew`. Donnez un 
 - Sans les alias, le `FROM "crew"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> de la sous-requête masque celui de la requête extérieure, et `"crew"."mentor_id"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> est la ligne même de la sous-requête. Postgres l’exécute sans erreur, et chaque `mentor` revient `null`, chaque compte `0` :
 
   ```sql
-  SELECT jsonb_build_object($5::text, "name") AS result
+  SELECT json_build_object($5::text, "name") AS result
   FROM "crew"
   WHERE ("id" = "crew"."mentor_id")
   LIMIT $6
@@ -187,7 +187,7 @@ db.select('films', db.all, {
 
 - **`strictNullChecks`** : sans lui (ou `strict`), `columns`, `extras` et `lateral` laissent au type la ligne entière, et il ne refuse rien ([Strict](/fr/select#options)).
 - **Une jointure non vérifiée** : `db.parent()` accepte une colonne de n’importe quelle table, sauf si vous nommez la table ([Vérifier la colonne parente](#check-the-parent-column)).
-- **[`withTies`](/fr/select#order-limit-offset-and-withties) dans un `selectOne()` imbriqué** : il écrit `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, qui garde toutes les lignes ex æquo : sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo ; sous `selectOne()` ou `selectExactlyOne()`, elle revient une fois, avec l’une des lignes ex æquo, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Dans un `select()` imbriqué, les ex æquo restent dans le tableau. Comme `lateral` de `count()`, chaque ex æquo est compté : 6 pour deux films de trois rôles ex æquo chacun. Dans un `lateral`, inchangé depuis Zapatos 6.6.1, et conservé : c’est le SQL que demande `withTies` ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). Comme valeur d’`extras`, un ex æquo fait refuser la requête par Postgres (21000) : « <span lang="en">more than one row returned by a subquery used as an expression</span> » ; Zapatos 6.6.1 refusait tout raccourci comme valeur d’`extras` (42601), ex æquo ou non.
+- **[`withTies`](/fr/select#order-limit-offset-and-withties) dans un `selectOne()` imbriqué** : il écrit `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, qui garde toutes les lignes ex æquo : sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo ; sous `selectOne()` ou `selectExactlyOne()`, elle revient une fois, avec l’une des lignes ex æquo, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Dans un `select()` imbriqué, les ex æquo restent dans le tableau. Comme `lateral` de `count()`, chaque ex æquo est compté : 6 pour deux films de trois rôles ex æquo chacun. Dans un `lateral`, inchangé depuis Zapatos 6.6.1, et conservé : c’est le SQL que demande `withTies` ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). Comme valeur d’`extras`, un ex æquo fait refuser la requête par Postgres (21000) : « <span lang="en">more than one row returned by a subquery used as an expression</span> » ; Zapatos 6.6.1 refusait tout raccourci comme valeur d’`extras` (42601), ex æquo ou non.
 - **Un `lock`** : sans `of`, `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> atteint les sous-requêtes, et Postgres refuse la requête (0A000) : « <span lang="en">FOR UPDATE is not allowed with aggregate functions</span> » sous `select()` ou `count()`, « <span lang="en">FOR UPDATE cannot be applied to the nullable side of an outer join</span> » sous `selectOne()`. Nommez la table ([`lock`](/fr/select#lock)) :
 
 <CastPanel example="lateral_lock">

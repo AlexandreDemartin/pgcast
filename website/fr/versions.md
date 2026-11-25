@@ -1,5 +1,5 @@
 ---
-english: 094ff8059936
+english: 136a11ee433a
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -114,7 +114,7 @@ De la 6.7 à la fin de la 6.x, si l’option `rejectOnQueryError` était omise o
 
 [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows), à partir de la 7.3.0, envoie un `select()` exécuté seul sous la forme d’une ligne par résultat, avec les mêmes valeurs. L’option n’émet jamais d’avertissement, et la 8.0 ne garde que ce comportement : le code qui exécute lui-même le texte de `.compile()` lit `rows.map(r => r.result)`.
 
-[`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), à partir de la 7.3.0, construit le JSON de `select()` et de ses semblables, et celui du `RETURNING` des écritures, avec les fonctions `json`, pour les mêmes valeurs, sauf l’ordre des clés d’une ligne et le type d’un résultat imbriqué. L’option n’émet jamais d’avertissement, et la 8.0 ne garde que ce comportement.
+[`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), à partir de la 7.3.0, construit le JSON de `select()` et de ses semblables, et celui du `RETURNING` des écritures, avec les fonctions `json`, pour les mêmes valeurs, sauf l’ordre des clés d’une ligne et le type d’un résultat imbriqué. L’option n’émet jamais d’avertissement, et la 8.0 supprime la clé et ne garde que `json` ([migration vers la 8.0](/fr/switching#from-8-0-shortcutsUseJson)).
 
 En 8.0, chaque option ne garde qu’un comportement, le meilleur ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 

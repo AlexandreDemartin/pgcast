@@ -1,5 +1,5 @@
 ---
-english: 12a9b74c9254
+english: 711994b3e840
 description: "Écrivez beaucoup de lignes d’un coup : découpez-les sous la limite de paramètres, ignorez celles déjà là, additionnez des comptes, ne récupérez que l’utile."
 ---
 
@@ -126,7 +126,7 @@ Par défaut, chaque ligne revient entière, avec son `$action` pour un upsert. P
 
 </CastPanel>
 
-- [`returning: ['seat']`](/fr/insert#insert-options) envoie `jsonb_build_object($8::text, "seat")`<!-- probe: examples/batches_returning.ts --> au lieu de `to_jsonb("seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
+- [`returning: ['seat']`](/fr/insert#insert-options) envoie `json_build_object($8::text, "seat", '$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: examples/batches_returning.ts --> au lieu de `to_json("row_seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
 - `$action` distingue les nouvelles lignes des lignes mises à jour : `newSeats` vaut `['F8']` quand F7 était déjà réservé.
 - [`reportAction: 'suppress'`](/fr/insert#upsert-options) retire `$action` du SQL et du type, pour un batch qui n’en a pas besoin.
 - Tous deux n’affinent le type qu’avec `strictNullChecks` activé ([Options](/fr/insert#insert-options)).

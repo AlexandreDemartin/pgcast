@@ -1,5 +1,5 @@
 ---
-english: d555764daf57
+english: 54ef56a88ad5
 ---
 
 # Pagination
@@ -144,7 +144,7 @@ Les séances, les plus proches d’abord, sur `starts_at` puis `id`. Ici `last` 
 - Pas sous forme de `Date`, qui garde les millisecondes et perd le reste. Prenez deux séances dans la même milliseconde, à 18:00:00.000100 et 18:00:00.000900 : en `Date`, les deux valent 18:00:00.000. Dans cet ordre `ASC`, la page après la première redonne la première ; dans un ordre `DESC`, la page après la seconde saute la première.
 - Une requête à vous dans le template [`sql`](/fr/sql-template#sql) reçoit `starts_at` de `pg` sous forme de `Date` : prenez le curseur dans la ligne d’un raccourci, qui a la chaîne.
 - Comparer sur `date_trunc('milliseconds', starts_at)` fonctionne aussi avec un `Date`, mais demande la même expression dans l’`order`, et un index dessus pour commencer à la dernière ligne. Cet index demande le fuseau, `date_trunc('milliseconds', starts_at, 'UTC')` : sur la forme à deux arguments, Postgres le refuse (42P17). La chaîne n’a besoin de rien de tout cela : un index sur `(starts_at, id)` sert la comparaison telle quelle.
-- Vérifiez la chaîne d’un curseur avant la requête, comme `decodeCursor()` vérifie les entiers ([ci-dessous](#send-the-cursor-to-the-client)) : Postgres refuse une chaîne qu’il ne peut pas lire comme une heure (22007). La forme qu’écrit `to_jsonb()` est `/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?[+-]\d\d:\d\d$/`.
+- Vérifiez la chaîne d’un curseur avant la requête, comme `decodeCursor()` vérifie les entiers ([ci-dessous](#send-the-cursor-to-the-client)) : Postgres refuse une chaîne qu’il ne peut pas lire comme une heure (22007). La forme qu’écrit `to_json()` est `/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?[+-]\d\d:\d\d$/`.
 
 ### Envoyer le curseur au client {#send-the-cursor-to-the-client}
 

@@ -1,5 +1,5 @@
 ---
-english: f44457d98777
+english: bf4ea0eb70f5
 ---
 
 # Transactions
@@ -472,7 +472,7 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-- Après `CURSOR FOR` vient le texte du fragment lui-même, avec ses valeurs, comme un template `sql` imbrique un fragment. Un `select()` passé tel quel envoie sa requête `jsonb_agg` : il est donc lu en un seul batch, le tableau entier, comme le dit son type. Pour ses lignes une à une, typées comme `select()` les type, donnez [`selectRows()`](/fr/select#selectRows), la même requête sans `jsonb_agg`.
+- Après `CURSOR FOR` vient le texte du fragment lui-même, avec ses valeurs, comme un template `sql` imbrique un fragment. Un `select()` passé tel quel envoie sa requête `json_agg` : il est donc lu en un seul batch, le tableau entier, comme le dit son type. Pour ses lignes une à une, typées comme `select()` les type, donnez [`selectRows()`](/fr/select#selectRows), la même requête sans `json_agg`.
 - `pgcast_cursor_<n>` prend le plus petit numéro qu’aucun autre `cursor()` encore en cours sur ce client ne détient : des boucles imbriquées obtiennent 1, puis 2 ; une boucle après une autre obtient de nouveau 1 ; deux en même temps obtiennent deux noms. Ne donnez pas à l’un de vos curseurs un nom de la forme `pgcast_cursor_<n>`.
 - `NO SCROLL` : le curseur ne lit qu’en avant. Sans lui, savoir si Postgres peut lire en arrière dépendrait du plan. C’est aussi la forme qu’exige une requête `FOR UPDATE`, dont les lignes sont verrouillées à mesure que chaque batch est lu, pas avant.
 - Postgres n’accepte pas de paramètre dans `FETCH FORWARD` : la taille est donc écrite dans le SQL, une fois vérifiée.

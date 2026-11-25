@@ -1,5 +1,5 @@
 ---
-english: e495ca42ea2c
+english: 546ba9fc7b05
 ---
 
 # Pourquoi pgcast
@@ -52,7 +52,7 @@ Chaque raccourci écrit une seule requête, et sa référence montre ce SQL. La 
 
 Le panneau montre ce que vous obtenez dans votre propre code : [`.compile()`](/fr/sql-template#compile) donne les mêmes `text` et `values`, et n’envoie rien. Chaque valeur est un paramètre, les clés JSON comprises ; chaque nom de table et de colonne est entre guillemets.
 
-L’imbrication est l’œuvre de Postgres lui-même, `jsonb_agg`<!-- probe: examples/why_studio.ts --> dans un `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts --> : le studio et ses films reviennent en une seule valeur JSON, en un aller-retour, sans lignes à recoudre en JavaScript.
+L’imbrication est l’œuvre de Postgres lui-même, `json_agg`<!-- probe: examples/why_studio.ts --> dans un `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts --> : le studio et ses films reviennent en une seule valeur JSON, en un aller-retour, sans lignes à recoudre en JavaScript.
 
 TypeScript connaît la seule colonne demandée, les films en dessous, et `undefined` quand aucun studio n’a cet `id` : il faut pour cela `strict`, que [Première requête](/fr/first-query#set-up-the-project) active.
 
