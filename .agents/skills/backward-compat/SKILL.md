@@ -45,8 +45,8 @@ Decision 019 § 1, which supersedes "an explicit old value is kept" of note 003 
 - **A new option that switches between two behaviours of pgcast names its exit**: the sole behaviour at the next major, written in its decision note and its docs entry, or it is refused.
 - **Kept**: configuration by nature (a fact the database cannot state, a listener, Zapatos 6.6.1's own keys), and an addition, off by default, that changes nothing while off (`constraintNames`).
 - **An old value stays only with a stated need that no other way meets**; "someone may rely on it" is not one, the migration entry answers it.
-- **A breaking change ships with its migration entry** in the same PR, in `website/switching.md` and `website/fr/switching.md`: before → after code, what the user sees change, how to find the calls (a grep, a type error). Without it, it is not merged.
-- **A removed key fails loudly**: it leaves the types, and its old value throws at `setConfig()` or before the generator's first query (decision 019 § 4).
+- **A breaking change ships with its migration entry** in the same PR, in `website/switching.md` and `website/fr/switching.md`: before → after code, what the user sees change, how to find the calls (a grep, a type error). Without it, it is not merged. Its review reads both code spans, before and after, in both languages: an entry held only an "after" for two rounds (#981). A section's entries share one intro, decided before its second PR opens and reread when an entry of another class joins: "never set → no change" was written for the entries already there (#982, #988).
+- **A removed key fails loudly**: it leaves the types, and its old value throws at `setConfig()` or before the generator's first query (decision 019 § 4). Its refusal, its reads and what it leaves behind: [reference.md](reference.md) § Removing an option.
 
 ## Fixing an existing bug
 
