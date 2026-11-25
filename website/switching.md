@@ -350,7 +350,7 @@ For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.condi
 
 ### Regenerate and compile {#regenerate-for-7-0}
 
-Regenerate whenever the generator version or an output option changes. Run `npx pgcast`, then diff the generated schema. The first four old settings below run quietly through 7.x and go in 8.0. The last three are permanent choices.
+Regenerate whenever the generator version or an output option changes. Run `npx pgcast`, then diff the generated schema. The first four old settings below, and the last, run quietly through 7.x and go in 8.0; the two parser choices stay.
 
 | 7.0 default | What changes for the caller | Old setting |
 |---|---|---|
@@ -360,7 +360,7 @@ Regenerate whenever the generator version or an output option changes. Run `npx 
 | [`domainsTypedByContext: true`](/generator#generate.domainsTypedByContext) | With the generated placeholder and default parsers, a `bigint` domain is a string in a raw row, a number in shortcut JSON, and accepts a `bigint` on write. [Domain types](#domain-and-parser-types). | `false` |
 | [`enumArraysTypedAsText: true`](/generator#generate.enumArraysTypedAsText) | A raw enum array is text such as `'{writer,editor}'`. Use the shortcut's array for `.map()`, or select `false` if your parser returns an array. | `false` (permanent) |
 | [`intervalsTypedAsObjects: true`](/generator#generate.intervalsTypedAsObjects) | A raw interval has `toPostgres()`. Shortcut JSON keeps the text. Select `false` if your parser returns text. | `false` (permanent) |
-| [`rejectOnQueryError: true`](/generator#generate.rejectOnQueryError) | `await generate()` and `await tsForConfig()` reject with the original connection or query error. Rethrow it or set `process.exitCode = 1` if the job must fail. A synchronous listener error also rejects generation. Handle any promise the listener returns. | `false` (permanent immediate exit) |
+| [`rejectOnQueryError: true`](/generator#generate.rejectOnQueryError) | `await generate()` and `await tsForConfig()` reject with the original connection or query error. Rethrow it or set `process.exitCode = 1` if the job must fail. A synchronous listener error also rejects generation. Handle any promise the listener returns. | `false` (immediate exit, through 7.x) |
 
 By default, `await check()` already rejects on database errors. It compares the contents of the schema and any generated custom types index, and checks that each placeholder exists. A failed check returns `false`. Explicit `rejectOnQueryError: false` ends the process on database errors for all three functions. Both CLI names, `pgcast` and `zapatos`, exit 1 on database errors. Their `--check` also exits 1 when that check returns `false`. [Generator errors](/generator#generate.rejectOnQueryError).
 
@@ -428,7 +428,7 @@ Restore the 6.x package and lockfile, reinstall, and restore the runtime and gen
 npm install zapatos@6.6.1
 ```
 
-- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn`, `topLevelSelectAsRows` and `transactionEventListener`, which TypeScript takes for a misspelt `transactionListener` (2561). Zapatos 6.6.1 never calls that listener: feed a log or a metric from `transactionListener`'s messages instead.
+- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn`, `shortcutsUseJson`, `topLevelSelectAsRows` and `transactionEventListener`, which TypeScript takes for a misspelt `transactionListener` (2561). Zapatos 6.6.1 never calls that listener: feed a log or a metric from `transactionListener`'s messages instead.
 - On [`moduleNames`](/generator#generate.moduleNames) `"pgcast"`, run `npm uninstall pgcast` too: both packages have a `zapatos` command. Your `pgcast/…` imports then no longer resolve, and 6.6.1 writes `zapatos/` but leaves `pgcast/` behind. So change each import back to `zapatos/…`, move the placeholders you edited to `zapatos/custom/`, their `declare module 'pgcast/custom'` renamed `'zapatos/custom'`, and delete `pgcast/`.
 - Rename a `pgcastconfig.json` to `zapatosconfig.json`: Zapatos 6.6.1's CLI reads no other file.
 - Take [`--check`](/generator#check) out of your scripts. Before the JSON argument, Zapatos 6.6.1's CLI reads it as that argument, and stops with code 1; after it, the CLI ignores it, writes the files and exits with code 0, so the check always passes. [`check()`](/generator#check) too: Zapatos 6.6.1's `zapatos/generate` has no such export, which TypeScript refuses (2305); at run time, `require()` gives `undefined` and the call throws `TypeError: check is not a function`, and an ES module import fails before any code runs.

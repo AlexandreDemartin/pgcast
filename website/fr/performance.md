@@ -1,5 +1,5 @@
 ---
-english: c0951e679a55
+english: cf18f85b93a9
 ---
 
 # Performance
@@ -13,7 +13,7 @@ Chaque ligne est `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, et `se
 
 - **Les grandes valeurs** : `to_jsonb` lit chaque valeur en entier, y compris un gros `jsonb` stocké hors de la ligne, et la reconstruit. Sur 10 000 lignes avec un `jsonb` de 4 Ko, `select()` prend environ 0,6 s, `SELECT *` environ 0,2 s.
 - **Un grand nombre de lignes** : `jsonb_agg` construit tout le résultat en une seule valeur dans la mémoire de Postgres, envoyée et parsée d’un bloc, jusqu’à une [limite](#limits).
-- **Les laterals imbriqués** : chaque niveau construit le `jsonb` de ses lignes et le fusionne dans celui de son parent. 1 000 studios de 20 films chacun prennent environ 0,1 s, contre 50 ms pour une simple jointure imbriquée en JavaScript.
+- **Les laterals imbriqués** : chaque niveau construit le `jsonb` de ses lignes et le fusionne dans celui de son parent. 1 000 studios de 20 films chacun prennent environ 0,1 s, contre 50 ms pour une simple jointure imbriquée en JavaScript. Avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), chaque niveau construit du `json`, que Postgres ne parse pas de nouveau : un tiers du temps dans ce cas.
 
 Une page de 50 petites lignes prend de 0,1 à 0,2 ms sous toutes les formes mesurées, environ un aller-retour vers un Postgres local : là, le JSON ne vaut pas la peine d’être évité. Ces chiffres sont des ordres de grandeur, mesurés depuis le client sur Postgres 17.3 en local.
 
@@ -76,7 +76,7 @@ Le template [`sql`](/fr/sql-template#sql) ne construit aucun JSON :
 
 ## Limites {#limits}
 
-- `select()` échoue dès que son `jsonb_agg` dépasse 256 Mo, avec l’erreur 54000 de Postgres, `total size of jsonb array elements exceeds the maximum of 268435455 bytes`. `columns`, `selectRows()` ou un `cursor()` restent en dessous.
+- `select()` échoue dès que son `jsonb_agg` dépasse 256 Mo, avec l’erreur 54000 de Postgres, `total size of jsonb array elements exceeds the maximum of 268435455 bytes`. `columns`, `selectRows()` ou un `cursor()` restent en dessous, de même que [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) pour un `select()` exécuté seul. Avec [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson), `json_agg` peut atteindre le 1 Go d’une valeur.
 - `pg` lit chaque valeur dans une seule chaîne JavaScript, et Node limite une chaîne à environ 512 Mo ([node-postgres#2653](https://github.com/brianc/node-postgres/issues/2653)).
 
 ## Mesurer {#measure}

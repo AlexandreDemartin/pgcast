@@ -89,9 +89,9 @@ Throughout 7.x, `aggregatesTypedByColumn: false` in both `db.setConfig()` and `C
 
 7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` and the generator's (below), except `selectExactlyOneChecksForSecondRow`, which stays off.
 
-Enabling every fix on 6.x, including aggregate types in `ConfigTypes`, prepares you for the new defaults. Even with a clean warning trace, compile the [read-only callbacks and array conditions](/switching#from-7-0) and check the [optional type peers](/install#requirements) on a fresh install. The [migration guide](/switching#regenerate-for-7-0) lists all ten quiet fallbacks that go in 8.0 and the three permanent choices.
+Enabling every fix on 6.x, including aggregate types in `ConfigTypes`, prepares you for the new defaults. Even with a clean warning trace, compile the [read-only callbacks and array conditions](/switching#from-7-0) and check the [optional type peers](/install#requirements) on a fresh install. The [migration guide](/switching#regenerate-for-7-0) lists the eleven old settings that go in 8.0 and the two that stay.
 
-Throughout 7.x, `undefinedMeansMissing: false` and `upsertRequiresSameKeys: false` independently restore the 6.x write behaviours without warnings. 8.0 removes both legacy write behaviours. Across the other options, three legacy values remain: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
+Throughout 7.x, `undefinedMeansMissing: false` and `upsertRequiresSameKeys: false` independently restore the 6.x write behaviours without warnings. 8.0 removes both legacy write behaviours. It removes `rejectOnQueryError: false` too. Two legacy values remain, as they say how your `pg` parses: `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
 
 In 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` and `transactionRequiresSatisfyingLevel` also default to `true`. Set any one to `false` to restore its [6.x transaction behaviour](/switching#runtime-migration) without a warning. 8.0 removes these three overrides.
 
@@ -105,13 +105,17 @@ In 6.x the warnings for the six schema options are notes through [`warningListen
 
 From 7.0, domain columns are typed by context. In raw rows, enum arrays are text and intervals are objects. The 6.x migration notes go away. `domainsTypedByContext: false` restores typing by placeholder through 7.x and goes in 8.0. For a raw direct domain over an enum array, `enumArraysTypedAsText: false` alone restores its placeholder. For fresh interval-domain text placeholders, set `intervalsTypedAsObjects: false`. The two parser choices, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false`, remain available beyond 8.0. See [Domains, enum arrays and intervals in 7.0](/switching#domain-and-parser-types).
 
-From 6.7 until 7.0, with `rejectOnQueryError` omitted or set to `null` in JSON, `generate()` and `tsForConfig()` sent `PGCAST_DEP006` to an enabled `warningListener` before exiting on a connection or query failure. From 7.0, both functions then reject with the original error, as [`check()`](/generator#export-check) does. The note is retired. Set `rejectOnQueryError: false` to keep the CLI's immediate exit with code 1 on a connection or query failure in 7.x, 8.0 and later.
+From 6.7 until 7.0, with `rejectOnQueryError` omitted or set to `null` in JSON, `generate()` and `tsForConfig()` sent `PGCAST_DEP006` to an enabled `warningListener` before exiting on a connection or query failure. From 7.0, both functions then reject with the original error, as [`check()`](/generator#export-check) does. The note is retired. In 7.x, set `rejectOnQueryError: false` to keep the CLI's immediate exit with code 1 on a connection or query failure. 8.0 removes the option: `generate()` always rejects, and the CLI prints the error and exits with code 1 itself ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), from 6.10, types a domain over `text` by the values its `CHECK` lists. It has no note and stays off in 7.0: a placeholder holding the domain's base type is how Zapatos types a domain, wider than the values but not wrong, as Postgres refuses the rest.
 
-[`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases) writes each column's value type in `Whereable`, `Insertable` and `Updatable` as an alias of `zapatos/db`, with the same types. It has no note, as there is nothing to migrate, and becomes the default in 8.0. `valuesTypedAsAliases: false` keeps the unions spelt out beyond 8.0.
+[`valuesTypedAsAliases`](/generator#generate.valuesTypedAsAliases) writes each column's value type in `Whereable`, `Insertable` and `Updatable` as an alias of `zapatos/db`, with the same types. It has no note, as there is nothing to migrate, and 8.0 keeps it alone.
 
-[`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0, sends a `select()` run on its own as one row per result, with the same values. It never warns, and becomes the default in 8.0. `topLevelSelectAsRows: false` keeps the aggregate beyond 8.0, for code that runs `.compile()`'s text itself.
+[`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows), from 7.3.0, sends a `select()` run on its own as one row per result, with the same values. It never warns, and 8.0 keeps it alone: code that runs `.compile()`'s text itself reads `rows.map(r => r.result)`.
+
+[`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson), from 7.3.0, builds the JSON of `select()` and its kin, and of the writes' `RETURNING`, with `json` functions, with the same values but for a row's key order and a nested result's type. It never warns, and 8.0 keeps it alone.
+
+In 8.0 each option keeps one behaviour, the better one ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 ## Further reading
 
