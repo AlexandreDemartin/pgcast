@@ -5,7 +5,7 @@
 - **In short**:
   - 8.0 removes each option that toggles between an old and a better behaviour, and keeps the better one alone. It keeps the options that are configuration by nature.
   - A removed key set to its old value throws, at `setConfig()` or before the generator's first query; it never switches silently.
-  - From now on, a new opt-in names its exit, the sole behaviour at the next major, or it is refused; a breaking change ships with its migration entry, or it is not merged.
+  - From now on, a new option that switches between two behaviours of pgcast names its exit, the sole behaviour at the next major, or it is refused; a breaking change ships with its migration entry, or it is not merged.
 
 ## Context
 
@@ -19,8 +19,9 @@
 
 - **One behaviour per option.** At a major, an option that chooses between two behaviours of pgcast goes, and the better one stays alone. "Better": the cheapest SQL for the same result (principle 6), then the type closest to what the database states (principle 1), then the result that matches the function's name, type and docs.
 - **Kept: configuration by nature.** A fact the database cannot state (the app's `pg` type parsers, its retries, where the files go), a listener, and Zapatos 6.6.1's own keys. These are not opt-ins.
+- **Kept: an addition**, off by default, that changes nothing while off (`constraintNames`: one more type, none changed). It switches no behaviour, so it stays opt-in under principle 4.
 - **An old value stays only with a stated need that no other way meets.** "Someone may rely on it" is not one; the migration entry answers it.
-- **A new opt-in names its exit**: the sole behaviour at the next major, written in its decision note and its docs entry, or it is refused.
+- **A new option that switches between two behaviours of pgcast names its exit**: the sole behaviour at the next major, written in its decision note and its docs entry, or it is refused.
 - **A breaking change ships with its migration entry**, in the same PR, in the major's migration guide (`website/switching.md` and `website/fr/switching.md`): before → after code, what the user sees change, how to find the affected calls (a grep, a type error). Without it, it is not merged.
 - **A removed key fails loudly** (§ 4), never switches silently.
 
@@ -71,7 +72,7 @@
 | `enumOrder` | `'declared'` | **remove** (A), always `'declared'` | Postgres compares and sorts by the declared order | `'alphabetical'`: the error. Then `every.crew_job` keeps the declared order: `every.crew_job[0]` is `'director'`, not `'cinematographer'` (`website/generator.md:361`) | Find: grep the key, then `every\.` indexed by position |
 | `rejectOnQueryError` | `true` | **remove** (A), always reject; the CLI catches, prints `*** error ***` and exits with code 1, as its own code, not an option (`src/generate/cliConfig.ts:63`) | the old value's need, the CLI's exit (note 003, #183), is met by the CLI | `false`: TS2353 or the error. Then a failed query rejects `generate()` (`src/generate/tsOutput.ts:226`). Uncaught, Node 22 prints the error on stderr and exits with code 1, where `false` printed `*** error 0 ***` on stdout and exited with 1 (probe); caught, the program goes on | Find: grep the key. Before `await generate({ …, rejectOnQueryError: false })` → after `await generate({ … }).catch(e => { console.error(e); process.exit(1); })` |
 | `uniqueIndexConstraintsOnly` | `true` | **remove** (A), always `true` | `false` lists names Postgres refuses as arbiters, 42704 and 55000 (`website/generator.md:444-445`); `constraintNames` lists every unique index for code that wants them all (`:455`) | `false`: the error. Then `UniqueIndex` loses bare unique indexes and deferrable keys: `constraint('festival_entries_live_idx')` fails to compile (`website/switching.md:359`) | Find: grep the key; regenerate, then `tsc`; a name a `Record` keyed by `UniqueIndex` still holds is checked by hand (`website/switching.md:387`) |
-| `constraintNames` | `false` | keep, an output choice; **open point** (§ 6) | adds a type, changes none; one catalog query more (`src/generate/tables.ts:327`); its cost on a large schema is not measured; a relation `every` beside an enum `Constraint` clashes (`website/generator.md:463`) | — | — |
+| `constraintNames` | `false` | keep, an addition off by default (§ 1); **open point** (§ 6) | adds a type, changes none; one catalog query more (`src/generate/tables.ts:327`); its cost on a large schema is not measured; a relation `every` beside an enum `Constraint` clashes (`website/generator.md:463`) | — | — |
 | `domainsTypedByContext` | `true` | **remove** (A), always `true` | `false` types a `bigint` domain as a string in the shortcuts' JSON, where they return a number (`website/generator.md:481-482`) | `false`: the error. Then a domain is typed by context while its placeholder holds the generated type, and a domain over a domain takes its innermost base type, not `any` (`website/generator.md:506`) | Find: grep the key; regenerate, then `tsc` |
 | `enumArraysTypedAsText` | `true` | keep | states the app's parser of an enum array, which the database cannot; `false` is the right type for a project that sets one, and no placeholder holds a plain column's type (`website/generator.md:526`) | — | — |
 | `intervalsTypedAsObjects` | `true` | keep | the same for `interval` (`website/generator.md:545`) | — | — |
@@ -108,7 +109,7 @@ Run on 2026-11-25 on master's build (`d9cfd72b`), Node 22, Postgres on `TEST_DAT
 |---|---|---|
 | `selectExactlyOneChecksForSecondRow` | remove; `LIMIT 1` alone | the name promises "exactly"; the check (`LIMIT 2`, a throw) is the stricter result, at one row's cost, but Zapatos documents "at least one", and a call that matched several rows would start to reject only at run time, which no grep finds |
 | `domainsTypedAsUnions` | remove; on alone | note 008 kept it off for good: Zapatos types a domain by its placeholder. On is the better type, derived from the database, but it adds names to `zapatos/schema`, and an existing placeholder keeps its `string` until deleted |
-| `constraintNames` | keep, off: an output choice, as `schemaJSDoc` | always on gives every project a type it may not use, at a compile cost not yet measured (`bench:types:large`) |
+| `constraintNames` | keep, off: an addition that changes nothing while off (§ 1), as `schemaJSDoc` | always on gives every project a type it may not use, at a compile cost not yet measured (`bench:types:large`) |
 
 ## 7. Options weighed
 
