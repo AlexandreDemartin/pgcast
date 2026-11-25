@@ -30,7 +30,7 @@ Each element exists once, where the tools read it natively.
 | Skill | Subject |
 |---|---|
 | `zero-abstraction` | Design a helper or an option: visible and unique SQL, derived from Postgres, minimal surface |
-| `backward-compat` | Backward compatibility with Zapatos 6.6.1: public API, `zapatos/*`, what breaks |
+| `backward-compat` | Backward compatibility as decision 019 scopes it: public API, `zapatos/*`, what a minor keeps and a major may break |
 | `sql-safety` | `core.ts` sensitive zone: escaping, parameters, identifiers, injection tests |
 | `type-tests` | Positive and negative type tests, compile cost (`bench:types`) |
 | `codegen-output` | Codegen output: snapshots, opt-in, canary, justified diff |

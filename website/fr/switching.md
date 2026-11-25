@@ -1,5 +1,5 @@
 ---
-english: 89bc1c8c34a6
+english: c46d4fa5ce1e
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -280,6 +280,22 @@ db.setConfig({
 ```
 
 En 6.x, lancez `npx zapatos` pour repérer les options du générateur qui modifieraient le schéma généré. Le générateur transmet ses notes de migration via `warningListener`.
+
+## Passer de pgcast 7.x à la 8.0 {#from-8-0}
+
+La 8.0.0 n’est pas encore publiée : cette section recense ses changements au fur et à mesure. D’ici sa sortie, la 7.x est la version à installer ([migration vers la 7.0](#from-7-0)). Une fois la 8.0.0 publiée, conservez l’alias du paquet et choisissez la commande qui correspond à vos imports.
+
+::: code-group
+
+```sh [zapatos/db]
+npm install zapatos@npm:@pgcast/pgcast@^8
+```
+
+```sh [pgcast/db]
+npm install pgcast@npm:@pgcast/pgcast@^8
+```
+
+:::
 
 ## Passer de pgcast 6.x à la 7.0 {#from-7-0}
 
