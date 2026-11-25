@@ -7,6 +7,7 @@ Released under the MIT licence: see LICENCE file
 import * as fs from 'fs';
 import * as path from 'path';
 import type * as pg from 'pg';
+import { refuseRemovedOptions, withoutRemovedOptions } from './removedOptions';
 import { schemaRulesAsTyped } from './schemaRules';
 
 
@@ -27,10 +28,7 @@ export interface OptionalConfig {
   schemaJSDoc: boolean;
   unprefixedSchema: string | null;
   customJSONParsingForLargeNumbers: boolean;
-  // optional, so a CompleteConfig written for 6.6.1 still compiles
-  typeEnumsAcrossSchemas?: boolean;  // look up an enum in its own schema by default; false uses the relation's schema
-  enumOrder?: 'alphabetical' | 'declared';  // Postgres's declared order by default; 'alphabetical' sorts the labels
-  // optional too; read it with ?? 'zapatos'
+  // optional, so a CompleteConfig written for 6.6.1 still compiles; read it with ?? 'zapatos'
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
   // optional for a CompleteConfig written for 6.6.1; the CLI sets false
   rejectOnQueryError?: boolean;  // reject with the query or connection error by default; false prints it and exits
@@ -92,7 +90,8 @@ export const moduleRoot = () => {
 };
 
 export const finaliseConfig = (config: Config) => {
-  const finalConfig = { ...defaultConfig, ...config } as CompleteConfig;
+  refuseRemovedOptions(config);  // before any query, whoever finalises: generate(), check(), the CLI
+  const finalConfig = withoutRemovedOptions({ ...defaultConfig, ...config } as CompleteConfig);
   finalConfig.schemas = schemaRulesAsTyped(finalConfig.schemas);  // a rule missing include or exclude (#301), or giving one as a string (#442)
   return finalConfig;
 };

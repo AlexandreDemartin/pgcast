@@ -1,5 +1,5 @@
 ---
-english: 4c2f6ca924c4
+english: 2ee51e80f536
 ---
 
 # Générateur
@@ -140,7 +140,8 @@ await generate({
 - Si la connexion ou une requête échoue, la promesse est rejetée avant toute écriture. Vous pouvez intercepter l’erreur d’origine de `pg` ou régler [`rejectOnQueryError: false`](#generate.rejectOnQueryError) pour que le processus s’arrête comme en 6.x.
 - Sur les autres erreurs, la promesse est rejetée : une écriture qui échoue (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` quand `outDir` est un fichier), une [règle](#generate.schemas) mal formée.
 - À l’exécution, une clé qu’il ne connaît pas est ignorée : un ancien `srcMode`, un `outdir` mal orthographié. En TypeScript, un littéral objet qui en contient une ne compile pas (TS2353, ou TS2561 avec une suggestion pour un nom proche comme `outdir`).
-- `zapatos/generate` exporte aussi `Config` et les fonctions qui composent `generate()` (`tsForConfig()`, `definitionForRelationInSchema()` et d’autres). `definitionForRelationInSchema()` ne remplit le tableau `columnsTypedByEnumName` qu’avec `typeEnumsAcrossSchemas: false`. `tsTypeForPgType()` traduit un nom de type dans un contexte donné. Pour un tableau d’enums, elle donne donc un type tableau. `definitionForRelationInSchema()` applique `enumArraysTypedAsText` aux lignes brutes. Voir les [paramètres de sortie de cette fonction](/fr/switching#domain-and-parser-types).
+- Une clé que la 8.0 a retirée, [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) ou [`enumOrder`](#generate.enumOrder), ne compile pas non plus (TS2353). Donnée quand même, depuis une variable, un fichier de configuration ou l’argument JSON de la CLI, `finaliseConfig()` lève une erreur, la promesse de `generate()`, de `check()`, de `tsForConfig()` ou de `definitionForRelationInSchema()` est rejetée, et la CLI s’arrête, avant la première requête, sans écrire aucun fichier, sauf si sa valeur est celle que la 8.0 applique toujours, `null` ou `undefined`. Erreur : `typeEnumsAcrossSchemas was removed in 8.0, which always does what typeEnumsAcrossSchemas: true did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-typeEnumsAcrossSchemas`.
+- `zapatos/generate` exporte aussi `Config` et les fonctions qui composent `generate()` (`tsForConfig()`, `definitionForRelationInSchema()` et d’autres). À partir de la 8.0.0, `definitionForRelationInSchema()` laisse vide son tableau `columnsTypedByEnumName` ; en 7.x, seul `typeEnumsAcrossSchemas: false` le remplissait. `tsTypeForPgType()` traduit un nom de type dans un contexte donné. Pour un tableau d’enums, elle donne donc un type tableau. `definitionForRelationInSchema()` applique `enumArraysTypedAsText` aux lignes brutes. Voir les [paramètres de sortie de cette fonction](/fr/switching#domain-and-parser-types).
 
 ## Les options {#options}
 
@@ -331,7 +332,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-À partir de la 7.0.0, la valeur par défaut, `true`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Le générateur cherche l’enum dans son propre schéma et écrit ses labels. La valeur `false` rétablit la recherche par nom dans le schéma de la relation, comme en 6.x.
+À partir de la 7.0.0, la valeur par défaut était `true`. À partir de la 8.0.0, la clé est retirée et le générateur se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-typeEnumsAcrossSchemas)) : il cherche l’enum dans son propre schéma et écrit ses labels. En 7.x, la valeur `false` conservait la recherche par nom dans le schéma de la relation, comme en 6.x.
 
 ```sql
 CREATE SCHEMA archive;
@@ -340,33 +341,33 @@ CREATE TYPE archive.crew_job AS ENUM ('projectionist', 'archivist');  -- public 
 CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, formats archive.print_format[], keeper archive.crew_job);
 ```
 
-| Colonne de `prints` | `false` | `true` |
+| Colonne de `prints` | 7.x avec `false` | 8.0 |
 |---|---|---|
 | `format` | `c.PgPrint_format`, un placeholder `any` | `('nitrate' \| 'safety' \| 'digital')` |
 | `formats` (`Selectable`) | `c.Pg_print_format \| null`, un placeholder `any` | `string \| null` par défaut, le tableau de labels ci-dessous avec `enumArraysTypedAsText: false` |
 | `formats` (`JSONSelectable`) | `c.Pg_print_format \| null`, un placeholder `any` | `('nitrate' \| 'safety' \| 'digital')[] \| null` |
 | `keeper` | `crew_job \| null` : les labels de `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
-- Les labels sont écrits en toutes lettres, pas nommés : le schéma de l’enum n’a pas besoin d’être dans [`schemas`](#generate.schemas). Dans l’ordre d’[`enumOrder`](#generate.enumOrder), comme pour chaque enum.
+- Les labels sont écrits en toutes lettres, pas nommés : le schéma de l’enum n’a pas besoin d’être dans [`schemas`](#generate.schemas). Dans leur ordre de déclaration, comme pour chaque enum ([`enumOrder`](#generate.enumOrder)).
 - Le générateur reconnaît les enums d’autres schémas par leur nom. Lorsqu’un enum porte le nom d’un type natif (`int4`), le générateur utilise ce type pour la colonne à la place des labels de l’enum. Si le nom de l’enum correspond à celui que Postgres donnerait normalement au type tableau d’un autre type (`_tag` pour `tag`), le générateur utilise les labels de l’enum pour typer les colonnes de ce type tableau.
 - Un domaine sur un tel enum reste un type personnalisé, `c.<name>`. Si le nom du placeholder est propre à ce domaine, le générateur y écrit les labels sans import à la première génération, même quand une relation du schéma de l’enum utilise aussi ce domaine. Un placeholder existant n’est jamais écrasé.
 
 ### `enumOrder` {#generate.enumOrder}
 
-À partir de la 7.0.0, la valeur par défaut, `"declared"`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Les labels suivent l’ordre de déclaration de l’enum, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()`. La valeur `"alphabetical"` rétablit le tri alphabétique de la 6.x.
+À partir de la 7.0.0, la valeur par défaut était `"declared"`. À partir de la 8.0.0, la clé est retirée et le générateur se comporte toujours comme avec `"declared"` ([migration vers la 8.0](/fr/switching#from-8-0-enumOrder)) : les labels suivent l’ordre de déclaration de l’enum, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()`. En 7.x, la valeur `"alphabetical"` conservait le tri alphabétique de la 6.x.
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
 ```
 
-| Type | `"alphabetical"` | `"declared"` |
+| Type | 7.x avec `"alphabetical"` | 8.0 |
 |---|---|---|
 | `crew_job` | `'cinematographer' \| 'composer' \| 'director' \| 'editor' \| 'writer'` | `'director' \| 'writer' \| 'editor' \| 'cinematographer' \| 'composer'` |
 | `every.crew_job` | `['cinematographer', 'composer', 'director', 'editor', 'writer']` | `['director', 'writer', 'editor', 'cinematographer', 'composer']` |
 
 - Un label ajouté par `ALTER TYPE … ADD VALUE … BEFORE` ou `AFTER` prend sa place dans cet ordre, tel que le donne `enum_range()`.
-- Pour TypeScript, seul `every.<name>` change : une union est le même type dans n’importe quel ordre. Avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), les labels d’un enum d’un autre schéma suivent cet ordre. Il en va de même dans un placeholder généré pour la première fois si son nom est propre au domaine.
-- Avec toute autre valeur, le générateur s’arrête avant la première requête et n’écrit aucun fichier. Il signale l’erreur `enumOrder must be 'declared' (the default) or 'alphabetical', not 'declard'`. TypeScript refuse aussi cette valeur (TS2322, ou TS2820 avec une suggestion pour une valeur proche comme `"declard"`).
+- Pour TypeScript, seul `every.<name>` change : une union est le même type dans n’importe quel ordre. Les labels d’un enum d’un autre schéma suivent eux aussi cet ordre. Il en va de même dans un placeholder généré pour la première fois si son nom est propre au domaine.
+- Donnée quand même, avec toute valeur autre que `"declared"`, `null` et `undefined`, la clé arrête le générateur avant la première requête, sans écrire aucun fichier : `enumOrder was removed in 8.0, which always does what enumOrder: "declared" did; delete it from the generator's config: https://pgcast.dev/switching#from-8-0-enumOrder`.
 
 ### `moduleNames` {#generate.moduleNames}
 
@@ -509,7 +510,7 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 - En 7.x, `false` rétablit sans note le type du placeholder, `any`, dans les cinq interfaces pour les deux colonnes. Ce réglage disparaît en 8.0.
 - `pg` parse un domaine sur un domaine selon le type de base de son domaine le plus intérieur, mais renvoie un tableau d’un domaine sous forme de texte, faute de connaître le type de ce tableau : de même pour un domaine sur un tel tableau, directement ou à travers d’autres domaines. Un tableau d’un domaine sur un tableau reste `any`, de même qu’un domaine sur celui-ci, ou qu’un type de base que le générateur ne sait pas traduire, tel que `point`.
-- Pour un domaine imbriqué ou un tableau de domaines dont le type de base est un enum, le générateur écrit le nom de cet enum s’il est défini dans le schéma de la relation, et ses labels s’il est défini ailleurs. Ce comportement vaut quel que soit le réglage de [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) et écarte tout homonyme. Un domaine défini directement sur un enum d’un autre schéma garde son placeholder dans les cinq interfaces. Si le placeholder est généré pour la première fois et que son nom est propre au domaine, son contenu dépend de `typeEnumsAcrossSchemas`. Par défaut, il contient les labels de cet enum. Avec `false`, il contient l’enum du même nom dans le schéma de la relation, ou `any` si ce schéma n’en contient aucun.
+- Pour un domaine imbriqué ou un tableau de domaines dont le type de base est un enum, le générateur écrit le nom de cet enum s’il est défini dans le schéma de la relation, et ses labels s’il est défini ailleurs, jamais comme l’enum du même nom dans le schéma de la relation. Un domaine défini directement sur un enum d’un autre schéma garde son placeholder dans les cinq interfaces. Si le placeholder est généré pour la première fois et que son nom est propre au domaine, il contient les labels de cet enum.
 - Un placeholder que vous modifiez garde son type dans les cinq interfaces, `unknown` compris. Si vous remplacez son type par `any`, le générateur le traite comme un placeholder laissé tel quel : écrivez `unknown`, ou réglez l’option sur `false`, pour garder une telle colonne non typée.
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
@@ -530,7 +531,7 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COL
 - `false` : le tableau, sans note de migration, même au-delà de la 8.0. Choisissez cette valeur si vous parsez le tableau avec `pg.types.setTypeParser` en lui passant l’OID du type du tableau (`SELECT 'crew_job[]'::regtype::oid`) et le parser de `text[]`. Déclarez `const textArrayOid: number = 1009`, puis passez `pg.types.getTypeParser(textArrayOid)`.
 - `true` : `string`, le texte que renvoie `pg`. Les écritures prennent toujours un tableau, donc le texte d’une ligne de `sql` ne se réécrit pas tel quel : `insert()` et `update()` le refusent (TS2769, TS2322), alors que Postgres l’accepterait.
 - Un domaine sur un tel tableau, comme `crew.past_jobs`, prend `db.DomainInContext<c.PgJob_list, crew_job[], string>` dans `Selectable` ([`DomainInContext`](/fr/value-types#DomainInContext)) : `string` tant que le type du placeholder est identique à celui que le générateur produirait avec les réglages actuels, même si vous avez modifié le fichier. Si les types diffèrent, les cinq interfaces utilisent celui du placeholder.
-- Un tableau d’un enum d’un autre schéma, typé par ses labels avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), ou sinon comme l’enum du même nom dans le schéma de la relation, est lui aussi un `string` dans `Selectable`. Sans l’un ni l’autre, c’est un placeholder `any`, et il le reste. Un tableau d’un domaine sur un enum relève de [`domainsTypedByContext`](#generate.domainsTypedByContext).
+- Un tableau d’un enum d’un autre schéma, typé par ses labels, est lui aussi un `string` dans `Selectable`. Un tableau d’un domaine sur un enum relève de [`domainsTypedByContext`](#generate.domainsTypedByContext).
 
 ### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
 

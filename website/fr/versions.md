@@ -1,5 +1,5 @@
 ---
-english: 2113623da6e2
+english: 0f7a574c619d
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -98,7 +98,7 @@ En 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` et `transac
 
 Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui utilise les labels d’un enum d’un autre schéma, sauf en cas de collision de noms, [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), qui rejette la promesse de `generate()` quand une requête échoue, plutôt que d’arrêter le processus, [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), qui filtre les cibles de conflit nommées selon l’index de la relation, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), qui type un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, selon le contexte, comme l’est son type de base, et un domaine sur un domaine ou un tableau d’un domaine, `any` sans l’option, par le type de base de son domaine le plus intérieur, [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), qui donne aux tableaux d’enums dans `Selectable` le type texte que renvoie `pg`, et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), qui type un `interval` dans `Selectable` comme `pg` le parse.
 
-En 7.x, `typeEnumsAcrossSchemas: false` rétablit la recherche dans le schéma de la relation et `enumOrder: "alphabetical"` rétablit le tri alphabétique des labels dans les tuples. Vous pouvez régler ces options indépendamment. Les deux notes de migration disparaissent en 7.0 et les deux anciens comportements en 8.0. Voir [comment adapter les imports de placeholders d’enums d’autres schémas](/fr/switching#enum-types).
+En 7.x, `typeEnumsAcrossSchemas: false` rétablit la recherche dans le schéma de la relation et `enumOrder: "alphabetical"` rétablit le tri alphabétique des labels dans les tuples. Vous pouvez régler ces options indépendamment. Les deux notes de migration disparaissent en 7.0, et la 8.0 retire les deux options ([migration vers la 8.0](/fr/switching#from-8-0-typeEnumsAcrossSchemas)). Voir [comment adapter les imports de placeholders d’enums d’autres schémas](/fr/switching#enum-types).
 
 En 7.x, sur une table partitionnée, `UniqueIndex` se fonde sur l’index de la table parente. [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit sans avertissement la liste de tous les index uniques de la relation. Ce réglage disparaît en 8.0. Voir [Cibles de conflit nommées en 7.0](/fr/switching#named-conflict-targets).
 
