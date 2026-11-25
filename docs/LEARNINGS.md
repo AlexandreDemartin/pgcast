@@ -47,6 +47,14 @@ Candidates for a check, a rule or a skill line.
 - A test that the CLI exits at once on a closed port says nothing of queries in flight, as every connection fails together: keep one in flight while another fails (a trap that sleeps, or an ACCESS EXCLUSIVE lock held by another session on a table with a column `DEFAULT`, which blocks the columns query) (#986).
 - Removing a read of the caller's config (`suppliedConfig.key`, `{ ...suppliedConfig, key }`) also removes the TypeError it threw on `null` or `undefined`: replay both on master and branch (#986).
 - To stop a run as soon as a query fails, act where it fails, not in a catch around the run: a `finally` that ends a pool, a stream or a server waits for the work in flight first (#986).
+- A removal that makes a variant the default turns its "same types" equality test into a comparison of the output with itself: the proof moves to the PR, as a probe against master's output (#975).
+- A wait for another PR to land checks `gh pr view --json mergeStateStatus` first: polling `git log origin/master` while it is BLOCKED spends the whole wait for nothing (#975).
+- learning: a comment added inside a script's template literal (the `source` of `check-declarations-floor.mjs`) must not hold backticks; lint caught it as "Unexpected token".
+- learning: a change that shrinks the generated schema moves the memory ratios of every `bench:types:large` case, not only libCheck's; plan a full `--update` (about 20 min), not `--cases libCheck` alone.
+- learning: `vitest run -u test/integration/codegen.test.ts` ran all 29 files; with `-u` placed before the path, the filter was not applied.
+- learning: a rewording that moves a claim's reference point (from 7.x's written-out union to Zapatos 6.6.1's) must be replayed against the new reference for each case; #654 made the Insertable differ from 6.6.1's.
+- learning: a "same output" proof that compiles only the main variant is completed cheaply by expanding each snapshot diff's added alias line through the old template and comparing it with the removed line: every variant in under a second, no database.
+- learning: before writing "same as Zapatos 6.6.1" about a type, check it against 6.6.1's `dist/generate/tables.js` (cached under `node_modules/.cache/pgcast-zapatos-661/`); pgcast changed the generated unions after 6.6.1 (#654), so the last pgcast release is usually the safer reference.
 
 ## Minors kept
 
@@ -67,3 +75,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/switching.md:407` and FR `:408` (#985): "arithmetic on a sum is TS18047" holds with `strictNullChecks` from TypeScript 4.9; TS2531 on 4.1, compiles with `strict: false`.
 - `form` `website/aggregates.md:3`, `website/select.md:143`, `:311` and FR twins (#985): "By default" / "Par défaut" where 8.0 has no other typing.
 - `form` `CHANGELOG.md:15` (#986): "refused too, as 7.x's `tsForConfig()` read it" does not name the one config that goes from working to refused: `generate()` with an inherited removed key, which 7.x's `finaliseConfig()` spread dropped.
+- `form` #989 `website/switching.md` § from-8-0-valuesTypedAsAliases: **What you see** could name that `--check` or `check()` in CI fails after the upgrade until `schema.d.ts` is regenerated.
+- `form` #989 `CHANGELOG.md:17`: the `bench:types:large --aliases` removal is contributor tooling on a user-facing Breaking line; `docs/WORKFLOW.md` already says it.
