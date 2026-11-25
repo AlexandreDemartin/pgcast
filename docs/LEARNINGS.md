@@ -10,6 +10,8 @@ What the agents returned during the chapter and what waits for its end. Written 
 
 Candidates for a check, a rule or a skill line.
 
+- #959 — `check:agents` caps a skill `reference.md` at 1,800 words; `type-tests/reference.md` is at the cap, so its next line needs a trim or a new home — builder
+
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
