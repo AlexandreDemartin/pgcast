@@ -22,12 +22,9 @@ const
   ofUser = { owner_id: sql`${db.self} = "users"."id"` },
   /** The text of a query with to_json, json_agg, json_build_object and NULL::json swapped for their jsonb twins. */
   toJsonb = (text: string) => text.replace(/\b(to_json|json_agg|json_build_object)\(/g, name => name.replace('json', 'jsonb')).replace(/\bNULL::json\b/g, 'NULL::jsonb'),
-  /** The query run with the jsonb twins of its json functions, its result through the query's own transform. */
-  runAsJsonb = async (q: db.SQLFragment<any, any>) => {
-    if (q.noop) return q.noopResult;
-    const { text, values } = q.compile();
-    return q.runResultTransform(await t.client.query({ text: toJsonb(text), values }));
-  },
+  /** The query run with the jsonb twins of its json functions in the text run() sends, its result as run() gives it. */
+  runAsJsonb = (q: db.SQLFragment<any, any>) =>
+    q.run({ query: (query: db.SQLQuery) => t.client.query({ ...query, text: toJsonb(query.text) }) }),
   /** The query built and run as it is, then with the jsonb twins of its json functions. */
   bothWays = async (build: () => db.SQLFragment<any, any>) => {
     const json = await build().run(t.client), jsonb = await runAsJsonb(build());
@@ -180,21 +177,13 @@ describe('json_build_object() and 100 arguments', () => {
   });
 });
 
-describe('with topLevelSelectAsRows (note 018 § 3): the same results each way', () => {
+describe('select() at the top level, its rows (note 018 § 3): the results of a copy, its aggregate', () => {
   const
-    combinations = {
-      aggregate: { topLevelSelectAsRows: false },
-      rows: { topLevelSelectAsRows: true },
-    },
-    /** The query built and run under each value of the option. */
-    eachWay = async (build: () => db.SQLFragment<any, any>) => {
-      const results: Record<string, any> = {};
-      for (const [name, config] of Object.entries(combinations)) {
-        db.setConfig(config);
-        results[name] = await build().run(t.client);
-      }
-      return results;
-    },
+    /** The query built and run as a copy, its aggregate as nested, then as it is, its rows. */
+    eachWay = async (build: () => db.SQLFragment<any, any>) => ({
+      aggregate: await build().copy().run(t.client) as any,
+      rows: await build().run(t.client) as any,
+    }),
     owner = () => db.selectOne('users', { id: parent('owner_id') }),
     byId = (rows: any[]) => [...rows].sort((a, b) => a.id - b.id),
     shapes: Record<string, () => db.SQLFragment<any, any>> = {
@@ -365,19 +354,17 @@ describe('the writes\' RETURNING: the same results as their jsonb twins', () => 
     expect(await outcome(sql`count(${'code'})`)).toBe('42803');
     expect(await outcome(sql`count(*)`, { returning: ['code'] })).toBe('42803');
   });
-  it('with topLevelSelectAsRows too: a write as a CTE or the main query of withCTEs() gives the same results each way', async () => {
+  it('a write as a CTE or the main query of withCTEs(), beside a select(): the same results as a copy, the select()\'s aggregate', async () => {
     const
-      combinations = [false, true],
       builds = [
         () => db.withCTEs({ w: db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: upperName }) }, db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } })),
         () => db.withCTEs({ s: db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } }) }, db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: { s: sql`(SELECT result FROM "s")` } })),
       ];
     for (const build of builds) {
       const results = [];
-      for (const topLevelSelectAsRows of combinations) {
-        db.setConfig({ topLevelSelectAsRows });
+      for (const query of [build().copy(), build()]) {
         await t.client.query('SAVEPOINT each_way');
-        results.push(await build().run(t.client));
+        results.push(await query.run(t.client));
         await t.client.query('ROLLBACK TO SAVEPOINT each_way');
       }
       for (const result of results.slice(1)) expect(result).toEqual(results[0]);

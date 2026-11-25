@@ -255,6 +255,9 @@ describe('with parameters (extended protocol)', () => {
     expect(q.compile().values).toHaveLength(1);
     expect((await q.run(t.client)).map(u => u.email).sort())
       .toEqual(['Ada@Example.com', 'bob@example.com', 'cyd@example.com']);
+    // "sq_<alias>" is the aggregate's, so nested, a copy
+    expect((await q.copy().run(t.client)).map(u => u.email).sort())
+      .toEqual(['Ada@Example.com', 'bob@example.com', 'cyd@example.com']);
   });
 
   it('a `"` in a string identifier stays in one column name with parameters too', async () => {
@@ -912,11 +915,13 @@ describe('without parameters (simple protocol)', () => {
 
   it('an alias that closes its quotes stays one alias, in "sq_<alias>" too', async () => {
     // `) AS "sq_u"; UPDATE …; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
+    // "sq_" is the aggregate's, so nested, a copy; on its own, the rows query keeps the alias alone
     const q = db.select('users', all, { alias: `u"; ${update}; --`, order: { by: 'id', direction: 'ASC' } } as any);
-    const { text, values } = q.compile();
+    const { text, values } = q.copy().compile();
     expect(text).toContain(`AS "sq_u""; ${update}; --"`);
     expect(values).toEqual([]);
     expect((await q.run(t.client)).map(u => u.id)).toEqual([1, 2, 3]);
+    expect((await q.copy().run(t.client)).map(u => u.id)).toEqual([1, 2, 3]);
     expect(await adaName()).toBe('Ada');
   });
 
@@ -929,9 +934,9 @@ describe('without parameters (simple protocol)', () => {
   ])('the alias is converted to a string once, so %s stays one alias in "sq_<alias>"', async (_, make) => {
     const outcome = await (async () => {
       const q = db.select('users', all, { alias: make(), order: { by: 'id', direction: 'ASC' } } as any);
-      return (await q.run(t.client)).map((u: any) => u.id);
+      return [(await q.run(t.client)).map((u: any) => u.id), (await q.copy().run(t.client)).map((u: any) => u.id)];
     })().catch((e: Error) => `rejects: ${e.message}`);
-    expect({ outcome, ada: await adaName() }).toEqual({ outcome: [1, 2, 3], ada: 'Ada' });
+    expect({ outcome, ada: await adaName() }).toEqual({ outcome: [[1, 2, 3], [1, 2, 3]], ada: 'Ada' });
   });
 
   it('no hostile table name, alias or lateral key of select() runs SQL of its own', async () => {
@@ -1185,7 +1190,7 @@ describe('without parameters (simple protocol)', () => {
       [{ order: { by: 'id', direction: 'ASC', get nulls() { return nulls(); } } }, ' ORDER BY "id" ASC NULLS FIRST'],
     ] as const) {
       const q = db.select('users', all, options as any);
-      expect(q.compile()).toEqual({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
+      expect(q.compile()).toEqual({ text: `SELECT to_json("users".*) AS result FROM "users"${clause}`, values: [] });
       expect((await q.run(t.client)).map(u => u.id).sort()).toEqual([1, 2, 3]);
       expect(await adaName()).toBe('Ada');
     }

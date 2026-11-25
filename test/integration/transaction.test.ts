@@ -1939,14 +1939,14 @@ describe('cursor()', () => {
     expect(messages).toEqual([expect.stringMatching(/^Transaction rollback \(code 40001\) on attempt 1 of /), expect.stringMatching(/^Retrying transaction, attempt 2 of /)]);
   });
 
-  it('yields the rows’ result of a fragment whose runResultTransform reads them, and a select() as is in one batch, its array', async () => {
+  it('yields the rows’ result of a fragment whose runResultTransform reads them, and a select() in one batch, its aggregate as nested, the array run() gives', async () => {
     const query = sql<db.SQL, G[]>`SELECT jsonb_build_object('g', g) AS result FROM generate_series(1, 3) AS g`;
     query.runResultTransform = qr => qr.rows.map(r => r.result);
     await db.readCommitted(t.pool, async c => {
       expect(await read(db.cursor(c, query, { batchSize: 2 }))).toEqual([gs(1, 2), gs(3)]);
       const users = db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }), texts = sent();
       expect(await read(db.cursor(c, users, { batchSize: 2 }))).toEqual([await users.run(c)]);
-      expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT coalesce(json_agg(result),']);
+      expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT json_build_object($1::text,']);
     });
   });
 

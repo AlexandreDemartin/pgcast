@@ -652,10 +652,10 @@ describe('null, and parent() with no column', () => {
 describe('shortcut arguments', () => {
   it('the table name is one identifier in "sq_<table>" too: `"` is doubled, `.` does not split', () => {
     // 6.6.1: `AS "sq_my"table"`, a syntax error; a table name 6.6.1 already wrote as one quoted
-    // name (`my""table`, a hand-escaped `my"table`) is written as before
-    expect(db.select('my"table', all).compile().text).toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("my""table".*) AS result FROM "my""table") AS "sq_my""table"`);
-    expect(db.select('my""table', all).compile().text).toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("my""table".*) AS result FROM "my""table") AS "sq_my""table"`);
-    expect(matrix(v => db.select(v, all))).toMatchInlineSnapshot(`
+    // name (`my""table`, a hand-escaped `my"table`) is written as before; "sq_" is the aggregate's, so nested, a copy
+    expect(db.select('my"table', all).copy().compile().text).toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("my""table".*) AS result FROM "my""table") AS "sq_my""table"`);
+    expect(db.select('my""table', all).copy().compile().text).toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("my""table".*) AS result FROM "my""table") AS "sq_my""table"`);
+    expect(matrix(v => db.select(v, all).copy())).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("a\\b".*) AS result FROM "a\\b") AS "sq_a\\b"",
         "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("a/*b".*) AS result FROM "a/*b") AS "sq_a/*b"",
@@ -948,29 +948,29 @@ describe('shortcut options', () => {
   it('columns', () => {
     expect(matrix(v => db.select('users', all, { columns: [v] } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a\\b") AS result FROM "users") AS "sq_users"",
-        "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a/*b") AS result FROM "users") AS "sq_users"",
-        "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a--b") AS result FROM "users") AS "sq_users"",
-        "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a$1b") AS result FROM "users") AS "sq_users"",
-        "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a"."b") AS result FROM "users") AS "sq_users"",
-        "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a""b") AS result FROM "users") AS "sq_users"",
-        "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a"" OR TRUE OR ""b") AS result FROM "users") AS "sq_users"",
-        "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a"".""b") AS result FROM "users") AS "sq_users"",
-        "escapedNul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a""""<NUL>""""b") AS result FROM "users") AS "sq_users"",
-        "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a""""""b") AS result FROM "users") AS "sq_users"",
-        "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, """") AS result FROM "users") AS "sq_users"",
-        "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "s".a$1."b"" OR TRUE OR ""c") AS result FROM "users") AS "sq_users"",
-        "nul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a<NUL>b") AS result FROM "users") AS "sq_users"",
-        "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a") AS result FROM "users") AS "sq_users"",
-        "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, """a"" OR TRUE OR ""b""") AS result FROM "users") AS "sq_users"",
-        "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, """") AS result FROM "users") AS "sq_users"",
-        "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a"" OR TRUE OR ""b") AS result FROM "users") AS "sq_users"",
-        "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "s"."a"" OR TRUE OR ""b") AS result FROM "users") AS "sq_users"",
-        "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a;b") AS result FROM "users") AS "sq_users"",
-        "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "a'b") AS result FROM "users") AS "sq_users"",
-        "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, """s"""."U&""a"" UESCAPE '!' || ""b""") AS result FROM "users") AS "sq_users"",
-        "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, """s"""."U&""a\\"" OR TRUE OR \\""b""") AS result FROM "users") AS "sq_users"",
-        "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS result FROM "users") AS "sq_users"",
+        "backslash": "SELECT json_build_object($1::text, "a\\b") AS result FROM "users"",
+        "comment": "SELECT json_build_object($1::text, "a/*b") AS result FROM "users"",
+        "dashes": "SELECT json_build_object($1::text, "a--b") AS result FROM "users"",
+        "dollar": "SELECT json_build_object($1::text, "a$1b") AS result FROM "users"",
+        "dot": "SELECT json_build_object($1::text, "a"."b") AS result FROM "users"",
+        "dquote": "SELECT json_build_object($1::text, "a""b") AS result FROM "users"",
+        "escapedCloses": "SELECT json_build_object($1::text, "a"" OR TRUE OR ""b") AS result FROM "users"",
+        "escapedDot": "SELECT json_build_object($1::text, "a"".""b") AS result FROM "users"",
+        "escapedNul": "SELECT json_build_object($1::text, "a""""<NUL>""""b") AS result FROM "users"",
+        "escapedOdd": "SELECT json_build_object($1::text, "a""""""b") AS result FROM "users"",
+        "lone": "SELECT json_build_object($1::text, """") AS result FROM "users"",
+        "mixedEscaped": "SELECT json_build_object($1::text, "s".a$1."b"" OR TRUE OR ""c") AS result FROM "users"",
+        "nul": "SELECT json_build_object($1::text, "a<NUL>b") AS result FROM "users"",
+        "prequoted": "SELECT json_build_object($1::text, "a") AS result FROM "users"",
+        "prequotedCloses": "SELECT json_build_object($1::text, """a"" OR TRUE OR ""b""") AS result FROM "users"",
+        "prequotedEmpty": "SELECT json_build_object($1::text, """") AS result FROM "users"",
+        "prequotedEscaped": "SELECT json_build_object($1::text, "a"" OR TRUE OR ""b") AS result FROM "users"",
+        "qualifiedEscaped": "SELECT json_build_object($1::text, "s"."a"" OR TRUE OR ""b") AS result FROM "users"",
+        "semicolon": "SELECT json_build_object($1::text, "a;b") AS result FROM "users"",
+        "squote": "SELECT json_build_object($1::text, "a'b") AS result FROM "users"",
+        "uescape": "SELECT json_build_object($1::text, """s"""."U&""a"" UESCAPE '!' || ""b""") AS result FROM "users"",
+        "unicodeCloses": "SELECT json_build_object($1::text, """s"""."U&""a\\"" OR TRUE OR \\""b""") AS result FROM "users"",
+        "unicodeEscaped": "SELECT json_build_object($1::text, "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS result FROM "users"",
       }
     `);
   });
@@ -1009,7 +1009,7 @@ describe('shortcut options', () => {
   it('a fragment in columns or returning, past the type, keeps its key a parameter in json_build_object()', () => {
     const now = sql`now()`;
     expect(db.select('users', all, { columns: [now] } as any).compile()).toEqual({
-      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($1::text, now()) AS result FROM "users") AS "sq_users"`,
+      text: `SELECT json_build_object($1::text, now()) AS result FROM "users"`,
       values: [now],
     });
     expect(db.insert('users', { email: 'a', display_name: 'b' }, { returning: [now] } as any).compile()).toEqual({
@@ -1023,29 +1023,29 @@ describe('shortcut options', () => {
   it('order.by', () => {
     expect(matrix(v => db.select('users', all, { order: { by: v, direction: 'ASC' } } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a\\b" ASC) AS "sq_users"",
-        "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a/*b" ASC) AS "sq_users"",
-        "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a--b" ASC) AS "sq_users"",
-        "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a$1b" ASC) AS "sq_users"",
-        "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"."b" ASC) AS "sq_users"",
-        "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a""b" ASC) AS "sq_users"",
-        "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"" OR TRUE OR ""b" ASC) AS "sq_users"",
-        "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"".""b" ASC) AS "sq_users"",
-        "escapedNul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a""""<NUL>""""b" ASC) AS "sq_users"",
-        "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a""""""b" ASC) AS "sq_users"",
-        "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY """" ASC) AS "sq_users"",
-        "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "s".a$1."b"" OR TRUE OR ""c" ASC) AS "sq_users"",
-        "nul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a<NUL>b" ASC) AS "sq_users"",
-        "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a" ASC) AS "sq_users"",
-        "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY """a"" OR TRUE OR ""b""" ASC) AS "sq_users"",
-        "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY """" ASC) AS "sq_users"",
-        "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"" OR TRUE OR ""b" ASC) AS "sq_users"",
-        "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "s"."a"" OR TRUE OR ""b" ASC) AS "sq_users"",
-        "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a;b" ASC) AS "sq_users"",
-        "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "a'b" ASC) AS "sq_users"",
-        "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY """s"""."U&""a"" UESCAPE '!' || ""b""" ASC) AS "sq_users"",
-        "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY """s"""."U&""a\\"" OR TRUE OR \\""b""" ASC) AS "sq_users"",
-        "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" ORDER BY "s".U&"a\\0022"" OR TRUE OR ""\\0022b" ASC) AS "sq_users"",
+        "backslash": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a\\b" ASC",
+        "comment": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a/*b" ASC",
+        "dashes": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a--b" ASC",
+        "dollar": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a$1b" ASC",
+        "dot": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"."b" ASC",
+        "dquote": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a""b" ASC",
+        "escapedCloses": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"" OR TRUE OR ""b" ASC",
+        "escapedDot": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"".""b" ASC",
+        "escapedNul": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a""""<NUL>""""b" ASC",
+        "escapedOdd": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a""""""b" ASC",
+        "lone": "SELECT to_json("users".*) AS result FROM "users" ORDER BY """" ASC",
+        "mixedEscaped": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "s".a$1."b"" OR TRUE OR ""c" ASC",
+        "nul": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a<NUL>b" ASC",
+        "prequoted": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a" ASC",
+        "prequotedCloses": "SELECT to_json("users".*) AS result FROM "users" ORDER BY """a"" OR TRUE OR ""b""" ASC",
+        "prequotedEmpty": "SELECT to_json("users".*) AS result FROM "users" ORDER BY """" ASC",
+        "prequotedEscaped": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a"" OR TRUE OR ""b" ASC",
+        "qualifiedEscaped": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "s"."a"" OR TRUE OR ""b" ASC",
+        "semicolon": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a;b" ASC",
+        "squote": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "a'b" ASC",
+        "uescape": "SELECT to_json("users".*) AS result FROM "users" ORDER BY """s"""."U&""a"" UESCAPE '!' || ""b""" ASC",
+        "unicodeCloses": "SELECT to_json("users".*) AS result FROM "users" ORDER BY """s"""."U&""a\\"" OR TRUE OR \\""b""" ASC",
+        "unicodeEscaped": "SELECT to_json("users".*) AS result FROM "users" ORDER BY "s".U&"a\\0022"" OR TRUE OR ""\\0022b" ASC",
       }
     `);
   });
@@ -1154,29 +1154,29 @@ describe('shortcut options', () => {
   it('characterization: extras keys', () => {
     expect(matrix(v => db.select('users', all, { extras: { [v]: sql`1` } } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a\\b" FROM "users") AS "row_users") AS "sq_users"",
-        "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a/*b" FROM "users") AS "row_users") AS "sq_users"",
-        "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a--b" FROM "users") AS "row_users") AS "sq_users"",
-        "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a$1b" FROM "users") AS "row_users") AS "sq_users"",
-        "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a.b" FROM "users") AS "row_users") AS "sq_users"",
-        "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a""b" FROM "users") AS "row_users") AS "sq_users"",
-        "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a"""" OR TRUE OR """"b" FROM "users") AS "row_users") AS "sq_users"",
-        "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a"".""b" FROM "users") AS "row_users") AS "sq_users"",
+        "backslash": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a\\b" FROM "users") AS "row_users"",
+        "comment": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a/*b" FROM "users") AS "row_users"",
+        "dashes": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a--b" FROM "users") AS "row_users"",
+        "dollar": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a$1b" FROM "users") AS "row_users"",
+        "dot": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a.b" FROM "users") AS "row_users"",
+        "dquote": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a""b" FROM "users") AS "row_users"",
+        "escapedCloses": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a"""" OR TRUE OR """"b" FROM "users") AS "row_users"",
+        "escapedDot": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a"".""b" FROM "users") AS "row_users"",
         "escapedNul": "throws: The key "a\\"\\"\\u0000\\"\\"b" cannot be a column alias, which an \`extras\` or \`lateral\` key beside every column becomes: it holds a NUL. Give \`columns\`, whose keys stay parameters.",
-        "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a""""""b" FROM "users") AS "row_users") AS "sq_users"",
-        "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """" FROM "users") AS "row_users") AS "sq_users"",
-        "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".a$1.""b"""" OR TRUE OR """"c""" FROM "users") AS "row_users") AS "sq_users"",
+        "escapedOdd": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a""""""b" FROM "users") AS "row_users"",
+        "lone": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """" FROM "users") AS "row_users"",
+        "mixedEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".a$1.""b"""" OR TRUE OR """"c""" FROM "users") AS "row_users"",
         "nul": "throws: The key "a\\u0000b" cannot be a column alias, which an \`extras\` or \`lateral\` key beside every column becomes: it holds a NUL. Give \`columns\`, whose keys stay parameters.",
-        "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """a""" FROM "users") AS "row_users") AS "sq_users"",
-        "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """a"" OR TRUE OR ""b""" FROM "users") AS "row_users") AS "sq_users"",
-        "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """""" FROM "users") AS "row_users") AS "sq_users"",
-        "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """a"""" OR TRUE OR """"b""" FROM "users") AS "row_users") AS "sq_users"",
-        "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "s.a"""" OR TRUE OR """"b" FROM "users") AS "row_users") AS "sq_users"",
-        "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a;b" FROM "users") AS "row_users") AS "sq_users"",
-        "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a'b" FROM "users") AS "row_users") AS "sq_users"",
-        "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".U&""a"" UESCAPE '!' || ""b""" FROM "users") AS "row_users") AS "sq_users"",
-        "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".U&""a\\"" OR TRUE OR \\""b""" FROM "users") AS "row_users") AS "sq_users"",
-        "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" FROM "users") AS "row_users") AS "sq_users"",
+        "prequoted": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """a""" FROM "users") AS "row_users"",
+        "prequotedCloses": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """a"" OR TRUE OR ""b""" FROM "users") AS "row_users"",
+        "prequotedEmpty": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """""" FROM "users") AS "row_users"",
+        "prequotedEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """a"""" OR TRUE OR """"b""" FROM "users") AS "row_users"",
+        "qualifiedEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "s.a"""" OR TRUE OR """"b" FROM "users") AS "row_users"",
+        "semicolon": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a;b" FROM "users") AS "row_users"",
+        "squote": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS "a'b" FROM "users") AS "row_users"",
+        "uescape": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".U&""a"" UESCAPE '!' || ""b""" FROM "users") AS "row_users"",
+        "unicodeCloses": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".U&""a\\"" OR TRUE OR \\""b""" FROM "users") AS "row_users"",
+        "unicodeEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, 1 AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" FROM "users") AS "row_users"",
       }
     `);
   });
@@ -1186,7 +1186,7 @@ describe('shortcut options', () => {
     // 6.6.1: `"lateral_x" ON true) AS …` in both places; beside every column, the key itself is one quoted column alias
     const key = 'x" ON true) AS "y';
     expect(db.select('users', all, { lateral: { [key]: sub } } as any).compile()).toEqual({
-      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_x"" ON true) AS ""y".result AS "x"" ON true) AS ""y" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_x"" ON true) AS ""y" ON true) AS "row_users") AS "sq_users"`,
+      text: `SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_x"" ON true) AS ""y".result AS "x"" ON true) AS ""y" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_x"" ON true) AS ""y" ON true) AS "row_users"`,
       values: [1],
     });
     // as for a string identifier, `a""b` reads as a hand-escaped `a"b`: the two keys get the same alias,
@@ -1195,38 +1195,39 @@ describe('shortcut options', () => {
     expect(pair.match(/AS "lateral_a""b" ON true/g)).toHaveLength(2);
     expect(matrix(v => db.select('users', all, { lateral: { [v]: sub } } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a\\b".result AS "a\\b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a\\b" ON true) AS "row_users") AS "sq_users"",
-        "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a/*b".result AS "a/*b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a/*b" ON true) AS "row_users") AS "sq_users"",
-        "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a--b".result AS "a--b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a--b" ON true) AS "row_users") AS "sq_users"",
-        "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a$1b".result AS "a$1b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a$1b" ON true) AS "row_users") AS "sq_users"",
-        "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a.b".result AS "a.b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a.b" ON true) AS "row_users") AS "sq_users"",
-        "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a""b".result AS "a""b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a""b" ON true) AS "row_users") AS "sq_users"",
-        "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a"" OR TRUE OR ""b".result AS "a"""" OR TRUE OR """"b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a"" OR TRUE OR ""b" ON true) AS "row_users") AS "sq_users"",
-        "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a"".""b".result AS "a"".""b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a"".""b" ON true) AS "row_users") AS "sq_users"",
+        "backslash": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a\\b".result AS "a\\b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a\\b" ON true) AS "row_users"",
+        "comment": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a/*b".result AS "a/*b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a/*b" ON true) AS "row_users"",
+        "dashes": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a--b".result AS "a--b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a--b" ON true) AS "row_users"",
+        "dollar": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a$1b".result AS "a$1b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a$1b" ON true) AS "row_users"",
+        "dot": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a.b".result AS "a.b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a.b" ON true) AS "row_users"",
+        "dquote": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a""b".result AS "a""b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a""b" ON true) AS "row_users"",
+        "escapedCloses": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a"" OR TRUE OR ""b".result AS "a"""" OR TRUE OR """"b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a"" OR TRUE OR ""b" ON true) AS "row_users"",
+        "escapedDot": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a"".""b".result AS "a"".""b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a"".""b" ON true) AS "row_users"",
         "escapedNul": "throws: The key "a\\"\\"\\u0000\\"\\"b" cannot be a column alias, which an \`extras\` or \`lateral\` key beside every column becomes: it holds a NUL. Give \`columns\`, whose keys stay parameters.",
-        "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a""""""b".result AS "a""""""b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a""""""b" ON true) AS "row_users") AS "sq_users"",
-        "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""".result AS """" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""" ON true) AS "row_users") AS "sq_users"",
-        "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".a$1.""b"""" OR TRUE OR """"c""".result AS """s"".a$1.""b"""" OR TRUE OR """"c""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".a$1.""b"""" OR TRUE OR """"c""" ON true) AS "row_users") AS "sq_users"",
+        "escapedOdd": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a""""""b".result AS "a""""""b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a""""""b" ON true) AS "row_users"",
+        "lone": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""".result AS """" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""" ON true) AS "row_users"",
+        "mixedEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".a$1.""b"""" OR TRUE OR """"c""".result AS """s"".a$1.""b"""" OR TRUE OR """"c""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".a$1.""b"""" OR TRUE OR """"c""" ON true) AS "row_users"",
         "nul": "throws: The key "a\\u0000b" cannot be a column alias, which an \`extras\` or \`lateral\` key beside every column becomes: it holds a NUL. Give \`columns\`, whose keys stay parameters.",
-        "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""a""".result AS """a""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""a""" ON true) AS "row_users") AS "sq_users"",
-        "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""a"" OR TRUE OR ""b""".result AS """a"" OR TRUE OR ""b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""a"" OR TRUE OR ""b""" ON true) AS "row_users") AS "sq_users"",
-        "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""".result AS """""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""" ON true) AS "row_users") AS "sq_users"",
-        "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""a"""" OR TRUE OR """"b""".result AS """a"""" OR TRUE OR """"b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""a"""" OR TRUE OR """"b""" ON true) AS "row_users") AS "sq_users"",
-        "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_s.a"" OR TRUE OR ""b".result AS "s.a"""" OR TRUE OR """"b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_s.a"" OR TRUE OR ""b" ON true) AS "row_users") AS "sq_users"",
-        "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a;b".result AS "a;b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a;b" ON true) AS "row_users") AS "sq_users"",
-        "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a'b".result AS "a'b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a'b" ON true) AS "row_users") AS "sq_users"",
-        "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".U&""a"" UESCAPE '!' || ""b""".result AS """s"".U&""a"" UESCAPE '!' || ""b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".U&""a"" UESCAPE '!' || ""b""" ON true) AS "row_users") AS "sq_users"",
-        "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".U&""a\\"" OR TRUE OR \\""b""".result AS """s"".U&""a\\"" OR TRUE OR \\""b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".U&""a\\"" OR TRUE OR \\""b""" ON true) AS "row_users") AS "sq_users"",
-        "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""".result AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" ON true) AS "row_users") AS "sq_users"",
+        "prequoted": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""a""".result AS """a""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""a""" ON true) AS "row_users"",
+        "prequotedCloses": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""a"" OR TRUE OR ""b""".result AS """a"" OR TRUE OR ""b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""a"" OR TRUE OR ""b""" ON true) AS "row_users"",
+        "prequotedEmpty": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""".result AS """""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""" ON true) AS "row_users"",
+        "prequotedEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""a"""" OR TRUE OR """"b""".result AS """a"""" OR TRUE OR """"b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""a"""" OR TRUE OR """"b""" ON true) AS "row_users"",
+        "qualifiedEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_s.a"" OR TRUE OR ""b".result AS "s.a"""" OR TRUE OR """"b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_s.a"" OR TRUE OR ""b" ON true) AS "row_users"",
+        "semicolon": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a;b".result AS "a;b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a;b" ON true) AS "row_users"",
+        "squote": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_a'b".result AS "a'b" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_a'b" ON true) AS "row_users"",
+        "uescape": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".U&""a"" UESCAPE '!' || ""b""".result AS """s"".U&""a"" UESCAPE '!' || ""b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".U&""a"" UESCAPE '!' || ""b""" ON true) AS "row_users"",
+        "unicodeCloses": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".U&""a\\"" OR TRUE OR \\""b""".result AS """s"".U&""a\\"" OR TRUE OR \\""b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".U&""a\\"" OR TRUE OR \\""b""" ON true) AS "row_users"",
+        "unicodeEscaped": "SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""".result AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" FROM "users" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $1) AS "lateral_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" ON true) AS "row_users"",
       }
     `);
   });
 
   it('the alias is one identifier in "sq_<alias>" too: `"` is doubled, `.` does not split', () => {
-    // `AS "sq_u"; DROP TABLE users; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
-    expect(db.select('users', all, { alias: 'u"; DROP TABLE users; --' } as any).compile().text)
+    // `AS "sq_u"; DROP TABLE users; --"`; 6.6.1: a syntax error; since #74: a second statement that ran; "sq_" is the
+    // aggregate's, so nested, a copy
+    expect(db.select('users', all, { alias: 'u"; DROP TABLE users; --' } as any).copy().compile().text)
       .toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("u""; DROP TABLE users; --".*) AS result FROM "users" AS "u""; DROP TABLE users; --") AS "sq_u""; DROP TABLE users; --"`);
-    expect(matrix(v => db.select('users', all, { alias: v } as any))).toMatchInlineSnapshot(`
+    expect(matrix(v => db.select('users', all, { alias: v } as any).copy())).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("a\\b".*) AS result FROM "users" AS "a\\b") AS "sq_a\\b"",
         "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("a/*b".*) AS result FROM "users" AS "a/*b") AS "sq_a/*b"",
@@ -1257,7 +1258,7 @@ describe('shortcut options', () => {
 
   it('an alias check stays fast on a long run of doubled quotes', () => {
     const alias = `${'a""'.repeat(100_000)}"`;
-    expect(db.select('users', all, { alias } as any).compile().text).toContain(`AS "sq_${alias.replace(/"/g, '""')}"`);
+    expect(db.select('users', all, { alias } as any).copy().compile().text).toContain(`AS "sq_${alias.replace(/"/g, '""')}"`);
   });
 
   it('a withCTEs() key is one identifier, as a lateral key is: `"` is doubled, `.` does not split', () => {
@@ -1336,7 +1337,7 @@ describe('shortcut options', () => {
       let result: string[] | string, q: db.SQLFragment<any, any> | undefined;
       try {
         q = db.select('users', all, { alias: make(log) } as any);
-        result = [q.compile().text, q.compile().text];
+        result = [q.copy().compile().text, q.copy().compile().text];  // "sq_" is the aggregate's, so nested, a copy
       } catch (e) {
         result = `${q ? 'compile ' : ''}throws: ${(e as Error).message}`;  // `throws` alone: as the query is built
       }
@@ -1347,11 +1348,11 @@ describe('shortcut options', () => {
       const alias = () => Object.assign(['u'], { toString: () => 'x"', replace: () => attack }) as any;
       const inner = `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("u".*) AS result FROM "users" AS "u") AS "sq_x"""`;
       expect(db.select('users', all, { lateral: { m: db.select('users', all, { alias: alias() }) } }).compile().text)
-        .toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_m".result AS "m" FROM "users" LEFT JOIN LATERAL (${inner}) AS "lateral_m" ON true) AS "row_users") AS "sq_users"`);
+        .toBe(`SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_m".result AS "m" FROM "users" LEFT JOIN LATERAL (${inner}) AS "lateral_m" ON true) AS "row_users"`);
       expect(db.select('users', all, { extras: { m: db.select('users', all, { alias: alias() }) } }).compile().text)
-        .toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, (${inner}) AS "m" FROM "users") AS "row_users") AS "sq_users"`);
+        .toBe(`SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, (${inner}) AS "m" FROM "users") AS "row_users"`);
       expect(db.select('users', all, { alias: alias(), lateral: { a: db.selectOne('accounts', { owner_id: db.parent('id') }) } }).compile().text)
-        .toBe(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_x""".*) AS result FROM (SELECT "u".*, "lateral_a".result AS "a" FROM "users" AS "u" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "u"."id") LIMIT $1) AS "lateral_a" ON true) AS "row_x""") AS "sq_x"""`);
+        .toBe(`SELECT to_json("row_x""".*) AS result FROM (SELECT "u".*, "lateral_a".result AS "a" FROM "users" AS "u" LEFT JOIN LATERAL (SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "u"."id") LIMIT $1) AS "lateral_a" ON true) AS "row_x"""`);
     });
   });
 
@@ -1472,29 +1473,29 @@ describe('shortcut options', () => {
   it('lock.of', () => {
     expect(matrix(v => db.select('users', all, { lock: { for: 'UPDATE', of: v } } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a\\b") AS "sq_users"",
-        "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a/*b") AS "sq_users"",
-        "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a--b") AS "sq_users"",
-        "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a$1b") AS "sq_users"",
-        "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"."b") AS "sq_users"",
-        "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a""b") AS "sq_users"",
-        "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"" OR TRUE OR ""b") AS "sq_users"",
-        "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"".""b") AS "sq_users"",
-        "escapedNul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a""""<NUL>""""b") AS "sq_users"",
-        "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a""""""b") AS "sq_users"",
-        "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """") AS "sq_users"",
-        "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "s".a$1."b"" OR TRUE OR ""c") AS "sq_users"",
-        "nul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a<NUL>b") AS "sq_users"",
-        "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a") AS "sq_users"",
-        "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """a"" OR TRUE OR ""b""") AS "sq_users"",
-        "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """") AS "sq_users"",
-        "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"" OR TRUE OR ""b") AS "sq_users"",
-        "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "s"."a"" OR TRUE OR ""b") AS "sq_users"",
-        "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a;b") AS "sq_users"",
-        "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a'b") AS "sq_users"",
-        "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """s"""."U&""a"" UESCAPE '!' || ""b""") AS "sq_users"",
-        "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "sq_users"",
-        "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "sq_users"",
+        "backslash": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a\\b"",
+        "comment": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a/*b"",
+        "dashes": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a--b"",
+        "dollar": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a$1b"",
+        "dot": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"."b"",
+        "dquote": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a""b"",
+        "escapedCloses": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"" OR TRUE OR ""b"",
+        "escapedDot": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"".""b"",
+        "escapedNul": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a""""<NUL>""""b"",
+        "escapedOdd": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a""""""b"",
+        "lone": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """"",
+        "mixedEscaped": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "s".a$1."b"" OR TRUE OR ""c"",
+        "nul": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a<NUL>b"",
+        "prequoted": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"",
+        "prequotedCloses": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """"",
+        "prequotedEscaped": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a"" OR TRUE OR ""b"",
+        "qualifiedEscaped": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "s"."a"" OR TRUE OR ""b"",
+        "semicolon": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a;b"",
+        "squote": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "a'b"",
+        "uescape": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """s"""."U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF """s"""."U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT to_json("users".*) AS result FROM "users" FOR UPDATE OF "s".U&"a\\0022"" OR TRUE OR ""\\0022b"",
       }
     `);
   });
@@ -1559,56 +1560,56 @@ describe('shortcut options', () => {
   it('distinct and groupBy', () => {
     expect(matrix(v => db.select('users', all, { distinct: v } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a\\b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a/*b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a--b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a$1b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"."b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a""b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"" OR TRUE OR ""b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"".""b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "escapedNul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a""""<NUL>""""b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a""""""b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("s".a$1."b"" OR TRUE OR ""c") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "nul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a<NUL>b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""a"" OR TRUE OR ""b""") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"" OR TRUE OR ""b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("s"."a"" OR TRUE OR ""b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a;b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a'b") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""s"""."U&""a"" UESCAPE '!' || ""b""") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""s"""."U&""a\\"" OR TRUE OR \\""b""") to_json("users".*) AS result FROM "users") AS "sq_users"",
-        "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") to_json("users".*) AS result FROM "users") AS "sq_users"",
+        "backslash": "SELECT DISTINCT ON ("a\\b") to_json("users".*) AS result FROM "users"",
+        "comment": "SELECT DISTINCT ON ("a/*b") to_json("users".*) AS result FROM "users"",
+        "dashes": "SELECT DISTINCT ON ("a--b") to_json("users".*) AS result FROM "users"",
+        "dollar": "SELECT DISTINCT ON ("a$1b") to_json("users".*) AS result FROM "users"",
+        "dot": "SELECT DISTINCT ON ("a"."b") to_json("users".*) AS result FROM "users"",
+        "dquote": "SELECT DISTINCT ON ("a""b") to_json("users".*) AS result FROM "users"",
+        "escapedCloses": "SELECT DISTINCT ON ("a"" OR TRUE OR ""b") to_json("users".*) AS result FROM "users"",
+        "escapedDot": "SELECT DISTINCT ON ("a"".""b") to_json("users".*) AS result FROM "users"",
+        "escapedNul": "SELECT DISTINCT ON ("a""""<NUL>""""b") to_json("users".*) AS result FROM "users"",
+        "escapedOdd": "SELECT DISTINCT ON ("a""""""b") to_json("users".*) AS result FROM "users"",
+        "lone": "SELECT DISTINCT ON ("""") to_json("users".*) AS result FROM "users"",
+        "mixedEscaped": "SELECT DISTINCT ON ("s".a$1."b"" OR TRUE OR ""c") to_json("users".*) AS result FROM "users"",
+        "nul": "SELECT DISTINCT ON ("a<NUL>b") to_json("users".*) AS result FROM "users"",
+        "prequoted": "SELECT DISTINCT ON ("a") to_json("users".*) AS result FROM "users"",
+        "prequotedCloses": "SELECT DISTINCT ON ("""a"" OR TRUE OR ""b""") to_json("users".*) AS result FROM "users"",
+        "prequotedEmpty": "SELECT DISTINCT ON ("""") to_json("users".*) AS result FROM "users"",
+        "prequotedEscaped": "SELECT DISTINCT ON ("a"" OR TRUE OR ""b") to_json("users".*) AS result FROM "users"",
+        "qualifiedEscaped": "SELECT DISTINCT ON ("s"."a"" OR TRUE OR ""b") to_json("users".*) AS result FROM "users"",
+        "semicolon": "SELECT DISTINCT ON ("a;b") to_json("users".*) AS result FROM "users"",
+        "squote": "SELECT DISTINCT ON ("a'b") to_json("users".*) AS result FROM "users"",
+        "uescape": "SELECT DISTINCT ON ("""s"""."U&""a"" UESCAPE '!' || ""b""") to_json("users".*) AS result FROM "users"",
+        "unicodeCloses": "SELECT DISTINCT ON ("""s"""."U&""a\\"" OR TRUE OR \\""b""") to_json("users".*) AS result FROM "users"",
+        "unicodeEscaped": "SELECT DISTINCT ON ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") to_json("users".*) AS result FROM "users"",
       }
     `);
     expect(matrix(v => db.select('users', all, { groupBy: v } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a\\b") AS "sq_users"",
-        "comment": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a/*b") AS "sq_users"",
-        "dashes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a--b") AS "sq_users"",
-        "dollar": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a$1b") AS "sq_users"",
-        "dot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"."b") AS "sq_users"",
-        "dquote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a""b") AS "sq_users"",
-        "escapedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"" OR TRUE OR ""b") AS "sq_users"",
-        "escapedDot": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"".""b") AS "sq_users"",
-        "escapedNul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a""""<NUL>""""b") AS "sq_users"",
-        "escapedOdd": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a""""""b") AS "sq_users"",
-        "lone": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY """") AS "sq_users"",
-        "mixedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "s".a$1."b"" OR TRUE OR ""c") AS "sq_users"",
-        "nul": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a<NUL>b") AS "sq_users"",
-        "prequoted": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a") AS "sq_users"",
-        "prequotedCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY """a"" OR TRUE OR ""b""") AS "sq_users"",
-        "prequotedEmpty": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY """") AS "sq_users"",
-        "prequotedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"" OR TRUE OR ""b") AS "sq_users"",
-        "qualifiedEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "s"."a"" OR TRUE OR ""b") AS "sq_users"",
-        "semicolon": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a;b") AS "sq_users"",
-        "squote": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "a'b") AS "sq_users"",
-        "uescape": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY """s"""."U&""a"" UESCAPE '!' || ""b""") AS "sq_users"",
-        "unicodeCloses": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "sq_users"",
-        "unicodeEscaped": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" GROUP BY "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "sq_users"",
+        "backslash": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a\\b"",
+        "comment": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a/*b"",
+        "dashes": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a--b"",
+        "dollar": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a$1b"",
+        "dot": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"."b"",
+        "dquote": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a""b"",
+        "escapedCloses": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"" OR TRUE OR ""b"",
+        "escapedDot": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"".""b"",
+        "escapedNul": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a""""<NUL>""""b"",
+        "escapedOdd": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a""""""b"",
+        "lone": "SELECT to_json("users".*) AS result FROM "users" GROUP BY """"",
+        "mixedEscaped": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "s".a$1."b"" OR TRUE OR ""c"",
+        "nul": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a<NUL>b"",
+        "prequoted": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"",
+        "prequotedCloses": "SELECT to_json("users".*) AS result FROM "users" GROUP BY """a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT to_json("users".*) AS result FROM "users" GROUP BY """"",
+        "prequotedEscaped": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a"" OR TRUE OR ""b"",
+        "qualifiedEscaped": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "s"."a"" OR TRUE OR ""b"",
+        "semicolon": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a;b"",
+        "squote": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "a'b"",
+        "uescape": "SELECT to_json("users".*) AS result FROM "users" GROUP BY """s"""."U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT to_json("users".*) AS result FROM "users" GROUP BY """s"""."U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT to_json("users".*) AS result FROM "users" GROUP BY "s".U&"a\\0022"" OR TRUE OR ""\\0022b"",
       }
     `);
   });
@@ -3057,7 +3058,7 @@ describe('selectRows()', () => {
     for (const [place, build] of Object.entries(builds)) {
       for (const [name, input] of Object.entries(hostile)) {
         const
-          selected = outcome(() => db.select(...build(input))),
+          selected = outcome(() => db.select(...build(input)).copy()),  // the aggregate, as select() compiles nested
           rows = outcome(() => db.selectRows(...build(input)));
         if (typeof selected === 'string' || typeof rows === 'string') {
           expect(rows, `${place} ${name}`).toBe(selected);
@@ -3204,7 +3205,7 @@ describe('an extras or lateral key, and an alias, beside every column', () => {
 
   it('an alias is one identifier in "row_<alias>", as in "sq_<alias>"', () => {
     expect(Object.fromEntries(Object.entries(payloads).map(([name, v]) => [name,
-      (r => typeof r === 'string' ? r : visible(r.text))(compiled(() => db.select('users', all, { alias: v, extras: { e: 'id' } } as any)))]))).toMatchInlineSnapshot(`
+      (r => typeof r === 'string' ? r : visible(r.text))(compiled(() => db.select('users', all, { alias: v, extras: { e: 'id' } } as any).copy()))]))).toMatchInlineSnapshot(`
         {
           "backslash": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_a\\b".*) AS result FROM (SELECT "a\\b".*, "id" AS "e" FROM "users" AS "a\\b") AS "row_a\\b") AS "sq_a\\b"",
           "closes": "SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_x"" FROM ""users""; DROP TABLE users; --".*) AS result FROM (SELECT "x"" FROM ""users""; DROP TABLE users; --".*, "id" AS "e" FROM "users" AS "x"" FROM ""users""; DROP TABLE users; --") AS "row_x"" FROM ""users""; DROP TABLE users; --") AS "sq_x"" FROM ""users""; DROP TABLE users; --"",

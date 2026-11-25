@@ -779,11 +779,11 @@ describe('cursor()', () => {
     expect(sent.map(q => q.text)).toEqual(['DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT "id" FROM "users" ORDER BY "id"', fetch(100).text, close().text]);
   });
 
-  it('writes a select() after CURSOR FOR as it compiles on its own, columns, order, limit and lock included, and yields its one row’s array', async () => {
+  it('writes a select() after CURSOR FOR as it compiles nested, its json_agg, columns, order, limit and lock included, and yields its one row’s array', async () => {
     const { sent, client } = cursorClient({ rows: [{ result: [{ id: 7 }] }] });
     const query = db.select('users', { manager_id: 1000 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, limit: 10, lock: { for: 'UPDATE' } });
     expect(await read(db.cursor(client, query, { batchSize: 100 }))).toEqual([[{ id: 7 }]]);
-    const own = query.compile();
+    const own = query.copy().compile();
     expect(sent[0]).toEqual({ text: `DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR ${own.text}`, values: own.values });
     expect(own.text).toMatch(/ ORDER BY "id" ASC LIMIT \$3 FOR UPDATE\) /);
     expect(sent.slice(1)).toEqual([fetch(100), fetch(100), close()]);

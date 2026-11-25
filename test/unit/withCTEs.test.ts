@@ -27,7 +27,7 @@ describe('withCTEs', () => {
   it('two CTEs, in the order of the object, the second reading the first', () => {
     const rich = sql`SELECT ${'owner_id'} FROM ${'accounts'} WHERE ${'owner_id'} IN (SELECT id FROM recent)`;
     expect(db.withCTEs({ recent, rich }, db.select('users', { id: sql`${self} IN (SELECT owner_id FROM rich)` }, { columns: ['id'] })).compile()).toEqual({
-      text: `${recentSQL}, "rich" AS (SELECT "owner_id" FROM "accounts" WHERE "owner_id" IN (SELECT id FROM recent)) SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($2::text, "id") AS result FROM "users" WHERE (("id" IN (SELECT owner_id FROM rich)))) AS "sq_users"`,
+      text: `${recentSQL}, "rich" AS (SELECT "owner_id" FROM "accounts" WHERE "owner_id" IN (SELECT id FROM recent)) SELECT json_build_object($2::text, "id") AS result FROM "users" WHERE (("id" IN (SELECT owner_id FROM rich)))`,
       values: [1, 'id'],
     });
   });
@@ -62,7 +62,7 @@ describe('withCTEs', () => {
       emptyInsert: before(db.insert('users', [])),
       emptyUpsert: before(db.upsert('users', [], 'email')),
     }).toEqual({
-      select: { text: 'WITH "recent" AS (SELECT "id" FROM "users" WHERE "manager_id" = $1) SELECT coalesce(json_agg(result), \'[]\') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users"', values: [1] },
+      select: { text: 'WITH "recent" AS (SELECT "id" FROM "users" WHERE "manager_id" = $1) SELECT to_json("users".*) AS result FROM "users"', values: [1] },
       selectOne: { text: 'WITH "recent" AS (SELECT "id" FROM "users" WHERE "manager_id" = $1) SELECT to_json("users".*) AS result FROM "users" LIMIT $2', values: [1, 1] },
       selectExactlyOne: { text: 'WITH "recent" AS (SELECT "id" FROM "users" WHERE "manager_id" = $1) SELECT to_json("users".*) AS result FROM "users" LIMIT $2', values: [1, 1] },
       count: { text: `${recentSQL} SELECT count(*) AS result FROM "users"`, values: [1] },
@@ -91,8 +91,7 @@ describe('withCTEs', () => {
     expect(db.withCTEs({ recent }, one).prepared('one_with').compile()).toMatchObject({ values: [1, 2], name: 'one_with' });
   });
 
-  it('select() with topLevelSelectAsRows: the main query is its rows query, a CTE keeps its json_agg', () => {
-    db.setConfig({ topLevelSelectAsRows: true });
+  it('select(): the main query is its rows query, a CTE keeps its json_agg', () => {
     const ids = db.select('users', all, { columns: ['id'] }), idsText = 'SELECT json_build_object($2::text, "id") AS result FROM "users"';
     expect(db.withCTEs({ recent }, ids).compile()).toEqual({ text: `${recentSQL} ${idsText}`, values: [1, 'id'] });
     expect(db.withCTEs({}, ids).compile()).toEqual({ text: 'SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'] });
@@ -112,14 +111,14 @@ describe('withCTEs', () => {
   it('a write shortcut as a CTE', () => {
     const eve = db.insert('users', { email: 'eve@example.com', display_name: 'Eve' }, { returning: ['id'] });
     expect(db.withCTEs({ eve }, db.select('users', all, { columns: ['display_name'] })).compile()).toEqual({
-      text: `WITH "eve" AS (INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING json_build_object($3::text, "id") AS result) SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object($4::text, "display_name") AS result FROM "users") AS "sq_users"`,
+      text: `WITH "eve" AS (INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING json_build_object($3::text, "id") AS result) SELECT json_build_object($4::text, "display_name") AS result FROM "users"`,
       values: ['Eve', 'eve@example.com', 'id', 'display_name'],
     });
   });
 
   it('in parentheses as an extras value and as an insert() value, as the shortcut is', () => {
     expect(db.select('users', all, { extras: { n: db.withCTEs({ recent }, db.count('accounts', all)) } }).compile()).toEqual({
-      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, (WITH "recent" AS (SELECT "id" FROM "users" WHERE "manager_id" = $1) SELECT count(*) AS result FROM "accounts") AS "n" FROM "users") AS "row_users") AS "sq_users"`,
+      text: `SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, (WITH "recent" AS (SELECT "id" FROM "users" WHERE "manager_id" = $1) SELECT count(*) AS result FROM "accounts") AS "n" FROM "users") AS "row_users"`,
       values: [1],
     });
     const name = db.withCTEs({ recent }, db.selectOne('users', all, { columns: ['display_name'] }));
@@ -135,7 +134,7 @@ describe('withCTEs', () => {
   it('in a lateral, parent() in the main query and in a CTE naming the parent', () => {
     const mine = sql`SELECT ${'id'} FROM ${'accounts'} WHERE ${'owner_id'} = ${parent('id')}`;
     expect(db.select('users', all, { lateral: { n: db.withCTEs({ mine }, db.count('accounts', { owner_id: parent('id') })) } }).compile()).toEqual({
-      text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_n".result AS "n" FROM "users" LEFT JOIN LATERAL (WITH "mine" AS (SELECT "id" FROM "accounts" WHERE "owner_id" = "users"."id") SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true) AS "row_users") AS "sq_users"`,
+      text: `SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "lateral_n".result AS "n" FROM "users" LEFT JOIN LATERAL (WITH "mine" AS (SELECT "id" FROM "accounts" WHERE "owner_id" = "users"."id") SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true) AS "row_users"`,
       values: [],
     });
   });

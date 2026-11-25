@@ -170,8 +170,7 @@ function SQLForAlias(prefix: string, name: string) {
 // update() value, in VALUES and ROW() (#656). A sql fragment is the caller's SQL, written as given
 const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInExtras'];
 // the query a shortcut compiles to on its own, which withCTEs() writes at the top level too: the LIMIT 2 form of a
-// selectExactlyOne() that checks for a second row, or the rows form of a select() with topLevelSelectAsRows, which
-// runs with rowsResult
+// selectExactlyOne() that checks for a second row, or the rows form of a select(), which runs with rowsResult
 const topLevelForm = Symbol('topLevelForm');
 type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
 const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
@@ -932,10 +931,9 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * For its rows one by one, as `cursor()` reads them, the same query without
  * its aggregate: `selectRows()`.
  *
- * With the `topLevelSelectAsRows` config option, read as `select()` is called,
- * `select()` run or compiled on its own, or as the main query of `withCTEs()`,
- * is `selectRows()`'s query, and `run()` gives the same array, one result per
- * row: `SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
+ * Run or compiled on its own, or as the main query of `withCTEs()`,
+ * `select()` is `selectRows()`'s query, and `run()` gives the array, one
+ * result per row: `SELECT to_json("films".*) AS result FROM "films" WHERE ("studio_id" = $1)`.
  * A single `lateral` passed through is converted above that query,
  * `SELECT to_json(result) AS result FROM (…) AS "sq_films"`, so its value
  * stays JSON, ordered and made distinct by its raw value. Nested (a
@@ -1074,7 +1072,7 @@ function selectQuery(
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
       sql<SQL, any>`SELECT coalesce(json_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
     checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false),
-    asRows = mode === SelectResultMode.Many && !rows && (getConfig().topLevelSelectAsRows ?? false);
+    asRows = mode === SelectResultMode.Many && !rows;
 
   if (checksSecondRow || asRows) {
     // compiled on its own, as `run()` does, the query asks for a second row, or is selectRows()'s; a parent query
@@ -1177,7 +1175,7 @@ export interface SelectRowsSignatures {
  * fragment it is given, and so reads a `select()` as its one aggregate row.
  * With `{ columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }`:
  * `SELECT json_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
- * where `select()` sends
+ * which `select()` sends on its own too, and nested wraps in
  * `SELECT coalesce(json_agg(result), '[]') AS result FROM (…the same…) AS "sq_films"`.
  *
  * `run()` gives what `select()` gives, `[]` for no row, but for a single
@@ -1454,10 +1452,10 @@ const inWith = <F>(fragment: F) =>
  * A no-op `query` or CTE (an `insert()` or `upsert()` of no row) is written
  * `SELECT NULL::json AS result WHERE false`, and the result is no no-op, so
  * the CTEs run. A `selectExactlyOne()` that checks for a second row still does
- * at the top level, and a `select()` with `topLevelSelectAsRows` is still its
- * rows query there, a CTE keeping its aggregate. The result is never
- * prepared, whatever `query` is, even by a `prepared()` called on `query` or a
- * CTE afterwards: call `prepared()` on it.
+ * at the top level, and a `select()` is still its rows query there, a CTE
+ * keeping its aggregate. The result is never prepared, whatever `query` is,
+ * even by a `prepared()` called on `query` or a CTE afterwards: call
+ * `prepared()` on it.
  * @param ctes The CTEs, keyed by name: a shortcut or a `sql` fragment each
  * @param query The main query
  */
