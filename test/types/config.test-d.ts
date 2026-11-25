@@ -34,8 +34,7 @@ describe('getConfig() and setConfig()', () => {
     expectTypeOf<keyof db.Config>().toEqualTypeOf<
       | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
       | 'queryListener' | 'resultListener' | 'transactionListener'
-      | 'transactionRequiresCommit' | 'transactionRequiresIdleClient'
-      | 'transactionRequiresSatisfyingLevel' | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn' | 'topLevelSelectAsRows'
+      | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn' | 'topLevelSelectAsRows'
       | 'transactionEventListener' | 'shortcutsUseJson'
     >();
   });
@@ -53,7 +52,28 @@ describe('getConfig() and setConfig()', () => {
     db.getConfig().undefinedMeansMissing;
     // @ts-expect-error upsertRequiresSameKeys is no key of the config getConfig() gives
     db.getConfig().upsertRequiresSameKeys;
-    const built = { transactionAttemptsMax: 3, undefinedMeansMissing: false, upsertRequiresSameKeys: false };
+    // @ts-expect-error transactionRequiresCommit is no key of Config from 8.0
+    db.setConfig({ transactionRequiresCommit: true });
+    // @ts-expect-error transactionRequiresIdleClient is no key of Config from 8.0
+    db.setConfig({ transactionRequiresIdleClient: true });
+    // @ts-expect-error transactionRequiresSatisfyingLevel is no key of Config from 8.0
+    db.setConfig({ transactionRequiresSatisfyingLevel: true });
+    // @ts-expect-error transactionRequiresCommit is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, transactionRequiresCommit: false });
+    // @ts-expect-error transactionRequiresIdleClient is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, transactionRequiresIdleClient: false });
+    // @ts-expect-error transactionRequiresSatisfyingLevel is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, transactionRequiresSatisfyingLevel: false });
+    // @ts-expect-error transactionRequiresCommit is no key of the config getConfig() gives
+    db.getConfig().transactionRequiresCommit;
+    // @ts-expect-error transactionRequiresIdleClient is no key of the config getConfig() gives
+    db.getConfig().transactionRequiresIdleClient;
+    // @ts-expect-error transactionRequiresSatisfyingLevel is no key of the config getConfig() gives
+    db.getConfig().transactionRequiresSatisfyingLevel;
+    const built = {
+      transactionAttemptsMax: 3, undefinedMeansMissing: false, upsertRequiresSameKeys: false,
+      transactionRequiresCommit: false, transactionRequiresIdleClient: false, transactionRequiresSatisfyingLevel: false,
+    };
     expectTypeOf(db.setConfig).toBeCallableWith(built);  // hence setConfig()'s refusal at run time
   });
 

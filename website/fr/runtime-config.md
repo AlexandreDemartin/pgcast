@@ -1,5 +1,5 @@
 ---
-english: cff009669323
+english: 0dc6d9330fc3
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -30,7 +30,7 @@ db.setConfig({
   - Zapatos 6.6.1 réglait la clé à `undefined`. Après `transactionAttemptsMax: undefined`, `transaction()` abandonnait après sa première tentative (« <span lang="en">… on attempt 1 of undefined, giving up</span> ») ; après `transactionRetryDelay: undefined`, chaque `transaction()` était rejetée avec « <span lang="en">TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.</span> » et ne libérait jamais le client qu’elle avait récupéré du pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - Elle renvoie une copie de la nouvelle configuration, comme `getConfig()` : modifier cet objet ne change rien. Zapatos 6.6.1 renvoyait la configuration elle-même ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - Elle garde l’objet `transactionRetryDelay` que vous lui donnez, pas une copie : modifier ensuite son `minMs` ou son `maxMs` modifie la configuration.
-- Une clé que la 8.0 a supprimée, [`undefinedMeansMissing`](#Config.undefinedMeansMissing) ou [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), ne compile pas (TS2353). Donnée quand même, depuis une variable ou du JavaScript, elle lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours (`true`), `null` ou `undefined`, et la configuration n’en garde aucune. Erreur : `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
+- Une clé que la 8.0 a supprimée, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) ou [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel), ne compile pas (TS2353). Donnée quand même, depuis une variable ou du JavaScript, elle lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours (`true`), `null` ou `undefined`, et la configuration n’en garde aucune. Erreur : `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
 - Une clé inconnue ne compile pas (TS2353), pas plus qu’une valeur du mauvais type (TS2322) :
 
 ```ts twoslash
@@ -73,9 +73,6 @@ interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;
   castObjectParamsToJson: boolean;
-  transactionRequiresCommit?: boolean;
-  transactionRequiresIdleClient?: boolean;
-  transactionRequiresSatisfyingLevel?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
   aggregatesTypedByColumn?: boolean;
   shortcutsUseJson?: boolean;
@@ -97,9 +94,6 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | l’attente avant chaque retry | à chaque `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | un paramètre tableau : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
-| [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | rejeter la promesse si Postgres répond au `COMMIT` par `ROLLBACK` | à chaque `transaction()` |
-| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | rejeter la promesse avant `START TRANSACTION` uniquement si votre client sans marqueur signale `T` ou `E` avant et après la requête vide. Si le client ne fournit aucun statut, l’appel se poursuit | à chaque `transaction()` qui reçoit un tel client |
-| [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul demande deux lignes et sa promesse est rejetée s’il en trouve une deuxième | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
 | [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` et ses semblables, et le `RETURNING` des écritures, construisent leur JSON avec les fonctions `json` : `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | à chaque `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()`, `withCTEs()`, `insert()`, `upsert()`, `update()` et `deletes()` |
@@ -193,38 +187,30 @@ Une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/in
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
-À partir de la 7.0.0, l’option vaut `true` par défaut.
-
-```ts
-transactionRequiresCommit?: boolean  // default: true
-```
+À partir de la 7.0.0, l’option valait `true` par défaut. À partir de la 8.0.0, la clé est supprimée et pgcast se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-transactionRequiresCommit)).
 
 Si Postgres répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> de [`transaction()`](/fr/transaction#transaction) par le command tag `ROLLBACK`, rien n’est enregistré.
 
-Avec `true`, `transaction()` est alors rejetée, sans retry, avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
+`transaction()` est alors rejetée, sans retry, avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
 
-Avec `false`, la promesse se résout avec la valeur renvoyée par le callback, sans avertissement. Voir [Laisser passer l’erreur](/fr/retries#let-the-error-through).
+Pendant toute la 7.x, avec `false`, la promesse se résolvait avec la valeur renvoyée par le callback, sans avertissement. Voir [Laisser passer l’erreur](/fr/retries#let-the-error-through).
 
 - Non couvert : un callback qui envoie lui-même `COMMIT` ou `ROLLBACK`.
 - Non testé avec `pg-native`.
 
 ### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
 
-À partir de la 7.0.0, l’option vaut `true` par défaut.
-
-```ts
-transactionRequiresIdleClient?: boolean  // default: true
-```
+À partir de la 7.0.0, l’option valait `true` par défaut. À partir de la 8.0.0, la clé est supprimée et pgcast se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-transactionRequiresIdleClient)).
 
 Avec un client sur lequel vous avez ouvert vous-même une transaction, par `BEGIN`, [`transaction()`](/fr/transaction#transaction) terminerait votre transaction : son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> la valide, ou son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> l’annule ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 
-Avec `true`, elle est rejetée avant d’envoyer son `START TRANSACTION`, avec "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->. Votre transaction reste ouverte, pour votre `COMMIT` ou votre `ROLLBACK`.
+Elle est rejetée avant d’envoyer son `START TRANSACTION`, avec "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->. Votre transaction reste ouverte, pour votre `COMMIT` ou votre `ROLLBACK`.
 
-Avec `false`, `transaction()` envoie `START TRANSACTION` sans vérifier de nouveau le statut du client, comme dans Zapatos 6.6.1. pgcast n’émet aucun avertissement.
+Pendant toute la 7.x, avec `false`, `transaction()` envoyait `START TRANSACTION` sans vérifier de nouveau le statut du client, comme dans Zapatos 6.6.1. pgcast n’émettait aucun avertissement.
 
-- pg dit si un client est dans un bloc à partir de pg 8.21 (`getTransactionStatus()`). Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, avec ou sans l’option, sans avertissement.
-- Avec `true`, quand pg signale un bloc, `transaction()` envoie d’abord une requête vide, pour relire le statut ; [`queryListener`](#Config.queryListener) et [`resultListener`](#Config.resultListener) la reçoivent, avec l’id de la transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
-- Pendant cette seconde vérification, le marqueur du premier appel contient le niveau d’isolation demandé par cet appel. Par défaut, un second appel n’exécute son callback sur ce client que si le niveau enregistré satisfait le niveau qu’il demande. Si un bloc de transaction est ouvert, les requêtes du callback s’exécutent au niveau d’isolation de ce bloc.
+- pg dit si un client est dans un bloc à partir de pg 8.21 (`getTransactionStatus()`). Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, sans avertissement.
+- Quand pg signale un bloc, `transaction()` envoie d’abord une requête vide, pour relire le statut ; [`queryListener`](#Config.queryListener) et [`resultListener`](#Config.resultListener) la reçoivent, avec l’id de la transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
+- Pendant cette seconde vérification, le marqueur du premier appel contient le niveau d’isolation demandé par cet appel. Un second appel n’exécute son callback sur ce client que si le niveau enregistré satisfait le niveau qu’il demande. Si un bloc de transaction est ouvert, les requêtes du callback s’exécutent au niveau d’isolation de ce bloc.
 - Seul un client que vous passez est vérifié : un client emprunté au pool, libéré alors qu’il était encore dans un bloc, ne l’est pas.
 - Un `BEGIN` envoyé sans `await` n’est pas encore vu : le client paraît hors de tout bloc.
 - Un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue peut lui aussi paraître hors de tout bloc : `transaction()` s’exécute alors comme dans la 6.6.1, sans avertissement.
@@ -233,19 +219,15 @@ Avec `false`, `transaction()` envoie `START TRANSACTION` sans vérifier de nouve
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
-À partir de la 7.0.0, l’option vaut `true` par défaut.
-
-```ts
-transactionRequiresSatisfyingLevel?: boolean  // default: true
-```
+À partir de la 7.0.0, l’option valait `true` par défaut. À partir de la 8.0.0, la clé est supprimée et pgcast se comporte toujours comme avec `true` ([migration vers la 8.0](/fr/switching#from-8-0-transactionRequiresSatisfyingLevel)).
 
 Un callback imbriqué s’exécute au niveau d’isolation de la transaction extérieure. Un appel à `serializable()` avec le client de `readCommitted()` ne peut donc pas garantir le niveau demandé ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 
-Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
+Quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
 
-Avec `false`, le client est transmis même si son niveau d’isolation est insuffisant. pgcast n’émet aucun avertissement.
+Pendant toute la 7.x, avec `false`, le client était transmis même si son niveau d’isolation était insuffisant, sans avertissement de pgcast.
 
-- Avec ou sans l’option, l’appel transmet le client si, dans le [tableau des niveaux d’isolation](/fr/transaction#IsolationSatisfying), son niveau figure sur la ligne correspondant au niveau demandé.
+- L’appel transmet le client si, dans le [tableau des niveaux d’isolation](/fr/transaction#IsolationSatisfying), son niveau figure sur la ligne correspondant au niveau demandé.
 - Seul le client d’une `transaction()` est vérifié, par sa marque `_zapatos`, que porte aussi un client simple tant qu’une `transaction()` s’exécute dessus, si bien qu’un second appel au même moment sur ce client est vérifié : un pool, un client simple inactif et un client gardé après la fin de sa transaction reçoivent leur propre transaction, comme avant.
 - Les types ne changent pas : un `Queryable` accepte le client de n’importe quel niveau ([`TxnClient`](/fr/transaction#TxnClient)).
 - Un test qui exécute du code dans une `transaction()` à lui, et lui passe ce client : ouvrez-la en `IsolationLevel.Serializable`, qui vaut pour tous les niveaux.
@@ -482,7 +464,7 @@ type TransactionEvent =
 
 ## Opt-ins et avertissements {#opt-ins-and-warnings}
 
-En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x ; la 8.0 supprime les deux premiers (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
+En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x ; la 8.0 les supprime tous, sauf `aggregatesTypedByColumn` (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente ; la 8.0 la retire et ne garde que `LIMIT 1`. [`shortcutsUseJson`](#Config.shortcutsUseJson), à partir de la 7.3.0, n’a pas d’avertissement non plus, puisque ses valeurs sont les mêmes : elle est désactivée en 7.x, et la 8.0 ne garde que `json`.
 

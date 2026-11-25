@@ -5,6 +5,7 @@ All notable changes to `@pgcast/adapter-pglite` are documented here. Format: [Ke
 ## [Unreleased]
 
 ### Changed
+- The README's note on a nested transaction says that pgcast 8.0 removes `transactionRequiresSatisfyingLevel`, so the level check always runs.
 - The README says type-checking needs `skipLibCheck: true`, as PGlite's own declarations fail without it.
 
 ## [0.1.2] - 2026-11-22

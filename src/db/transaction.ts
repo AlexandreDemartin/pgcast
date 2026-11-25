@@ -35,7 +35,7 @@ export type IsolationSatisfying<T extends IsolationLevel> = {
   [IsolationLevel.SerializableRODeferrable]: IsolationSatisfying<IsolationLevel.SerializableRO>;
 }[T];
 
-// For each nested request, the outer levels accepted with transactionRequiresSatisfyingLevel. The type tests check each row against IsolationSatisfying.
+// For each nested request, the outer levels whose client it accepts. The type tests check each row against IsolationSatisfying.
 // A Map, so that a level it doesn't know, a string from JavaScript ('constructor'), is passed through, as in Zapatos 6.6.1
 const
   { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,
@@ -177,16 +177,14 @@ type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
  * as appropriate.
  *
  * When the callback catches a query error and Postgres answers `COMMIT` with
- * `ROLLBACK`, reject without retrying. With `transactionRequiresCommit: false`,
- * resolve with the callback's result even though its writes were rolled back.
+ * `ROLLBACK`, reject without retrying: nothing was saved.
  *
  * When a caller's client still reports a transaction block after an empty
- * query, reject before `START TRANSACTION`. Set
- * `transactionRequiresIdleClient: false` to skip the recheck and run, ending the caller's block.
+ * query, reject before `START TRANSACTION`, leaving the caller's block open.
  *
  * Open the outer helper at the level you need. A later `SET TRANSACTION` leaves
  * its marker unchanged. If the marked level does not satisfy the nested request
- * (`IsolationSatisfying`), reject before its callback unless `transactionRequiresSatisfyingLevel: false`.
+ * (`IsolationSatisfying`), reject before its callback.
  *
  * Given a `PoolLike` of another driver, the callback gets its client, a
  * `TxnClientLike`, released once the transaction ends. Passed to a nested
@@ -217,8 +215,7 @@ export async function transaction<T, M extends IsolationLevel, C = unknown, N ex
     // if txnClientOrQueryable is a TxnClient, just pass it through: its callback runs at the outer transaction's level, as
     // Postgres can't change the isolation level once the transaction's first query has run (see https://github.com/AlexandreDemartin/pgcast/issues/177)
     const outer = (txnClientOrQueryable as TxnClient<IsolationLevel>)._zapatos?.isolationLevel;
-    if (outer !== undefined && satisfying.has(outer) && satisfying.get(isolationLevel)?.includes(outer) === false &&
-        (getConfig().transactionRequiresSatisfyingLevel ?? true)) {
+    if (outer !== undefined && satisfying.has(outer) && satisfying.get(isolationLevel)?.includes(outer) === false) {
       throw new Error(`transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${isolationLevel} (IsolationSatisfying)`);
     }
     return (callback as Callback<T, M>)(txnClientOrQueryable as TxnClient<IsolationSatisfying<M>>);
@@ -239,7 +236,7 @@ export async function transaction<T, M extends IsolationLevel, C = unknown, N ex
 
     // a client of the caller's, inside a block of its own (BEGIN): our COMMIT or ROLLBACK would end that
     // transaction (see https://github.com/AlexandreDemartin/pgcast/issues/233)
-    if (!clientIsOurs && inBlock(txnClient) && (getConfig().transactionRequiresIdleClient ?? true)) {
+    if (!clientIsOurs && inBlock(txnClient)) {
       // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
       // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
       await sql``.run(txnClient);  // meanwhile, a call at the same moment sees the mark, and is passed through
@@ -307,7 +304,7 @@ export async function transaction<T, M extends IsolationLevel, C = unknown, N ex
 
       // after a query error that the callback caught, the transaction is aborted: Postgres answers COMMIT
       // with the command tag ROLLBACK, not an error, and nothing was saved (see https://github.com/AlexandreDemartin/pgcast/issues/190)
-      if (commandTag === 'ROLLBACK' && (config.transactionRequiresCommit ?? true)) {
+      if (commandTag === 'ROLLBACK') {
         throw new Error('the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on');
       }
 

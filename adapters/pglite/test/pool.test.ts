@@ -70,15 +70,9 @@ describe('transactions', () => {
     expect(n.counts()).toEqual([4, 4]);
   });
 
-  it('read the ROLLBACK that answers the COMMIT of an aborted transaction by default and with transactionRequiresCommit false', async () => {
-    vi.resetModules();
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
-    const fdb = await import('../../../src/db');
+  it('read the ROLLBACK that answers the COMMIT of an aborted transaction, and reject', async () => {
     const swallow = async (c: db.QueryableLike) => { await db.sql`SELECT 1/0`.run(c).catch(() => { }); return 'swallowed'; };
-    await expect(fdb.readCommitted(u.pool(), swallow)).rejects.toThrow('the transaction was rolled back, not committed');
-    fdb.setConfig({ transactionRequiresCommit: false });
-    expect(await fdb.readCommitted(u.pool(), swallow)).toBe('swallowed');
-    expect(emitWarning).not.toHaveBeenCalled();
+    await expect(db.readCommitted(u.pool(), swallow)).rejects.toThrow('the transaction was rolled back, not committed');
   });
 
   it('pass the client of a transaction through to a nested one, given with a cast (#702)', async () => {

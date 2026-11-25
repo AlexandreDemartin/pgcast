@@ -312,6 +312,93 @@ Each option below has left `Config`. Setting it in an object literal no longer c
 - **Find the calls**: `grep -rn upsertRequiresSameKeys`. Each batch that differs throws as it is built, so your tests find it.
 - **Before → after**: `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])`<!-- tsc -->, with `false`, becomes either every row with each key and the value you mean, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'])`<!-- tsc -->, or [`updateColumns`](/insert#upsert-options) naming only the keys every row gives, `db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4, votes: 1 }], ['film_id', 'stars'], { updateColumns: ['votes'] })`<!-- tsc -->. A key a row lacks still sets that row's stored value to `DEFAULT`, with no error, as `false` did.
 
+### `transactionRequiresCommit` {#from-8-0-transactionRequiresCommit}
+
+8.0 always does what `transactionRequiresCommit: true`, the 7.x default, did: when the callback of [`transaction()`](/transaction#transaction) catches a query's error and returns, Postgres answers the `COMMIT` with `ROLLBACK`, nothing is saved, and the promise rejects without a retry ([Let the error through](/retries#let-the-error-through)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `transactionRequiresCommit was removed in 8.0, which always does what transactionRequiresCommit: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresCommit`<!-- message -->. Once you delete it, such a transaction rejects with "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->, where 7.x with `false` resolved with the callback's result.
+- **Find the calls**: `grep -rn transactionRequiresCommit`, then each `catch` around a query inside a `transaction()` callback. Each one that catches an error rejects, so your tests find it once they reach it.
+- **Before → after**: with `false`, the promise resolved, and neither the booking nor the rating was saved:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+await db.serializable(pool, async txnClient => {
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(txnClient);
+  try {
+    await db.insert('ratings', { film_id: 1002, stars: 5 }).run(txnClient);
+  } catch { }
+});
+```
+
+Run the query that may fail in a [`savepoint()`](/transaction#savepoint), and let out the 40001 and 40P01 that `transaction()` retries. The booking is saved, with or without the rating:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+await db.serializable(pool, async txnClient => {
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(txnClient);
+  await db.savepoint(txnClient, spClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(spClient))
+    .catch((err: unknown) => {
+      if (db.isDatabaseError(err, 'TransactionRollback_SerializationFailure', 'TransactionRollback_DeadlockDetected')) throw err;
+    });
+});
+```
+
+### `transactionRequiresIdleClient` {#from-8-0-transactionRequiresIdleClient}
+
+8.0 always does what `transactionRequiresIdleClient: true`, the 7.x default, did: given a client you sent `BEGIN` on, [`transaction()`](/transaction#transaction) rejects before sending its `START TRANSACTION`, and your transaction stays open for your `COMMIT` or `ROLLBACK` ([Your own `BEGIN`](/transaction#your-own-begin)). pg reports the block from pg 8.21; on older versions, `transaction()` runs as in Zapatos 6.6.1.
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `transactionRequiresIdleClient was removed in 8.0, which always does what transactionRequiresIdleClient: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresIdleClient`<!-- message -->. Once you delete it, such a call rejects with "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->, where 7.x with `false` committed your transaction, or rolled it back.
+- **Find the calls**: `grep -rn transactionRequiresIdleClient`, then `grep -rn "'BEGIN"`: each client you send `BEGIN` on, then give to a transaction helper.
+- **Before → after**: with `false`, the `COMMIT` of `readCommitted()`, at the session's own level, committed the booking and the rating, and the caller's `ROLLBACK` found no transaction:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
+  await db.readCommitted(client, txnClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(txnClient));
+  await client.query('ROLLBACK');
+} finally {
+  client.release();
+}
+```
+
+Inside your own block, give the work a [`savepoint()`](/transaction#savepoint), which runs at your block's level, and the caller's `ROLLBACK` undoes both rows. Or open the transaction with `db.readCommitted(pool, …)` in place of your `BEGIN`, for its retries:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
+  await db.savepoint(client, spClient => db.insert('ratings', { film_id: 1002, stars: 5 }).run(spClient));
+  await client.query('ROLLBACK');
+} finally {
+  client.release();
+}
+```
+
+### `transactionRequiresSatisfyingLevel` {#from-8-0-transactionRequiresSatisfyingLevel}
+
+8.0 always does what `transactionRequiresSatisfyingLevel: true`, the 7.x default, did: a nested call given the client of a transaction at a level that doesn't satisfy its own ([`IsolationSatisfying`](/transaction#IsolationSatisfying)) rejects before its callback, and unless the outer callback catches the error, the outer transaction rolls back ([Passing a transaction through](/transaction#passing-a-transaction-through)).
+
+- **What you see**: with `false`, or any value but `true`, `null` and `undefined`, `setConfig()` throws `transactionRequiresSatisfyingLevel was removed in 8.0, which always does what transactionRequiresSatisfyingLevel: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-transactionRequiresSatisfyingLevel`<!-- message -->. Once you delete it, such a call rejects with "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, each `…` a level of the call, where 7.x with `false` ran its callback at the outer level.
+- **Find the calls**: `grep -rn transactionRequiresSatisfyingLevel`, then each transaction helper given a client rather than a pool. TypeScript accepts the client of any level there, so the error, which names both levels, is how your tests find each one.
+- **Before → after**: `db.readCommitted(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc --> ran its `insert()` at `READ COMMITTED` with `false`. Open the outer transaction at the level the nested one needs: `db.serializable(pool, txnClient => db.serializable(txnClient, inner => db.insert('ratings', { film_id: 1002, stars: 5 }).run(inner)))`<!-- tsc -->.
+
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 
 8.0 always does what `typeEnumsAcrossSchemas: true`, the 7.x default, did: an enum of another schema is looked up in its own schema and written out by its labels ([`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas)).

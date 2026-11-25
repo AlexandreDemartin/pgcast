@@ -68,10 +68,7 @@ So an id is read, never hard-coded; and a prepared name stands for one text acro
 
 ### Give code that commits the pool
 
-With pg 8.21 or later, [`transaction()`](/transaction#your-own-begin) rejects when the test's client still reports its own `BEGIN` after the empty query. Its seeds remain in the test's transaction for its `ROLLBACK`. With [`transactionRequiresIdleClient: false`](/runtime-config#Config.transactionRequiresIdleClient), `serializable()` sends `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) --> and can end the test's transaction:
-
-- If the test has run no query yet, or at the session's own level (`readCommitted()`, on a default server), its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits the test's transaction, rows and all.
-- At another level, after any query, the test's seeds included, Postgres refuses with 25001 ("SET TRANSACTION ISOLATION LEVEL must be called before any query"): its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes the seeds, and the call rejects.
+With pg 8.21 or later, [`transaction()`](/transaction#your-own-begin) rejects when the test's client still reports its own `BEGIN` after the empty query. Its seeds remain in the test's transaction for its `ROLLBACK`. Through 7.x, [`transactionRequiresIdleClient: false`](/runtime-config#Config.transactionRequiresIdleClient) could end the test's transaction ([Your own `BEGIN`](/transaction#your-own-begin)); 8.0 removes the option.
 
 Give code that commits the pool and delete what it commits:
 
