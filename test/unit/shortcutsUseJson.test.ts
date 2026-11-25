@@ -260,3 +260,146 @@ describe('shortcutsUseJson with topLevelSelectAsRows (note 018 § 3)', () => {
       .toBe(`SELECT to_json(result) AS result FROM (SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result FROM "accounts" LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = "accounts"."owner_id")) AS "sq_users") AS "lateral_passthru" ON true) AS "sq_accounts"`);
   });
 });
+
+describe('shortcutsUseJson in the writes\' RETURNING (note 018 § 2)', () => {
+  const
+    row = { email: 'a@example.com', display_name: 'A' },
+    upper = { upper: sql`upper(${'display_name'})` },
+    insertSQL = 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)',
+    upsertSQL = `${insertSQL} ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")`,
+    action = `CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END`,
+    writes: Record<string, () => db.SQLFragment<any, any>> = {
+      insert: () => db.insert('users', row),
+      insertMany: () => db.insert('users', [row, row]),
+      insertReturning: () => db.insert('users', row, { returning: ['id', 'email'] }),
+      insertExtras: () => db.insert('users', row, { extras: upper }),
+      insertNoExtras: () => db.insert('users', row, { extras: {} }),
+      insertReturningExtras: () => db.insert('users', row, { returning: ['id'], extras: upper }),
+      insertQueryExtras: () => db.insert('users', row, { extras: { n: db.count('accounts', { owner_id: sql`${db.self} = "users"."id"` }) } }),
+      insertQualified: () => db.insert('extra.type_zoo', { c_int4: 1 }, { extras: { j: 'c_json' } }),
+      upsert: () => db.upsert('users', row, 'email'),
+      upsertReturning: () => db.upsert('users', row, 'email', { returning: ['id'] }),
+      upsertReturningNone: () => db.upsert('users', row, 'email', { returning: [] }),
+      upsertExtras: () => db.upsert('users', row, 'email', { extras: upper }),
+      upsertReturningExtras: () => db.upsert('users', row, 'email', { returning: ['id'], extras: upper }),
+      upsertSuppress: () => db.upsert('users', row, 'email', { reportAction: 'suppress' }),
+      upsertSuppressExtras: () => db.upsert('users', row, 'email', { reportAction: 'suppress', extras: upper }),
+      upsertDoNothing: () => db.upsert('users', row, 'email', { updateColumns: db.doNothing }),
+      update: () => db.update('users', { display_name: 'B' }, { id: 1 }),
+      updateExtras: () => db.update('users', { display_name: 'B' }, { id: 1 }, { extras: upper }),
+      updateReturning: () => db.update('users', { display_name: 'B' }, { id: 1 }, { returning: ['id'], extras: upper }),
+      deletes: () => db.deletes('accounts', { id: 1 }),
+      deletesExtras: () => db.deletes('accounts', { id: 1 }, { extras: { twice: sql`${'balance'} * 2` } }),
+      deletesReturning: () => db.deletes('accounts', { id: 1 }, { returning: ['id'] }),
+      insertNoop: () => db.insert('users', []),
+      upsertNoop: () => db.upsert('users', [], 'email'),
+      cte: () => db.withCTEs({ w: db.insert('users', row, { extras: upper }) }, db.select('users', all)),
+      cteMain: () => db.withCTEs({ s: db.select('users', { id: 1 }) }, db.upsert('users', row, 'email')),
+      cteNoop: () => db.withCTEs({ none: db.insert('users', []), nothing: db.upsert('users', [], 'email') }, db.deletes('accounts', { id: 1 })),
+      cteNoopMain: () => db.withCTEs({ s: db.select('users', { id: 1 }) }, db.insert('users', [])),
+      inSql: () => sql`WITH "w" AS (${db.update('users', { display_name: 'B' }, { id: 1 }, { extras: upper })}) SELECT result FROM "w"`,
+    };
+
+  it('off: false, or left out, gives master\'s SQL and values for every write', () => {
+    const compiled = (value?: boolean) => Object.fromEntries(Object.entries(writes).map(([name, build]) => [name, off(build, value).compile()]));
+    const leftOut = compiled();
+    expect(leftOut.insertExtras.text).toBe(`${insertSQL} RETURNING to_jsonb("users".*) || jsonb_build_object($3::text, upper("display_name")) AS result`);
+    expect(leftOut.upsertReturningExtras).toEqual({
+      text: `${upsertSQL} RETURNING jsonb_build_object($3::text, "id") || jsonb_build_object($4::text, upper("display_name")) || jsonb_build_object('$action', ${action}) AS result`,
+      values: ['A', 'a@example.com', 'id', 'upper'],
+    });
+    expect(leftOut.cteNoop.text).toBe(`WITH "none" AS (SELECT NULL::jsonb AS result WHERE false), "nothing" AS (SELECT NULL::jsonb AS result WHERE false) DELETE FROM "accounts" WHERE ("id" = $1) RETURNING to_jsonb("accounts".*) AS result`);
+    expect(compiled(false)).toEqual(leftOut);
+  });
+
+  const compiled = (name: string) => on(writes[name]).compile();
+
+  it('every column: to_json(); with extras or $action, to_json() of a scalar subquery\'s row, its keys aliases', () => {
+    expect(compiled('insert')).toEqual({ text: `${insertSQL} RETURNING to_json("users".*) AS result`, values: ['A', 'a@example.com'] });
+    expect(compiled('insertMany').text).toBe('INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4) RETURNING to_json("users".*) AS result');
+    expect(compiled('insertNoExtras').text).toBe(`${insertSQL} RETURNING to_json("users".*) AS result`);
+    expect(compiled('insertExtras')).toEqual({
+      text: `${insertSQL} RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, upper("display_name") AS "upper") AS "row_users") AS result`,
+      values: ['A', 'a@example.com'],
+    });
+    expect(compiled('insertQueryExtras').text).toBe(`${insertSQL} RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, (SELECT count(*) AS result FROM "accounts" WHERE (("owner_id" = "users"."id"))) AS "n") AS "row_users") AS result`);
+    expect(compiled('insertQualified').text).toBe(`INSERT INTO "extra"."type_zoo" ("c_int4") VALUES ($1) RETURNING (SELECT to_json("row_extra.type_zoo".*) FROM (SELECT "extra"."type_zoo".*, "c_json" AS "j") AS "row_extra.type_zoo") AS result`);
+    expect(compiled('upsert')).toEqual({
+      text: `${upsertSQL} RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, ${action} AS "$action") AS "row_users") AS result`,
+      values: ['A', 'a@example.com'],
+    });
+    expect(compiled('upsertExtras').text).toBe(`${upsertSQL} RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, upper("display_name") AS "upper", ${action} AS "$action") AS "row_users") AS result`);
+    expect(compiled('upsertSuppress').text).toBe(`${upsertSQL} RETURNING to_json("users".*) AS result`);
+    expect(compiled('upsertSuppressExtras').text).toBe(`${upsertSQL} RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, upper("display_name") AS "upper") AS "row_users") AS result`);
+    expect(compiled('upsertDoNothing').text).toBe(`${insertSQL} ON CONFLICT ("email") DO NOTHING RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, ${action} AS "$action") AS "row_users") AS result`);
+    expect(compiled('update')).toEqual({ text: 'UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING to_json("users".*) AS result', values: ['B', 1] });
+    expect(compiled('updateExtras').text).toBe('UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, upper("display_name") AS "upper") AS "row_users") AS result');
+    expect(compiled('deletes').text).toBe('DELETE FROM "accounts" WHERE ("id" = $1) RETURNING to_json("accounts".*) AS result');
+    expect(compiled('deletesExtras')).toEqual({
+      text: 'DELETE FROM "accounts" WHERE ("id" = $1) RETURNING (SELECT to_json("row_accounts".*) FROM (SELECT "accounts".*, "balance" * 2 AS "twice") AS "row_accounts") AS result',
+      values: [1],
+    });
+  });
+
+  it('returning: one json_build_object(), extras and $action included, keys still parameters', () => {
+    expect(compiled('insertReturning')).toEqual({ text: `${insertSQL} RETURNING json_build_object($3::text, "id", $4::text, "email") AS result`, values: ['A', 'a@example.com', 'id', 'email'] });
+    expect(compiled('insertReturningExtras')).toEqual({ text: `${insertSQL} RETURNING json_build_object($3::text, "id", $4::text, upper("display_name")) AS result`, values: ['A', 'a@example.com', 'id', 'upper'] });
+    expect(compiled('upsertReturning')).toEqual({ text: `${upsertSQL} RETURNING json_build_object($3::text, "id", '$action', ${action}) AS result`, values: ['A', 'a@example.com', 'id'] });
+    expect(compiled('upsertReturningNone').text).toBe(`${upsertSQL} RETURNING json_build_object('$action', ${action}) AS result`);
+    expect(compiled('upsertReturningExtras')).toEqual({
+      text: `${upsertSQL} RETURNING json_build_object($3::text, "id", $4::text, upper("display_name"), '$action', ${action}) AS result`,
+      values: ['A', 'a@example.com', 'id', 'upper'],
+    });
+    expect(compiled('updateReturning').text).toBe('UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING json_build_object($3::text, "id", $4::text, upper("display_name")) AS result');
+    expect(compiled('deletesReturning').text).toBe('DELETE FROM "accounts" WHERE ("id" = $1) RETURNING json_build_object($2::text, "id") AS result');
+  });
+
+  it('a key equal to a column, or to $action, is written twice, in the order || merges them', () => {
+    expect(text(on(() => db.upsert('users', row, 'email', { extras: { email: sql`upper(${'email'})`, $action: sql`'x'` } }))))
+      .toBe(`${upsertSQL} RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, upper("email") AS "email", 'x' AS "$action", ${action} AS "$action") AS "row_users") AS result`);
+    expect(text(on(() => db.upsert('users', row, 'email', { returning: ['email'], extras: { $action: sql`'x'` } }))))
+      .toBe(`${upsertSQL} RETURNING json_build_object($3::text, "email", $4::text, 'x', '$action', ${action}) AS result`);
+  });
+
+  it('the no-op forms keep their SQL; as a CTE, a no-op is SELECT NULL::json', () => {
+    expect(compiled('insertNoop')).toEqual(off(writes.insertNoop).compile());
+    expect(compiled('upsertNoop')).toEqual(off(writes.upsertNoop).compile());
+    expect(compiled('cteNoop').text).toBe('WITH "none" AS (SELECT NULL::json AS result WHERE false), "nothing" AS (SELECT NULL::json AS result WHERE false) DELETE FROM "accounts" WHERE ("id" = $1) RETURNING to_json("accounts".*) AS result');
+    expect(compiled('cteNoopMain').text).toBe(`WITH "s" AS (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1)) AS "sq_users") SELECT NULL::json AS result WHERE false`);
+  });
+
+  it('as a CTE, as the main query of withCTEs() and in a sql template: the same RETURNING', () => {
+    expect(compiled('cte').text).toBe(`WITH "w" AS (${insertSQL} RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, upper("display_name") AS "upper") AS "row_users") AS result) SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users") AS "sq_users"`);
+    expect(compiled('cteMain').text).toBe(`WITH "s" AS (SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1)) AS "sq_users") INSERT INTO "users" ("display_name", "email") VALUES ($2, $3) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, ${action} AS "$action") AS "row_users") AS result`);
+    expect(compiled('inSql').text).toBe('WITH "w" AS (UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING (SELECT to_json("row_users".*) FROM (SELECT "users".*, upper("display_name") AS "upper") AS "row_users") AS result) SELECT result FROM "w"');
+  });
+
+  it('returning: null and extras: null throw as the query compiles, as off', () => {
+    const failure = (q: db.SQLFragment<any, any>) => { try { q.compile(); return 'compiled'; } catch (err) { return (err as Error).message; } };
+    for (const build of [
+      () => db.insert('users', row, { returning: null, extras: null } as any),
+      () => db.upsert('users', row, 'email', { extras: null } as any),
+      () => db.update('users', { display_name: 'B' }, { id: 1 }, { returning: null } as any),
+      () => db.deletes('accounts', { id: 1 }, { returning: ['id'], extras: null } as any),
+    ]) expect(failure(on(build))).toBe(failure(off(build)));
+    expect(failure(on(() => db.insert('users', [], { returning: null } as any)))).toBe('compiled');
+  });
+
+  it('a key a row cannot alias is refused beside every column, not beside returning; over 50 keys, $action included, too', () => {
+    const
+      failure = (q: db.SQLFragment<any, any>) => { try { q.compile(); return 'compiled'; } catch (err) { return (err as Error).message; } },
+      refused = (key: string, problem: string) => `The key ${JSON.stringify(key)} cannot be a column alias, which \`shortcutsUseJson\` makes of an \`extras\` key beside every column: ${problem}. Give \`returning\`, whose keys stay parameters, or set \`shortcutsUseJson: false\`.`,
+      extras = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, 'id'])),
+      tooMany = (keys: number) => `\`shortcutsUseJson\` builds this row with one \`json_build_object()\`, which Postgres limits to 100 arguments: its ${keys} keys (\`returning\`, \`extras\` and \`$action\` together) take ${keys * 2}. Give 50 keys at most, or set \`shortcutsUseJson: false\`, under which \`returning\`, \`extras\` and \`$action\` take one \`jsonb_build_object()\` each.`;
+    expect(failure(on(() => db.insert('users', row, { extras: { '': 'id' } })))).toBe(refused('', 'it is empty'));
+    expect(failure(on(() => db.update('users', { display_name: 'B' }, { id: 1 }, { extras: { 'a\0b': 'id' } })))).toBe(refused('a\0b', 'it holds a NUL'));
+    expect(failure(on(() => db.upsert('users', row, 'email', { extras: { ['x'.repeat(64)]: 'id' } })))).toBe(refused('x'.repeat(64), "it takes 64 bytes in UTF-8, over Postgres's 63"));
+    expect(failure(on(() => db.deletes('accounts', { id: 1 }, { extras: { ['x'.repeat(63)]: 'id' } })))).toBe('compiled');
+    expect(failure(on(() => db.insert('users', row, { returning: ['id'], extras: { '': 'id' } })))).toBe('compiled');
+    expect(failure(on(() => db.upsert('users', row, 'email', { returning: ['id'], extras: extras(48) })))).toBe('compiled');
+    expect(failure(on(() => db.upsert('users', row, 'email', { returning: ['id'], extras: extras(49) })))).toBe(tooMany(51));
+    expect(failure(on(() => db.insert('users', row, { returning: ['id'], extras: extras(49) })))).toBe('compiled');
+    expect(failure(on(() => db.upsert('users', row, 'email', { extras: extras(60) })))).toBe('compiled');
+    expect(failure(off(() => db.upsert('users', row, 'email', { returning: ['id'], extras: extras(49) })))).toBe('compiled');
+  });
+});

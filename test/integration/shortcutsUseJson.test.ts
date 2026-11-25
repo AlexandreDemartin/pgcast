@@ -233,3 +233,163 @@ describe('shortcutsUseJson with topLevelSelectAsRows (note 018 § 3): the same r
     }
   });
 });
+
+describe('shortcutsUseJson in the writes\' RETURNING: the same results both ways', () => {
+  const
+    /** The write built and run with the option off, then on, each in a savepoint rolled back, so both see the same rows. */
+    bothWrites = async <R>(build: () => db.SQLFragment<R, any>) => {
+      const results: Record<string, any> = {};
+      for (const [name, value] of [['jsonb', false], ['json', true]] as const) {
+        db.setConfig({ shortcutsUseJson: value });
+        await t.client.query('SAVEPOINT both_ways');
+        results[name] = await build().run(t.client);
+        await t.client.query('ROLLBACK TO SAVEPOINT both_ways');
+      }
+      return results as { jsonb: R; json: R };
+    },
+    // every type of accounts, its id given, so that both runs insert the same row
+    account = { id: 1000, owner_id: 1, balance: 12.5, overdraft_limit: 5, lifetime_ops: '9007199254740993', ratio: 0.25, scores: [1, 2], flags: [true, false], grid: [[1, 2], [3, 4]], opened_on: '2026-01-02' },
+    ofOwner = { id: sql`${db.self} = "accounts"."owner_id"` },
+    ofUser = { owner_id: sql`${db.self} = "users"."id"` },
+    newOrg = { country: 'DE', code: 'acme-berlin', name: 'Acme Berlin' },
+    oldOrg = { country: 'FR', code: 'acme', name: 'Acme' },
+    orgKey = ['country', 'code'] as const,
+    upperName = { upper: sql`upper(${'name'})` },
+    writes: Record<string, () => db.SQLFragment<any, any>> = {
+      insert: () => db.insert('accounts', account),
+      insertMany: () => db.insert('accounts', [account, { ...account, id: 1001 }], { returning: ['id', 'balance', 'grid'], extras: { twice: sql`${'balance'} * 2` } }),
+      insertExtras: () => db.insert('accounts', account, { extras: { twice: sql`${'balance'} * 2`, owner: db.selectOne('users', ofOwner, { lateral: { n: db.count('accounts', { owner_id: parent('id') }) } }) } }),
+      insertSelectExtras: () => db.insert('accounts', account, { extras: { team: db.select('users', { manager_id: sql`${db.self} = "accounts"."owner_id"` }, { order, extras: { e: 'email' } }) } }),
+      insertKeyIsColumn: () => db.insert('accounts', account, { extras: { balance: sql`${'balance'} * 2` } }),
+      insertReturningNone: () => db.insert('accounts', account, { returning: [], extras: { b: 'balance' } }),
+      upsertInsert: () => db.upsert('orgs', newOrg, [...orgKey]),
+      upsertUpdate: () => db.upsert('orgs', oldOrg, [...orgKey], { extras: upperName }),
+      upsertMany: () => db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { returning: ['code'], extras: upperName }),
+      upsertReturningNone: () => db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { returning: [] }),
+      upsertActionKey: () => db.upsert('orgs', oldOrg, [...orgKey], { extras: { $action: sql`'x'` } }),
+      upsertSuppress: () => db.upsert('orgs', oldOrg, [...orgKey], { reportAction: 'suppress', extras: upperName }),
+      upsertDoNothing: () => db.upsert('orgs', oldOrg, [...orgKey], { updateColumns: db.doNothing }),
+      update: () => db.update('users', { display_name: 'Ada L.' }, { id: 1 }, { extras: { upper: sql`upper(${'display_name'})`, accounts: db.select('accounts', ofUser, { order }) } }),
+      updateReturning: () => db.update('users', { mood: 'ok' }, { manager_id: 1 }, { returning: ['id', 'home', 'settings', 'tags', 'created_at'], extras: { n: db.count('accounts', ofUser) } }),
+      updateNone: () => db.update('users', { display_name: 'x' }, sql`false`, { extras: { upper: sql`upper(${'display_name'})` } }),
+      deletes: () => db.deletes('products', { id: 2 }),
+      deletesExtras: () => db.deletes('memberships', { user_id: 2 }, { extras: { org: db.selectOne('orgs', { country: sql`${db.self} = "memberships"."org_country"`, code: sql`${db.self} = "memberships"."org_code"` }) } }),
+      insertNoop: () => db.insert('accounts', []),
+      upsertNoop: () => db.upsert('orgs', [], [...orgKey]),
+      cte: () => db.withCTEs({ w: db.insert('accounts', account, { extras: { twice: sql`${'balance'} * 2` } }) }, sql`SELECT result FROM "w"`),
+      cteMain: () => db.withCTEs({ s: db.select('users', { id: 1 }) }, db.upsert('orgs', [newOrg, oldOrg], [...orgKey])),
+      cteNoop: () => db.withCTEs({ none: db.insert('accounts', []), nothing: db.upsert('orgs', [], [...orgKey]) }, db.update('users', { display_name: 'x' }, { id: 2 }, { extras: { upper: sql`upper(${'display_name'})` } })),
+      cteNoopMain: () => db.withCTEs({ s: db.select('users', { id: 1 }) }, db.insert('accounts', [])),
+      cteUpdateNone: () => db.withCTEs({ u: db.update('users', { display_name: 'x' }, sql`false`) }, sql`SELECT count(*) AS n FROM "u"`),
+      inSql: () => sql`WITH "w" AS (${db.deletes('memberships', { user_id: 2 }, { extras: { r: sql`upper(${'role'})` } })}) SELECT result FROM "w"`,
+    };
+
+  it.each(Object.keys(writes))('%s', async name => {
+    const { jsonb, json } = await bothWrites(writes[name]);
+    expect(json).toEqual(jsonb);
+  });
+
+  it('upsert(): each row\'s $action, INSERT or UPDATE, last written where extras has one too', async () => {
+    const many = await bothWrites(writes.upsertMany), key = await bothWrites(writes.upsertActionKey);
+    expect(many.json).toEqual([{ code: 'acme-berlin', upper: 'ACME BERLIN', $action: 'INSERT' }, { code: 'acme', upper: 'ACME', $action: 'UPDATE' }]);
+    expect(key.json).toMatchObject({ code: 'acme', $action: 'UPDATE' });
+    expect(await bothWrites(writes.upsertDoNothing)).toEqual({ jsonb: undefined, json: undefined });
+  });
+
+  it('a json column keeps its keys as stored, and a row its columns\' order, then extras, then $action', async () => {
+    const
+      zoo = (options = {}) => db.insert('extra.type_zoo', { c_int8: '9007199254740993', c_float8: 1.5, c_json: { zeta: 1, a: { yy: 2, b: 3 } }, c_jsonb: { zeta: 1, a: 2 }, c_timestamptz: '2026-01-02T03:04:05Z' }, options),
+      withoutId = ({ id, ...row }: any) => row,
+      plain = await bothWrites(() => zoo()),
+      extras = await bothWrites(() => zoo({ extras: { j: 'c_json', f: sql`${'c_float8'} * 2` } })),
+      returning = await bothWrites(() => zoo({ returning: ['c_json', 'c_int8'], extras: { j: 'c_json' } }));
+    expect(withoutId(plain.json)).toEqual(withoutId(plain.jsonb));
+    expect(withoutId(extras.json)).toEqual(withoutId(extras.jsonb));
+    expect(returning.json).toEqual(returning.jsonb);
+    expect(Object.keys(plain.json).slice(0, 3)).toEqual(['id', 'c_int2', 'c_int4']);
+    expect(Object.keys(extras.json)).toEqual([...Object.keys(plain.json), 'j', 'f']);
+    expect(Object.keys(returning.json)).toEqual(['c_json', 'c_int8', 'j']);
+    expect(Object.keys(extras.json.c_json)).toEqual(['zeta', 'a']);
+    expect(Object.keys(extras.jsonb.c_json)).toEqual(['a', 'zeta']);
+    const orgs = await bothWrites(writes.upsertMany), org = await bothWrites(writes.upsertUpdate);
+    expect(Object.keys(orgs.json[0])).toEqual(['code', 'upper', '$action']);
+    expect(Object.keys(org.json)).toEqual(['country', 'code', 'name', 'parent_country', 'parent_code', 'upper', '$action']);
+  });
+
+  it('a write\'s result read from a CTE is json: DISTINCT over it fails (42883), as note 018 § 4 says, and ::jsonb works', async () => {
+    db.setConfig({ shortcutsUseJson: true });
+    const w = () => db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { returning: ['code'] });
+    expect(await pgError(t.client, () => db.withCTEs({ w: w() }, sql`SELECT DISTINCT result FROM "w"`).run(t.client))).toMatchObject({ code: '42883' });
+    expect(await db.withCTEs({ w: w() }, sql`SELECT DISTINCT result::jsonb ->> 'code' AS code FROM "w" ORDER BY code`).run(t.client)).toEqual([{ code: 'acme' }, { code: 'acme-berlin' }]);
+  });
+
+  it('a partition whose columns sit where the table\'s do still refuses $action (0A000), both ways', async () => {
+    for (const value of [false, true]) {
+      db.setConfig({ shortcutsUseJson: value });
+      expect(await pgError(t.client, () => db.upsert('events', { id: 1000, occurred_on: '2025-06-02', kind: 'k' }, ['id', 'occurred_on']).run(t.client)))
+        .toMatchObject({ code: '0A000', message: 'cannot retrieve a system column in this context' });
+    }
+  });
+
+  it('50 keys run, $action included; 51 are refused before any query, and off they run', async () => {
+    const
+      extras = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, 'code'])),
+      q = (n: number) => db.upsert('orgs', oldOrg, [...orgKey], { returning: ['code'], extras: extras(n) }),
+      sent: unknown[] = [];
+    db.setConfig({ shortcutsUseJson: true });
+    expect(Object.keys(await q(48).run(t.client) ?? {})).toHaveLength(50);
+    db.setConfig({ queryListener: query => sent.push(query) });
+    await expect(q(49).run(t.client)).rejects.toThrow('its 51 keys (`returning`, `extras` and `$action` together) take 102');
+    for (const key of ['', 'a\0b', 'x'.repeat(64)]) {
+      await expect(db.insert('accounts', account, { extras: { [key]: 'id' } }).run(t.client)).rejects.toThrow('cannot be a column alias');
+    }
+    expect(sent).toHaveLength(0);
+    db.setConfig({ shortcutsUseJson: false });
+    expect(Object.keys(await q(49).run(t.client) ?? {})).toHaveLength(51);
+  });
+  it('characterisation: beside every column, what RETURNING refuses may run in the subquery, where Postgres no longer sees it in RETURNING', async () => {
+    const
+      outcome = async (value: boolean, extra: db.SQLFragment<any>, options = {}) => {
+        db.setConfig({ shortcutsUseJson: value });
+        await t.client.query('SAVEPOINT refused');
+        try { return (await db.upsert('orgs', oldOrg, [...orgKey], { ...options, extras: { x: extra } }).run(t.client))?.x ?? null; }
+        catch (err) { return (err as { code?: string }).code; }
+        finally { await t.client.query('ROLLBACK TO SAVEPOINT refused'); }
+      },
+      both = async (extra: db.SQLFragment<any>, options = {}) => [await outcome(false, extra, options), await outcome(true, extra, options)];
+    // an aggregate of no column, a window function and a set-returning one take the subquery's one row
+    expect(await both(sql`count(*)`)).toEqual(['42803', 1]);
+    expect(await both(sql`row_number() OVER ()`)).toEqual(['42P20', 1]);
+    expect(await both(sql`generate_series(1, 2)`)).toEqual(['0A000', '21000']);
+    // an aggregate of a column stays at its level, and beside returning the extras stay in RETURNING
+    expect(await both(sql`count(${'code'})`)).toEqual(['42803', '42803']);
+    expect(await both(sql`count(*)`, { returning: ['code'] })).toEqual(['42803', '42803']);
+  });
+  it('with topLevelSelectAsRows too: a write as a CTE or the main query of withCTEs() gives the same results each way', async () => {
+    const
+      combinations = [[false, false], [true, false], [false, true], [true, true]] as const,
+      builds = [
+        () => db.withCTEs({ w: db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: upperName }) }, db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } })),
+        () => db.withCTEs({ s: db.select('orgs', all, { order: { by: 'code', direction: 'ASC' } }) }, db.upsert('orgs', [newOrg, oldOrg], [...orgKey], { extras: { s: sql`(SELECT result FROM "s")` } })),
+      ];
+    for (const build of builds) {
+      const results = [];
+      for (const [shortcutsUseJson, topLevelSelectAsRows] of combinations) {
+        db.setConfig({ shortcutsUseJson, topLevelSelectAsRows });
+        await t.client.query('SAVEPOINT each_way');
+        results.push(await build().run(t.client));
+        await t.client.query('ROLLBACK TO SAVEPOINT each_way');
+      }
+      for (const result of results.slice(1)) expect(result).toEqual(results[0]);
+    }
+  });
+
+  it('a write nested in a read\'s lateral or extras is refused by Postgres both ways (42601)', async () => {
+    for (const value of [false, true]) {
+      db.setConfig({ shortcutsUseJson: value });
+      const w = () => db.insert('orgs', newOrg);
+      expect(await pgError(t.client, () => db.select('users', all, { extras: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
+      expect(await pgError(t.client, () => db.select('users', all, { lateral: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
+    }
+  });
+});

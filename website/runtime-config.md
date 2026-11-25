@@ -100,7 +100,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | the client of a transaction at a level that doesn't satisfy the one asked for: reject, not run the callback at that level | at each `transaction()` given such a client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a standalone `selectExactlyOne()` requests two rows and rejects on a second | at each `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` and `max()`: `null` when no row matches, and `min()` and `max()` the column's value, not `Number()` of it | at each `run()` of those |
-| [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` and its kin build their JSON with `json` functions: `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | at each `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()` and `withCTEs()` |
+| [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` and its kin, and the writes' `RETURNING`, build their JSON with `json` functions: `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | at each `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()`, `withCTEs()`, `insert()`, `upsert()`, `update()` and `deletes()` |
 | [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) | `false` | a standalone `select()` sends `selectRows()`'s query, one row per result, in place of one `jsonb_agg` value | at each `select()` |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
@@ -292,18 +292,19 @@ With `false`, `.run()` applies `Number()` to the result. An empty set gives `0`,
 shortcutsUseJson?: boolean  // default: false; true in 8.0
 ```
 
-With `true`, [`select()`](/select#select), [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) and [`selectRows()`](/select#selectRows) build each row with `to_json` and `json_build_object`, and `select()` its array with `json_agg`, in place of their `jsonb` twins: `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. `json` keeps the text as Postgres writes it, where `jsonb` parses and sorts it: on 1000 studios with a `lateral` of 20 films each, 37 ms in place of 110 ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). The SQL of each option: [With `shortcutsUseJson`](/select#shortcutsUseJson).
+With `true`, [`select()`](/select#select), [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) and [`selectRows()`](/select#selectRows) build each row with `to_json` and `json_build_object`, and `select()` its array with `json_agg`, in place of their `jsonb` twins: `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. So do [`insert()`](/insert#insert), [`upsert()`](/insert#upsert), [`update()`](/insert#update) and [`deletes()`](/insert#deletes) in their `RETURNING`. `json` keeps the text as Postgres writes it, where `jsonb` parses and sorts it: on 1000 studios with a `lateral` of 20 films each, 37 ms in place of 110 ([decision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). The SQL of each option: [reads](/select#shortcutsUseJson) and [writes](/insert#shortcutsUseJson).
 
 The values and the types are the same, except:
 
-- A row's keys come in the table's order, then `extras`, then the `lateral` keys, not `jsonb`'s shorter keys first: code that reads `Object.keys()` or compares `JSON.stringify()` sees it. A `json` column keeps its keys as stored, and a `float8` `-0` stays `-0`.
+- A row's keys come in the table's order, then `extras`, then the `lateral` keys or `upsert()`'s `$action`, not `jsonb`'s shorter keys first: code that reads `Object.keys()` or compares `JSON.stringify()` sees it. A `json` column keeps its keys as stored, and a `float8` `-0` stays `-0`.
 - A nested result is `json`: a `jsonb` function over it fails, `jsonb_typeof((…))` gives 42883, and so do `DISTINCT` and `UNION`; `->` and `->>` work, and so does a cast, `::jsonb`.
 - A type parser set for `jsonb` (3802) alone no longer applies; [`enableCustomJSONParsingForLargeNumbers()`](/value-types#enableCustomJSONParsingForLargeNumbers) sets both.
-- Beside every column, each `extras` or `lateral` key is a column alias. A key Postgres would refuse or truncate, empty, with a NUL or over 63 bytes in UTF-8, throws while compiling, so `.run()` rejects before any query: give `columns`, whose keys stay parameters.
-- With `columns`, the columns, `extras` and `lateral` keys share one `json_build_object()`, which Postgres limits to 100 arguments: over 50 keys throw while compiling, where each part had 50 of its own.
+- Beside every column, each `extras` or `lateral` key is a column alias. A key Postgres would refuse or truncate, empty, with a NUL or over 63 bytes in UTF-8, throws while compiling, so `.run()` rejects before any query: give `columns`, or a write's `returning`, whose keys stay parameters.
+- Beside every column, a write's `extras` run in a subquery over its row, which takes some that `RETURNING` refuses off: `count(*)` gives 1 there ([Writes](/insert#shortcutsUseJson)).
+- With `columns` or `returning`, the columns, `extras`, `lateral` keys and `$action` share one `json_build_object()`, which Postgres limits to 100 arguments: over 50 keys throw while compiling, where each part had 50 of its own.
 - `select()`'s array may reach a value's 1 GB, where `jsonb_agg` stops at 256 MB (54000).
 
-`insert()`, `update()`, `upsert()` and `deletes()` keep `jsonb`, and so do [the aggregates](/aggregates), which build no JSON. Read when the shortcut is called, not at `.run()`. Off, the SQL is unchanged; it stays off, with no warning, through 7.x, and `false` keeps it after 8.0 too.
+[The aggregates](/aggregates) keep their SQL, as they build no JSON. Read when the shortcut is called, not at `.run()`. Off, the SQL is unchanged; it stays off, with no warning, through 7.x, and `false` keeps it after 8.0 too.
 
 ### `topLevelSelectAsRows` {#Config.topLevelSelectAsRows}
 

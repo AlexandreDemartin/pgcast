@@ -1,5 +1,5 @@
 ---
-english: a88a60e1274c
+english: d18f0080afd3
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -105,7 +105,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul demande deux lignes et sa promesse est rejetée s’il en trouve une deuxième | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
-| [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` et ses semblables construisent leur JSON avec les fonctions `json` : `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | à chaque `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()` et `withCTEs()` |
+| [`shortcutsUseJson`](#Config.shortcutsUseJson) | `false` | `select()` et ses semblables, et le `RETURNING` des écritures, construisent leur JSON avec les fonctions `json` : `coalesce(json_agg(result), '[]')`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) --> | à chaque `select()`, `selectOne()`, `selectExactlyOne()`, `selectRows()`, `withCTEs()`, `insert()`, `upsert()`, `update()` et `deletes()` |
 | [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) | `false` | un `select()` exécuté seul envoie la requête de `selectRows()`, une ligne par résultat, au lieu d’une seule valeur `jsonb_agg` | à chaque `select()` |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
@@ -297,18 +297,19 @@ Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne 
 shortcutsUseJson?: boolean  // default: false; true in 8.0
 ```
 
-Avec `true`, [`select()`](/fr/select#select), [`selectOne()`](/fr/select#selectOne), [`selectExactlyOne()`](/fr/select#selectExactlyOne) et [`selectRows()`](/fr/select#selectRows) construisent chaque ligne avec `to_json` et `json_build_object`, et `select()` son tableau avec `json_agg`, à la place de leurs équivalents `jsonb` : `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. `json` garde le texte tel que Postgres l’écrit, là où `jsonb` le parse et le trie : sur 1000 studios avec un `lateral` de 20 films chacun, 37 ms au lieu de 110 ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Le SQL de chaque option : [Avec `shortcutsUseJson`](/fr/select#shortcutsUseJson).
+Avec `true`, [`select()`](/fr/select#select), [`selectOne()`](/fr/select#selectOne), [`selectExactlyOne()`](/fr/select#selectExactlyOne) et [`selectRows()`](/fr/select#selectRows) construisent chaque ligne avec `to_json` et `json_build_object`, et `select()` son tableau avec `json_agg`, à la place de leurs équivalents `jsonb` : `to_json("films".*)`<!-- probe: (db.setConfig({ shortcutsUseJson: true }), db.select('films', db.all)) -->. [`insert()`](/fr/insert#insert), [`upsert()`](/fr/insert#upsert), [`update()`](/fr/insert#update) et [`deletes()`](/fr/insert#deletes) font de même dans leur `RETURNING`. `json` garde le texte tel que Postgres l’écrit, là où `jsonb` le parse et le trie : sur 1000 studios avec un `lateral` de 20 films chacun, 37 ms au lieu de 110 ([décision 018](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/018-json-output.md)). Le SQL de chaque option : [lectures](/fr/select#shortcutsUseJson) et [écritures](/fr/insert#shortcutsUseJson).
 
 Les valeurs et les types sont les mêmes, sauf :
 
-- Les clés d’une ligne viennent dans l’ordre de la table, puis `extras`, puis les clés de `lateral`, et non les clés les plus courtes d’abord comme avec `jsonb` : un code qui lit `Object.keys()` ou compare des `JSON.stringify()` le voit. Une colonne `json` garde ses clés telles qu’elles sont stockées, et un `-0` de type `float8` reste `-0`.
+- Les clés d’une ligne viennent dans l’ordre de la table, puis `extras`, puis les clés de `lateral` ou le `$action` d’`upsert()`, et non les clés les plus courtes d’abord comme avec `jsonb` : un code qui lit `Object.keys()` ou compare des `JSON.stringify()` le voit. Une colonne `json` garde ses clés telles qu’elles sont stockées, et un `-0` de type `float8` reste `-0`.
 - Un résultat imbriqué est du `json` : une fonction `jsonb` appliquée dessus échoue, `jsonb_typeof((…))` donne 42883, de même que `DISTINCT` et `UNION` ; `->` et `->>` fonctionnent, tout comme un cast, `::jsonb`.
 - Un parseur de type réglé pour `jsonb` (3802) seul ne s’applique plus ; [`enableCustomJSONParsingForLargeNumbers()`](/fr/value-types#enableCustomJSONParsingForLargeNumbers) règle les deux.
-- À côté de toutes les colonnes, chaque clé d’`extras` ou de `lateral` est un alias de colonne. Une clé que Postgres refuserait ou tronquerait, vide, avec un NUL ou de plus de 63 octets en UTF-8, lève une erreur à la compilation, donc `.run()` est rejetée avant toute requête : passez `columns`, dont les clés restent des paramètres.
-- Avec `columns`, les colonnes et les clés d’`extras` et de `lateral` partagent un seul `json_build_object()`, que Postgres limite à 100 arguments : au-delà de 50 clés, une erreur est levée à la compilation, là où chaque partie en avait 50 à elle seule.
+- À côté de toutes les colonnes, chaque clé d’`extras` ou de `lateral` est un alias de colonne. Une clé que Postgres refuserait ou tronquerait, vide, avec un NUL ou de plus de 63 octets en UTF-8, lève une erreur à la compilation, donc `.run()` est rejetée avant toute requête : passez `columns`, ou le `returning` d’une écriture, dont les clés restent des paramètres.
+- À côté de toutes les colonnes, les `extras` d’une écriture s’exécutent dans une sous-requête sur sa ligne, qui accepte certains `extras` que `RETURNING` refuse, option désactivée : `count(*)` y donne 1 ([Écritures](/fr/insert#shortcutsUseJson)).
+- Avec `columns` ou `returning`, les colonnes, les clés d’`extras` et de `lateral` et `$action` partagent un seul `json_build_object()`, que Postgres limite à 100 arguments : au-delà de 50 clés, une erreur est levée à la compilation, là où chaque partie en avait 50 à elle seule.
 - Le tableau de `select()` peut atteindre le 1 Go d’une valeur, là où `jsonb_agg` s’arrête à 256 Mo (54000).
 
-`insert()`, `update()`, `upsert()` et `deletes()` gardent `jsonb`, tout comme [les agrégats](/fr/aggregates), qui ne construisent pas de JSON. L’option est lue quand le raccourci est appelé, pas à `.run()`. Désactivée, le SQL est inchangé ; elle reste désactivée, sans avertissement, pendant toute la série 7.x, et `false` la garde désactivée après la 8.0 aussi.
+[Les agrégats](/fr/aggregates) gardent leur SQL, car ils ne construisent pas de JSON. L’option est lue quand le raccourci est appelé, pas à `.run()`. Désactivée, le SQL est inchangé ; elle reste désactivée, sans avertissement, pendant toute la série 7.x, et `false` la garde désactivée après la 8.0 aussi.
 
 ### `topLevelSelectAsRows` {#Config.topLevelSelectAsRows}
 
