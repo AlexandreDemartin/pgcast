@@ -29,6 +29,8 @@ Candidates for a check, a rule or a skill line.
 - #999 — `bench:types` compares with `bench/baseline.json`, stale on master itself (+7.4 %): measure master in a detached worktree before reading a rise as the PR's.
 - #999 — A docs claim that names a parameter by position ("its last parameter") breaks under an option that adds one after it (`offset` after `LIMIT`): name the clause, and probe it with every option that appends a parameter.
 - #999 — A scratch copy whose `node_modules` links another checkout's makes `npm run test:types` write that checkout's `node_modules/.cache/pgcast`: a separate install when that checkout must stay untouched.
+- #1002 — A cut that keeps a skill under its size limit goes before the commits that add to it, so every commit passes `check:agents`.
+- #1002 — A check that runs on drafts is proved by opening the PR with a body that fails it, then `gh pr edit` to the real body: one move shows the red run and the `edited` trigger.
 
 ## Minors kept
 
@@ -70,3 +72,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/switching.md:456` and `fr/:457` (#999): "its last parameter is `1`, not `2`" is false with an `offset` (`LIMIT $2 OFFSET $3`, `[1,2,1]` → `[1,1,1]`); "its `LIMIT` parameter" / "le paramètre de son `LIMIT`".
 - `form` `website/switching.md:458` and `fr/:459` (#999): the before span does not say it ran under `true`, as its siblings say "with `false`"; "…<!-- tsc -->, with `true`, becomes" / "…, avec `true`, devient".
 - `form` `website/runtime-config.md:228` (#999): "`true` made one run on its own ask for two rows" does not say what ran; "a `selectExactlyOne()` run on its own", as the FR twin (`:233`) says.
+

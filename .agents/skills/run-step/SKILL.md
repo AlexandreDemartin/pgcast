@@ -35,7 +35,7 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 
 ## Issue body
 
-The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in English, concise (skill `concise-docs`):
+The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in English, concise (skill `concise-docs`), in two layers (skill `plan-and-proofs` § Two layers): **Files**, **Notes** and any long detail folded.
 
 - **What**: the expected behaviour, the SQL before / after when it matters · **Why**.
 - **Done when**: the acceptance criteria as checkboxes; it names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…). A check the agents' tools cannot run (a DevTools panel, a test behind a sign-in) names the proof an agent can give and leaves the live check to the owner (#864, #870).
@@ -61,10 +61,10 @@ The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the ga
 
 1. **Issue**: **Files** and **Risk** present; stop points asked.
 2. **Plan** (`normal`, `high`): the `builder` posts it on the issue. At `high` it stops; the orchestrator checks the plan against the issue, then resumes it within 5 minutes, or else starts a fresh `builder` with "plan checked": after 5 minutes its cache is cold, and resuming rewrites its whole context (#812).
-3. **Build**: tests first, one-line commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with **Proofs** (skill `plan-and-proofs`).
-4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its comment (skill `review-comments`).
+3. **Build**: tests first, one-line commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with its **Proof** (skill `plan-and-proofs`).
+4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its round comment (skill `review-comments`).
 5. **Fixes**: a fresh `builder`, blocking items only; the others go to `docs/LEARNINGS.md` § Minors kept.
-6. **Verify** (`high`): `branch-reviewer` in `verify` mode on the fix commits, posted as a second comment; `not fixed` or `regressed` goes back to 5. A third round that finds a deeper hole: [reference.md](reference.md) § Rounds.
+6. **Verify** (`high`): `branch-reviewer` in `verify` mode on the fix commits, its verdicts edited into the round comment; `partly`, `not fixed` or `regressed` goes back to 5. A third round that finds a deeper hole: [reference.md](reference.md) § Rounds.
 7. **Learnings**: the agents' "learning" remarks, one line each in `docs/LEARNINGS.md`, last commit of the branch ("Record what #22 taught").
 8. **Gate**: `gh pr ready`, green CI (skill `ci-gate`), then the gate of the **Risk**, squash and clean-up (skill `merge-gate`). The merge closes the issue; no "Tick step" commit.
 
@@ -81,7 +81,7 @@ An agent knows only what its brief says. It follows the skills, names an excepti
 - A brief quotes the rule it relies on, with its file and section, never a paraphrase (a section said to name a label named a script, #886; a page title, #894), and states a tool's limits only from its code (#911).
 - A step whose **Risk** names a lens: the `builder` and `branch-reviewer` briefs quote the core rules of that lens's skill that apply to its class (a removal under `compat`: `backward-compat` § One behaviour per option and § Replay, do not reason), and the reviewer checks each as a line of its review (#981, #989, #991).
 - **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR and created before the spawn (a log into a missing folder fails silently, #895), where the reviewer's harness stays for the fix round, the variables the harness reads (its scratch folder, its probe database) set to the fix round's own (#863).
-- **A CI-only criterion** (a matrix, a failing job): the orchestrator proves it after `gh pr ready`, which auto mode refuses to a subagent; a draft's **CI passed** proves nothing (skill `ci-gate` § Pitfalls).
+- A CI-only criterion (a matrix, a failing job): [reference.md](reference.md) § CI-only criterion.
 
 ## Ritual rules
 

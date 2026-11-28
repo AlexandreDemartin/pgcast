@@ -11,12 +11,14 @@ We validate locally while iterating; CI runs **once ready**.
 
 | Situation | What happens |
 |---|---|
-| **Draft** PR | no heavy job (`.github/workflows/ci.yml`, condition on `draft`) |
+| **Draft** PR | no heavy job (`.github/workflows/ci.yml`, condition on `draft`); **PR body** alone runs (below) |
 | Ready PR, **docs only** (`.md` outside `.agents/`, `.claude/` and `website/`, `CHANGELOG.md` aside) | `changes` then **CI passed**; `build`, `bench-types`, `typescript-7`, `typescript-4-1` and `docs` skipped |
 | Ready PR, **docs site only** (anything under `website/`, its Markdown included, or `CHANGELOG.md`, its `/changelog` page) | `docs` (builds the site, checks its examples), then **CI passed**; `build`, `bench-types`, `typescript-7` and `typescript-4-1` skipped |
 | Ready PR, anything else | full run: `build` (9 jobs), `release-dry-run` (a publish dry run per package), `bench-types`, `typescript-7`, `typescript-4-1`, `docs` when `src/`, the root `package*.json`, `tsconfig.json` or a workflow changes, then **CI passed** |
 | Push to `master` | full run |
 | Layer of a stack (base: the branch below) | same rule as a PR to `master`: CI runs on each layer |
+
+**PR body** (`.github/workflows/pr-body.yml`) is the one exception to "drafts run nothing": it checks the body's word budget (skill `plan-and-proofs` § Two layers) when a PR is opened, edited, reopened or marked ready, drafts included, as it is cheap. It is a workflow of its own, outside **CI passed**, so the merge waits for it apart (skill `merge-gate`).
 
 ## Iterate, then run
 
@@ -33,7 +35,7 @@ We validate locally while iterating; CI runs **once ready**.
 
 ## Pitfalls
 
-- **Proofs on a draft**: **CI passed** is green with every job skipped; they are local only. A check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready (#868, #871). CodeQL does run on a draft: read its alerts before the review, as it caught what lint and the tests did not (#854).
+- **Checks on a draft**: **CI passed** is green with every job skipped; they are local only. A check meant to run in CI is proved on the branch by a temporary workflow, removed in its own commit before ready (#868, #871). CodeQL does run on a draft: read its alerts before the review, as it caught what lint and the tests did not (#854).
 - **A conflicting PR**: GitHub runs no CI on it (CodeQL only). Before review, `gh pr ready` and merge, `gh pr view <n> --json mergeable` says `MERGEABLE` and **CI passed** is in `statusCheckRollup`; a French page's `english:` hash conflicts each time master edits its English page.
 - **A push just before `gh pr ready`**: the full run can start on the previous head. Wait until `gh pr view <n> --json headRefOid` shows the pushed SHA before `gh pr ready`, or check the ready run's `headSha` (#924).
 - **A job's log**: `gh api repos/AlexandreDemartin/pgcast/actions/jobs/<id>/logs --allow-escape-sequences` reads a finished job while the run's others go, where `gh run view --job <id> --log` refuses; without the flag it refuses a log holding terminal escape sequences, which are stripped after (#920, #925).

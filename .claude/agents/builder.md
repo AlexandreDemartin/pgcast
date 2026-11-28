@@ -17,7 +17,7 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 - The number of the step's issue and the decisions taken for it. You read it with `gh issue view <n> --repo AlexandreDemartin/pgcast`, and only it: **Files**, and in its **Notes**, **Risk** and **Read**.
 - Or "plan checked", to resume a `high` step after its plan.
-- Or, to fix: the PR, its branch and the blocking items of the review comment (`file:line`, expected fix); a non-blocking one is not fixed. A fix rereads `origin/master` before each item: an open PR may have landed it meanwhile (#960).
+- Or, to fix: the PR, its branch and the blocking items of the round comment (`file:line`, expected fix); a non-blocking one is not fixed. A fix rereads `origin/master` before each item: an open PR may have landed it meanwhile (#960).
 
 ## Where to work
 
@@ -59,7 +59,7 @@ Explore, plan, code, commit.
 - `gh pr create --draft --base master --repo AlexandreDemartin/pgcast`: never to `jawj/zapatos`. For a layer of a stack, `--base <branch below>`.
 - Title per skill `pr-shape` § PR title, ending with `(closes #n)`.
 - A PR too big for the skill `pr-shape` § Size and scope: stop and propose a split to the orchestrator.
-- Body: `Closes #n`, then **What** · **Why** · **Proofs** · **Decided alone**, and the label `decided-alone` if needed (skill `plan-and-proofs`).
+- Body from `.github/pull_request_template.md`: `Closes #n`, then **Change** · **Look at** · **Decided alone** · **Proof**, with **Evidence** and **Docs swept** folded, and the label `decided-alone` if needed (skill `plan-and-proofs` § The PR body); `node scripts/check-body.mjs <file>` passes before `gh pr create`, and the body is reread after each fix round.
 - The `builder` does not mark the PR ready, does not close the issue and never merges: the orchestrator does (skill `merge-gate`).
 
 ## Clean up

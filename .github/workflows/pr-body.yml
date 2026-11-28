@@ -1,0 +1,29 @@
+name: PR body
+
+# The owner's one-minute read: at most 200 words above the body's first <details> (skill plan-and-proofs § Two layers).
+# Drafts included, as it is cheap: the one exception to "drafts run nothing" (skill ci-gate). `edited` reruns it on a
+# change of body, which ci.yml does not listen to; its own group per PR, so a new edit cancels only this check's run.
+on:
+  pull_request:
+    types: [opened, edited, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-body-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Count the words above the fold
+        # The body comes through the environment, never into the script itself (injection); the runner's own Node runs
+        # it, as it needs no dependency.
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/check-body.mjs

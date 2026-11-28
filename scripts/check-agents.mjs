@@ -2,7 +2,7 @@
 // `npm run check:agents`: keeps the agent method (.agents/README.md) consistent, AGENTS.md § Architecture in step with
 // src/ and CHANGELOG.md § Deprecated with its messages, finds a CHANGELOG.md entry written twice in a release,
 // recounts the summary of the characterisation report, then runs the tests of the guard hook, of the release-folder
-// resolver and of these checks.
+// resolver, of the body's word count (scripts/check-body.mjs) and of these checks.
 import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -71,7 +71,7 @@ if (errors.length > 0) {
 console.log(`✓ ${skills.length} skills, ${readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).length} agents, AGENTS.md § Architecture, CHANGELOG.md § Deprecated and entries, ${reportPath} summary`);
 
 const tests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs', '.claude/hooks/handover.test.mjs', 'scripts/check-architecture.test.mjs',
-  'scripts/check-changelog-entries.test.mjs', 'scripts/check-deprecations.test.mjs', 'scripts/check-report.test.mjs',
+  'scripts/check-body.test.mjs', 'scripts/check-changelog-entries.test.mjs', 'scripts/check-deprecations.test.mjs', 'scripts/check-report.test.mjs',
   'scripts/check-skills.test.mjs', 'scripts/release-folder.test.mjs'],
   {stdio: 'inherit'});
 process.exit(tests.status ?? 1);

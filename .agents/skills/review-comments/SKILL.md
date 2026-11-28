@@ -1,11 +1,11 @@
 ---
 name: review-comments
-description: 'Review comments on a pgcast PR: Conventional Comments labels, what blocks, one comment per round, who posts it, the verify comment, `→ fixed in <sha>`. USE FOR: writing or posting a review, triaging its items, verifying fixes, marking a blocker fixed. DO NOT USE FOR: what a review checks (agent branch-reviewer), the merge (merge-gate).'
+description: 'Review comments on a pgcast PR: Conventional Comments labels, what blocks, one comment per round, who posts it, its table and fold, the verify that edits it. USE FOR: writing or posting a review, triaging its items, verifying fixes, marking a blocker fixed. DO NOT USE FOR: what a review checks (agent branch-reviewer), the merge (merge-gate).'
 ---
 
 # Review comments
 
-A review leaves one comment per round on the PR. The reviewer stays read-only and returns the text; the orchestrator posts it.
+A review leaves one comment per round on the PR, and its verify edits that comment. The reviewer stays read-only and returns the text; the orchestrator posts and edits it.
 
 ## Labels
 
@@ -27,24 +27,45 @@ A review leaves one comment per round on the PR. The reviewer stays read-only an
 - Nothing to flag: one line, "LGTM". No summary of the diff nor compliment.
 - The agent's "learning" remarks go apart, never in the comment (skill `run-step`).
 
+## Round comment
+
+Two layers (skill `plan-and-proofs` § Two layers):
+
+```markdown
+| # | Blocking | Fix |
+|---|---|---|
+| 1 | `not(or(a, b))` compiles to `NOT a OR b`, which negates only `a` | pending |
+
+For you: <a doubt the owner must settle>
+
+2 minors → LEARNINGS, 1 no action, 1 pre-existing → #n.
+
+<details><summary>Items in full</summary> … </details>
+```
+
+- Above the fold: one row of about 15 words per blocking item, its scenario (input → wrong behaviour), not the reviewer's prose. Then one `For you:` line, left out when there is no doubt to settle. Then the count of the others: minors → `docs/LEARNINGS.md`, no action, pre-existing → an issue.
+- Folded: every item in full, as the reviewer wrote it (§ Labels).
+- No blocking item: `LGTM` in place of the table, then the count.
+- The reviewer returns the whole text; the orchestrator writes the count once it has triaged, runs `node scripts/check-body.mjs <file>`, then posts it.
+
 ## Rounds
 
-1. **Review**: the orchestrator posts it with `gh pr comment <pr> --repo AlexandreDemartin/pgcast --body-file <file>`; the URL it prints ends with `#issuecomment-<id>`.
+1. **Review**: the orchestrator posts the round comment, each **Fix** `pending`, with `gh pr comment <pr> --repo AlexandreDemartin/pgcast --body-file <file>`; the URL it prints ends with `#issuecomment-<id>`.
 2. **Fixes**: blocking items only, by a fresh `builder` (skill `run-step` § Sequence). Non-blocking items do not block ("LGTM with comments"): they go to `docs/LEARNINGS.md` § Minors kept, each tagged `form` or `defect`, so the end-of-chapter review reads the defects first.
-3. **Verify** (`high`): a second comment, posted the same way (§ Verify comment).
-4. **Marked fixed**: once a blocking item's fix is verified, the orchestrator edits the review comment and ends the item with `→ fixed in <sha>`:
+3. **Verify** (`high`, § Verify), or the orchestrator's check of the fix commit against the item (`normal`): the orchestrator edits the same comment, never a second one. Each **Fix** becomes `<sha>, verify: <verdict>`, and the verify's evidence goes inside the fold:
    `gh api -X PATCH repos/AlexandreDemartin/pgcast/issues/comments/<id> -F body=@<file>`.
+4. A `partly`, `not fixed` or `regressed` verdict opens the next round, with its own comment.
 
-At `normal` there is no verify round: the orchestrator checks the fix commit against the item before marking it. A passage rewritten across rounds is reread against skill `concise-docs` before `gh pr ready`: clauses added round by round end as one long sentence (#873).
+A passage rewritten across rounds is reread against skill `concise-docs` before `gh pr ready`: clauses added round by round end as one long sentence (#873).
 
-## Verify comment
+## Verify
 
-- Heading `Verify`, then one line per blocking item of the review, in its order:
+- The reviewer returns, as text, one line per blocking item of the round, in its order:
 
 ```text
 - fixed: `src/db/conditions.ts:42`, `not(or(a, b))` — <sha> — `unit/conditions › not parenthesises its condition` gives `NOT (a OR b)`
 ```
 
 - Verdicts: `fixed`, `partly`, `not fixed`, `regressed`, each with the SHA and the evidence (a test, a `file:line`).
-- `not fixed` or `regressed`: back to the fixes, then a new verify comment.
+- The orchestrator writes each verdict into its row's **Fix**, and the lines under a `Verify` heading inside the fold.
 - New defects found on the way: below the verdicts, in Conventional Comments.
