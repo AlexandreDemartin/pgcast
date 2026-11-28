@@ -165,3 +165,14 @@ describe('withCTEs', () => {
     expect(await query.run(t.client)).toBe(3);
   });
 });
+
+it.each(['inner', 'outer'])('keeps the rows transform through an empty %s CTE wrapper', async empty => {
+  const q = db.select('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } });
+  const main = db.withCTEs(empty === 'inner' ? {} : { reports }, q);
+  main.runResultTransform = qr => qr.rows.map(row => row.result.id);
+  const outer = db.withCTEs(empty === 'outer' ? {} : { reports }, main);
+  expect(await outer.run(t.client)).toEqual([2, 3]);
+  expect(await outer.copy().run(t.client)).toEqual([{ id: 2 }, { id: 3 }]);
+  expect(outer.compile()).toEqual(db.withCTEs({ reports }, q).compile());
+  expect(outer.copy().compile()).toEqual(db.withCTEs({ reports }, q).copy().compile());
+});
