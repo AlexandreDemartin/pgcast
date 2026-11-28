@@ -9,7 +9,7 @@ What pgcast adds to Zapatos 6.6.1, one line each: the version it came in, and a 
 |---|---|
 | [`withCTEs()`](/sql-template#withCTEs): CTEs before a shortcut, its result type kept | 6.11.0 |
 | [`selectRows()`](/select#selectRows): the query of `select()` as a fragment, one row per result, for a [cursor](/cursors) | 6.12.0 |
-| [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow): `selectExactlyOne()` throws on a second row, opt-in | 6.7.0 |
+| [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow): `selectExactlyOne()` throws on a second row, opt-in through 7.x, removed in 8.0.0 | 6.7.0 |
 | [`topLevelSelectAsRows`](/runtime-config#Config.topLevelSelectAsRows): `select()` run on its own sends one row per result, the same array, opt-in through 7.x, always from 8.0.0 | 7.3.0 |
 | [`shortcutsUseJson`](/runtime-config#Config.shortcutsUseJson): `select()` and its kin, and the writes' `RETURNING`, build their JSON with `json` functions, the same values, opt-in through 7.x, always from 8.0.0 | 7.3.0 |
 | [`ReturningTypeForTable`](/insert#ReturningTypeForTable) and [`UpsertReturnableForTable`](/insert#UpsertReturnableForTable), exported: the row a write returns, to type a fake result | 6.7.0 |

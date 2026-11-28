@@ -25,7 +25,7 @@ db.setConfig({
   - Zapatos 6.6.1 set the key to `undefined`. After `transactionAttemptsMax: undefined`, `transaction()` gave up after its first attempt ("… on attempt 1 of undefined, giving up"); after `transactionRetryDelay: undefined`, every `transaction()` rejected with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined." and never released the client it took from a pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - It returns a copy of the new configuration, as `getConfig()` does: changing that object changes nothing. Zapatos 6.6.1 returned the configuration itself ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - It keeps the `transactionRetryDelay` object you give it, not a copy: changing its `minMs` or `maxMs` afterwards changes the configuration.
-- A key 8.0 removed, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient), [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`shortcutsUseJson`](#Config.shortcutsUseJson) or [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows), does not compile (TS2353). Given anyway, from a variable or JavaScript, it throws unless its value is the one 8.0 always behaves as (`true`), `null` or `undefined`, and the configuration keeps none of them. Error: `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
+- A key 8.0 removed, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient), [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`shortcutsUseJson`](#Config.shortcutsUseJson), [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) or [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), does not compile (TS2353). Given anyway, from a variable or JavaScript, it throws unless its value is the one 8.0 always behaves as (`true`, or `false` for `selectExactlyOneChecksForSecondRow`), `null` or `undefined`, and the configuration keeps none of them. Error: `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
 - An unknown key does not compile (TS2353), and neither does a value of the wrong type (TS2322):
 
 ```ts twoslash
@@ -68,7 +68,6 @@ interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;
   castObjectParamsToJson: boolean;
-  selectExactlyOneChecksForSecondRow?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -76,7 +75,7 @@ interface Config {
 }
 ```
 
-The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still compiles; `getConfig()` types them `boolean | undefined`, though it always gives a value.
+The key pgcast adds, `transactionEventListener`, is optional, so a `Config` written for Zapatos 6.6.1 still compiles.
 
 <div class="stack">
 
@@ -86,7 +85,6 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | the wait before each retry | at each `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | an array parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> in place of `$1` | at each `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | a plain object parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> in place of `$1` | at each `compile()` |
-| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a standalone `selectExactlyOne()` requests two rows and rejects on a second | at each `selectExactlyOne()` |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
 | [`transactionListener`](#Config.transactionListener) | none | called when an attempt of `transaction()` fails with `40001` or `40P01`, and at each retry | at each `transaction()` |
@@ -223,17 +221,11 @@ Through 7.x, `false` let an insufficient level pass through too, without a warni
 
 ### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
 
-```ts
-selectExactlyOneChecksForSecondRow?: boolean  // default: false through 7.x; removed in 8.0
-```
+From 6.7.0 through 7.x, the default was `false`. From 8.0.0, the key is removed and pgcast always behaves as `false` ([8.0 migration](/switching#from-8-0-selectExactlyOneChecksForSecondRow)).
 
-With the check enabled and `withTies` off, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> with `2`, and `.run()` rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when a second row comes: "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. With both off, it asks for one, `LIMIT 1`, and gives the first row that matches, as in Zapatos 6.6.1.
+A [`selectExactlyOne()`](/select#selectExactlyOne) asks for one row, `LIMIT $2`<!-- probe: db.selectExactlyOne('films', { id: 1000 }) --> with `1`, and gives the first that matches, as in Zapatos 6.6.1: "at least one row" is how Zapatos reads it, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 
-- Nested in a `lateral` or a `sql` template, or copied with [`.copy()`](/sql-template#copy), it requests one row.
-- [`withTies: true`](/select#order-limit-offset-and-withties) compiles each limit as `FETCH FIRST … ROWS WITH TIES`. A nested query can return all ties. A standalone copy still requests one row plus ties and rejects with `NotExactlyOneError` if it gets a second row with the check enabled.
-- With a [`lock`](/select#lock), `LIMIT $2` locks the second row too: after `.run()` rejects, both rows stay locked until the transaction ends, and another session's `FOR UPDATE NOWAIT` on either gets 55P03.
-- Off, it never warns, and it stays off through 7.x: "at least one row" is how Zapatos reads `selectExactlyOne()`, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)). 8.0 removes it: `selectExactlyOne()` asks for `LIMIT 1` alone, and the key set to `true` throws ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
-- Read when `selectExactlyOne()` is called, not at `.run()`.
+Through 7.x, `true` made one run on its own ask for two rows and reject on a second with a [`NotExactlyOneError`](/select#NotExactlyOneError), and with a [`lock`](/select#lock) lock that second row too ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 ### `aggregatesTypedByColumn` {#Config.aggregatesTypedByColumn}
 

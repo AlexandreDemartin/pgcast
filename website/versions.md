@@ -46,7 +46,7 @@ A fix can still stop a call that only worked through the bug. 6.6.2's escaping f
 
 Two opt-ins stay off through 7.x: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0), which becomes the only behaviour in 8.0. [`selectExactlyOne()`](/select#selectExactlyOne) checks for at least one row when run alone; nested, a missing row gives `null`. Zapatos nests it in a `lateral`, where ties can duplicate the parent row with `withTies: true`.
 
-Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), rejects on a second row when the query is run on its own. It never warns, and stays off through 7.x. 8.0 removes it, and `selectExactlyOne()` asks for `LIMIT 1` alone: the key set to `true` throws ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
+Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), rejects on a second row when the query is run on its own. It never warns, and stays off through 7.x. 8.0 removes it, and `selectExactlyOne()` asks for `LIMIT 1` alone: the key set to `true` throws ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md), [8.0 migration](/switching#from-8-0-selectExactlyOneChecksForSecondRow)).
 
 ## Why an opt-in, not a breaking change
 

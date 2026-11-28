@@ -140,7 +140,7 @@ A read shortcut is a subquery there: `select()`, `selectOne()`, `selectExactlyOn
 
 `lateral?: { [key: string]: SQLFragment } | SQLFragment`, a [`LateralOption`](#LateralOption): other shortcuts, nested, each joined with `LEFT JOIN LATERAL … ON true`. In them, [`db.parent()`](/sql-template#parent) names a column of this query's table.
 
-- **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`, or `null` when its query returns no row ([`count()`](/aggregates#count)). A `count()` whose `groupBy` gives several groups brings the parent row back once per group under an outer `select()`; under `selectOne()` or `selectExactlyOne()`, once, with one group's count, though with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) `selectExactlyOne()` rejects with `NotExactlyOneError`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
+- **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`, or `null` when its query returns no row ([`count()`](/aggregates#count)). A `count()` whose `groupBy` gives several groups brings the parent row back once per group under an outer `select()`; under `selectOne()` or `selectExactlyOne()`, once, with one group's count. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
 - **One subquery**: its result is passed through in place of each row. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
   - When you call `.run()` on the outer `selectOne()`, `selectExactlyOne()` or [`selectRows()`](#selectRows), `pg` reads the passed-through `result` column with its configured type parser. An outer `select()` converts each value to JSON, `to_json(result)`, and returns them in an array. A `sql` template keeps its result annotation in both cases.
   - By default, `pg` reads a [`count()`](/aggregates#count) of two rows as `"2"`. It also reads `bigint` or `numeric` results from `sum()` and `avg()` as strings. With `Number` as its `int8` parser, the same count gives `2`. The aggregate is typed as `number`, or `number | null` for `sum()` and `avg()` by default.
@@ -269,7 +269,7 @@ As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row mat
 
 </CastPanel>
 
-With [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), the query run on its own asks for two rows (by default `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> with `2`) and `.run()` rejects on a second row too. Nested in a `lateral` or a `sql` template, it requests one row plus any ties with `withTies: true`.
+From 8.0.0, it asks for one row alone, on its own as nested in a `lateral` or a `sql` template, plus any ties with `withTies: true`. Through 7.x, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) made the query run on its own ask for two rows and reject on a second ([8.0 migration](/switching#from-8-0-selectExactlyOneChecksForSecondRow)).
 
 ### `NotExactlyOneError` {#NotExactlyOneError}
 
@@ -279,7 +279,7 @@ class NotExactlyOneError extends Error {
 }
 ```
 
-What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->; with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), a second row gives "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
+What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
 
 Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran, or, for a [`.copy()`](/sql-template#copy), the one it was copied from: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
 
