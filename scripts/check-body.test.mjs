@@ -70,3 +70,10 @@ test('reads PR_BODY from the environment, an empty body included, and needs a bo
   assert.equal(none.status, 2);
   assert.match(none.stderr, /PR_BODY/);
 });
+
+test('passes on the templates of a PR and of an issue', () => {
+  for (const file of ['.github/pull_request_template.md', '.github/ISSUE_TEMPLATE/task.md']) {
+    const result = run([file]);
+    assert.equal(result.status, 0, `${file}: ${result.stderr}`);
+  }
+});
