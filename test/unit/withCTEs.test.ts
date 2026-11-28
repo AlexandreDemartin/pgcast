@@ -129,6 +129,16 @@ describe('withCTEs', () => {
     expect(after.prepared('ids_late').compile()).toEqual({ text: 'SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'], name: 'ids_late' });
   });
 
+  it('select(): never takes the prepared() name of the query, set before the call or after', () => {
+    const one = sql`SELECT 1`, ids = { text: 'WITH "one" AS (SELECT 1) SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'] };
+    const before = db.select('users', all, { columns: ['id'] }).prepared('p1');
+    before.compile(); before.preparedName = undefined;
+    expect(db.withCTEs({ one }, before).compile()).toEqual(ids);
+    const after = db.select('users', all, { columns: ['id'] }), result = db.withCTEs({ one }, after);
+    after.prepared('p2');
+    expect(result.compile()).toEqual(ids);
+  });
+
   it('a write shortcut as a CTE', () => {
     const eve = db.insert('users', { email: 'eve@example.com', display_name: 'Eve' }, { returning: ['id'] });
     expect(db.withCTEs({ eve }, db.select('users', all, { columns: ['display_name'] })).compile()).toEqual({
