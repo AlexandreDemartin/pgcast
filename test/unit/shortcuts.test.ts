@@ -1914,9 +1914,12 @@ describe('selectRows', () => {
         values: [1],
       });
       expect(q.copy({ preparedName: 'copied' }).compile()).toMatchObject({ text: q.copy().compile().text, name: 'copied' });
-      // the rows form runs with its own: one set on the query is the aggregate's, as a copy runs it
-      expect(q.runResultTransform(qr([[{ id: 1 }, { id: 2 }]]))).toEqual([{ id: 1 }, { id: 2 }]);
-      expect(q.copy().runResultTransform).toBe(q.runResultTransform);
+      expect(q.runResultTransform(qr([{ id: 1 }, { id: 2 }]))).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(q.copy().runResultTransform(qr([[{ id: 1 }, { id: 2 }]]))).toEqual([{ id: 1 }, { id: 2 }]);
+      const seq = Number(sql`SELECT 1`.prepared().preparedName!.split('_').pop());
+      q.prepared(`_zapatos_prepared_${seq + 1}`);
+      expect(q.copy().preparedName).not.toBe(q.preparedName);
+      expect(q.copy({ preparedName: undefined } as any).compile().name).toBeUndefined();
     });
 
     it('prepared(), noop and parentTable set on the query go with the rows form', () => {

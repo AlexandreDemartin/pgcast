@@ -1067,33 +1067,66 @@ describe('selectRows', () => {
         `${i >= 2 ? `/* marked no-op: won't hit DB unless forced -> */ ` : ''}SELECT json_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "id" ASC`));
     });
 
-    it('a prepared copy keeps the name, not the text: on one connection the second to run throws, a copy named apart runs', async () => {
-      const unique = (name: string) => `Prepared statements must be unique - '${name}' was used for a different statement`;
-      const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_rows_first');
-      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
-      await expect(run(q.copy())).rejects.toThrow(unique('accounts_rows_first'));
-      expect(await run(q.copy({ preparedName: 'accounts_agg_apart' }))).toEqual([{ id: 1 }, { id: 2 }]);
-      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
-      const copiedFirst = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared('accounts_agg_first');
-      expect(await run(copiedFirst.copy())).toEqual([{ id: 1 }, { id: 2 }]);
-      await expect(run(copiedFirst)).rejects.toThrow(unique('accounts_agg_first'));
+    it.each([false, true])('runs a prepared select and its aggregate copy on one connection (copy first: %s)', async copyFirst => {
+      for (const name of [undefined, `accounts_rows_${copyFirst}`]) {
+        const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }).prepared(name);
+        const copy = q.copy(), named = q.copy({ preparedName: 'accounts_agg' });
+        expect(copy.compile().name).toMatch(/^_zapatos_prepared_/);
+        expect(copy.compile().name).not.toBe(q.compile().name);
+        expect(copy.copy().compile()).toEqual(copy.compile());
+        expect(named.compile().name).toBe('accounts_agg');
+        const pair = copyFirst ? [copy, q] : [q, copy];
+        for (const fragment of [...pair, ...pair, named, copy.copy()]) {
+          expect(await run(fragment)).toEqual([{ id: 1 }, { id: 2 }]);
+        }
+        for (const outer of [sql`${q}`, sql`SELECT (${q}) AS result`,
+          db.selectOne('users', { id: 1 }, { lateral: q }), db.selectOne('users', { id: 1 }, { lateral: { child: q } }),
+          db.selectOne('users', { id: 1 }, { extras: { child: q } })]) {
+          expect(outer.compile().name).toBe(q.preparedName);
+        }
+        expect(await run(sql`SELECT (${q}) AS result`.prepared('accounts_outer'))).toEqual([{ result: [{ id: 1 }, { id: 2 }] }]);
+      }
     });
 
-    it('a runner of your own that pairs its compile() and runResultTransform gets the first result alone, where the rows give the array', async () => {
-      const
-        q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId }),
-        none = db.select('accounts', { owner_id: -1 });
-      expect(q.runResultTransform(await t.client.query(q.compile()))).toEqual({ id: 1 });
-      expect(none.runResultTransform(await t.client.query(none.compile()))).toBeUndefined();
-      expect((await t.client.query(q.compile())).rows.map(r => r.result)).toEqual([{ id: 1 }, { id: 2 }]);
-      expect((await t.client.query(none.compile())).rows.map(r => r.result)).toEqual([]);
-    });
+    it.each([[1, [{ id: 1 }, { id: 2 }]], [2, [{ id: 3 }]], [-1, []]] as const)(
+      'pairs compile() with the receiving fragment\'s transform for owner %s', async (owner_id, rows) => {
+        const q = db.select('accounts', { owner_id }, { columns: ['id'], order: byId });
+        for (const [fragment, expected] of [
+          [q, rows], [q.copy(), rows], [sql`SELECT (${q}) AS result`, [{ result: rows }]],
+          [db.selectOne('users', { id: 1 }, { lateral: q }), rows],
+          [db.selectOne('users', { id: 1 }, { columns: [], lateral: { child: q } }), { child: rows }],
+          [db.selectOne('users', { id: 1 }, { columns: [], extras: { child: q } }), { child: rows }],
+          [db.withCTEs({ child: q }, sql`SELECT result FROM child`), [{ result: rows }]],
+        ] as const) {
+          expect(fragment.runResultTransform(await t.client.query(fragment.compile()))).toEqual(expected);
+          expect(await run(fragment)).toEqual(expected);
+        }
+      });
 
-    it('a runResultTransform you set applies to its copies only: run on its own, it transforms its rows with its own', async () => {
+    it('runs the wrapped compile() once and applies the assigned transform to that result', async () => {
       const q = db.select('accounts', { owner_id: 1 }, { columns: ['id'], order: byId });
+      const compile = q.compile, wrapped = vi.fn(() => {
+        const original = compile();
+        return { ...original, text: original.text + ' /* accounts */' };
+      });
+      q.compile = wrapped;
       q.runResultTransform = () => 'mine';
-      expect(await run(q)).toEqual([{ id: 1 }, { id: 2 }]);
-      expect(await run(q.copy())).toBe('mine');
+      const sent = vi.fn(), received = vi.fn();
+      db.setConfig({ queryListener: sent, resultListener: received });
+      const driver = vi.spyOn(t.client, 'query');
+      try {
+        expect(await run(q)).toBe('mine');
+        expect(driver.mock.calls[0][0]).toBe(wrapped.mock.results[0].value);
+      } finally {
+        driver.mockRestore();
+      }
+      expect(wrapped).toHaveBeenCalledTimes(1);
+      expect(sent.mock.calls[0][0]).toBe(wrapped.mock.results[0].value);
+      expect(received.mock.calls[0][0]).toBe('mine');
+      const copy = q.copy();
+      expect(await run(copy)).toEqual([{ id: 1 }, { id: 2 }]);
+      copy.runResultTransform = qr => qr.rows;
+      expect(await run(copy)).toEqual([{ result: [{ id: 1 }, { id: 2 }] }]);
     });
 
     it('cursor() reads its one aggregate row, as nested', async () => {
