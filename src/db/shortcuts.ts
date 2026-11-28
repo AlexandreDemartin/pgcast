@@ -213,7 +213,9 @@ function columnPairs(columns: readonly Column[]) {
 // an extras or lateral key beside every column is a column alias, as to_json() names its keys
 // after the columns: one quoted identifier, every `"` doubled, so that it comes back as given (SQLForAlias keeps a
 // hand-escaped `a""b`, which would come back as `a"b`), never split on `.`. Postgres refuses an empty one (42601) and
-// a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles
+// a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles.
+// The bytes are counted in UTF-8, as the database's encoding is not known here: in one of another encoding, Postgres
+// counts its own, so a shorter key may still come back cut (31 × é come back as 21 in EUC_JP)
 function SQLForKeyAlias(key: string, list: 'columns' | 'returning' = 'columns') {
   const
     text = `${key}`,
