@@ -24,6 +24,10 @@ Each change of this table is a lever of #812, with its keep-or-revert test and i
 - A third round finding a deeper hole in one part cuts it to a Deferred section, its blockers checked against what stays (#746); a design on several conditional types writes its hunt grid before the first review (#751).
 - A round that accepts a cost above the Epic's **Done when** amends that **Done when** in the same round, naming the exception and where it is accepted; the range review rereads each absolute criterion ("at or under Zapatos 6.6.1") against the final baseline (#924's literal cost reached #919's range review as a blocker).
 
+## CI-only criterion
+
+- The orchestrator proves it after `gh pr ready`, which auto mode refuses to a subagent; a draft's **CI passed** proves nothing (skill `ci-gate` § Pitfalls).
+
 ## Risk
 
 - `{ col: self }` never passes through `conditions.ts`, so #106 was `high` from the start.
