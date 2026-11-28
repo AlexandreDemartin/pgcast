@@ -1,5 +1,5 @@
 ---
-english: 9b177d42a6bc
+english: 4981cb02f9ae
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
