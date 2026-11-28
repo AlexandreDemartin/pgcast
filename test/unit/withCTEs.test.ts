@@ -132,7 +132,7 @@ describe('withCTEs', () => {
   it('select(): never takes the prepared() name of the query, set before the call or after', () => {
     const one = sql`SELECT 1`, ids = { text: 'WITH "one" AS (SELECT 1) SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'] };
     const before = db.select('users', all, { columns: ['id'] }).prepared('p1');
-    before.compile(); before.preparedName = undefined;
+    before.compile(); delete before.preparedName;
     expect(db.withCTEs({ one }, before).compile()).toEqual(ids);
     const after = db.select('users', all, { columns: ['id'] }), result = db.withCTEs({ one }, after);
     after.prepared('p2');
