@@ -1475,6 +1475,7 @@ export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]
     result.compile = (compiled, parentTable, currentColumn) => compiled ? nestedCompile(compiled, parentTable, currentColumn) :
       topLevel().compile(undefined, parentTable, currentColumn);
     if (query['aggregateResultTransform']) {
+      Object.defineProperty(result, topLevelForm, { get: topLevel });
       result['aggregateResultTransform'] = query['aggregateResultTransform'];
       result.runResultTransform = query.runResultTransform;
     }
