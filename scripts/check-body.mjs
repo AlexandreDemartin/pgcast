@@ -11,13 +11,23 @@ export const budget = 200;
 // Whole lines left out: the line that links the issue, and the agent's attribution.
 const leftOut = [/^\s*(?:Closes|Part of) #\d/i, /^\W*Generated with\b/];
 
+/** `body` without its HTML comments, scanned once from the left; an unclosed `<!--` hides the rest, as GitHub renders it. */
+function withoutComments(body) {
+  let kept = '', from = 0;
+  for (let open; (open = body.indexOf('<!--', from)) !== -1; from = body.indexOf('-->', open + 4) + 3) {
+    kept += body.slice(from, open);
+    if (body.indexOf('-->', open + 4) === -1) return kept;
+  }
+  return kept + body.slice(from);
+}
+
 /**
  * The words of `body` above its first line that opens a `<details>` (a `<details>` later in a line does not), HTML
  * comments, images and the lines of `leftOut` aside. A code span counts as one word, a link as its text, and a token
  * with no letter or digit (punctuation, a table's separator row) as none.
  */
 export function wordsAboveFold(body) {
-  const lines = body.replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/);
+  const lines = withoutComments(body).split(/\r?\n/);
   const fold = lines.findIndex(line => /^\s*<details\b/i.test(line));
   return lines.slice(0, fold === -1 ? lines.length : fold)
     .filter(line => !leftOut.some(pattern => pattern.test(line)))
