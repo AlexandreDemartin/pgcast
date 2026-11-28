@@ -180,9 +180,11 @@ const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
 // even if the caller changes the rows transform. Caller SQL borrowing a transform stays as written (isQuery):
 // a json read inside a sql child, compared as written, needs the caller's to_jsonb() (42883 otherwise). A json read is
 // a select(); a selectOne(), selectExactlyOne() or selectRows() not built with distinct: true whose passed-through
-// lateral, if any, is one; a copy() of one, or withCTEs() over one. Anything else, an aggregate included, carries no
-// mark. A copy() with its literals or expressions overridden keeps its source's mark, so a json read's is compared as
-// jsonb, and its values come back as jsonb gives them (7::bigint as 7, a timestamptz as a string).
+// lateral, if any, is one; a copy() of one, or withCTEs() over one. A runResultTransform the caller sets takes a query
+// out of this set, except a select(), withCTEs() over one, and a copy() of either with its SQL unchanged: the mark is on
+// the transform (#1003). Anything else, an aggregate included, carries no mark. A copy() with its literals or
+// expressions overridden keeps its source's mark, so a json read's is compared as jsonb, and its values come back as
+// jsonb gives them (7::bigint as 7, a timestamptz as a string).
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
