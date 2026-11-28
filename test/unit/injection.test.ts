@@ -3418,3 +3418,31 @@ describe('an extras key, and a table, in a write\'s RETURNING beside every colum
       `);
   });
 });
+
+it('keeps the same identifiers and parameters in both forms of a select', () => {
+  for (const name of ['plain', hostile.dquote, hostile.squote, hostile.semicolon, hostile.dashes, hostile.comment,
+    hostile.dollar, hostile.backslash, hostile.nul]) {
+    const
+      q = db.select('users', { display_name: name }, { alias: name }).prepared('rows'),
+      quoted = name === hostile.dquote ? 'a""b' : name,
+      rows = `SELECT to_json("${quoted}".*) AS result FROM "users" AS "${quoted}" WHERE ("display_name" = $1)`,
+      aggregate = `SELECT coalesce(json_agg(result), '[]') AS result FROM (${rows}) AS "sq_${quoted}"`,
+      automatic = q.copy(), aggregateNames: (string | undefined)[] = [],
+      copy = q.copy({ preparedName: 'aggregate' }),
+      prefix = sql`SELECT ${param(1)}::int AS n`;
+    for (const [fragment, text, values, statement] of [
+      [q, rows, [name], 'rows'], [copy, aggregate, [name], 'aggregate'], [automatic, aggregate, [name], automatic.preparedName],
+      [q.copy({ literals: ['SELECT ', ''], expressions: [param(name)], preparedName: 'override' }), 'SELECT $1', [name], 'override'],
+      [sql`${prefix}, (${q})`, `SELECT $1::int AS n, (${aggregate.replace(' = $1)', ' = $2)')})`, [1, name], 'rows'],
+      [db.withCTEs({ k: prefix }, q), `WITH "k" AS (SELECT $1::int AS n) ${rows.replace(' = $1)', ' = $2)')}`, [1, name], undefined],
+    ] as const) {
+      const compiled = fragment.compile();
+      expect(visible(compiled.text)).toBe(visible(text));
+      expect(compiled.values).toEqual(values);
+      expect(compiled.name).toBe(statement);
+      if (text === aggregate) aggregateNames.push(compiled.name);
+    }
+    expect(automatic.preparedName).toMatch(/^_zapatos_prepared_\d+$/);
+    expect(aggregateNames).toEqual(['aggregate', automatic.compile().name]);
+  }
+});

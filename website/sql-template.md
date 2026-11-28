@@ -568,7 +568,7 @@ Applied by `run()` to what `pg` returns. `qr` is typed `pg.QueryResult`, but a [
 
 </CastPanel>
 
-It applies only to `run()` on that fragment: not when it is nested in another, nor given to `lateral` or `extras`. A [`select()`](/select#select) run on its own compiles and transforms its rows query with a transform of its own, so its `.run()` gives the array whatever you assign: one you set applies to its copies only, which run the aggregate ([8.0 migration](/switching#from-8-0-topLevelSelectAsRows)).
+An embedded fragment supplies SQL. Only the outer fragment transforms the result. From 8.0.0. On a [`select()`](/select#select) run on its own or as the main query of `withCTEs()`, your transform receives one row per result. The default, `qr.rows.map(r => r.result)`, collects them into an array ([8.0 migration](/switching#from-8-0-topLevelSelectAsRows)).
 
 ### `prepared()` {#prepared}
 
@@ -584,15 +584,19 @@ The values are parameters, not part of the text, so one name serves every call o
 
 A name stands for one text: on a connection that has prepared `'p'`, a fragment of another text named `'p'` makes `pg` reject with "Prepared statements must be unique - 'p' was used for a different statement".
 
+A template, lateral or extras query can inherit the name of a prepared select it embeds. To run both texts on one connection, give the enclosing query its own name.
+
 ### `copy()` {#copy}
 
 ```ts
 fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?, noop?, noopResult? }): SQLFragment<RunResult, Constraint>
 ```
 
-A new fragment on the same literals and expressions. It keeps `runResultTransform`, `parentTable`, `preparedName`, `noop` and `noopResult`, except those `override` gives. So a copied shortcut resolves to what the shortcut does, as its type says: `count('films', all).copy().run(pool)` gives `4` on the docs schema, where Zapatos 6.6.1 gave the copy the default transform, so the rows: `[{ result: '4' }]`.
+A new fragment on the same literals and expressions. For a query with one SQL form, it keeps `runResultTransform`, `parentTable`, `preparedName`, `noop` and `noopResult`, except those `override` gives. So a copied shortcut resolves to what the shortcut does, as its type says: `count('films', all).copy().run(pool)` gives `4` on the docs schema, where Zapatos 6.6.1 gave the copy the default transform, so the rows: `[{ result: '4' }]`.
 
-A copy compiles as a nested fragment. Without `withTies`, a copy of `selectExactlyOne()` keeps `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> with `1`, even with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow). A standalone copy rejects on no rows, and with the check enabled it also rejects on a second tied row when `withTies` is on. `lateral` gives a copy of each subquery its parent's `parentTable`. A copy of `select()` keeps its `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', db.all).copy() -->, where the `select()` run on its own sends one row per result ([8.0 migration](/switching#from-8-0-topLevelSelectAsRows)). So a copy of a prepared `select()` keeps its name, not its text: give the copy its own, `q.copy({ preparedName: 'films_agg' })`<!-- tsc: (q => …)(db.select('films', db.all).prepared('films_p')) -->, or on one connection whichever of the two runs second makes `pg` reject, as [above](#prepared).
+A copy compiles as a nested fragment. Without `withTies`, a copy of `selectExactlyOne()` keeps `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> with `1`, even with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow). A standalone copy rejects on no rows, and with the check enabled it also rejects on a second tied row when `withTies` is on. `lateral` gives a copy of each subquery its parent's `parentTable`.
+
+From 8.0.0. A copy of `select()`, including the main query of `withCTEs()`, runs its `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', db.all).copy() --> and reads the array from the single row. You can assign a transform to that copy. If the select is prepared, its copy gets a separate name and keeps it across runs. To choose the name, use `q.copy({ preparedName: 'films_agg' })`<!-- tsc: (q => …)(db.select('films', db.all).prepared('films_p')) -->.
 
 ## `withCTEs()` {#withCTEs}
 

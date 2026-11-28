@@ -1828,6 +1828,23 @@ describe('cursor()', () => {
     expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'COMMIT']);
   });
 
+  it('uses the declared aggregate for a select and the live transform for other queries', async () => {
+    await db.readCommitted(t.pool, async c => {
+      const q = db.select('users', { id: -1 });
+      q.runResultTransform = () => ['rows'];
+      expect(await read(db.cursor(c, q, { batchSize: 1 }))).toEqual([[]]);
+      const aggregate = q.copy();
+      aggregate.runResultTransform = qr => [qr.command, qr.rows[0].result];
+      expect(await read(db.cursor(c, aggregate, { batchSize: 1 }))).toEqual([['FETCH', []]]);
+
+      const plain = series(2), batches = db.cursor(c, plain, { batchSize: 1 });
+      expect((await batches.next()).value).toEqual(gs(1));
+      plain.runResultTransform = qr => [qr.command, qr.rows[0].g];
+      expect((await batches.next()).value).toEqual(['FETCH', 2]);
+      await batches.return();
+    });
+  });
+
   it('yields nothing for an empty result, after DECLARE, one FETCH and CLOSE', async () => {
     const texts = sent();
     expect(await db.readCommitted(t.pool, c => read(db.cursor(c, series(0), { batchSize: 3 })))).toEqual([]);

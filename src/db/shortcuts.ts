@@ -40,6 +40,8 @@ import {
 } from './core';
 
 import {
+  aggregateCopy,
+  aggregateResultTransform,
   callerValue,
   completeKeysWithDefaultValue,
   identifier,
@@ -174,11 +176,9 @@ const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInEx
 const topLevelForm = Symbol('topLevelForm');
 type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
 const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
-// set by select() and its kin on the runResultTransform of a query whose result is `json`, as they build it: a
-// parent's plain DISTINCT over it as a passed-through lateral compares it as `jsonb` (json has no equality, 42883),
-// where an aggregate's or a `jsonb` result (`distinct: true`'s row) is compared as it is. Each query gets a
-// transform of its own, which copy() and so withCTEs() keep, where they do not keep topLevelForm; a sql fragment
-// given a query's transform is the caller's SQL, and is read only on a query (isQuery)
+// A plain DISTINCT over a passed-through json child needs to_jsonb() (json has no equality, 42883).
+// Mark the transform of the nested form, which copy() keeps. A select's aggregate is always json,
+// even if the caller changes the rows transform. Caller SQL borrowing a transform stays as written (isQuery).
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
@@ -939,8 +939,7 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * stays JSON, ordered and made distinct by its raw value. Nested (a
  * `lateral`, `extras`, a `sql` template, a CTE), in a `copy()` and in
  * `cursor()`, it keeps its aggregate. Run on its own, it compiles and
- * transforms its rows query with a `runResultTransform` of its own: one you
- * set on the query applies to its copies only, which run the aggregate.
+ * applies its `runResultTransform` to those rows. A copy uses the aggregate's transform.
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -994,7 +993,7 @@ function selectQuery(
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
     passthrough = lateral instanceof SQLFragment,
-    jsonChild = passthrough && isQuery(lateral) && !!(lateral.runResultTransform as JSONResult)[jsonResult],
+    jsonChild = passthrough && isQuery(lateral) && (lateral[aggregateCopy] || !!lateral[aggregateResultTransform] || !!(lateral.runResultTransform as JSONResult)[jsonResult]),
     plainDistinct = !!distinct && !(distinct instanceof SQLFragment || typeof distinct === 'string' || Array.isArray(distinct)),
     // the JSON of a row is built with json functions (decision 018 § 2), but under a plain DISTINCT, which compares
     // jsonb rows, json having no equality operator (42883)
@@ -1051,15 +1050,13 @@ function selectQuery(
         ofClause = ofTables === undefined ? [] : sql` OF ${mapWithSeparator(ofTables as Table[], sql`, `, t => t)}`;  // `as` clause is required when TS not strict
       return sql` FOR ${raw(strength)}${ofClause}${wait ? sql` ${raw(wait)}` : []}`;
     }),
-    lateralSQL = lateral === undefined ? [] :
-      lateral instanceof SQLFragment ? (() => {
-        return sql` LEFT JOIN LATERAL (${lateral.copy({ parentTable: alias })}) AS "lateral_passthru" ON true`;
-      })() :
-        Object.keys(lateral).sort().map(k => {
-          /// enables `parent('column')` in subquery's Whereables
-          const subQ = lateral[k].copy({ parentTable: alias });
-          return sql` LEFT JOIN LATERAL (${subQ}) AS ${SQLForAlias('lateral_', k)} ON true`;
-        });
+    // A lateral embeds the child's prepared name, as a template interpolation does.
+    lateralCopy = (child: SQLFragment<any>) => child.copy(child.preparedName === undefined ?
+      { parentTable: alias } : { parentTable: alias, preparedName: child.preparedName }),
+    lateralSQL = lateral === undefined ? [] : lateral instanceof SQLFragment ?
+      sql` LEFT JOIN LATERAL (${lateralCopy(lateral)}) AS "lateral_passthru" ON true` :
+      Object.keys(lateral).sort().map(k =>
+        sql` LEFT JOIN LATERAL (${lateralCopy(lateral[k])}) AS ${SQLForAlias('lateral_', k)} ON true`);
 
   const
     limit = callerValue(allOptions, 'limit'),
@@ -1095,11 +1092,6 @@ function selectQuery(
     (query as TopLevelFormed)[topLevelForm] = topLevelQuery;
     query.compile = (result, parentTable, currentColumn) =>
       result ? nestedCompile(result, parentTable, currentColumn) : topLevel().compile(undefined, parentTable, currentColumn);
-    if (asRows) {
-      // run() too: a copy, which compiles as nested, keeps the query's own runResultTransform, the aggregate's
-      topLevelQuery.runResultTransform = rowsResult;
-      query.run = (queryable, force) => topLevel().run(queryable, force);
-    }
   }
 
   query.runResultTransform =
@@ -1127,6 +1119,10 @@ function selectQuery(
   // select()'s json_agg, a row built with json functions, or a passed-through json result kept as it is
   (query.runResultTransform as JSONResult)[jsonResult] = mode !== SelectResultMode.Numeric &&
     ((mode === SelectResultMode.Many && !rows) || asJson || (jsonChild && !plainDistinct));
+  if (asRows) {
+    query[aggregateResultTransform] = query.runResultTransform;
+    query.runResultTransform = rowsResult;
+  }
   query['parenthesisedInExtras'] = true;
   return query;
 }
@@ -1469,17 +1465,22 @@ export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]
       query.copy({ literals: ['', ''], expressions: [withClause(query)], noop: false }) as Q, { preparedName: undefined }),
     topLevelQuery = (query as TopLevelFormed)[topLevelForm];
 
+  if (query[aggregateCopy]) result[aggregateCopy] = true;
   if (topLevelQuery) {
     // compiled on its own, the LIMIT 2 form or the rows form, as select() compiles it; nested, LIMIT 1 or the aggregate
     const
       nestedCompile = result.compile,
-      topLevel = () => Object.assign(entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery), { parentTable: result.parentTable, preparedName: result.preparedName });
+      topLevel = () => {
+        const main = entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery);
+        if (query[aggregateResultTransform]) main.noop = result.noop;
+        return Object.assign(main, { parentTable: result.parentTable, preparedName: result.preparedName });
+      };
     result.compile = (compiled, parentTable, currentColumn) => compiled ? nestedCompile(compiled, parentTable, currentColumn) :
       topLevel().compile(undefined, parentTable, currentColumn);
-    // the rows form runs with its own result, one per row, as select() runs it
-    if (topLevelQuery.runResultTransform === rowsResult) {
-      result.run = (queryable, force) =>
-        Object.assign(topLevel(), { runResultTransform: rowsResult, noop: result.noop, noopResult: result.noopResult }).run(queryable, force);
+    if (query[aggregateResultTransform]) {
+      Object.defineProperty(result, topLevelForm, { get: topLevel });
+      result[aggregateResultTransform] = query[aggregateResultTransform];
+      result.runResultTransform = query.runResultTransform;
     }
   }
   return result;

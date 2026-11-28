@@ -105,6 +105,9 @@ describe('withCTEs', () => {
     expect(nested).toContain(`SELECT coalesce(json_agg(result), '[]') AS result FROM (SELECT json_build_object(`);
     expect(db.withCTEs({ recent }, ids).copy().compile().text).toBe(`${recentSQL} SELECT coalesce(json_agg(result), '[]') AS result FROM (${idsText}) AS "sq_users"`);
     expect(db.withCTEs({ recent }, ids).prepared('ids_with').compile()).toEqual({ text: `${recentSQL} ${idsText}`, values: [1, 'id'], name: 'ids_with' });
+    const main = db.withCTEs({ recent }, ids).prepared('ids_with');
+    expect(main.copy().compile().name).not.toBe(main.preparedName);
+    expect(main.copy().compile().values).toEqual([1, 'id']);
     expect(db.withCTEs({ recent }, ids).runResultTransform).toBe(ids.runResultTransform);
   });
 

@@ -30,6 +30,21 @@ describe('withCTEs', () => {
     expect(await db.withCTEs({ reports }, sql`SELECT count(*)::int AS n FROM reports`).run(t.client)).toEqual([{ n: 2 }]);
   });
 
+  it('pairs a CTE main select and its aggregate copy with their own transforms', async () => {
+    for (const ctes of [{ reports }, {}]) {
+      const q = db.select('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } });
+      q.runResultTransform = qr => qr.rows.map(r => r.result.id);
+      const main = db.withCTEs(ctes, q).prepared(`reports_${Object.keys(ctes).length}`), copy = main.copy();
+      expect(main.runResultTransform(await t.client.query(main.compile()))).toEqual([2, 3]);
+      expect(await main.run(t.client)).toEqual([2, 3]);
+      expect(await copy.run(t.client)).toEqual([{ id: 2 }, { id: 3 }]);
+      main.runResultTransform = qr => qr.rows.length;
+      expect(await main.run(t.client)).toBe(2);
+      expect(await db.selectOne('users', { id: 1 }, { distinct: true, lateral: main }).prepared('distinct_' + main.preparedName).run(t.client))
+        .toEqual([{ id: 2 }, { id: 3 }]);
+    }
+  });
+
   it('two CTEs, the second reading the first; one that reads a later one is 42P01', async () => {
     const rich = sql`SELECT ${'owner_id'} AS id FROM ${'accounts'} WHERE ${'owner_id'} IN (SELECT id FROM reports)`;
     expect(await db.withCTEs({ reports, rich }, db.count('users', { id: sql`${self} IN (SELECT id FROM rich)` })).run(t.client)).toBe(1);
@@ -149,4 +164,15 @@ describe('withCTEs', () => {
     expect(await result.run(t.client)).toBe(1);
     expect(await query.run(t.client)).toBe(3);
   });
+});
+
+it.each(['inner', 'outer'])('keeps the rows transform through an empty %s CTE wrapper', async empty => {
+  const q = db.select('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } });
+  const main = db.withCTEs(empty === 'inner' ? {} : { reports }, q);
+  main.runResultTransform = qr => qr.rows.map(row => row.result.id);
+  const outer = db.withCTEs(empty === 'outer' ? {} : { reports }, main);
+  expect(await outer.run(t.client)).toEqual([2, 3]);
+  expect(await outer.copy().run(t.client)).toEqual([{ id: 2 }, { id: 3 }]);
+  expect(outer.compile()).toEqual(db.withCTEs({ reports }, q).compile());
+  expect(outer.copy().compile()).toEqual(db.withCTEs({ reports }, q).copy().compile());
 });

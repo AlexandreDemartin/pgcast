@@ -850,3 +850,10 @@ describe('range strings', () => {
     expect(await selectable.run(t.client)).toEqual(written);
   });
 });
+
+it('copies a fragment whose subclass defines aggregateResultTransform', async () => {
+  class Fragment extends db.SQLFragment {
+    aggregateResultTransform() { return 'custom'; }
+  }
+  expect(await new Fragment(['SELECT 1 AS n'], []).copy().run(t.client)).toEqual([{ n: 1 }]);
+});
