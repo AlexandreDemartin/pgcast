@@ -177,7 +177,10 @@ type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
 const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
 // A plain DISTINCT over a passed-through json child needs to_jsonb() (json has no equality, 42883).
 // Mark the transform of the nested form, which copy() keeps. A select's aggregate is always json,
-// even if the caller changes the rows transform. Caller SQL borrowing a transform stays as written (isQuery).
+// even if the caller changes the rows transform. Caller SQL borrowing a transform stays as written (isQuery):
+// a shortcut inside a sql child is json, compared as written, so it needs the caller's to_jsonb() (42883 otherwise).
+// A copy() of a shortcut with its literals or expressions overridden keeps the mark, so it is compared as jsonb, and
+// its values come back as jsonb gives them (7::bigint as 7, a timestamptz as a string).
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
