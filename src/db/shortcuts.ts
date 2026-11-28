@@ -41,6 +41,7 @@ import {
 
 import {
   aggregateCopy,
+  aggregateResultTransform,
   callerValue,
   completeKeysWithDefaultValue,
   identifier,
@@ -992,7 +993,7 @@ function selectQuery(
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
     passthrough = lateral instanceof SQLFragment,
-    jsonChild = passthrough && isQuery(lateral) && (lateral[aggregateCopy] || !!lateral['aggregateResultTransform'] || !!(lateral.runResultTransform as JSONResult)[jsonResult]),
+    jsonChild = passthrough && isQuery(lateral) && (lateral[aggregateCopy] || !!lateral[aggregateResultTransform] || !!(lateral.runResultTransform as JSONResult)[jsonResult]),
     plainDistinct = !!distinct && !(distinct instanceof SQLFragment || typeof distinct === 'string' || Array.isArray(distinct)),
     // the JSON of a row is built with json functions (decision 018 § 2), but under a plain DISTINCT, which compares
     // jsonb rows, json having no equality operator (42883)
@@ -1119,7 +1120,7 @@ function selectQuery(
   (query.runResultTransform as JSONResult)[jsonResult] = mode !== SelectResultMode.Numeric &&
     ((mode === SelectResultMode.Many && !rows) || asJson || (jsonChild && !plainDistinct));
   if (asRows) {
-    query['aggregateResultTransform'] = query.runResultTransform;
+    query[aggregateResultTransform] = query.runResultTransform;
     query.runResultTransform = rowsResult;
   }
   query['parenthesisedInExtras'] = true;
@@ -1471,14 +1472,14 @@ export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]
       nestedCompile = result.compile,
       topLevel = () => {
         const main = entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery);
-        if (query['aggregateResultTransform']) main.noop = result.noop;
+        if (query[aggregateResultTransform]) main.noop = result.noop;
         return Object.assign(main, { parentTable: result.parentTable, preparedName: result.preparedName });
       };
     result.compile = (compiled, parentTable, currentColumn) => compiled ? nestedCompile(compiled, parentTable, currentColumn) :
       topLevel().compile(undefined, parentTable, currentColumn);
-    if (query['aggregateResultTransform']) {
+    if (query[aggregateResultTransform]) {
       Object.defineProperty(result, topLevelForm, { get: topLevel });
-      result['aggregateResultTransform'] = query['aggregateResultTransform'];
+      result[aggregateResultTransform] = query[aggregateResultTransform];
       result.runResultTransform = query.runResultTransform;
     }
   }

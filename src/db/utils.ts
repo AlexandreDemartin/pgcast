@@ -8,6 +8,7 @@ import type { Parameter, ParentColumn, SQLFragment } from './core';
 
 // An unchanged copy of a select still produces json_agg, whatever its JS transform.
 export const aggregateCopy = Symbol('aggregateCopy');
+export const aggregateResultTransform = Symbol('aggregateResultTransform');
 
 // no longer used in src/db (core.ts and shortcuts.ts declare their own), and kept: the declarations a package emitted
 // under node10 resolution, against Zapatos 6.6.1 or against pgcast before #578, name it as `zapatos/dist/db/utils`

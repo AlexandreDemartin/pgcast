@@ -6,7 +6,7 @@ Released under the MIT licence: see LICENCE file
 
 import * as pg from 'pg';
 import { isDatabaseError } from './pgErrors';
-import { mapWithSeparator, wait } from './utils';
+import { aggregateResultTransform, mapWithSeparator, wait } from './utils';
 import { sql, raw, param, SQLFragment } from './core';
 import { getConfig } from './config';
 import type { SQLQuery, TransactionEvent } from './config';
@@ -687,7 +687,7 @@ async function* cursorBatches<RunResult>(
 
   const inner = query.copy();  // before a number is taken, which a copy() that throws would leave taken
 
-  const batchQuery = query['aggregateResultTransform'] ? inner : query;
+  const batchQuery = query[aggregateResultTransform] ? inner : query;
 
   // the lowest free number, not a depth: two loops at once, then a third, each get a name no running one holds
   const held = cursorNumbers.get(txnClient) ?? new Set<number>();

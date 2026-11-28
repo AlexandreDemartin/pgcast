@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import type * as pg from 'pg';
 
 import { getConfig, SQLQuery } from './config';
-import { aggregateCopy, builtinName, identifier, isBuiltin, isKeylessBuiltin, isPOJO, isRefusedBuffer, space } from './utils';
+import { aggregateCopy, aggregateResultTransform, builtinName, identifier, isBuiltin, isKeylessBuiltin, isPOJO, isRefusedBuffer, space } from './utils';
 
 import type {
   Updatable,
@@ -456,7 +456,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
   runResultTransform: (qr: pg.QueryResult) => any = qr => qr.rows;
 
   // A top-level select runs its rows query. Its shallow copy runs the nested aggregate.
-  protected aggregateResultTransform?: (qr: pg.QueryResult) => any;
+  protected [aggregateResultTransform]?: (qr: pg.QueryResult) => any;
 
   protected [aggregateCopy]?: boolean;
 
@@ -488,16 +488,16 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
   }): SQLFragment<RunResult, Constraint> {
     const { literals = this.literals, expressions = this.expressions, ...overrideRest } = override ?? {};
     const copy = Object.assign(new SQLFragment<RunResult, Constraint>(literals, expressions), {
-      runResultTransform: this.aggregateResultTransform ?? this.runResultTransform,
+      runResultTransform: this[aggregateResultTransform] ?? this.runResultTransform,
       [aggregateCopy]: literals === this.literals && expressions === this.expressions &&
-        (!!this.aggregateResultTransform || !!this[aggregateCopy]),
+        (!!this[aggregateResultTransform] || !!this[aggregateCopy]),
       parentTable: this.parentTable,
       preparedName: this.preparedName,
       noop: this.noop,
       noopResult: this.noopResult,
       parenthesisedInExtras: this.parenthesisedInExtras
     }, overrideRest);
-    if (this.aggregateResultTransform && copy.preparedName != null && !('preparedName' in overrideRest)) {
+    if (this[aggregateResultTransform] && copy.preparedName != null && !('preparedName' in overrideRest)) {
       const name = nextPreparedName();
       copy.preparedName = name === copy.preparedName ? nextPreparedName() : name;  // an explicit name can match the sequence
     }
