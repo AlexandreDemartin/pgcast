@@ -137,7 +137,7 @@ describe('distinct: true over a passed-through lateral', () => {
     expect(await counted.run(t.client)).toEqual([1]);
   });
 
-  it('a copy() of a json read with its literals overridden is still compared as jsonb, of a count() or a sql fragment of the same text as written', async () => {
+  it('a copy() of a json read with its literals overridden is still compared as jsonb, of a count(), a selectOne() over a count() or a sql fragment of the same text as written', async () => {
     // its runResultTransform still marks a json result, which copy() keeps, as it keeps it for withCTEs()
     const
       bigint = 'SELECT 7::bigint AS result', copied = owner().copy({ literals: [bigint], expressions: [] }),
@@ -153,6 +153,14 @@ describe('distinct: true over a passed-through lateral', () => {
     expect(db.selectOne('accounts', all, { distinct: true, lateral: counted(bigint) }).compile().text).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
     expect([await run(counted(bigint), false), await run(counted(bigint), true)]).toEqual(['7', '7']);
     expect(await run(counted(at), true)).toEqual(new Date('2020-01-02T03:04:05Z'));
+    // a selectOne() whose passed-through lateral is no json read is none either, nor is its copy
+    const
+      overCount = () => db.selectOne('users', { id: parent('owner_id') }, { lateral: db.count('accounts', { owner_id: parent('id') }) }),
+      overCounted = (literal: string) => overCount().copy({ literals: [literal], expressions: [] });
+    expect(db.selectOne('accounts', all, { distinct: true, lateral: overCount() }).compile().text).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
+    expect(await run(overCount(), true)).toBe('2');
+    expect([await run(overCounted(bigint), false), await run(overCounted(bigint), true)]).toEqual(['7', '7']);
+    expect(await run(overCounted(at), true)).toEqual(new Date('2020-01-02T03:04:05Z'));
   });
 });
 
