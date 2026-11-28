@@ -377,3 +377,15 @@ describe('the writes\' RETURNING: the same results as their jsonb twins', () => 
     expect(await pgError(t.client, () => db.select('users', all, { lateral: { w: w() } as any }).run(t.client))).toMatchObject({ code: '42601' });
   });
 });
+
+it.each(['select', 'CTE main'])('keeps the JSON type of a %s copy with a custom transform', async form => {
+  const q = db.select('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } });
+  const copy = (form === 'select' ? q : db.withCTEs({ k: sql`SELECT 1` }, q)).copy();
+  const parent = () => db.selectOne('users', { id: 1 }, { distinct: true, lateral: copy });
+  const compiled = parent().compile();
+  copy.runResultTransform = () => 'custom';
+  expect(await parent().run(t.client)).toEqual([{ id: 2 }, { id: 3 }]);
+  expect(parent().compile()).toEqual(compiled);
+  expect(compiled.text).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result)');
+  expect(await copy.run(t.client)).toBe('custom');
+});
