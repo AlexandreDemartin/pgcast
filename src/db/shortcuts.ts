@@ -201,6 +201,15 @@ function SQLForJSONObject(pairs: [string, SQL, ours?: true][], parts = 'columns,
     sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v, ours]) => sql`${ours ? raw(`'${k}'`) : sql`${param(k)}::text`}, ${v}`)})`;
 }
 
+// the pairs of a `columns` or `returning` list, read by index up to its `length`, as mapWithSeparator() reads a list:
+// a string past the type gives its characters, which Postgres finds missing (42703) as `.run()` sends them, as in
+// Zapatos 6.6.1, where a `map()` threw at the call
+function columnPairs(columns: readonly Column[]) {
+  const pairs: [string, SQL][] = [];
+  for (let i = 0, len = columns.length; i < len; i++) pairs.push([columns[i], columns[i]]);
+  return pairs;
+}
+
 // an extras or lateral key beside every column is a column alias, as to_json() names its keys
 // after the columns: one quoted identifier, every `"` doubled, so that it comes back as given (SQLForAlias keeps a
 // hand-escaped `a""b`, which would come back as `a"b`), never split on `.`. Postgres refuses an empty one (42601) and
@@ -228,7 +237,7 @@ function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, 
     json = returning === null ? refusedSQL(returningNull) :
       extras === null ? refusedSQL(extrasNull) :
       returning !== undefined ? SQLForJSONObject([
-        ...returning.map((c): [string, SQL] => [c, c]),
+        ...columnPairs(returning),
         ...keys.map((k): [string, SQL] => [k, asScalar(extras![k])]),
         ...(reportAction ? [['$action', action, true] as [string, SQL, true]] : []),
       ], '`returning`, `extras` and `$action`', 'returning') :
@@ -1014,7 +1023,7 @@ function selectQuery(
           columns === null ? refusedSQL(columnsNull) :
           extras === null ? refusedSQL(extrasNull) :
           columns === undefined ? sql`to_json(${asRow ? SQLForAlias('row_', alias) : alias}.*)` :
-          SQLForJSONObject([...columns.map((c): [string, SQL] => [c, c]), ...keyPairs, ...lateralPairs]),
+          SQLForJSONObject([...columnPairs(columns), ...keyPairs, ...lateralPairs]),
     colsExtraSQL = passthrough || mode === SelectResultMode.Numeric || asJson ? [] : SQLForExtras(extras),
     colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric || asJson ? [] :
       passthrough ? (plainDistinct && jsonChild ? sql`to_jsonb("lateral_passthru".result)` : sql`"lateral_passthru".result`) :
