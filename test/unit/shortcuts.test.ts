@@ -2639,7 +2639,7 @@ describe('returning or columns given as no array, read by index as Zapatos 6.6.1
       values: ['A', 'a@x.org', 'i', 'd'],
     });
     expect(db.upsert('users', row, 'email', { returning: id }).compile()).toEqual({
-      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email") = ROW(EXCLUDED."display_name", EXCLUDED."email") RETURNING json_build_object($3::text, "i", $4::text, "d", \'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING json_build_object($3::text, "i", $4::text, "d", \'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
       values: ['A', 'a@x.org', 'i', 'd'],
     });
     expect(db.update('users', { display_name: 'A' }, { id: 1 }, { returning: id }).compile()).toEqual({
