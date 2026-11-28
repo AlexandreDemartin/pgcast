@@ -93,7 +93,7 @@ An agent knows only what its brief says. It follows the skills, names an excepti
 
 Applies to every Epic that closes, a release chapter included; an Epic never closes before its method PR.
 
-1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept, each "still holds" a run on master (#690); its fixes in a follow-up PR.
+1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept, each "still holds" a run on master (#690); its fixes in a follow-up PR; before a major, one `branch-reviewer` per lens, in parallel, each on its lens's files, at `xhigh` (reference § Models).
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped, with its proof ([reference.md](reference.md) § Method PRs); the file is emptied in the same PR, which closes the Epic (`Closes #epic`). Like any method PR, it rewrites § Current workflow of Epic #836 and adds its row to § History, and § Watch is reread against the method (what it shows becomes a comment or a sub-issue there).
 3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
 4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it (one session reached 966K tokens, #732). Within a chapter it updates the hand-over after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`, `.claude/settings.json`) and lose nothing (#812).
