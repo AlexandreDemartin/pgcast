@@ -175,16 +175,13 @@ const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInEx
 const topLevelForm = Symbol('topLevelForm');
 type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
 const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
-// A plain DISTINCT over a passed-through json child needs to_jsonb() (json has no equality, 42883).
-// Mark the transform of the nested form, which copy() keeps. A select's aggregate is always json,
-// even if the caller changes the rows transform. Caller SQL borrowing a transform stays as written (isQuery):
-// a json read inside a sql child, compared as written, needs the caller's to_jsonb() (42883 otherwise). A json read is
-// a select(); a selectOne(), selectExactlyOne() or selectRows() not built with distinct: true whose passed-through
-// lateral, if any, is one; a copy() of one, or withCTEs() over one. A runResultTransform the caller sets takes a query
-// out of this set, except a select(), withCTEs() over one, and a copy() of either with its SQL unchanged: the mark is on
-// the transform (#1003). Anything else, an aggregate included, carries no mark. A copy() with its literals or
-// expressions overridden keeps its source's mark, so a json read's is compared as jsonb, and its values come back as
-// jsonb gives them (7::bigint as 7, a timestamptz as a string).
+// A plain DISTINCT over a passed-through json child needs to_jsonb() (json has no equality, 42883). The json mark is
+// set at the end of select(): jsonResult on the query's transform and, for a select(), its aggregate transform, which
+// an unchanged copy() flags with aggregateCopy. copy() and withCTEs() carry it at any depth, a copy() with its literals
+// or expressions overridden too, so it is compared as its source is. A sql fragment is never read as marked, whatever
+// its transform (isQuery): a json read inside one, compared as written, needs the caller's to_jsonb(). The mark lives
+// on the transform, so a runResultTransform the caller sets may drop it or borrow another query's (#1003).
+// website/select.md defines the set.
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;

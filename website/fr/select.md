@@ -1,5 +1,5 @@
 ---
-english: d7e92b34bdf8
+english: 15190cf3977d
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -82,14 +82,13 @@ Le SQL de chaque ligne du tableau est ce que compile la bibliothèque construite
 - Une clé égale à une colonne apparaît deux fois dans le JSON, et la dernière l’emporte, comme `||` la fait l’emporter.
 - Avec `columns`, un seul `json_build_object()` prend 100 arguments : au-delà de 50 clés, colonnes et clés d’`extras` et de `lateral` comprises, une erreur est levée à la compilation.
 - Un `lateral` transmis, sauf sous `distinct: true`, et les [agrégats](/fr/aggregates) gardent leur SQL ; la sous-requête construit le sien avec `json`.
-- Sous `distinct: true`, une lecture en `json` est :
+- Sous `distinct: true`, là où aucun appelant n’a défini de `runResultTransform`, une lecture en `json` est :
   - un `select()` ;
   - un `selectOne()`, un `selectExactlyOne()` ou un `selectRows()` construit sans `distinct: true`, dont le `lateral`, s’il est transmis, est lui-même une lecture en `json` ;
-  - une `copy()` de l’une d’elles, ou `withCTEs()` appliqué à l’une d’elles.
-
-  Un `runResultTransform` défini par l’appelant sort une requête de cet ensemble, sauf un `select()`, `withCTEs()` appliqué à un `select()`, et une `copy()` de l’un ou l’autre dont le SQL est inchangé.
-- Tout autre `lateral` transmis est comparé tel qu’il est écrit : un agrégat (`count()`…), l’un de ces trois raccourcis construit avec `distinct: true`, ou un fragment `sql`, quoi qu’il contienne. Une lecture en `json` placée dans un fragment `sql` demande donc `to_jsonb()`, faute de quoi elle échoue avec 42883.
-- Une `copy()` dont les `literals` ou les `expressions` sont remplacés est comparée comme sa source, si bien que ses valeurs reviennent telles que `jsonb` les donne pour une lecture en `json`, `7::bigint` en `7` et un `timestamptz` en chaîne, et telles qu’elles sont écrites pour tout autre `lateral`, `"7"` et un `Date`.
+  - une `copy()` d’une lecture en `json`, ou `withCTEs()` appliqué à une telle lecture, à toute profondeur.
+- Les autres `lateral` transmis sont comparés tels qu’ils sont écrits, comme un agrégat (`count()`…), l’un de ces trois raccourcis construit avec `distinct: true`, ou un fragment `sql`, quoi qu’il contienne. Une lecture en `json` placée dans un fragment `sql` demande donc `to_jsonb()`, faute de quoi elle échoue avec 42883.
+- Une `copy()` dont les `literals` ou les `expressions` sont remplacés est comparée comme sa source : pour une lecture en `json`, ses valeurs reviennent telles que `jsonb` les donne, `7::bigint` en `7` et un `timestamptz` en chaîne ; pour toute autre, telles qu’elles sont écrites, `"7"` et un `Date`.
+- Là où un appelant a défini un `runResultTransform`, sur un `lateral` transmis ou sur une requête qu’il copie, enveloppe ou transmet, ce `lateral` peut être comparé tel qu’il est écrit ou en `jsonb`, sauf si c’est un fragment `sql`, jusqu’à ce que [#1003](https://github.com/AlexandreDemartin/pgcast/issues/1003) garde la marque sur la requête.
 
 <!-- probe: db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } }) -->
 ```sql

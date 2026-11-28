@@ -78,14 +78,13 @@ From 8.0.0, each row and the array are built with `json` functions, which keep t
 - A key equal to a column comes twice in the JSON, and the last wins, as `||` makes it win.
 - With `columns`, one `json_build_object()` takes 100 arguments: over 50 keys, columns, `extras` and `lateral` keys together, throw while compiling.
 - A passed-through `lateral`, but under `distinct: true`, and the [aggregates](/aggregates) keep their SQL; the subquery builds its own with `json`.
-- Under `distinct: true`, a `json` read is:
+- Under `distinct: true`, where no caller set a `runResultTransform`, a `json` read is:
   - a `select()`;
   - a `selectOne()`, `selectExactlyOne()` or `selectRows()` not built with `distinct: true`, whose `lateral`, if passed through, is itself a `json` read;
-  - a `copy()` of one, or `withCTEs()` over one.
-
-  A `runResultTransform` the caller sets takes a query out of this set, except a `select()`, `withCTEs()` over one, and a `copy()` of either with its SQL unchanged.
-- Any other `lateral` passed through is compared as written: an aggregate (`count()`…), one of those three built with `distinct: true`, or a `sql` fragment, whatever it holds. So a `json` read inside a `sql` fragment needs `to_jsonb()`, or it fails with 42883.
-- A `copy()` with its `literals` or `expressions` overridden is compared as its source is, so its values come back as `jsonb` gives them for a `json` read, `7::bigint` as `7` and a `timestamptz` as a string, and as written for any other, `"7"` and a `Date`.
+  - a `copy()` of a `json` read, or `withCTEs()` over one, at any depth.
+- Other `lateral`s passed through are compared as written, such as an aggregate (`count()`…), one of those three built with `distinct: true`, or a `sql` fragment, whatever it holds. So a `json` read inside a `sql` fragment needs `to_jsonb()`, or it fails with 42883.
+- A `copy()` with its `literals` or `expressions` overridden is compared as its source is: for a `json` read, its values come back as `jsonb` gives them, `7::bigint` as `7` and a `timestamptz` as a string; for any other, as written, `"7"` and a `Date`.
+- Where a caller set a `runResultTransform`, on a `lateral` passed through or on a query it copies, wraps or passes through, that `lateral` may be compared as written or as `jsonb`, unless it is a `sql` fragment, until [#1003](https://github.com/AlexandreDemartin/pgcast/issues/1003) keeps the mark on the query.
 
 <!-- probe: db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } }) -->
 ```sql
