@@ -109,6 +109,36 @@ describe('withCTEs', () => {
     expect(db.withCTEs({ recent }, ids).runResultTransform).toBe(ids.runResultTransform);
   });
 
+  it('select(): reads the noop and parentTable of the query at the call, as nested, whatever a top-level compile set', () => {
+    const one = sql`SELECT 1`, idsText = 'WITH "one" AS (SELECT 1) SELECT json_build_object($1::text, "id") AS result FROM "users"';
+    // a no-op set, compiled at the top level, then unset, before the call
+    const before = db.select('users', all, { columns: ['id'] });
+    before.noop = true; before.compile(); before.noop = false;
+    expect(db.withCTEs({ one }, before).compile()).toEqual({ text: idsText, values: ['id'] });
+    // set and compiled at the top level after the call
+    const after = db.select('users', all, { columns: ['id'] }), result = db.withCTEs({ one }, after);
+    after.noop = true; after.compile();
+    expect(result.compile()).toEqual({ text: idsText, values: ['id'] });
+    // a parentTable set, compiled, then unset, before the call: parent() has no table, as in a query never compiled
+    const owned = db.select('accounts', { owner_id: parent('id') }, { columns: ['id'] });
+    owned.parentTable = 'users'; owned.compile(); delete owned.parentTable;
+    expect(() => db.withCTEs({ one }, owned).compile()).toThrow("The 'parent' table alias has no meaning here");
+    // the query itself, at the top level, reads its own at each compile
+    expect(after.compile()).toEqual({ text: '/* marked no-op: won\'t hit DB unless forced -> */ SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'] });
+    after.noop = false;
+    expect(after.prepared('ids_late').compile()).toEqual({ text: 'SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'], name: 'ids_late' });
+  });
+
+  it('select(): never takes the prepared() name of the query, set before the call or after', () => {
+    const one = sql`SELECT 1`, ids = { text: 'WITH "one" AS (SELECT 1) SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'] };
+    const before = db.select('users', all, { columns: ['id'] }).prepared('p1');
+    before.compile(); delete before.preparedName;
+    expect(db.withCTEs({ one }, before).compile()).toEqual(ids);
+    const after = db.select('users', all, { columns: ['id'] }), result = db.withCTEs({ one }, after);
+    after.prepared('p2');
+    expect(result.compile()).toEqual(ids);
+  });
+
   it('a write shortcut as a CTE', () => {
     const eve = db.insert('users', { email: 'eve@example.com', display_name: 'Eve' }, { returning: ['id'] });
     expect(db.withCTEs({ eve }, db.select('users', all, { columns: ['display_name'] })).compile()).toEqual({

@@ -125,6 +125,77 @@ describe('distinct: true over a passed-through lateral', () => {
     expect(jsonb).toBe('2');
     expect(json).toBe('2');
   });
+
+  it('a json read inside a sql child is json, compared as written: 42883, and with to_jsonb() the distinct rows; a count() runs', async () => {
+    const
+      inSql = db.select('accounts', all, { distinct: true, lateral: sql`SELECT (${owner()}) AS result` }),
+      wrapped = db.select('accounts', all, { distinct: true, lateral: sql`SELECT to_jsonb((${owner()})) AS result` }),
+      counted = db.select('accounts', all, { distinct: true, lateral: sql`SELECT (${db.count('users', { id: parent('owner_id') })}) AS result` });
+    expect(inSql.compile().text).toMatch(/^SELECT to_json\(result\) AS result FROM \(SELECT DISTINCT "lateral_passthru"\.result AS result FROM "accounts" LEFT JOIN LATERAL/);
+    expect(await pgError(t.client, () => inSql.run(t.client))).toEqual({ code: '42883', message: 'could not identify an equality operator for type json' });
+    expect((await wrapped.run(t.client)).map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
+    expect(await counted.run(t.client)).toEqual([1]);
+  });
+
+  it('a selectRows() inside a sql child is a json read too: 42883; built with distinct: true, or over a max(), it runs', async () => {
+    const
+      inSql = (rows: db.SQLFragment<any, any>) => db.select('accounts', all, { distinct: true, lateral: sql`SELECT (${rows}) AS result` }),
+      owners = { id: parent('owner_id') };
+    expect(await pgError(t.client, () => inSql(db.selectRows('users', owners)).run(t.client))).toEqual({ code: '42883', message: 'could not identify an equality operator for type json' });
+    expect((await inSql(db.selectRows('users', owners, { distinct: true })).run(t.client)).map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
+    expect((await inSql(db.selectRows('users', owners, { lateral: db.max('accounts', { owner_id: parent('id') }, { columns: ['id'] }) })).run(t.client)).sort()).toEqual([2, 3]);
+  });
+
+  it('a runResultTransform the caller sets takes a selectOne() out of the json reads, compared as written: 42883 (#1003); a select() keeps its to_jsonb() and runs', async () => {
+    // the json mark lives on the transform, so the caller's own drops it; a select()'s aggregate keeps its mark
+    const one = owner();
+    one.runResultTransform = qr => qr.rows[0]?.result;
+    const overOne = db.select('accounts', all, { distinct: true, lateral: one });
+    expect(overOne.compile().text).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
+    expect(await pgError(t.client, () => overOne.run(t.client))).toEqual({ code: '42883', message: 'could not identify an equality operator for type json' });
+    const many = db.select('users', { id: parent('owner_id') });
+    many.runResultTransform = qr => qr.rows;
+    const overMany = db.select('accounts', all, { distinct: true, lateral: many });
+    expect(overMany.compile().text).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
+    expect((await overMany.run(t.client)).map((us: any) => us[0].display_name).sort()).toEqual(['Ada', 'Bob']);
+  });
+
+  it('a copy() of a json read with its literals overridden is still compared as jsonb, of a count(), a selectOne() over a count() or a sql fragment of the same text as written', async () => {
+    // its runResultTransform still marks a json result, which copy() keeps, as it keeps it for withCTEs()
+    const
+      bigint = 'SELECT 7::bigint AS result', copied = owner().copy({ literals: [bigint], expressions: [] }),
+      run = (lateral: db.SQLFragment<any>, distinct: boolean) => db.selectOne('accounts', { owner_id: 1 }, { distinct, lateral }).run(t.client);
+    expect(db.selectOne('accounts', all, { distinct: true, lateral: copied }).compile().text).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
+    expect([await run(copied, false), await run(copied, true)]).toEqual(['7', 7]);
+    const fragment = sql`SELECT 7::bigint AS result`;
+    expect([await run(fragment, false), await run(fragment, true)]).toEqual(['7', '7']);
+    const at = `SELECT '2020-01-02T03:04:05Z'::timestamptz AS result`, at2 = owner().copy({ literals: [at], expressions: [] });
+    expect(await run(at2, false)).toEqual(new Date('2020-01-02T03:04:05Z'));
+    expect(typeof await run(at2, true)).toBe('string');
+    const counted = (literal: string) => db.count('users', { id: parent('owner_id') }).copy({ literals: [literal], expressions: [] });
+    expect(db.selectOne('accounts', all, { distinct: true, lateral: counted(bigint) }).compile().text).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
+    expect([await run(counted(bigint), false), await run(counted(bigint), true)]).toEqual(['7', '7']);
+    expect(await run(counted(at), true)).toEqual(new Date('2020-01-02T03:04:05Z'));
+    // a selectOne() whose passed-through lateral is no json read is none either, nor is its copy
+    const
+      overCount = () => db.selectOne('users', { id: parent('owner_id') }, { lateral: db.count('accounts', { owner_id: parent('id') }) }),
+      overCounted = (literal: string) => overCount().copy({ literals: [literal], expressions: [] });
+    expect(db.selectOne('accounts', all, { distinct: true, lateral: overCount() }).compile().text).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
+    expect(await run(overCount(), true)).toBe('2');
+    expect([await run(overCounted(bigint), false), await run(overCounted(bigint), true)]).toEqual(['7', '7']);
+    expect(await run(overCounted(at), true)).toEqual(new Date('2020-01-02T03:04:05Z'));
+  });
+
+  it('withCTEs() over a copy() of a copy() of a select() is a json read at any depth: compared as jsonb, and its copy() with its literals overridden gives 7', async () => {
+    // copy() and withCTEs() carry the mark however deep, where no caller set a runResultTransform
+    const
+      deep = () => db.withCTEs({ one: sql`SELECT 1` }, db.select('users', { id: parent('owner_id') }).copy().copy()),
+      over = db.select('accounts', all, { distinct: true, lateral: deep() }),
+      copied = deep().copy({ literals: ['SELECT 7::bigint AS result'], expressions: [] });
+    expect(over.compile().text).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
+    expect((await over.run(t.client)).map((us: any) => us[0].display_name).sort()).toEqual(['Ada', 'Bob']);
+    expect(await db.selectOne('accounts', { owner_id: 1 }, { distinct: true, lateral: copied }).run(t.client)).toBe(7);
+  });
 });
 
 describe('a key equal to a column', () => {

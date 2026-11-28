@@ -100,6 +100,16 @@ describe('withCTEs', () => {
     expect([await prepared.run(t.client), await prepared.run(t.client)]).toEqual([[{ id: 2 }, { id: 3 }], [{ id: 2 }, { id: 3 }]]);
   });
 
+  it('select(): runs as the query stands at the call, whatever a top-level compile set before or after', async () => {
+    const ids = () => db.select('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } });
+    const before = ids();
+    before.noop = true; before.noopResult = []; before.compile(); before.noop = false;
+    expect(await db.withCTEs({ reports }, before).run(t.client)).toEqual([{ id: 2 }, { id: 3 }]);
+    const after = ids(), result = db.withCTEs({ reports }, after);
+    after.noop = true; after.noopResult = []; after.compile();
+    expect(await result.run(t.client)).toEqual([{ id: 2 }, { id: 3 }]);
+  });
+
   it('select(), prepared and run on its own, then a CTE: the CTE is its aggregate, unprepared', async () => {
     const tag = randomBytes(4).toString('hex');
     for (const [i, options] of [{}, { lateral: db.count('accounts', { owner_id: parent('id') }) }].entries()) {

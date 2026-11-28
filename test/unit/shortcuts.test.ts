@@ -2627,6 +2627,51 @@ describe('null as options, or as an options key', () => {
   });
 });
 
+// `returning` or `columns` given as no array, past the type: Zapatos 6.6.1's mapWithSeparator() read its `length` and
+// each index, so a string's characters were columns, which `.run()` finds missing (42703,
+// test/integration/shortcuts.test.ts), and an object with no `length` none; never a TypeError at the call
+describe('returning or columns given as no array, read by index as Zapatos 6.6.1 read it', () => {
+  const id = 'id' as any, none = {} as any, row = { email: 'a@x.org', display_name: 'A' };
+
+  it('a string as returning: its characters, one column each, in insert(), upsert(), update() and deletes()', () => {
+    expect(db.insert('users', row, { returning: id }).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING json_build_object($3::text, "i", $4::text, "d") AS result',
+      values: ['A', 'a@x.org', 'i', 'd'],
+    });
+    expect(db.upsert('users', row, 'email', { returning: id }).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING json_build_object($3::text, "i", $4::text, "d", \'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
+      values: ['A', 'a@x.org', 'i', 'd'],
+    });
+    expect(db.update('users', { display_name: 'A' }, { id: 1 }, { returning: id }).compile()).toEqual({
+      text: 'UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING json_build_object($3::text, "i", $4::text, "d") AS result',
+      values: ['A', 1, 'i', 'd'],
+    });
+    expect(db.deletes('users', { id: 1 }, { returning: id }).compile()).toEqual({
+      text: 'DELETE FROM "users" WHERE ("id" = $1) RETURNING json_build_object($2::text, "i", $3::text, "d") AS result',
+      values: [1, 'i', 'd'],
+    });
+  });
+
+  it('a string as columns: its characters, at the top level, beside extras and nested', () => {
+    expect(db.select('users', all, { columns: id }).compile()).toEqual({
+      text: 'SELECT json_build_object($1::text, "i", $2::text, "d") AS result FROM "users"',
+      values: ['i', 'd'],
+    });
+    expect(db.selectOne('users', all, { columns: id, extras: { n: sql`1` } }).compile()).toEqual({
+      text: 'SELECT json_build_object($1::text, "i", $2::text, "d", $3::text, 1) AS result FROM "users" LIMIT $4',
+      values: ['i', 'd', 'n', 1],
+    });
+    expect(db.selectOne('users', all, { lateral: { a: db.select('accounts', all, { columns: id }) } }).compile().text)
+      .toContain('LEFT JOIN LATERAL (SELECT coalesce(json_agg(result), \'[]\') AS result FROM (SELECT json_build_object($1::text, "i", $2::text, "d") AS result FROM "accounts") AS "sq_accounts") AS "lateral_a" ON true');
+  });
+
+  it('an object with no length: no column, an empty object', () => {
+    expect(db.insert('users', row, { returning: none }).compile().text)
+      .toBe('INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING json_build_object() AS result');
+    expect(db.select('users', all, { columns: none }).compile().text).toBe('SELECT json_build_object() AS result FROM "users"');
+  });
+});
+
 // an option is what the caller wrote: Zapatos 6.6.1 and 6.7.2 read each one with `options?.x`, destructuring or
 // `allOptions.x`, so a key that other code added to Object.prototype was an option of every call given an options
 // object without it; each row compiles as the call without that option (#552)

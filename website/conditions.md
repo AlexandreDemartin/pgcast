@@ -558,7 +558,7 @@ Without the alias, `"crew"."id"` would be the subquery's own row: written by han
 
 > `` `exists()` was given `parent: 'crew'`, which names "crew", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option. ``<!-- message -->
 
-Names compare as Postgres reads them: `'crew'`, `'"crew"'` and `'public.crew'` are one name. The check compares names, not tables, so `parent: 'public.crew'` over a `crew` table of another schema is refused too, though Postgres would tell the two apart: an alias settles it.
+Names compare as Postgres reads them: `'crew'`, `'"crew"'` and `'public.crew'` are one name. The check compares names, not tables, so `parent: 'public.crew'` over a `crew` table of another schema is refused too, though Postgres would tell the two apart: an alias settles it. The 63 bytes are counted in UTF-8: in a database of another encoding, Postgres counts its own, so two long names the check tells apart may be one to Postgres, with no error.
 
 ### `isInSelect()` {#conditions.isInSelect}
 

@@ -175,9 +175,13 @@ const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInEx
 const topLevelForm = Symbol('topLevelForm');
 type TopLevelFormed = { [topLevelForm]?: SQLFragment<any, any> };
 const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
-// A plain DISTINCT over a passed-through json child needs to_jsonb() (json has no equality, 42883).
-// Mark the transform of the nested form, which copy() keeps. A select's aggregate is always json,
-// even if the caller changes the rows transform. Caller SQL borrowing a transform stays as written (isQuery).
+// A plain DISTINCT over a passed-through json child needs to_jsonb() (json has no equality, 42883). The json mark is
+// set at the end of select(): jsonResult on the query's transform and, for a select(), its aggregate transform, which
+// an unchanged copy() flags with aggregateCopy. copy() and withCTEs() carry it at any depth, a copy() with its literals
+// or expressions overridden too, so it is compared as its source is. A sql fragment is never read as marked, whatever
+// its transform (isQuery): a json read inside one, compared as written, needs the caller's to_jsonb(). The mark lives
+// on the transform, so a runResultTransform the caller sets may drop it or borrow another query's (#1003).
+// website/select.md defines the set.
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
@@ -201,10 +205,21 @@ function SQLForJSONObject(pairs: [string, SQL, ours?: true][], parts = 'columns,
     sql`json_build_object(${mapWithSeparator(pairs, sql`, `, ([k, v, ours]) => sql`${ours ? raw(`'${k}'`) : sql`${param(k)}::text`}, ${v}`)})`;
 }
 
+// the pairs of a `columns` or `returning` list, read by index up to its `length`, as mapWithSeparator() reads a list:
+// a string past the type gives its characters, which Postgres finds missing (42703) as `.run()` sends them, as in
+// Zapatos 6.6.1, where a `map()` threw at the call
+function columnPairs(columns: readonly Column[]) {
+  const pairs: [string, SQL][] = [];
+  for (let i = 0, len = columns.length; i < len; i++) pairs.push([columns[i], columns[i]]);
+  return pairs;
+}
+
 // an extras or lateral key beside every column is a column alias, as to_json() names its keys
 // after the columns: one quoted identifier, every `"` doubled, so that it comes back as given (SQLForAlias keeps a
 // hand-escaped `a""b`, which would come back as `a"b`), never split on `.`. Postgres refuses an empty one (42601) and
-// a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles
+// a NUL (08P01), and truncates one over 63 bytes (NAMEDATALEN) with only a NOTICE: refused as the query compiles.
+// The bytes are counted in UTF-8, as the database's encoding is not known here: in one of another encoding, Postgres
+// counts its own, so a shorter key may still come back cut (31 × é come back as 21 in EUC_JP)
 function SQLForKeyAlias(key: string, list: 'columns' | 'returning' = 'columns') {
   const
     text = `${key}`,
@@ -228,7 +243,7 @@ function SQLForReturning(table: Table, options: ReturningOptionsForTable<Table, 
     json = returning === null ? refusedSQL(returningNull) :
       extras === null ? refusedSQL(extrasNull) :
       returning !== undefined ? SQLForJSONObject([
-        ...returning.map((c): [string, SQL] => [c, c]),
+        ...columnPairs(returning),
         ...keys.map((k): [string, SQL] => [k, asScalar(extras![k])]),
         ...(reportAction ? [['$action', action, true] as [string, SQL, true]] : []),
       ], '`returning`, `extras` and `$action`', 'returning') :
@@ -1014,7 +1029,7 @@ function selectQuery(
           columns === null ? refusedSQL(columnsNull) :
           extras === null ? refusedSQL(extrasNull) :
           columns === undefined ? sql`to_json(${asRow ? SQLForAlias('row_', alias) : alias}.*)` :
-          SQLForJSONObject([...columns.map((c): [string, SQL] => [c, c]), ...keyPairs, ...lateralPairs]),
+          SQLForJSONObject([...columnPairs(columns), ...keyPairs, ...lateralPairs]),
     colsExtraSQL = passthrough || mode === SelectResultMode.Numeric || asJson ? [] : SQLForExtras(extras),
     colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric || asJson ? [] :
       passthrough ? (plainDistinct && jsonChild ? sql`to_jsonb("lateral_passthru".result)` : sql`"lateral_passthru".result`) :
@@ -1075,7 +1090,8 @@ function selectQuery(
     // `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps its aggregate, which the parent reads as one
     // value; the top-level form takes the properties a caller may have set on the query since (those `copy()` carries
     // over), so it is a fragment of its own, never the one nested in the aggregate, which would carry the name and
-    // noop nested
+    // noop nested; a copy each time, so that withCTEs() reads the query as it stands at its call, never as its last
+    // top-level compile left it
     const
       // a single lateral passed through keeps its JSON value, as json_agg() converts it (pg parses the bare column,
       // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
@@ -1084,9 +1100,9 @@ function selectQuery(
         sql<SQL, any>`SELECT to_json(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
         rowsSQL(limit),
       nestedCompile = query.compile,
-      topLevel = () => Object.assign(topLevelQuery,
+      topLevel = () => Object.assign(topLevelQuery.copy(),
         { parentTable: query.parentTable, preparedName: query.preparedName, noop: query.noop, noopResult: query.noopResult });
-    (query as TopLevelFormed)[topLevelForm] = topLevelQuery;
+    Object.defineProperty(query, topLevelForm, { get: topLevel });
     query.compile = (result, parentTable, currentColumn) =>
       result ? nestedCompile(result, parentTable, currentColumn) : topLevel().compile(undefined, parentTable, currentColumn);
   }

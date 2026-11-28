@@ -1,5 +1,5 @@
 ---
-english: e0cf3f4cce2c
+english: f2b007b48e7d
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -75,13 +75,20 @@ Le SQL de chaque ligne du tableau est ce que compile la bibliothèque construite
 |---|---|
 | `columns`, avec ou sans `extras` et `lateral` | un seul `json_build_object($1::text, "title", $2::text, upper("title"))`<!-- probe: db.select('films', db.all, { columns: ['title'], extras: { upper: db.sql`upper(${'title'})` } }) -->, dont les clés sont des paramètres |
 | `extras` ou `lateral`, à côté de toutes les colonnes | `to_json("row_films".*)`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> de la ligne avec ses clés en alias, `"lateral_cast".result AS "cast"`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) -->, dans une sous-requête `AS "row_films"`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> |
-| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: db.select('films', db.all, { distinct: true }) -->, car `json` n’a pas d’égalité, si bien que le `result` de chaque ligne est en `jsonb` ; sur un `select()`, un `selectOne()` ou un `selectExactlyOne()` transmis, `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) }) --> |
+| `distinct: true` | `SELECT DISTINCT to_jsonb("films".*)`<!-- probe: db.select('films', db.all, { distinct: true }) -->, car `json` n’a pas d’égalité, si bien que le `result` de chaque ligne est en `jsonb` ; sur une lecture en `json` transmise (ci-dessous), `SELECT DISTINCT to_jsonb("lateral_passthru".result)`<!-- probe: db.select('films', db.all, { distinct: true, lateral: db.selectOne('studios', { id: db.parent('studio_id') }) }) --> ; sur tout autre, `SELECT DISTINCT "lateral_passthru".result`<!-- probe: db.select('films', db.all, { distinct: true, lateral: db.count('roles', { film_id: db.parent('id') }) }) --> |
 
-- À côté de toutes les colonnes, chaque clé est un identifiant, chaque `"` doublé. Une clé vide, avec un NUL ou de plus de 63 octets en UTF-8, que Postgres refuserait ou tronquerait, lève une erreur à la compilation : passez `columns`, dont les clés restent des paramètres.
+- À côté de toutes les colonnes, chaque clé est un identifiant, chaque `"` doublé. Une clé vide, avec un NUL ou de plus de 63 octets en UTF-8, que Postgres refuserait ou tronquerait, lève une erreur à la compilation : passez `columns`, dont les clés restent des paramètres. Les octets sont comptés en UTF-8 : dans une base d’un autre encodage, Postgres compte les siens, si bien qu’une clé plus courte peut encore revenir tronquée, 31 `é` en 21 dans `EUC_JP`.
 - Dans ce cas, un `order.by` ou un `distinct` en chaîne est écrit après la table, `ORDER BY "films"."title" ASC`<!-- probe: db.select('films', db.all, { order: { by: 'title', direction: 'ASC' }, extras: { upper: db.sql`upper(${'title'})` } }) -->, sauf s’il contient un `.` : un nom seul correspondrait aussi à une clé du même nom (42702). Ainsi `by: 'result'` désigne la colonne de la table. Un fragment `sql` est écrit tel quel : un nom seul identique à une clé y échoue donc avec 42702, `` by: db.sql`${'title'}` `` à côté de `extras: { title: … }`, de même dans `distinct` ou à côté d’une clé de `lateral`. Qualifiez-le, `` db.sql`${'films'}.${'title'}` ``.
 - Une clé égale à une colonne apparaît deux fois dans le JSON, et la dernière l’emporte, comme `||` la fait l’emporter.
 - Avec `columns`, un seul `json_build_object()` prend 100 arguments : au-delà de 50 clés, colonnes et clés d’`extras` et de `lateral` comprises, une erreur est levée à la compilation.
 - Un `lateral` transmis, sauf sous `distinct: true`, et les [agrégats](/fr/aggregates) gardent leur SQL ; la sous-requête construit le sien avec `json`.
+- Sous `distinct: true`, là où aucun appelant n’a défini de `runResultTransform`, une lecture en `json` est :
+  - un `select()` ;
+  - un `selectOne()`, un `selectExactlyOne()` ou un `selectRows()` construit sans `distinct: true`, dont le `lateral`, s’il est transmis, est lui-même une lecture en `json` ;
+  - une `copy()` d’une lecture en `json`, ou `withCTEs()` appliqué à une telle lecture, à toute profondeur.
+- Les autres `lateral` transmis sont comparés tels qu’ils sont écrits, comme un agrégat (`count()`…), l’un de ces trois raccourcis construit avec `distinct: true`, ou un fragment `sql`, quoi qu’il contienne. Une lecture en `json` placée dans un fragment `sql` demande donc `to_jsonb()`, faute de quoi elle échoue avec 42883.
+- Une `copy()` dont les `literals` ou les `expressions` sont remplacés est comparée comme sa source : pour une lecture en `json`, ses valeurs reviennent telles que `jsonb` les donne, `7::bigint` en `7` et un `timestamptz` en chaîne ; pour toute autre, telles qu’elles sont écrites, `"7"` et un `Date`.
+- Là où un appelant a défini un `runResultTransform`, sur un `lateral` transmis ou sur une requête qu’il copie, enveloppe ou transmet à toute profondeur, ce `lateral` peut être comparé tel qu’il est écrit ou en `jsonb`, sauf si c’est un fragment `sql`, jusqu’à ce que [#1003](https://github.com/AlexandreDemartin/pgcast/issues/1003) garde la marque sur la requête.
 
 <!-- probe: db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } }) -->
 ```sql

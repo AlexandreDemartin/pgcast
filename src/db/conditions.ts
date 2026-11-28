@@ -354,7 +354,8 @@ export const arrayOverlaps: ArrayCondition = (a: readonly unknown[] | ParentColu
 
 // the last identifier of a name, as Postgres reads the text compileExpression writes, which ends with a quoted
 // part: `""` undoubled, a `U&` part's escapes decoded (no `UESCAPE` follows one there), then cut to its first 63
-// bytes in UTF-8, at a character's end, as Postgres truncates a name (NAMEDATALEN)
+// bytes in UTF-8, at a character's end, as Postgres truncates a name (NAMEDATALEN) in a UTF-8 database: one of
+// another encoding counts its own bytes, so two names told apart here may be one to Postgres
 const lastIdentifier = (name: string) => {
   const
     parts = sql`${name}`.compile().text.match(/(?:[Uu]&)?"(?:[^"]|"")*"|[^".\s]+/g) ?? [],

@@ -1,5 +1,5 @@
 ---
-english: 3b6ce8a6ed77
+english: 7f960cc297fb
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -563,7 +563,7 @@ Sans l’alias, `"crew"."id"` serait la ligne même de la sous-requête : écri
 
 > `` `exists()` was given `parent: 'crew'`, which names "crew", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option. ``<!-- message -->
 
-Les noms se comparent comme Postgres les lit : `'crew'`, `'"crew"'` et `'public.crew'` ne font qu’un seul nom. La vérification compare des noms, pas des tables : `parent: 'public.crew'` sur une table `crew` d’un autre schéma est donc refusé aussi, alors que Postgres distinguerait les deux. Un alias règle la question.
+Les noms se comparent comme Postgres les lit : `'crew'`, `'"crew"'` et `'public.crew'` ne font qu’un seul nom. La vérification compare des noms, pas des tables : `parent: 'public.crew'` sur une table `crew` d’un autre schéma est donc refusé aussi, alors que Postgres distinguerait les deux. Un alias règle la question. Les 63 octets sont comptés en UTF-8 : dans une base d’un autre encodage, Postgres compte les siens, si bien que deux noms longs que la vérification distingue peuvent n’en faire qu’un pour Postgres, sans aucune erreur.
 
 ### `isInSelect()` {#conditions.isInSelect}
 
