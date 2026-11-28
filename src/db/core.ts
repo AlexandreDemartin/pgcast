@@ -384,6 +384,7 @@ export function sql<
 }
 
 let preparedNameSeq = 0;
+const nextPreparedName = () => `_zapatos_prepared_${preparedNameSeq++}`;
 
 // one or more double-quoted identifiers joined by `.`, as Postgres lexes them: `"a"`, `"a"."b"`, `"a""b"`;
 // whitespace may surround a dot, as in the aggregate rule of shortcuts.ts, but a comment may not
@@ -454,6 +455,9 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
    */
   runResultTransform: (qr: pg.QueryResult) => any = qr => qr.rows;
 
+  // A top-level select runs its rows query. Its shallow copy runs the nested aggregate.
+  protected aggregateResultTransform?: (qr: pg.QueryResult) => any;
+
   parentTable?: string = undefined;  // used for nested shortcut select queries
   preparedName?: string = undefined;  // for prepared statements
 
@@ -466,7 +470,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
   /**
    * Performs a shallow copy of this SQLFragment, optionally overriding some of its properties.
-   * The copy keeps `runResultTransform`, so a copied shortcut resolves to the shortcut's result.
+   * A select's copy uses the aggregate transform. If the select is prepared, its copy gets a separate name.
+   * Other copies keep the original transform and name.
    * It compiles as the fragment does nested in another: a copy of `selectExactlyOne()` keeps
    * `LIMIT 1`, even with `selectExactlyOneChecksForSecondRow`.
    * @param override The properties to override
@@ -480,15 +485,19 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     noopResult?: any;
   }): SQLFragment<RunResult, Constraint> {
     const { literals = this.literals, expressions = this.expressions, ...overrideRest } = override ?? {};
-    const copy = new SQLFragment<RunResult, Constraint>(literals, expressions);
-    return Object.assign(copy, {
-      runResultTransform: this.runResultTransform,  // what the type of the copy promises
+    const copy = Object.assign(new SQLFragment<RunResult, Constraint>(literals, expressions), {
+      runResultTransform: this.aggregateResultTransform ?? this.runResultTransform,
       parentTable: this.parentTable,
       preparedName: this.preparedName,
       noop: this.noop,
       noopResult: this.noopResult,
       parenthesisedInExtras: this.parenthesisedInExtras
     }, overrideRest);
+    if (this.aggregateResultTransform && copy.preparedName != null && !('preparedName' in overrideRest)) {
+      const name = nextPreparedName();
+      copy.preparedName = name === copy.preparedName ? nextPreparedName() : name;  // an explicit name can match the sequence
+    }
+    return copy;
   }
 
   /**
@@ -497,7 +506,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
    * @param name A name for the prepared query. If not specified, it takes the
    * value '_zapatos_prepared_N', where N is an increasing sequence number.
    */
-  prepared = (name = `_zapatos_prepared_${preparedNameSeq++}`) => {
+  prepared = (name = nextPreparedName()) => {
     this.preparedName = name;
     return this;
   };
