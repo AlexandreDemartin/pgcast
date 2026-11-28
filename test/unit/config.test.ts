@@ -68,14 +68,12 @@ describe('setConfig()', () => {
     transactionRetryDelay: { minMs: 25, maxMs: 250 },
     castArrayParamsToJson: false,
     castObjectParamsToJson: false,
-    selectExactlyOneChecksForSecondRow: false,
   };
   const changed = {
     transactionAttemptsMax: 2,
     transactionRetryDelay: { minMs: 0, maxMs: 0 },
     castArrayParamsToJson: true,
     castObjectParamsToJson: true,
-    selectExactlyOneChecksForSecondRow: true,
   };
 
   // decision 019 § 4: a key 8.0 removed passes as the value 8.0 always behaves as, null or undefined, and is not kept;
@@ -84,13 +82,14 @@ describe('setConfig()', () => {
     undefinedMeansMissing: true, upsertRequiresSameKeys: true,
     transactionRequiresCommit: true, transactionRequiresIdleClient: true, transactionRequiresSatisfyingLevel: true,
     aggregatesTypedByColumn: true, shortcutsUseJson: true, topLevelSelectAsRows: true,
+    selectExactlyOneChecksForSecondRow: false,
   };
   const set = (config: object) => db.setConfig(config as db.NewConfig);
   const message = (key: string, kept: boolean) => `${key} was removed in 8.0, which always does what ${key}: ${kept} ` +
     `did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-${key}`;
 
   describe.each(Object.entries(removed))('the removed key %s', (key, kept) => {
-    it.each([false, 0, '', 'yes', 1, {}])('throws for %j, naming the key, what 8.0 does and its entry, and changes nothing', value => {
+    it.each([!kept, 0, '', 'yes', 1, {}])('throws for %j, naming the key, what 8.0 does and its entry, and changes nothing', value => {
       const before = db.getConfig();
       expect(() => set({ transactionAttemptsMax: 2, [key]: value })).toThrow(new Error(message(key, kept)));
       expect(db.getConfig()).toEqual(before);
