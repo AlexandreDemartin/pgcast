@@ -19,6 +19,10 @@ Candidates for a check, a rule or a skill line.
 - #992 — A brief's "master touches only X" goes stale within the round: after merging master, `git diff --stat HEAD^1 HEAD` says what came in (#992).
 - #992 — A sentence that limits a behaviour to one entry point ("a `select()` run on its own") is replayed on every entry point the same mechanism covers: the main query of `withCTEs()` took the same path and the sentence left it out (#992).
 - #992 — The #981 rule (read before and after) applies to each case of an entry's list, not only to the entry: a fix that adds a bullet can give its "after" inline and never reach **Before → after** (#992).
+- #998 — Running a prepared child and its embedding in both orders tells a historical name collision from one a change of SQL introduced: the builder's replay stopped a break 019 does not list — codex
+- #998 — Put an empty CTE list on either side of another wrapper when testing whether the public compiler and transform survive composition — codex
+- #998 — Count server-side prepared statements on the connection that ran them, after repeatedly creating copies as well as repeatedly running one copy: a compiled name alone misses a copy the test never executed — codex
+- #998 — Comparing the code spans of the English and French migration entries caught a missing `oldTransform` assignment — codex
 
 ## Minors kept
 
@@ -55,3 +59,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `form` `website/switching.md:453` and `fr/:454` (#992): the prepared copy gets its "after" inline only, where the other cases get a before → after; add `q.copy()` → `q.copy({ preparedName: 'films_agg' })` (or let #993 remove the case).
 - `defect` `website/sql-template.md:571` and `fr/:575` (#992): "A `select()` run on its own" leaves out the main query of `withCTEs()`, which behaves the same; say it as `CHANGELOG.md:15` does.
 - `form` `CHANGELOG.md:15` (#992): eight effects in one sentence joined by semicolons; name them and link the migration entry (skill `concise-docs`).
+- #998 — `defect` `website/switching.md:440`: "sends `selectRows()`'s query" holds except for a passed-through `count()` lateral, where `select()` wraps it in `to_json(result)` and returns `[2]` against `selectRows()`'s `['2']`; qualify it EN and FR as `sql-template.md` does — codex
