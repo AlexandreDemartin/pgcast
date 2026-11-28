@@ -75,7 +75,7 @@ An agent knows only what its brief says. It follows the skills, names an excepti
 - **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix), each a red test commit, then its fix commit (#550).
   - Started as the typed `builder`; only if the harness answers "Agent type 'builder' not found", a general-purpose agent told to read `.claude/agents/builder.md` first.
 - **Model and effort** per role, the effort passed in each spawn: a user setting can pin a model at `high` over the session's effort; an agent's frontmatter and a spawn's `effort` both outrank it. A session reads `.claude/agents/` when it starts: a changed agent applies from the next session (#731, #732). The table: [reference.md](reference.md) § Models.
-- **A `builder`'s hand-over**: one that stopped past about 80 calls (agent `builder` § Hand-over) is followed by a fresh `builder` with the issue, the branch and its hand-over note.
+- **A `builder`'s hand-over**: one that stopped past about 80 calls (agent `builder` § Hand-over, reminded by its hook) is followed by a fresh `builder` with the issue, the branch and its hand-over note; one cut by `maxTurns` (its result marked partial) too, from its last pushed commit when it left no note.
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
 - A brief quotes the rule it relies on, with its file and section, never a paraphrase (a section said to name a label named a script, #886; a page title, #894), and states a tool's limits only from its code (#911).
@@ -93,7 +93,7 @@ An agent knows only what its brief says. It follows the skills, names an excepti
 
 Applies to every Epic that closes, a release chapter included; an Epic never closes before its method PR.
 
-1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept, each "still holds" a run on master (#690); its fixes in a follow-up PR.
+1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept, each "still holds" a run on master (#690); its fixes in a follow-up PR; before a major, one `branch-reviewer` per lens, in parallel, each on its lens's files, at `xhigh` (reference § Models).
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped, with its proof ([reference.md](reference.md) § Method PRs); the file is emptied in the same PR, which closes the Epic (`Closes #epic`). Like any method PR, it rewrites § Current workflow of Epic #836 and adds its row to § History, and § Watch is reread against the method (what it shows becomes a comment or a sub-issue there).
 3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
 4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it (one session reached 966K tokens, #732). Within a chapter it updates the hand-over after each merge, so that the session can compact at 250K tokens (`autoCompactWindow`, `.claude/settings.json`) and lose nothing (#812).

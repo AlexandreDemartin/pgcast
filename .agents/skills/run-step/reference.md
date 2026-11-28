@@ -8,6 +8,7 @@ The cases of skill `run-step` that serve a minority of steps; [SKILL.md](SKILL.m
 |---|---|---|
 | `builder`, every step (plan and build) and round of fixes | the session's | `high` |
 | `branch-reviewer`, review and `verify` | the session's | `high` |
+| `branch-reviewer`, range review before a major: one per lens (`sql`, `types`, `codegen`, `compat`), each on its lens's files | the session's | `xhigh` |
 | `chores`, French proofreader, npm and site audits | `sonnet` | `medium` |
 | Orchestrator | the session's | the session's |
 

@@ -3,6 +3,12 @@ name: builder
 effort: high
 description: 'Builds a pgcast step, GitHub sub-issue of an Epic (runtime, codegen, tests, docs): plan comment, code, draft PR with its proofs; or applies the blocking items of a review when started afresh with them. Choose it over the default agent to write the code of a branch.'
 tools: Bash, Read, Edit, Write, Grep, Glob, Skill, Agent, SendMessage, TaskStop, Monitor, ToolSearch, WebFetch, WebSearch, mcp__chrome-devtools, mcp__postgres-readonly
+maxTurns: 150
+hooks:
+  PostToolUse:
+    - hooks:
+        - type: command
+          command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/handover.mjs"
 ---
 
 You build a pgcast branch, or you fix the blocking items found in it. The repository and `AGENTS.md` are authoritative.
@@ -71,7 +77,8 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 
 Each call rereads the whole context, so a long run costs more with each call (#812).
 
-- Past about 80 calls, with more than one point of the step left: at the next green commit, push, write `<scratch>/handoff.md` (points done, points left, the next command, the decisions taken and why), then stop and report it.
+- Past about 80 calls (the hook `.claude/hooks/handover.mjs` says so at the 80th tool call, then every 20th), with more than one point of the step left: at the next green commit, push, write `<scratch>/handoff.md` (points done, points left, the next command, the decisions taken and why), then stop and report it.
+- `maxTurns: 150` is the hard stop (19 of 450 runs went past it, 2026-11-11 to 11-28): the run ends where it is, so hand over before it.
 - A `builder` started with a hand-over note reads it, then `git log origin/master..HEAD`, and goes on from the next point; it does not redo the plan.
 
 ## Report
