@@ -33,6 +33,10 @@ gh pr merge <pr> --repo AlexandreDemartin/pgcast --squash \
 - Before merging, the label `decided-alone` matches the PR's **Decided alone** section (skill `plan-and-proofs`).
 - No commit after the green CI.
 
+## The owner's update
+
+After each merge, the orchestrator tells the owner, in French, in three lines at most: what shipped (its link), what was decided alone, and what waits.
+
 ## A stack
 
 - From bottom to top; a middle layer is never merged before the ones below it.
