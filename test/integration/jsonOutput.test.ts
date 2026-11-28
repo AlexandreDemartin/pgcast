@@ -137,6 +137,15 @@ describe('distinct: true over a passed-through lateral', () => {
     expect(await counted.run(t.client)).toEqual([1]);
   });
 
+  it('a selectRows() inside a sql child is a json read too: 42883; built with distinct: true, or over a count(), it runs', async () => {
+    const
+      inSql = (rows: db.SQLFragment<any>) => db.select('accounts', all, { distinct: true, lateral: sql`SELECT (${rows}) AS result` }),
+      owners = { id: parent('owner_id') };
+    expect(await pgError(t.client, () => inSql(db.selectRows('users', owners)).run(t.client))).toEqual({ code: '42883', message: 'could not identify an equality operator for type json' });
+    expect((await inSql(db.selectRows('users', owners, { distinct: true })).run(t.client)).map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob']);
+    expect((await inSql(db.selectRows('users', owners, { lateral: db.count('accounts', { owner_id: parent('id') }) })).run(t.client)).sort()).toEqual([1, 2]);
+  });
+
   it('a copy() of a json read with its literals overridden is still compared as jsonb, of a count(), a selectOne() over a count() or a sql fragment of the same text as written', async () => {
     // its runResultTransform still marks a json result, which copy() keeps, as it keeps it for withCTEs()
     const
