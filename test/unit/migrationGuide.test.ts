@@ -5,6 +5,13 @@ import { describe, expect, it } from 'vitest';
 describe.each(['website', 'website/fr'])('%s migration guide', dir => {
   const page = readFileSync(dir + '/switching.md', 'utf8');
 
+  it('shows how repeated copies of a prepared select can share a name', () => {
+    const step = page.split('{#from-8-0-topLevelSelectAsRows}')[1].split('\n### ')[0];
+    expect(step).toContain('p.copy().run(c)');
+    expect(step).toContain("p.copy({ preparedName: 'films_agg' }).run(c)");
+    expect(step.split(/\*\*(?:Find the calls|Trouver les appels)\*\*/)[1].split('\n')[0]).toContain('.copy()');
+  });
+
   it.each(['npm install', 'pnpm add', 'yarn add', 'bun add'])(
     'keeps %s on the 6.x warning route', command => {
       const step = page.split('{#swap-the-package}')[1].split('\n## ')[0];
