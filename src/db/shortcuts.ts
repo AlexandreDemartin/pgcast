@@ -1075,7 +1075,8 @@ function selectQuery(
     // `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps its aggregate, which the parent reads as one
     // value; the top-level form takes the properties a caller may have set on the query since (those `copy()` carries
     // over), so it is a fragment of its own, never the one nested in the aggregate, which would carry the name and
-    // noop nested
+    // noop nested; a copy each time, so that withCTEs() reads the query as it stands at its call, never as its last
+    // top-level compile left it
     const
       // a single lateral passed through keeps its JSON value, as json_agg() converts it (pg parses the bare column,
       // a count() as a string, a date as a Date), converted above the same rows query, so that ORDER BY and DISTINCT
@@ -1084,9 +1085,9 @@ function selectQuery(
         sql<SQL, any>`SELECT to_json(result) AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}` :
         rowsSQL(limit),
       nestedCompile = query.compile,
-      topLevel = () => Object.assign(topLevelQuery,
+      topLevel = () => Object.assign(topLevelQuery.copy(),
         { parentTable: query.parentTable, preparedName: query.preparedName, noop: query.noop, noopResult: query.noopResult });
-    (query as TopLevelFormed)[topLevelForm] = topLevelQuery;
+    Object.defineProperty(query, topLevelForm, { get: topLevel });
     query.compile = (result, parentTable, currentColumn) =>
       result ? nestedCompile(result, parentTable, currentColumn) : topLevel().compile(undefined, parentTable, currentColumn);
   }
