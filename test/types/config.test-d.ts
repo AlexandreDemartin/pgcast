@@ -34,7 +34,6 @@ describe('getConfig() and setConfig()', () => {
     expectTypeOf<keyof db.Config>().toEqualTypeOf<
       | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
       | 'queryListener' | 'resultListener' | 'transactionListener'
-      | 'selectExactlyOneChecksForSecondRow'
       | 'transactionEventListener'
     >();
   });
@@ -94,10 +93,19 @@ describe('getConfig() and setConfig()', () => {
     db.setConfig({ transactionAttemptsMax: 3, topLevelSelectAsRows: false });
     // @ts-expect-error topLevelSelectAsRows is no key of the config getConfig() gives
     db.getConfig().topLevelSelectAsRows;
+    // @ts-expect-error selectExactlyOneChecksForSecondRow is no key of Config from 8.0
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    // @ts-expect-error selectExactlyOneChecksForSecondRow is no key of Config from 8.0, its kept value too
+    db.setConfig({ selectExactlyOneChecksForSecondRow: false });
+    // @ts-expect-error selectExactlyOneChecksForSecondRow is no key of Config from 8.0, beside a kept key too
+    db.setConfig({ transactionAttemptsMax: 3, selectExactlyOneChecksForSecondRow: true });
+    // @ts-expect-error selectExactlyOneChecksForSecondRow is no key of the config getConfig() gives
+    db.getConfig().selectExactlyOneChecksForSecondRow;
     const built = {
       transactionAttemptsMax: 3, undefinedMeansMissing: false, upsertRequiresSameKeys: false,
       transactionRequiresCommit: false, transactionRequiresIdleClient: false, transactionRequiresSatisfyingLevel: false,
       aggregatesTypedByColumn: false, shortcutsUseJson: false, topLevelSelectAsRows: false,
+      selectExactlyOneChecksForSecondRow: true,
     };
     expectTypeOf(db.setConfig).toBeCallableWith(built);  // hence setConfig()'s refusal at run time
   });

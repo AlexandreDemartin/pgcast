@@ -69,12 +69,9 @@ describe('withCTEs', () => {
     expect(await db.withCTEs({ added: db.insert('users', []) }, sql`SELECT count(*)::int AS n FROM added`).run(t.client)).toEqual([{ n: 0 }]);
   });
 
-  it('selectExactlyOne() with selectExactlyOneChecksForSecondRow: a second row rejects at the top level, as alone', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+  it('selectExactlyOne(): of two rows, the first at the top level, as alone', async () => {
     for (const ctes of [{ reports }, {}]) {
-      const err = await db.withCTEs(ctes, db.selectExactlyOne('users', all)).run(t.client).catch((e: unknown) => e);
-      expect(err).toBeInstanceOf(db.NotExactlyOneError);
-      expect((err as Error).message).toMatch(/^One result expected but more returned/);
+      expect(await db.withCTEs(ctes, db.selectExactlyOne('users', all, { columns: ['id'], order: { by: 'id', direction: 'ASC' } })).run(t.client)).toEqual({ id: 1 });
     }
     // nested, one row per parent row, as the shortcut nested
     expect(await db.selectOne('users', { id: 1 }, { columns: ['id'], lateral: { account: db.withCTEs({ reports }, db.selectExactlyOne('accounts', { owner_id: parent('id') }, { columns: ['owner_id'] })) } }).run(t.client))

@@ -81,11 +81,6 @@ describe('select() and its kin: the same results as their jsonb twins', () => {
     expect(json).toEqual(jsonb);
   });
 
-  it('selectExactlyOne() checking for a second row still finds it', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    await expect(db.selectExactlyOne('users', { manager_id: 1 }, { extras: { e: 'email' } }).run(t.client)).rejects.toThrow('One result expected but more returned');
-  });
-
   it('a nested result is json', async () => {
     const q = db.selectOne('users', { id: 1 }, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } });
     expect(await sql`SELECT json_typeof((${q})) AS v`.run(t.client)).toEqual([{ v: 'object' }]);

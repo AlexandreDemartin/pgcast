@@ -1,5 +1,5 @@
 ---
-english: 0da3269bd8a0
+english: 1386791bd525
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -47,7 +47,7 @@ Une correction peut tout de même casser un appel qui ne marchait que grâce au 
 
 Deux opt-ins restent désactivés pendant toute la série 7.x : `selectExactlyOneChecksForSecondRow`, ci-dessous, et [`domainsTypedAsUnions`](#_7-0-and-8-0), l’option du générateur, qui devient le seul comportement en 8.0. Exécutée seule, la requête [`selectExactlyOne()`](/fr/select#selectExactlyOne) vérifie qu’elle renvoie au moins une ligne. Une fois imbriquée, elle donne `null` en l’absence de ligne. Zapatos l’imbrique dans un `lateral`. Avec `withTies: true`, les lignes ex æquo peuvent alors dupliquer la ligne parente.
 
-Son option, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), entraîne le rejet de la promesse si la requête, exécutée seule, trouve une deuxième ligne. Elle n’émet aucun avertissement et reste désactivée pendant toute la série 7.x. La 8.0 la retire, et `selectExactlyOne()` ne demande plus que `LIMIT 1` : la clé réglée à `true` lève une erreur ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
+Son option, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), entraîne le rejet de la promesse si la requête, exécutée seule, trouve une deuxième ligne. Elle n’émet aucun avertissement et reste désactivée pendant toute la série 7.x. La 8.0 la retire, et `selectExactlyOne()` ne demande plus que `LIMIT 1` : la clé réglée à `true` lève une erreur ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md), [migration vers la 8.0](/fr/switching#from-8-0-selectExactlyOneChecksForSecondRow)).
 
 ## Pourquoi un opt-in, pas une rupture {#why-an-opt-in-not-a-breaking-change}
 

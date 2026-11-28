@@ -1483,8 +1483,7 @@ describe('select', () => {
       });
     });
 
-    it('selectExactlyOne keeps LIMIT 1 there, with selectExactlyOneChecksForSecondRow', () => {
-      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    it('selectExactlyOne keeps LIMIT 1 there', () => {
       expect(asExtra(db.selectExactlyOne('accounts', owner, ordered))).toEqual({
         text: outer(`SELECT json_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5),
         values: ['id', 'x', 'balance', 1, 1, 1],
@@ -1680,33 +1679,24 @@ describe('selectOne, selectExactlyOne', () => {
     expect(db.selectOne('users', all, { limit: 5 }).compile().values).toEqual([1]);
   });
 
-  it('selectExactlyOneChecksForSecondRow: LIMIT 2 when compiled on its own', () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+  it('selectExactlyOne: LIMIT 1 on its own, prepared and with a lock, as selectOne()', () => {
     expect(db.selectExactlyOne('users', { id: 1 }).compile()).toEqual({
       text: 'SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
-      values: [1, 2],
+      values: [1, 1],
     });
     expect(db.selectExactlyOne('users', { id: 1 }).prepared('one_user').compile()).toEqual({
       text: 'SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
-      values: [1, 2],
+      values: [1, 1],
       name: 'one_user',
     });
-    // selectOne is unchanged
-    expect(db.selectOne('users', { id: 1 }).compile().values).toEqual([1, 1]);
-  });
-
-  it('selectExactlyOneChecksForSecondRow: LIMIT 2 keeps the no-op marker', () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    const q = db.selectExactlyOne('users', { id: 1 });
-    q.noop = true;
-    expect(q.compile()).toEqual({
-      text: `/* marked no-op: won't hit DB unless forced -> */ SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2`,
-      values: [1, 2],
+    expect(db.selectExactlyOne('users', { id: 1 }, { lock: { for: 'UPDATE' } }).compile()).toEqual({
+      text: 'SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2 FOR UPDATE',
+      values: [1, 1],
     });
+    expect(db.selectExactlyOne('users', { id: 1 }).compile()).toEqual(db.selectOne('users', { id: 1 }).compile());
   });
 
-  it('selectExactlyOneChecksForSecondRow: LIMIT 1 when nested, in a lateral or sql', () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+  it('selectExactlyOne: LIMIT 1 when nested, in a lateral or sql', () => {
     const manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm' });
     expect(db.select('users', all, { columns: ['id'], lateral: { manager } }).compile()).toEqual({
       text: `SELECT json_build_object($1::text, "id", $2::text, "lateral_manager".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_json("m".*) AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $3) AS "lateral_manager" ON true`,
@@ -1719,10 +1709,9 @@ describe('selectOne, selectExactlyOne', () => {
     });
   });
 
-  it('selectExactlyOneChecksForSecondRow: LIMIT 1 in a copy, which compiles as a nested query', () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+  it('selectExactlyOne: LIMIT 1 in a copy, which compiles as a nested query', () => {
     const q = db.selectExactlyOne('users', { id: 1 });
-    expect(q.compile().values).toEqual([1, 2]);
+    expect(q.compile().values).toEqual([1, 1]);
     expect(q.copy().compile()).toEqual({
       text: 'SELECT to_json("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
       values: [1, 1],
@@ -1748,11 +1737,6 @@ describe('selectOne, selectExactlyOne', () => {
       expect(inLateral(db.selectExactlyOne('accounts', { owner_id: parent('id') }, byOwner))).toEqual({ text: lateralText, values: ['id', 'account', 'id', 1] });
     });
 
-    it('selectExactlyOne with selectExactlyOneChecksForSecondRow: 2 at top level, 1 in a lateral', () => {
-      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-      expect(db.selectExactlyOne('accounts', { owner_id: 1 }, byOwner).compile()).toEqual({ text: topText, values: ['id', 1, 2] });
-      expect(inLateral(db.selectExactlyOne('accounts', { owner_id: parent('id') }, byOwner))).toEqual({ text: lateralText, values: ['id', 'account', 'id', 1] });
-    });
   });
 
   it('copies nested in a lateral compile as the shortcuts they are copied from', () => {
@@ -1769,13 +1753,9 @@ describe('selectOne, selectExactlyOne', () => {
     });
   });
 
-  it('without selectExactlyOneChecksForSecondRow: LIMIT 1, as in 6.6.1', () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: false });
-    const q = db.selectExactlyOne('users', { id: 1 });
-    expect(q.compile().values).toEqual([1, 1]);
-    // read when selectExactlyOne() is called, not when the query is compiled
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    expect(q.compile().values).toEqual([1, 1]);
+  it('selectExactlyOne: LIMIT 1 given the removed key as false, its kept value, as in 6.6.1', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: false } as db.NewConfig);
+    expect(db.selectExactlyOne('users', { id: 1 }).compile().values).toEqual([1, 1]);
   });
 });
 
@@ -1835,11 +1815,6 @@ describe('selectRows', () => {
     ({ text: `SELECT coalesce(json_agg(result), '[]') AS result FROM (${rows.text}) AS "sq_${alias.replace(/"/g, '""')}"`, values: rows.values });
 
   it.each(cases)('%s: a copy of select() sends the same query, in json_agg', (_, table, where, options) => {
-    expect(db.select(table, where, options).copy().compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
-  });
-
-  it.each(cases)('%s, with selectExactlyOneChecksForSecondRow: a copy of select() sends the same query, in json_agg', (_, table, where, options) => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     expect(db.select(table, where, options).copy().compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
   });
 
@@ -1953,12 +1928,6 @@ describe('selectRows', () => {
       expect(db.selectExactlyOne('accounts', { owner_id: 1 }).compile()).toEqual({ text: 'SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) LIMIT $2', values: [1, 1] });
       expect(db.count('accounts', { owner_id: 1 }).compile().text).toBe('SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = $1)');
       expect(db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }).compile().text).toBe('SELECT sum("balance") AS result FROM "accounts" WHERE ("owner_id" = $1)');
-    });
-
-    it('with selectExactlyOneChecksForSecondRow too, each keeps its own top-level form', () => {
-      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-      expect(db.select('accounts', { owner_id: 1 }).compile().text).toBe('SELECT to_json("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1)');
-      expect(db.selectExactlyOne('accounts', { owner_id: 1 }).compile().values).toEqual([1, 2]);
     });
   });
 });
@@ -2538,13 +2507,6 @@ describe('lateral: null, or a lateral key whose query is null or undefined', () 
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('with selectExactlyOneChecksForSecondRow, selectExactlyOne() of lateral: null rejects the same way', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    const queryable = { query: vi.fn() } as any;
-    await expect(db.selectExactlyOne('users', all, { lateral: null as any }).run(queryable)).rejects.toThrow(lateralNull);
-    expect(queryable.query).not.toHaveBeenCalled();
-  });
-
   it('lateral: undefined and an object of queries compile as before', () => {
     expect(db.select('users', all, { lateral: undefined }).compile()).toEqual(db.select('users', all).compile());
     expect(db.select('users', all, { lateral: { n: db.count('accounts', all) } }).compile().text)
@@ -2625,11 +2587,6 @@ describe('null as options, or as an options key', () => {
     });
     Object.assign(expected, { inLateral: columnsNull, inExtras: extrasNull, inLateralCount: orderNull, copied: lockNull });
     expect(await outcomes(builds)).toEqual(expected);
-  });
-
-  it('with selectExactlyOneChecksForSecondRow, selectExactlyOne() of columns: null rejects the same way', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    expect(await outcomes({ columns: () => db.selectExactlyOne('users', all, { columns: no }) })).toEqual({ columns: columnsNull });
   });
 
   it('returning or extras as null rejects run() in the writes, with no query sent', async () => {
@@ -3062,8 +3019,7 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
       .toBe('UPDATE "users" SET ("manager_id") = ROW((SELECT count(*) AS result FROM "accounts")) WHERE ("id" = $1) RETURNING to_json("users".*) AS result');
   });
 
-  it('selectExactlyOne keeps LIMIT 1 there, with selectExactlyOneChecksForSecondRow', () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+  it('selectExactlyOne keeps LIMIT 1 there', () => {
     expect(db.update('users', { settings: db.selectExactlyOne('accounts', all, ordered) }, { id: 2 }).compile()).toEqual({
       text: 'UPDATE "users" SET ("settings") = ROW((SELECT json_build_object($1::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $2)) WHERE ("id" = $3) RETURNING to_json("users".*) AS result',
       values: ['balance', 1, 2],

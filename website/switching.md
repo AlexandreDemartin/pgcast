@@ -449,6 +449,14 @@ From 8.0.0. As with `topLevelSelectAsRows: true`, a [`select()`](/select#select)
 - **Find the calls**. Search for `topLevelSelectAsRows`, `.compile()` in queries you send yourself and tests of SQL, `runResultTransform =`, `preparedName` and `setTypeParser(114`. Look for `.copy()` on a prepared select. In test fakes, use `grep -rn 'result: \['`.
 - **Before → after**: `(await pool.query(q.compile())).rows[0].result` becomes `(await pool.query(q.compile())).rows.map(r => r.result)`<!-- tsc: async () => { const q = db.select('films', db.all); return …; } -->, or `await q.run(pool)`. In a custom transform, change `qr.rows[0].result.map(titleOf)` to `qr.rows.map(r => titleOf(r.result))`. To keep the old transform, set `a.runResultTransform = oldTransform` on `const a = q.copy()`. Run `a.run(pool)` or pass `a` to `cursor()`.
 
+### `selectExactlyOneChecksForSecondRow` {#from-8-0-selectExactlyOneChecksForSecondRow}
+
+8.0 always does what `selectExactlyOneChecksForSecondRow: false`, the 7.x default, did: [`selectExactlyOne()`](/select#selectExactlyOne) asks for one row, `LIMIT 1`, and gives the first that matches, as in Zapatos 6.6.1, and still rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when none comes ([decision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
+
+- **What you see**: with `true`, or any value but `false`, `null` and `undefined`, `setConfig()` throws `selectExactlyOneChecksForSecondRow was removed in 8.0, which always does what selectExactlyOneChecksForSecondRow: false did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-selectExactlyOneChecksForSecondRow`<!-- message -->. Once you delete it, a query run on its own that matches two rows gives the first, where 7.x with `true` rejected; its last parameter is `1`, not `2`; and with a [`lock`](/select#lock) it locks that row alone. `getConfig()` no longer has the key.
+- **Find the calls**: `grep -rn selectExactlyOneChecksForSecondRow`, and `grep -rn 'more returned'` for code that read the error's message. Then `tsc`: the key in a `setConfig()` literal is TS2353, and read from `getConfig()` TS2339.
+- **Before → after**: where a second row must still fail, ask for two and count them: `db.selectExactlyOne('films', { title: 'The Long Take' }).run(pool)`<!-- tsc --> becomes `const films = await db.select('films', { title: 'The Long Take' }, { limit: 2 }).run(pool)`<!-- tsc -->, then a throw unless `films.length === 1`.
+
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 
 8.0 always does what `typeEnumsAcrossSchemas: true`, the 7.x default, did: an enum of another schema is looked up in its own schema and written out by its labels ([`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas)).
@@ -583,7 +591,7 @@ By default, `await check()` already rejects on database errors. It compares the 
 
 Regeneration preserves existing `custom/` placeholders. Generate a second copy into an empty `outDir` outside your TypeScript project, compare its placeholders with yours and merge the changes that fit your parsers. Then run `npx tsc` against the regenerated schema and run your tests.
 
-Three settings keep their own defaults. `selectExactlyOneChecksForSecondRow` stays off. When enabled, a standalone query rejects on a second row. [Nested queries and copies](/runtime-config#Config.selectExactlyOneChecksForSecondRow) request one row plus any ties with `withTies: true`. The generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) stays opt-in and [`moduleNames`](/generator#generate.moduleNames) still defaults to `'zapatos'`.
+Three settings keep their own defaults. `selectExactlyOneChecksForSecondRow` stays off: when enabled, a standalone query rejects on a second row, and 8.0 removes it ([8.0 migration](#from-8-0-selectExactlyOneChecksForSecondRow)). The generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) stays opt-in and [`moduleNames`](/generator#generate.moduleNames) still defaults to `'zapatos'`.
 
 ### Enum types in 7.0 {#enum-types}
 

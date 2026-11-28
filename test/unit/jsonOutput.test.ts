@@ -99,9 +99,7 @@ describe('select() and its kin', () => {
       values: [1, 1, 1],
     });
     expect(compiled('selectRows').text).toBe(`SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "email" AS "e" FROM "users") AS "row_users"`);
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    const exactlyOne = compiled('selectExactlyOne');
-    expect(exactlyOne).toEqual({ text: `SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "email" AS "e" FROM "users" WHERE ("id" = $1) LIMIT $2) AS "row_users"`, values: [1, 2] });
+    expect(compiled('selectExactlyOne')).toEqual({ text: `SELECT to_json("row_users".*) AS result FROM (SELECT "users".*, "email" AS "e" FROM "users" WHERE ("id" = $1) LIMIT $2) AS "row_users"`, values: [1, 1] });
     expect(sql`SELECT ${shapes.selectExactlyOne()}`.compile().values).toEqual([1, 1]);
   });
 

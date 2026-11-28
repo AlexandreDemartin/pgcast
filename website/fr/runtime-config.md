@@ -1,5 +1,5 @@
 ---
-english: 6b4868253683
+english: 5afbd9a03e10
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -30,7 +30,7 @@ db.setConfig({
   - Zapatos 6.6.1 réglait la clé à `undefined`. Après `transactionAttemptsMax: undefined`, `transaction()` abandonnait après sa première tentative (« <span lang="en">… on attempt 1 of undefined, giving up</span> ») ; après `transactionRetryDelay: undefined`, chaque `transaction()` était rejetée avec « <span lang="en">TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.</span> » et ne libérait jamais le client qu’elle avait récupéré du pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - Elle renvoie une copie de la nouvelle configuration, comme `getConfig()` : modifier cet objet ne change rien. Zapatos 6.6.1 renvoyait la configuration elle-même ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - Elle garde l’objet `transactionRetryDelay` que vous lui donnez, pas une copie : modifier ensuite son `minMs` ou son `maxMs` modifie la configuration.
-- Une clé que la 8.0 a supprimée, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient), [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`shortcutsUseJson`](#Config.shortcutsUseJson) ou [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows), ne compile pas (TS2353). Donnée quand même, depuis une variable ou du JavaScript, elle lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours (`true`), `null` ou `undefined`, et la configuration n’en garde aucune. Erreur : `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
+- Une clé que la 8.0 a supprimée, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient), [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`shortcutsUseJson`](#Config.shortcutsUseJson), [`topLevelSelectAsRows`](#Config.topLevelSelectAsRows) ou [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), ne compile pas (TS2353). Donnée quand même, depuis une variable ou du JavaScript, elle lève une erreur, sauf si sa valeur est celle que la 8.0 applique toujours (`true`, ou `false` pour `selectExactlyOneChecksForSecondRow`), `null` ou `undefined`, et la configuration n’en garde aucune. Erreur : `undefinedMeansMissing was removed in 8.0, which always does what undefinedMeansMissing: true did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-undefinedMeansMissing`<!-- message -->.
 - Une clé inconnue ne compile pas (TS2353), pas plus qu’une valeur du mauvais type (TS2322) :
 
 ```ts twoslash
@@ -73,7 +73,6 @@ interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;
   castObjectParamsToJson: boolean;
-  selectExactlyOneChecksForSecondRow?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -81,7 +80,7 @@ interface Config {
 }
 ```
 
-Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours. Le type que renvoie `getConfig()` pour ces clés est `boolean | undefined`, même si chacune a toujours une valeur.
+La clé qu’ajoute pgcast, `transactionEventListener`, est facultative, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours.
 
 <div class="stack">
 
@@ -91,7 +90,6 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | l’attente avant chaque retry | à chaque `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | un paramètre tableau : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
-| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul demande deux lignes et sa promesse est rejetée s’il en trouve une deuxième | à chaque `selectExactlyOne()` |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
 | [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque retry | à chaque `transaction()` |
@@ -228,17 +226,11 @@ Pendant toute la 7.x, avec `false`, le client était transmis même si son nivea
 
 ### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
 
-```ts
-selectExactlyOneChecksForSecondRow?: boolean  // default: false through 7.x; removed in 8.0
-```
+De la 6.7.0 à la fin de la 7.x, la valeur par défaut était `false`. À partir de la 8.0.0, la clé est supprimée et pgcast se comporte toujours comme avec `false` ([migration vers la 8.0](/fr/switching#from-8-0-selectExactlyOneChecksForSecondRow)).
 
-Avec la vérification activée et `withTies` désactivé, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté seul demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> avec `2`, et la promesse de `.run()` est rejetée avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) si la requête trouve une deuxième ligne : "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Avec les deux options désactivées, il en demande une, `LIMIT 1`, et renvoie la première ligne qui correspond, comme dans Zapatos 6.6.1.
+Un [`selectExactlyOne()`](/fr/select#selectExactlyOne) demande une ligne, `LIMIT $2`<!-- probe: db.selectExactlyOne('films', { id: 1000 }) --> avec `1`, et renvoie la première qui correspond, comme dans Zapatos 6.6.1 : « au moins une ligne », c’est ainsi que Zapatos le lit, imbriqué dans un `lateral` sur une clé étrangère `NOT NULL` ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 
-- Imbriqué dans un `lateral` ou un template `sql`, ou copié avec [`.copy()`](/fr/sql-template#copy), le raccourci demande une ligne.
-- Avec [`withTies: true`](/fr/select#order-limit-offset-and-withties), chaque limite se compile en `FETCH FIRST … ROWS WITH TIES`. Une requête imbriquée peut renvoyer tous les ex æquo. Une copie exécutée seule demande toujours une ligne et les éventuelles lignes ex æquo. Si la vérification est activée et que Postgres renvoie une deuxième ligne, sa promesse est rejetée avec une `NotExactlyOneError`.
-- Avec un [`lock`](/fr/select#lock), `LIMIT $2` verrouille aussi la deuxième ligne : une fois `.run()` rejetée, les deux lignes restent verrouillées jusqu’à la fin de la transaction, et le `FOR UPDATE NOWAIT` d’une autre session sur l’une d’elles reçoit 55P03.
-- Sans l’option, aucun avertissement, et elle reste désactivée pendant toute la série 7.x : « au moins une ligne », c’est ainsi que Zapatos lit `selectExactlyOne()`, imbriqué dans un `lateral` sur une clé étrangère `NOT NULL` ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)). La 8.0 la retire : `selectExactlyOne()` ne demande plus que `LIMIT 1`, et la clé réglée à `true` lève une erreur ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
-- Lue quand `selectExactlyOne()` est appelée, pas à `.run()`.
+Pendant toute la 7.x, avec `true`, un `selectExactlyOne()` exécuté seul demandait deux lignes, et sa promesse était rejetée avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) s’il en trouvait une deuxième ; avec un [`lock`](/fr/select#lock), il verrouillait aussi cette deuxième ligne ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
 
 ### `aggregatesTypedByColumn` {#Config.aggregatesTypedByColumn}
 

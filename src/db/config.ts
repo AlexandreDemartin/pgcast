@@ -28,14 +28,13 @@ export type TransactionEvent =
 
 /**
  * The runtime configuration. A key added by pgcast is optional, so that a
- * `Config` written for Zapatos 6.6.1 still compiles; read it with `?? <default>`.
+ * `Config` written for Zapatos 6.6.1 still compiles.
  */
 export interface Config {
   transactionAttemptsMax: number;
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
-  selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -48,7 +47,6 @@ const defaults: Config = {
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
-  selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
 };
 
 let config: Config = { ...defaults };
@@ -64,6 +62,7 @@ const removedOptions: { [key: string]: boolean } = {
   aggregatesTypedByColumn: true,  // sum() and avg() give null on an empty set, min() and max() the column's value as pg parses it
   shortcutsUseJson: true,  // select() and its kin, and the writes' RETURNING, build their JSON with to_json, json_agg and json_build_object
   topLevelSelectAsRows: true,  // select() run or compiled on its own is selectRows()'s query, one row per result; nested, its aggregate
+  selectExactlyOneChecksForSecondRow: false,  // selectExactlyOne() asks for LIMIT 1 and gives the first row, as Zapatos 6.6.1 does
 };
 
 /**

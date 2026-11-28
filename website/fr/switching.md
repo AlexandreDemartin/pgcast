@@ -1,5 +1,5 @@
 ---
-english: 4981cb02f9ae
+english: ba4f529430b0
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -450,6 +450,14 @@ La 8.0 fait toujours ce que faisait `shortcutsUseJson: true` : [`select()`](/fr
 - **Trouver les appels**. Cherchez `topLevelSelectAsRows`, `.compile()` dans les requêtes que vous envoyez vous-même et dans les tests qui vérifient le SQL, ainsi que `runResultTransform =`, `preparedName` et `setTypeParser(114`. Repérez les appels à `.copy()` sur une requête de sélection préparée. Dans les fakes de vos tests, utilisez `grep -rn 'result: \['`.
 - **Avant → après** : `(await pool.query(q.compile())).rows[0].result` devient `(await pool.query(q.compile())).rows.map(r => r.result)`<!-- tsc: async () => { const q = db.select('films', db.all); return …; } -->, ou `await q.run(pool)`. Pour une transformation personnalisée, remplacez `qr.rows[0].result.map(titleOf)` par `qr.rows.map(r => titleOf(r.result))`. Pour conserver l’ancienne transformation, définissez `a.runResultTransform = oldTransform` sur la copie créée avec `const a = q.copy()`. Exécutez `a.run(pool)` ou passez `a` à `cursor()`.
 
+### `selectExactlyOneChecksForSecondRow` {#from-8-0-selectExactlyOneChecksForSecondRow}
+
+La 8.0 fait toujours ce que faisait `selectExactlyOneChecksForSecondRow: false`, la valeur par défaut de la 7.x : [`selectExactlyOne()`](/fr/select#selectExactlyOne) demande une ligne, `LIMIT 1`, et renvoie la première qui correspond, comme dans Zapatos 6.6.1, et sa promesse est toujours rejetée avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) quand aucune ne correspond ([décision 019](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/019-one-behaviour.md)).
+
+- **Ce que vous voyez** : avec `true`, ou toute valeur autre que `false`, `null` et `undefined`, `setConfig()` lève `selectExactlyOneChecksForSecondRow was removed in 8.0, which always does what selectExactlyOneChecksForSecondRow: false did; delete it from setConfig(): https://pgcast.dev/switching#from-8-0-selectExactlyOneChecksForSecondRow`<!-- message -->. Une fois l’option retirée, une requête exécutée seule qui trouve deux lignes renvoie la première, là où la 7.x avec `true` rejetait sa promesse ; son dernier paramètre vaut `1`, pas `2` ; et avec un [`lock`](/fr/select#lock), elle ne verrouille que cette ligne. `getConfig()` n’a plus la clé.
+- **Trouver les appels** : `grep -rn selectExactlyOneChecksForSecondRow`, et `grep -rn 'more returned'` pour le code qui lisait le message de l’erreur. Puis `tsc` : la clé dans un littéral passé à `setConfig()` donne TS2353, et lue sur `getConfig()`, TS2339.
+- **Avant → après** : là où une deuxième ligne doit toujours échouer, demandez-en deux et comptez-les : `db.selectExactlyOne('films', { title: 'The Long Take' }).run(pool)`<!-- tsc --> devient `const films = await db.select('films', { title: 'The Long Take' }, { limit: 2 }).run(pool)`<!-- tsc -->, puis levez une erreur sauf si `films.length === 1`.
+
 ### `typeEnumsAcrossSchemas` {#from-8-0-typeEnumsAcrossSchemas}
 
 La 8.0 fait toujours ce que faisait `typeEnumsAcrossSchemas: true`, la valeur par défaut de la 7.x : un enum d’un autre schéma est cherché dans son propre schéma et écrit par ses labels ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)).
@@ -584,7 +592,7 @@ Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de b
 
 La régénération conserve les placeholders existants dans `custom/`. Générez une seconde copie dans un `outDir` vide, hors de votre projet TypeScript. Comparez ses placeholders aux vôtres et intégrez les changements adaptés à vos parsers. Lancez ensuite `npx tsc` avec le schéma régénéré, puis vos tests.
 
-Trois réglages conservent leur valeur par défaut. `selectExactlyOneChecksForSecondRow` reste désactivé. Si vous l’activez, la promesse d’une requête exécutée seule est rejetée si Postgres renvoie une deuxième ligne. [Les requêtes imbriquées et les copies](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) demandent une ligne et, avec `withTies: true`, les éventuelles lignes ex æquo. Dans le générateur, [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste un opt-in et [`moduleNames`](/fr/generator#generate.moduleNames) vaut toujours `'zapatos'` par défaut.
+Trois réglages conservent leur valeur par défaut. `selectExactlyOneChecksForSecondRow` reste désactivé : si vous l’activez, la promesse d’une requête exécutée seule est rejetée si Postgres renvoie une deuxième ligne, et la 8.0 le retire ([migration vers la 8.0](#from-8-0-selectExactlyOneChecksForSecondRow)). Dans le générateur, [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste un opt-in et [`moduleNames`](/fr/generator#generate.moduleNames) vaut toujours `'zapatos'` par défaut.
 
 ### Types des enums en 7.0 {#enum-types}
 

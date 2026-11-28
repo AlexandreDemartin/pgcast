@@ -474,8 +474,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
    * Performs a shallow copy of this SQLFragment, optionally overriding some of its properties.
    * A select's copy uses the aggregate transform. If the select is prepared, its copy gets a separate name.
    * Other copies keep the original transform and name.
-   * It compiles as the fragment does nested in another: a copy of `selectExactlyOne()` keeps
-   * `LIMIT 1`, even with `selectExactlyOneChecksForSecondRow`.
+   * It compiles as the fragment does nested in another: a copy of `select()` compiles its aggregate.
    * @param override The properties to override
    */
   copy(override?: {

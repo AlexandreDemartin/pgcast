@@ -23,6 +23,12 @@ Candidates for a check, a rule or a skill line.
 - #998 — Put an empty CTE list on either side of another wrapper when testing whether the public compiler and transform survive composition — codex
 - #998 — Count server-side prepared statements on the connection that ran them, after repeatedly creating copies as well as repeatedly running one copy: a compiled name alone misses a copy the test never executed — codex
 - #998 — Comparing the code spans of the English and French migration entries caught a missing `oldTransform` assignment — codex
+- #999 — In the characterisation report, a finding's class is the first word of its Proposal cell: a removed opt-in appends to the cell and keeps **opt-in** (R9, R16, R14); R14 is the first case where 8.0 keeps the unfixed behaviour.
+- #999 — The first removed key whose kept value is `false` turns the refusal grid's hard-coded `false` into `!kept`, and rewords `runtime-config.md:28` ("the one 8.0 always behaves as (`true`)").
+- #999 — Removing a config key breaks `docs:build` through `check-changelog.mjs` when an old CHANGELOG line still type-checks a snippet setting it: grep the CHANGELOG for `<!-- tsc -->` on the removed key.
+- #999 — `bench:types` compares with `bench/baseline.json`, stale on master itself (+7.4 %): measure master in a detached worktree before reading a rise as the PR's.
+- #999 — A docs claim that names a parameter by position ("its last parameter") breaks under an option that adds one after it (`offset` after `LIMIT`): name the clause, and probe it with every option that appends a parameter.
+- #999 — A scratch copy whose `node_modules` links another checkout's makes `npm run test:types` write that checkout's `node_modules/.cache/pgcast`: a separate install when that checkout must stay untouched.
 
 ## Minors kept
 
@@ -60,3 +66,7 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/sql-template.md:571` and `fr/:575` (#992): "A `select()` run on its own" leaves out the main query of `withCTEs()`, which behaves the same; say it as `CHANGELOG.md:15` does.
 - `form` `CHANGELOG.md:15` (#992): eight effects in one sentence joined by semicolons; name them and link the migration entry (skill `concise-docs`).
 - #998 — `defect` `website/switching.md:440`: "sends `selectRows()`'s query" holds except for a passed-through `count()` lateral, where `select()` wraps it in `to_json(result)` and returns `[2]` against `selectRows()`'s `['2']`; qualify it EN and FR as `sql-template.md` does — codex
+- `form` `README.md:93` (#999): the opt-ins row still says "a standalone `selectExactlyOne()` throws on a second row" with no "through 7.x … removed in 8.0, `LIMIT 1` alone", as the `topLevelSelectAsRows` and `shortcutsUseJson` rows have; for #977 if not before.
+- `defect` `website/switching.md:456` and `fr/:457` (#999): "its last parameter is `1`, not `2`" is false with an `offset` (`LIMIT $2 OFFSET $3`, `[1,2,1]` → `[1,1,1]`); "its `LIMIT` parameter" / "le paramètre de son `LIMIT`".
+- `form` `website/switching.md:458` and `fr/:459` (#999): the before span does not say it ran under `true`, as its siblings say "with `false`"; "…<!-- tsc -->, with `true`, becomes" / "…, avec `true`, devient".
+- `form` `website/runtime-config.md:228` (#999): "`true` made one run on its own ask for two rows" does not say what ran; "a `selectExactlyOne()` run on its own", as the FR twin (`:233`) says.
