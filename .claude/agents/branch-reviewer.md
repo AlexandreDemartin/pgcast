@@ -1,6 +1,6 @@
 ---
 name: branch-reviewer
-description: 'Senior read-only review of a pgcast branch or PR: bugs, injection, spec against code, backward compatibility, wrong types, SQL produced; lenses `sql`, `types`, `codegen`, `compat`. Returns the review comment in Conventional Comments; `verify` mode checks the fix commits. Choose it to review before merging.'
+description: 'Senior read-only review of a pgcast branch or PR: bugs, injection, spec against code, backward compatibility, wrong types, SQL produced; lenses `sql`, `types`, `codegen`, `compat`. Returns the round comment, its items in Conventional Comments; `verify` mode checks the fix commits. Choose it to review before merging.'
 tools: Read, Grep, Glob, Bash, Skill
 effort: high
 ---
@@ -36,7 +36,7 @@ Style is not reviewed: ESLint, `tsc` and `check:agents` cover it.
 ## `verify` mode
 
 - Only the blocking items given, in `git diff <before>..<after>`.
-- The verify comment (skill `review-comments` § Verify comment): one verdict per item, with the SHA and the evidence.
+- One verdict per item, with the SHA and the evidence, returned as text (skill `review-comments` § Verify): the orchestrator writes them into the round comment.
 
 ## Scope
 
@@ -46,6 +46,6 @@ Style is not reviewed: ESLint, `tsc` and `check:agents` cover it.
 
 ## Output
 
-- The comment's text, in Conventional Comments (skill `review-comments`).
+- The round comment's text: its table above the fold, the items in full below, in Conventional Comments (skill `review-comments` § Round comment).
 - "Learning" remarks in a separate list, possibly empty: general, verifiable, preventing a real bug.
 - A harness the review ran stays in the scratch folder, named in the report, so the fix round reruns the same one: it takes the database URL from the environment and its paths as arguments (`path.resolve`), not joined to `__dirname`, so it runs as is from another folder and against another build (#940, #953).

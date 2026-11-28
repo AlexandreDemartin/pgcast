@@ -44,5 +44,5 @@ Complete in substance, concise in form.
 |---|---|
 | Skill, agent | ~100 lines, 150 at most (`.agents/README.md` § Writing a skill) |
 | JSDoc | 1 to 3 lines: the contract, and the SQL produced for a helper |
-| PR description | `Closes #n`, then **What** · **Why** · **Proofs** · **Decided alone**, as bullets (skill `plan-and-proofs`) |
+| Issue, plan comment, PR description, round comment | at most 200 words above the first `<details>`, the detail folded below it (skill `plan-and-proofs` § Two layers) |
 | Decision note | context, options in a table, proposed choice, question to the user |

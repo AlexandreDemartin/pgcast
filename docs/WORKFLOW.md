@@ -12,16 +12,16 @@ flowchart TD
     risk1 -- "low" --> build
     risk1 -- "normal" --> planN["Plan comment on the issue"] --> build
     risk1 -- "high" --> planH["Plan comment, the builder stops"] --> check["Orchestrator checks the plan"] --> build
-    build["Branch type/n-slug, tests first, one-line commits"] --> draft["Draft PR: What, Why, Proofs, Decided alone"]
+    build["Branch type/n-slug, tests first, one-line commits"] --> draft["Draft PR: Change, Look at, Decided alone, Proof; Evidence folded"]
     draft --> risk2{"Risk"}
     risk2 -- "low" --> reread["The builder rereads its diff"] --> ready
-    risk2 -- "normal or high" --> review["Review comment, Conventional Comments"]
+    risk2 -- "normal or high" --> review["Round comment: blockers table, items folded"]
     review --> blocking{"Blocking items?"}
     blocking -- "none" --> ready
     blocking -- "yes" --> fixes["A fresh builder fixes the blockers"]
     fixes --> risk3{"Risk"}
     risk3 -- "normal" --> ready
-    risk3 -- "high" --> verify["Verify comment, one verdict per blocker"]
+    risk3 -- "high" --> verify["Verify: its verdicts edited into the round comment"]
     verify -- "not fixed or regressed" --> fixes
     verify -- "all fixed" --> ready
     ready["gh pr ready, green CI"] --> gate{"Merge gate"}
@@ -29,7 +29,7 @@ flowchart TD
     gate -- "Show: normal" --> squash
     gate -- "Ask: high" --> owner["Answered by the owner's standing delegation; a release waits for the owner"] --> squash
     owner -. "meanwhile" .-> next["Next step: independent, or stacked on this PR"]
-    squash["Squash merge, the issue closes"] --> clean["Clean up: branch -D, fetch --prune"]
+    squash["Squash merge, the issue closes"] --> update["Owner's update, three lines in French"] --> clean["Clean up: branch -D, fetch --prune"]
     clean --> epic{"Last step of the Epic?"}
     epic -- "no" --> issue
     epic -- "yes" --> chapter["End of chapter: whole range review, method PR on LEARNINGS"]
@@ -37,13 +37,13 @@ flowchart TD
 
 | Stage | What it leaves on GitHub | Skill |
 |---|---|---|
-| Issue | the brief: **What**, **Done when**, **Files**, **Risk** ([template](../.github/ISSUE_TEMPLATE/task.md)) | [`run-step`](../.agents/skills/run-step/SKILL.md) § Issue body |
-| Plan | a comment on the issue, before any code | [`plan-and-proofs`](../.agents/skills/plan-and-proofs/SKILL.md) |
+| Issue | the brief: **What**, **Why**, **Done when** above the fold; **Files**, **Risk** folded ([template](../.github/ISSUE_TEMPLATE/task.md)) | [`run-step`](../.agents/skills/run-step/SKILL.md) § Issue body |
+| Plan | a comment on the issue, before any code: the approach above the fold, the detail folded | [`plan-and-proofs`](../.agents/skills/plan-and-proofs/SKILL.md) |
 | Branch and commits | `fix/26-upsert-update-values`; one-line commits in plain English; a bug's failing test before its fix | [`pr-shape`](../.agents/skills/pr-shape/SKILL.md) |
-| Draft PR | `Closes #n`, **What** · **Why** · **Proofs** · **Decided alone** | [`plan-and-proofs`](../.agents/skills/plan-and-proofs/SKILL.md) |
-| Review, fixes, verify | one comment per round; blockers marked `→ fixed in <sha>` | [`review-comments`](../.agents/skills/review-comments/SKILL.md) |
-| CI | none while in draft; **CI passed** on the last commit | [`ci-gate`](../.agents/skills/ci-gate/SKILL.md) |
-| Gate, squash, clean-up | one commit per PR on `master` | [`merge-gate`](../.agents/skills/merge-gate/SKILL.md) |
+| Draft PR | `Closes #n`, **Change** · **Look at** · **Decided alone** · **Proof** in at most 200 words, checked by **PR body**; **Evidence** and **Docs swept** folded ([template](../.github/pull_request_template.md)) | [`plan-and-proofs`](../.agents/skills/plan-and-proofs/SKILL.md) |
+| Review, fixes, verify | one comment per round, a table of its blockers; the verify edits each **Fix** to `<sha>, verify: <verdict>` | [`review-comments`](../.agents/skills/review-comments/SKILL.md) |
+| CI | **PR body** alone while in draft; **CI passed** on the last commit | [`ci-gate`](../.agents/skills/ci-gate/SKILL.md) |
+| Gate, squash, clean-up | one commit per PR on `master`; the owner's update in three lines | [`merge-gate`](../.agents/skills/merge-gate/SKILL.md) |
 
 ## Risk
 

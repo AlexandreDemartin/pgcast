@@ -18,13 +18,19 @@ labels: 'type: task'
 - [ ] <!-- an acceptance criterion the PR proves -->
 - [ ] `npm run lint && npm run typecheck && npm test && npm run test:types && npm run build` pass <!-- plus `bench:types`, `check:agents`… when needed -->
 
-## Files
+<details><summary>Details for agents and audit</summary>
+
+<!-- Above: the owner's one-minute read, at most 200 words (`node scripts/check-body.mjs <file>`); below, folded: the rest. -->
+
+### Files
 
 <!-- The targeted paths, the feature's docs page included (skill pr-shape § Splitting like Zapatos): `src/db/conditions.ts`, `test/unit/conditions.test.ts`, `website/conditions.md`. -->
 
-## Notes
+### Notes
 
 - **Risk**: `low` | `normal` | `high` <!-- the review and the merge gate (skill run-step § Risk); the lens (sql, types, codegen, compat) and the blockers -->
 - **Class**: <!-- fix or opt-in (decision 003) -->
 - **Read**: <!-- the skills, as: skill `sql-safety` -->
 - **Frozen by**: <!-- the tests that pin the current behaviour -->
+
+</details>
