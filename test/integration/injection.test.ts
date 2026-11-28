@@ -1848,7 +1848,7 @@ it('runs a select with punctuation in its alias and filter in both forms', async
     const automatic = q.copy(), name = automatic.preparedName;
     const rows = input === 'Ada' ? [{ id: 1 }] : [];
     for (const [fragment, result] of [
-      [q, rows], [q.copy({ preparedName: `copy_${i}` }), rows],
+      [q, rows], [q.copy({ preparedName: `copy_${i}` }), rows], [automatic, rows],
       [sql`SELECT ${param(1)}::int AS n, (${q}) AS result`.prepared(`outer_${i}`), [{ n: 1, result: rows }]],
       [db.withCTEs({ k: sql`SELECT ${param(1)}::int` }, q), rows],
     ] as const) {

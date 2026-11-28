@@ -3431,7 +3431,7 @@ it('keeps the same identifiers and parameters in both forms of a select', () => 
       copy = q.copy({ preparedName: 'aggregate' }),
       prefix = sql`SELECT ${param(1)}::int AS n`;
     for (const [fragment, text, values, statement] of [
-      [q, rows, [name], 'rows'], [copy, aggregate, [name], 'aggregate'],
+      [q, rows, [name], 'rows'], [copy, aggregate, [name], 'aggregate'], [automatic, aggregate, [name], automatic.preparedName],
       [q.copy({ literals: ['SELECT ', ''], expressions: [param(name)], preparedName: 'override' }), 'SELECT $1', [name], 'override'],
       [sql`${prefix}, (${q})`, `SELECT $1::int AS n, (${aggregate.replace(' = $1)', ' = $2)')})`, [1, name], 'rows'],
       [db.withCTEs({ k: prefix }, q), `WITH "k" AS (SELECT $1::int AS n) ${rows.replace(' = $1)', ' = $2)')}`, [1, name], undefined],
