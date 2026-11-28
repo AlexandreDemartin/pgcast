@@ -35,7 +35,7 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 
 ## Issue body
 
-The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in English, concise (skill `concise-docs`):
+The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in English, concise (skill `concise-docs`), in two layers (skill `plan-and-proofs` § Two layers): **Files**, **Notes** and any long detail folded.
 
 - **What**: the expected behaviour, the SQL before / after when it matters · **Why**.
 - **Done when**: the acceptance criteria as checkboxes; it names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…). A check the agents' tools cannot run (a DevTools panel, a test behind a sign-in) names the proof an agent can give and leaves the live check to the owner (#864, #870).
@@ -61,8 +61,8 @@ The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the ga
 
 1. **Issue**: **Files** and **Risk** present; stop points asked.
 2. **Plan** (`normal`, `high`): the `builder` posts it on the issue. At `high` it stops; the orchestrator checks the plan against the issue, then resumes it within 5 minutes, or else starts a fresh `builder` with "plan checked": after 5 minutes its cache is cold, and resuming rewrites its whole context (#812).
-3. **Build**: tests first, one-line commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with **Proofs** (skill `plan-and-proofs`).
-4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its comment (skill `review-comments`).
+3. **Build**: tests first, one-line commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with its **Proof** (skill `plan-and-proofs`).
+4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its round comment (skill `review-comments`).
 5. **Fixes**: a fresh `builder`, blocking items only; the others go to `docs/LEARNINGS.md` § Minors kept.
 6. **Verify** (`high`): `branch-reviewer` in `verify` mode on the fix commits, posted as a second comment; `not fixed` or `regressed` goes back to 5. A third round that finds a deeper hole: [reference.md](reference.md) § Rounds.
 7. **Learnings**: the agents' "learning" remarks, one line each in `docs/LEARNINGS.md`, last commit of the branch ("Record what #22 taught").
