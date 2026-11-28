@@ -71,6 +71,11 @@ test('reads PR_BODY from the environment, an empty body included, and needs a bo
   assert.match(none.stderr, /PR_BODY/);
 });
 
+test('an unclosed <!-- hides the rest of the body, as GitHub renders it', () => {
+  assert.equal(wordsAboveFold('Shown here.\n<!-- never closed\nhidden words'), 2);
+  assert.equal(wordsAboveFold('a <!-- one --> b <!<!-- two -->-- c'), 3);
+});
+
 test('passes on the templates of a PR and of an issue', () => {
   for (const file of ['.github/pull_request_template.md', '.github/ISSUE_TEMPLATE/task.md']) {
     const result = run([file]);
