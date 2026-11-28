@@ -185,6 +185,17 @@ describe('distinct: true over a passed-through lateral', () => {
     expect([await run(overCounted(bigint), false), await run(overCounted(bigint), true)]).toEqual(['7', '7']);
     expect(await run(overCounted(at), true)).toEqual(new Date('2020-01-02T03:04:05Z'));
   });
+
+  it('withCTEs() over a copy() of a copy() of a select() is a json read at any depth: compared as jsonb, and its copy() with its literals overridden gives 7', async () => {
+    // copy() and withCTEs() carry the mark however deep, where no caller set a runResultTransform
+    const
+      deep = () => db.withCTEs({ one: sql`SELECT 1` }, db.select('users', { id: parent('owner_id') }).copy().copy()),
+      over = db.select('accounts', all, { distinct: true, lateral: deep() }),
+      copied = deep().copy({ literals: ['SELECT 7::bigint AS result'], expressions: [] });
+    expect(over.compile().text).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
+    expect((await over.run(t.client)).map((us: any) => us[0].display_name).sort()).toEqual(['Ada', 'Bob']);
+    expect(await db.selectOne('accounts', { owner_id: 1 }, { distinct: true, lateral: copied }).run(t.client)).toBe(7);
+  });
 });
 
 describe('a key equal to a column', () => {
