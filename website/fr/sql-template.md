@@ -1,5 +1,5 @@
 ---
-english: 0a7a3a571f4b
+english: 6a590f71ff57
 ---
 
 # Template SQL
