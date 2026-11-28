@@ -146,6 +146,20 @@ describe('distinct: true over a passed-through lateral', () => {
     expect((await inSql(db.selectRows('users', owners, { lateral: db.max('accounts', { owner_id: parent('id') }, { columns: ['id'] }) })).run(t.client)).sort()).toEqual([2, 3]);
   });
 
+  it('a runResultTransform the caller sets takes a selectOne() out of the json reads, compared as written: 42883 (#1003); a select() keeps its to_jsonb() and runs', async () => {
+    // the json mark lives on the transform, so the caller's own drops it; a select()'s aggregate keeps its mark
+    const one = owner();
+    one.runResultTransform = qr => qr.rows[0]?.result;
+    const overOne = db.select('accounts', all, { distinct: true, lateral: one });
+    expect(overOne.compile().text).toContain('SELECT DISTINCT "lateral_passthru".result AS result');
+    expect(await pgError(t.client, () => overOne.run(t.client))).toEqual({ code: '42883', message: 'could not identify an equality operator for type json' });
+    const many = db.select('users', { id: parent('owner_id') });
+    many.runResultTransform = qr => qr.rows;
+    const overMany = db.select('accounts', all, { distinct: true, lateral: many });
+    expect(overMany.compile().text).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
+    expect((await overMany.run(t.client)).map((us: any) => us[0].display_name).sort()).toEqual(['Ada', 'Bob']);
+  });
+
   it('a copy() of a json read with its literals overridden is still compared as jsonb, of a count(), a selectOne() over a count() or a sql fragment of the same text as written', async () => {
     // its runResultTransform still marks a json result, which copy() keeps, as it keeps it for withCTEs()
     const
