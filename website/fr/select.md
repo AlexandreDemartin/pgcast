@@ -1,5 +1,5 @@
 ---
-english: 15190cf3977d
+english: f2b007b48e7d
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -88,7 +88,7 @@ Le SQL de chaque ligne du tableau est ce que compile la bibliothèque construite
   - une `copy()` d’une lecture en `json`, ou `withCTEs()` appliqué à une telle lecture, à toute profondeur.
 - Les autres `lateral` transmis sont comparés tels qu’ils sont écrits, comme un agrégat (`count()`…), l’un de ces trois raccourcis construit avec `distinct: true`, ou un fragment `sql`, quoi qu’il contienne. Une lecture en `json` placée dans un fragment `sql` demande donc `to_jsonb()`, faute de quoi elle échoue avec 42883.
 - Une `copy()` dont les `literals` ou les `expressions` sont remplacés est comparée comme sa source : pour une lecture en `json`, ses valeurs reviennent telles que `jsonb` les donne, `7::bigint` en `7` et un `timestamptz` en chaîne ; pour toute autre, telles qu’elles sont écrites, `"7"` et un `Date`.
-- Là où un appelant a défini un `runResultTransform`, sur un `lateral` transmis ou sur une requête qu’il copie, enveloppe ou transmet, ce `lateral` peut être comparé tel qu’il est écrit ou en `jsonb`, sauf si c’est un fragment `sql`, jusqu’à ce que [#1003](https://github.com/AlexandreDemartin/pgcast/issues/1003) garde la marque sur la requête.
+- Là où un appelant a défini un `runResultTransform`, sur un `lateral` transmis ou sur une requête qu’il copie, enveloppe ou transmet à toute profondeur, ce `lateral` peut être comparé tel qu’il est écrit ou en `jsonb`, sauf si c’est un fragment `sql`, jusqu’à ce que [#1003](https://github.com/AlexandreDemartin/pgcast/issues/1003) garde la marque sur la requête.
 
 <!-- probe: db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } }) -->
 ```sql

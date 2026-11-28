@@ -84,7 +84,7 @@ From 8.0.0, each row and the array are built with `json` functions, which keep t
   - a `copy()` of a `json` read, or `withCTEs()` over one, at any depth.
 - Other `lateral`s passed through are compared as written, such as an aggregate (`count()`…), one of those three built with `distinct: true`, or a `sql` fragment, whatever it holds. So a `json` read inside a `sql` fragment needs `to_jsonb()`, or it fails with 42883.
 - A `copy()` with its `literals` or `expressions` overridden is compared as its source is: for a `json` read, its values come back as `jsonb` gives them, `7::bigint` as `7` and a `timestamptz` as a string; for any other, as written, `"7"` and a `Date`.
-- Where a caller set a `runResultTransform`, on a `lateral` passed through or on a query it copies, wraps or passes through, that `lateral` may be compared as written or as `jsonb`, unless it is a `sql` fragment, until [#1003](https://github.com/AlexandreDemartin/pgcast/issues/1003) keeps the mark on the query.
+- Where a caller set a `runResultTransform`, on a `lateral` passed through or on a query it copies, wraps or passes through at any depth, that `lateral` may be compared as written or as `jsonb`, unless it is a `sql` fragment, until [#1003](https://github.com/AlexandreDemartin/pgcast/issues/1003) keeps the mark on the query.
 
 <!-- probe: db.select('films', { studio_id: 1000 }, { order: { by: 'title', direction: 'ASC' }, lateral: { cast: db.select('roles', { film_id: db.parent('id') }, { columns: ['character'] }) } }) -->
 ```sql
