@@ -31,6 +31,37 @@ Candidates for a check, a rule or a skill line.
 - #999 — A scratch copy whose `node_modules` links another checkout's makes `npm run test:types` write that checkout's `node_modules/.cache/pgcast`: a separate install when that checkout must stay untouched.
 - #1002 — A cut that keeps a skill under its size limit goes before the commits that add to it, so every commit passes `check:agents`.
 - #1002 — A check that runs on drafts is proved by opening the PR with a body that fails it, then `gh pr edit` to the real body: one move shows the red run and the `edited` trigger.
+- #1000 — PGlite lives only under `adapters/pglite`: a builder runs `npm ci && npm run build` there before probing on it.
+- #1000 — A probe that loads two runtimes gives each its own `db.all`: passing master's to 6.6.1 throws "Cannot convert a Symbol value to a string".
+- #1000 — A hostile string past the type as `columns` over 50 characters is refused by the 50-key guard before Postgres sees it: an injection payload there stays under 50 characters.
+- #1000 — Heredoc edits with nested quotes and backslashes can be refused by the shell's safety check; the Edit tool takes such test edits.
+- #1000 — A test commit is followed by `npm run typecheck`, which checks the tests' tsconfig too: `sql([…])` is not a `TemplateStringsArray`, and `x.optional = undefined` fails under `exactOptionalPropertyTypes`; two errors reached a hand-over.
+- #1000 — After a query is rejected inside a transaction, no read shows that nothing ran (the transaction is aborted, then rolled back): prove one statement by a frozen text plus `values.length > 0`, or by an analysis error (42703) where a second statement would fail at parse (42601).
+- #1000 — `setConfig({})` merges and resets nothing: a harness that switches config between runtimes sets each key back explicitly.
+- #1000 — A docs sentence about "a shortcut" is replayed over each kind: the select family, the aggregates, a `distinct: true` read, the writes (`jsonResult` is false for aggregates and `distinct: true` reads).
+- #1000 — A commit chained after a `grep` of the typecheck log runs even when typecheck fails: gate on typecheck's own exit code.
+- #1000 — `vitest -t` takes a regex: `'prepared() name'` matched nothing and "17 skipped" looked like a pass; use a plain substring.
+- #1000 — `toStrictEqual({ name: undefined })` fails on a compile result with no `name` key: `toEqual` checks "no name".
+- #1000 — A json-mark claim is probed per base and per `distinct` setting: a `select()` built with `distinct: true` stays json, a `selectOne()` built with it does not.
+- #1000 — A docs sentence that defines a kind of value by the shortcut that builds it is probed with that shortcut wrapping a child of every other kind: a `selectOne()` takes its jsonness from its passed-through `lateral`.
+- #1000 — A review's Expected wording is a claim too: probe it like the code before writing it, or the fix copies its gap.
+- #1000 — A grid check that searches the whole compiled text for `to_jsonb("lateral_passthru"…)` also matches a nested child's own wrap: read only the outer query's head, the text before its first ` LEFT JOIN LATERAL ` (#1000 fix round 2).
+- #1000 — `vitest -t` takes a regex: a title with `()` matches nothing and the file reports "skipped"; use `..` in place of the parentheses (#1000).
+- #1000 — A verify's scratch worktrees do not outlive it: a rerun of its harness on PGlite installs and builds `adapters/pglite` first (`npm ci && npm run build`) (#1000).
+- #1000 — A docs sentence that closes a set ("any other … is compared as written") is checked against every place that sets, copies or carries the mark (`git grep` of its symbol), not against the reviewer's list: two fix rounds followed the list and missed `selectRows()` and `withCTEs()` (#1000 verify 2).
+- #1000 — A test that probes past a type (a passed-through lateral `selectRows()` refuses) runs `typecheck` before its commit: Vitest alone passed, and the pin needed a follow-up commit (#1000 fix round 3).
+- #1000 — A grid's expected run allows for row counts: a `sql` scalar over a multi-row child fails with 21000 whatever its json status, so the grid tells 21000 apart from the json check (#1000).
+- #1000 — A definition drawn from the setters, copiers and readers of a mark (`git grep` of its symbol) found `copy()` and `withCTEs()` in one pass, where two rounds that copied the review's list each missed members (#1000).
+- #1000 — A mark carried on a public, writable field (`runResultTransform`) has a setter outside `src/`, the caller's assignment: a closed set is derived from the public API that writes the field as well as from `git grep` of the mark (#1000 verify 3).
+- #1000 — A verifier's harness that classifies rows against the old docs keeps printing MISMATCH after a docs-only fix: the fix round switches its docs class to the adopted wording before counting (#1000 fix round 4).
+- #1000 — `git grep -c … | head` truncates per-page counts: a Docs swept count per page is taken without `head` (#1000).
+- #1000 — An Expected wording is checked against every observable its harness measures (the head and the overridden copy's values), not only the one the item names (#1000 verify 4).
+- #1000 — A mark carried through `copy()` and `withCTEs()` is stated recursively ("at any depth"), or a translator resolves the antecedent to one level (#1000 verify 4).
+- #1000 — Past three rounds closing one set by listing its members, the docs state what holds unconditionally and defer the rest to the issue that simplifies the mechanism (#1000, rounds 1 to 4).
+- #1000 — A scope clause that must cover several bullets goes last, as its own bullet, not inside the first one (#1000 round 5).
+- #1000 — A cut to "what holds" needs its own probe of the kept zone, wide enough to back a 0-mismatch claim (#1000 round 5).
+- #1000 — A probe that gives a nested fragment a preparedName uses a fresh name per build: a nested preparedName names the outer compiled query, so one name with two SQL texts fails on one connection (#1000 verify 5).
+- #1000 — When a docs rule says "at any depth" for one case, the exception that scopes it says it too, or a reader takes the contrast as one level (#1000 verify 5).
 
 ## Minors kept
 
@@ -72,4 +103,7 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - `defect` `website/switching.md:456` and `fr/:457` (#999): "its last parameter is `1`, not `2`" is false with an `offset` (`LIMIT $2 OFFSET $3`, `[1,2,1]` → `[1,1,1]`); "its `LIMIT` parameter" / "le paramètre de son `LIMIT`".
 - `form` `website/switching.md:458` and `fr/:459` (#999): the before span does not say it ran under `true`, as its siblings say "with `false`"; "…<!-- tsc -->, with `true`, becomes" / "…, avec `true`, devient".
 - `form` `website/runtime-config.md:228` (#999): "`true` made one run on its own ask for two rows" does not say what ran; "a `selectExactlyOne()` run on its own", as the FR twin (`:233`) says.
-
+- `defect` `test/integration/injection.test.ts:1883` (#1000): `expect(await users()).toBe(before)` reads after `pgError()`'s `ROLLBACK TO SAVEPOINT`, so it proves nothing; freeze `compile().text` for `'x"; DELETE FROM users; --'` and drop the reads, or say so in the comment.
+- `form` `docs/decisions/019-one-behaviour.md:59` (#1000): the `topLevelSelectAsRows` row's Find column still gives the `runResultTransform`/`compile` workaround #998 made moot; the same "(fixed by #998, 2026-11-28 …)" mark.
+- `form` `src/db/shortcuts.ts:212` (#1000): `pairs.push([columns[i], columns[i]])` reads each index twice, where 6.6.1 and master read once; `const c = columns[i]`.
+- `form` `CHANGELOG.md:25` (#1000): the `TypeError` line lists six functions; `selectExactlyOne()` and a `select()` nested as a `lateral` threw too; "`select()` and its kin".
