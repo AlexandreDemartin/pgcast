@@ -1,5 +1,5 @@
 ---
-english: 02da0f254db9
+english: 9507adb8024c
 description: "Comprendre ce qui a échoué dans une requête et y répondre : une place déjà réservée, une séance qui n’existe pas, une option mal donnée par votre code."
 ---
 
@@ -107,7 +107,7 @@ Pour une place qui peut être prise, demandez à Postgres de ne pas refuser : [
 
 - Reconnaissez-la avec `err instanceof db.NotExactlyOneError`. Ce n’est pas une `pg.DatabaseError` et elle n’a pas de `code`, donc `isDatabaseError()` donne `false`.
 - Son message est "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->, et `err.query.compile()` donne le SQL et les valeurs du cast panel.
-- `selectExactlyOne()` demande `LIMIT $2`<!-- probe: examples/errors_not_found.ts -->, de valeur `1`, donc deux lignes correspondantes ne sont pas une erreur : il donne la première, comme dans Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)). Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), une deuxième ligne fait aussi rejeter la promesse de `.run()` avec une `NotExactlyOneError` : "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
+- `selectExactlyOne()` demande `LIMIT $2`<!-- probe: examples/errors_not_found.ts -->, de valeur `1`, donc deux lignes correspondantes ne sont pas une erreur : il donne la première, comme dans Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)). Pendant toute la 7.x, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) faisait aussi rejeter une deuxième ligne ; la 8.0 la retire ([migration vers la 8.0](/fr/switching#from-8-0-selectExactlyOneChecksForSecondRow)).
 - Dans un `lateral`, une ligne manquante vaut `null`, et n’est pas une erreur ([`selectExactlyOne()`](/fr/select#selectExactlyOne)).
 - Quand une ligne manquante est normale, comme dans une recherche, [`selectOne()`](/fr/select#selectOne) donne `undefined` à la place, et TypeScript vous oblige à le vérifier.
 
@@ -184,8 +184,6 @@ function statusOf(err: unknown) {
   return 500;  // anything else: a bug, or the database out of reach
 }
 ```
-
-Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), une `NotExactlyOneError` dont le message dit « <span lang="en">more returned</span> » signale deux lignes là où une seule était attendue, pas une ligne absente : pas de 404.
 
 ## Voir aussi {#see-also}
 

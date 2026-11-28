@@ -1,5 +1,5 @@
 ---
-english: 91b8d17d4170
+english: e0cf3f4cce2c
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -144,7 +144,7 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
 
 `lateral?: { [key: string]: SQLFragment } | SQLFragment`, un [`LateralOption`](#LateralOption) : d’autres raccourcis, imbriqués, chacun joint par `LEFT JOIN LATERAL … ON true`. Dans ceux-ci, [`db.parent()`](/fr/sql-template#parent) nomme une colonne de la table de cette requête.
 
-- **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`, ou `null` quand sa requête ne renvoie aucune ligne ([`count()`](/fr/aggregates#count)). Un `count()` dont le `groupBy` donne plusieurs groupes fait revenir la ligne parente une fois par groupe sous un `select()` extérieur ; sous `selectOne()` ou `selectExactlyOne()`, une seule fois, avec le compte de l’un des groupes, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
+- **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`, ou `null` quand sa requête ne renvoie aucune ligne ([`count()`](/fr/aggregates#count)). Un `count()` dont le `groupBy` donne plusieurs groupes fait revenir la ligne parente une fois par groupe sous un `select()` extérieur ; sous `selectOne()` ou `selectExactlyOne()`, une seule fois, avec le compte de l’un des groupes. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
 - **Une seule sous-requête** : son résultat est transmis à la place de chaque ligne. `columns` et `extras` n’ont alors rien à quoi s’ajouter, et le type les refuse, avec `strictNullChecks` activé.
   - Quand vous appelez `.run()` sur la requête extérieure `selectOne()`, `selectExactlyOne()` ou [`selectRows()`](#selectRows), `pg` lit la colonne `result` transmise avec le parseur configuré pour son type. Un `select()` extérieur convertit chaque valeur en JSON, `to_json(result)`, et les renvoie dans un tableau. Un template `sql` garde son annotation de type de résultat dans les deux cas.
   - Par défaut, quand [`count()`](/fr/aggregates#count) compte deux lignes, `pg` renvoie la chaîne `"2"`. Il lit aussi les résultats de type `bigint` ou `numeric` de `sum()` et `avg()` comme des chaînes. Avec `Number` comme parseur d’`int8`, le même compte donne `2`. `count()` est typé `number`. Par défaut, `sum()` et `avg()` sont typés `number | null`.
@@ -273,7 +273,7 @@ Comme [`selectOne()`](#selectOne), mais son type n’a pas d’`undefined` : qu
 
 </CastPanel>
 
-Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), la requête exécutée seule demande deux lignes (par défaut `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> avec `2`) et la promesse de `.run()` est aussi rejetée s’il y a une deuxième ligne. Imbriquée dans un `lateral` ou un template `sql`, elle demande une ligne et, avec `withTies: true`, les éventuelles lignes ex æquo.
+À partir de la 8.0.0, elle ne demande qu’une ligne, exécutée seule comme imbriquée dans un `lateral` ou un template `sql`, et, avec `withTies: true`, les éventuelles lignes ex æquo. Pendant toute la 7.x, avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), la requête exécutée seule demandait deux lignes, et sa promesse était rejetée s’il y en avait une deuxième ([migration vers la 8.0](/fr/switching#from-8-0-selectExactlyOneChecksForSecondRow)).
 
 ### `NotExactlyOneError` {#NotExactlyOneError}
 
@@ -283,7 +283,7 @@ class NotExactlyOneError extends Error {
 }
 ```
 
-L’erreur avec laquelle `selectExactlyOne()`, le mode `ExactlyOne` de `select()`, est rejetée quand aucune ligne ne correspond. Son `name` est `'NotExactlyOneError'`, son `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message --> ; avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), une seconde ligne donne "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
+L’erreur avec laquelle `selectExactlyOne()`, le mode `ExactlyOne` de `select()`, est rejetée quand aucune ligne ne correspond. Son `name` est `'NotExactlyOneError'`, son `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
 
 Sa `query` est le [`SQLFragment`](/fr/sql-template#SQLFragment) exécuté ou, pour une [`.copy()`](/fr/sql-template#copy), celui dont elle est la copie : `err.query.compile()` donne son SQL et ses valeurs. `err instanceof db.NotExactlyOneError` la reconnaît ; pour l’intercepter : [Distinguer une ligne manquante des autres erreurs](/fr/handle-errors#tell-a-missing-row-from-the-others).
 

@@ -1,5 +1,5 @@
 ---
-english: 48c6e8ba1920
+english: 33364bd690ff
 ---
 
 # Transactions
@@ -747,4 +747,4 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 
 </div>
 
-Après une requête, pgcast rejette dans deux cas qui lui sont propres : `selectExactlyOne()` sans ligne, ou avec une seconde sous [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) ; `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` ([Erreurs](#errors)).
+Après une requête, pgcast rejette dans deux cas qui lui sont propres : `selectExactlyOne()` sans ligne, avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) ; `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` ([Erreurs](#errors)).

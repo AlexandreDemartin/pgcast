@@ -1,5 +1,5 @@
 ---
-english: 1d7b516c4c88
+english: e2b8c6b6b51f
 ---
 
 # Nouveautés
@@ -13,7 +13,7 @@ Ce que pgcast ajoute à Zapatos 6.6.1, une ligne par ajout : la version qui l�
 |---|---|
 | [`withCTEs()`](/fr/sql-template#withCTEs) : des CTE avant un raccourci, dont le type du résultat est conservé | 6.11.0 |
 | [`selectRows()`](/fr/select#selectRows) : la requête de `select()` comme fragment, une ligne par résultat, pour un [curseur](/fr/cursors) | 6.12.0 |
-| [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) : `selectExactlyOne()` lève une erreur sur une deuxième ligne, en opt-in | 6.7.0 |
+| [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) : `selectExactlyOne()` lève une erreur sur une deuxième ligne, en opt-in pendant toute la 7.x, retirée en 8.0.0 | 6.7.0 |
 | [`topLevelSelectAsRows`](/fr/runtime-config#Config.topLevelSelectAsRows) : `select()` exécuté seul envoie une ligne par résultat, le même tableau, en opt-in pendant toute la 7.x, toujours à partir de la 8.0.0 | 7.3.0 |
 | [`shortcutsUseJson`](/fr/runtime-config#Config.shortcutsUseJson) : `select()` et ses semblables, et le `RETURNING` des écritures, construisent leur JSON avec les fonctions `json`, les mêmes valeurs, en opt-in pendant toute la 7.x, toujours à partir de la 8.0.0 | 7.3.0 |
 | [`ReturningTypeForTable`](/fr/insert#ReturningTypeForTable) et [`UpsertReturnableForTable`](/fr/insert#UpsertReturnableForTable), exportés : la ligne que renvoie une écriture, pour typer un faux résultat | 6.7.0 |
