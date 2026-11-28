@@ -1845,6 +1845,7 @@ describe('an extras key in a write\'s RETURNING beside every column', () => {
 it('runs a select with punctuation in its alias and filter in both forms', async () => {
   for (const [i, input] of ['Ada', 'a"b', "a'b", 'a;b', 'a--b', 'a/*b', 'a$1b', 'a\\b', 'a\0b'].entries()) {
     const q = db.select('users', { display_name: input }, { alias: input, columns: ['id'] }).prepared(`alias_${i}`);
+    const automatic = q.copy(), name = automatic.preparedName;
     const rows = input === 'Ada' ? [{ id: 1 }] : [];
     for (const [fragment, result] of [
       [q, rows], [q.copy({ preparedName: `copy_${i}` }), rows],
@@ -1857,6 +1858,12 @@ it('runs a select with punctuation in its alias and filter in both forms', async
         expect(await fragment.run(t.client)).toEqual(result);
       }
       expect(await adaName(t.client)).toBe('Ada');
+    }
+    expect(automatic.compile().name).toBe(name);
+    expect(name).toMatch(/^_zapatos_prepared_\d+$/);
+    if (!input.includes('\0')) {
+      const prepared = await t.client.query('SELECT statement FROM pg_prepared_statements WHERE name = $1', [name]);
+      expect(prepared.rows).toEqual([{ statement: automatic.compile().text }]);
     }
   }
 });

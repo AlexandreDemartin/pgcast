@@ -3427,6 +3427,7 @@ it('keeps the same identifiers and parameters in both forms of a select', () => 
       quoted = name === hostile.dquote ? 'a""b' : name,
       rows = `SELECT to_json("${quoted}".*) AS result FROM "users" AS "${quoted}" WHERE ("display_name" = $1)`,
       aggregate = `SELECT coalesce(json_agg(result), '[]') AS result FROM (${rows}) AS "sq_${quoted}"`,
+      automatic = q.copy(), aggregateNames: (string | undefined)[] = [],
       copy = q.copy({ preparedName: 'aggregate' }),
       prefix = sql`SELECT ${param(1)}::int AS n`;
     for (const [fragment, text, values, statement] of [
@@ -3439,6 +3440,9 @@ it('keeps the same identifiers and parameters in both forms of a select', () => 
       expect(visible(compiled.text)).toBe(visible(text));
       expect(compiled.values).toEqual(values);
       expect(compiled.name).toBe(statement);
+      if (text === aggregate) aggregateNames.push(compiled.name);
     }
+    expect(automatic.preparedName).toMatch(/^_zapatos_prepared_\d+$/);
+    expect(aggregateNames).toEqual(['aggregate', automatic.compile().name]);
   }
 });
