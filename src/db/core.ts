@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import type * as pg from 'pg';
 
 import { getConfig, SQLQuery } from './config';
-import { builtinName, identifier, isBuiltin, isKeylessBuiltin, isPOJO, isRefusedBuffer, space } from './utils';
+import { aggregateCopy, builtinName, identifier, isBuiltin, isKeylessBuiltin, isPOJO, isRefusedBuffer, space } from './utils';
 
 import type {
   Updatable,
@@ -458,6 +458,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
   // A top-level select runs its rows query. Its shallow copy runs the nested aggregate.
   protected aggregateResultTransform?: (qr: pg.QueryResult) => any;
 
+  protected [aggregateCopy]?: boolean;
+
   parentTable?: string = undefined;  // used for nested shortcut select queries
   preparedName?: string = undefined;  // for prepared statements
 
@@ -487,6 +489,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     const { literals = this.literals, expressions = this.expressions, ...overrideRest } = override ?? {};
     const copy = Object.assign(new SQLFragment<RunResult, Constraint>(literals, expressions), {
       runResultTransform: this.aggregateResultTransform ?? this.runResultTransform,
+      [aggregateCopy]: literals === this.literals && expressions === this.expressions &&
+        (!!this.aggregateResultTransform || !!this[aggregateCopy]),
       parentTable: this.parentTable,
       preparedName: this.preparedName,
       noop: this.noop,

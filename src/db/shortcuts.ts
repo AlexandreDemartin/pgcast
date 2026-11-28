@@ -40,6 +40,7 @@ import {
 } from './core';
 
 import {
+  aggregateCopy,
   callerValue,
   completeKeysWithDefaultValue,
   identifier,
@@ -991,7 +992,7 @@ function selectQuery(
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
     passthrough = lateral instanceof SQLFragment,
-    jsonChild = passthrough && isQuery(lateral) && (!!lateral['aggregateResultTransform'] || !!(lateral.runResultTransform as JSONResult)[jsonResult]),
+    jsonChild = passthrough && isQuery(lateral) && (lateral[aggregateCopy] || !!lateral['aggregateResultTransform'] || !!(lateral.runResultTransform as JSONResult)[jsonResult]),
     plainDistinct = !!distinct && !(distinct instanceof SQLFragment || typeof distinct === 'string' || Array.isArray(distinct)),
     // the JSON of a row is built with json functions (decision 018 § 2), but under a plain DISTINCT, which compares
     // jsonb rows, json having no equality operator (42883)
@@ -1463,6 +1464,7 @@ export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]
       query.copy({ literals: ['', ''], expressions: [withClause(query)], noop: false }) as Q, { preparedName: undefined }),
     topLevelQuery = (query as TopLevelFormed)[topLevelForm];
 
+  if (query[aggregateCopy]) result[aggregateCopy] = true;
   if (topLevelQuery) {
     // compiled on its own, the LIMIT 2 form or the rows form, as select() compiles it; nested, LIMIT 1 or the aggregate
     const
