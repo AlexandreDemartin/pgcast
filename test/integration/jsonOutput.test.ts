@@ -142,7 +142,8 @@ describe('distinct: true over a passed-through lateral', () => {
       run = (lateral: db.SQLFragment<any>, distinct: boolean) => db.selectOne('accounts', { owner_id: 1 }, { distinct, lateral }).run(t.client);
     expect(db.selectOne('accounts', all, { distinct: true, lateral: copied }).compile().text).toContain('SELECT DISTINCT to_jsonb("lateral_passthru".result) AS result');
     expect([await run(copied, false), await run(copied, true)]).toEqual(['7', 7]);
-    expect([await run(sql([bigint]), false), await run(sql([bigint]), true)]).toEqual(['7', '7']);
+    const fragment = sql`SELECT 7::bigint AS result`;
+    expect([await run(fragment, false), await run(fragment, true)]).toEqual(['7', '7']);
     const at = `SELECT '2020-01-02T03:04:05Z'::timestamptz AS result`, at2 = owner().copy({ literals: [at], expressions: [] });
     expect(await run(at2, false)).toEqual(new Date('2020-01-02T03:04:05Z'));
     expect(typeof await run(at2, true)).toBe('string');

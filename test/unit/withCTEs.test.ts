@@ -121,7 +121,7 @@ describe('withCTEs', () => {
     expect(result.compile()).toEqual({ text: idsText, values: ['id'] });
     // a parentTable set, compiled, then unset, before the call: parent() has no table, as in a query never compiled
     const owned = db.select('accounts', { owner_id: parent('id') }, { columns: ['id'] });
-    owned.parentTable = 'users'; owned.compile(); owned.parentTable = undefined;
+    owned.parentTable = 'users'; owned.compile(); delete owned.parentTable;
     expect(() => db.withCTEs({ one }, owned).compile()).toThrow("The 'parent' table alias has no meaning here");
     // the query itself, at the top level, reads its own at each compile
     expect(after.compile()).toEqual({ text: '/* marked no-op: won\'t hit DB unless forced -> */ SELECT json_build_object($1::text, "id") AS result FROM "users"', values: ['id'] });
