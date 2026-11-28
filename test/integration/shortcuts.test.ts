@@ -1153,10 +1153,10 @@ describe('selectOne, selectExactlyOne', () => {
     expect((err as db.NotExactlyOneError).query.compile()).toEqual(q.compile());
   });
 
-  it.each([{}, { selectExactlyOneChecksForSecondRow: false }])('selectExactlyOne silently takes the first of two rows under %j', async config => {
+  it.each([{}, { selectExactlyOneChecksForSecondRow: null }, { selectExactlyOneChecksForSecondRow: false }])('selectExactlyOne silently takes the first of two rows under %j', async config => {
     const warning = vi.spyOn(process, 'emitWarning');
     try {
-      db.setConfig(config);
+      db.setConfig(config as db.NewConfig);
       const first = db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } });
       expect(first.compile().values).toEqual(['id', 1, 1]);
       expect(await run(first)).toEqual({ id: 2 });
@@ -1165,24 +1165,19 @@ describe('selectOne, selectExactlyOne', () => {
     } finally { warning.mockRestore(); }
   });
 
-  it('selectExactlyOne throws a NotExactlyOneError on a second row, with selectExactlyOneChecksForSecondRow', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    const q = db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'] });
-    const err = await q.run(t.client).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(db.NotExactlyOneError);
-    expect((err as db.NotExactlyOneError).message).toBe('One result expected but more returned (hint: check `.query.compile()` on this Error)');
-    expect((err as db.NotExactlyOneError).query).toBe(q);
+  it('selectExactlyOne with a lock takes and locks the first of two rows only', async () => {
+    const first = db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lock: { for: 'UPDATE' } });
+    expect(first.compile().values).toEqual(['id', 1, 1]);
+    expect(await run(first)).toEqual({ id: 2 });
+    const other = await t.pool.connect();
+    try {
+      // the test's client holds its transaction open: the second row is free, the first is locked (55P03)
+      expect((await other.query('SELECT id FROM users WHERE id = 3 FOR UPDATE NOWAIT')).rows).toEqual([{ id: 3 }]);
+      expect(await other.query('SELECT id FROM users WHERE id = 2 FOR UPDATE NOWAIT').catch((e: unknown) => e)).toMatchObject({ code: '55P03' });
+    } finally { other.release(); }
   });
 
-  it('selectExactlyOne gives its one row, or throws on none, with selectExactlyOneChecksForSecondRow', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    expect(await run(db.selectExactlyOne('users', { id: 3 }, { columns: ['display_name'] }))).toEqual({ display_name: 'Cyd' });
-    const err = await db.selectExactlyOne('users', { id: -1 }).run(t.client).catch((e: unknown) => e);
-    expect((err as db.NotExactlyOneError).message).toBe('One result expected but none returned (hint: check `.query.compile()` on this Error)');
-  });
-
-  it('in a lateral, selectExactlyOne keeps LIMIT 1, so the parent row comes once, with selectExactlyOneChecksForSecondRow', async () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+  it('in a lateral, selectExactlyOne keeps LIMIT 1, so the parent row comes once', async () => {
     expect(await run(db.select('users', { id: 1 }, {
       columns: ['id'],
       lateral: { report: db.selectExactlyOne('users', { manager_id: parent('id') }, { alias: 'r', columns: ['id'], order: { by: 'id', direction: 'ASC' } }) },
@@ -1205,8 +1200,6 @@ describe('selectOne, selectExactlyOne', () => {
 
     it('in a lateral, the parent row comes once per tie', async () => {
       expect(await userIds(db.selectOne('accounts', owned, byOwner))).toEqual([1, 1, 2, 3]);
-      expect(await userIds(db.selectExactlyOne('accounts', owned, byOwner))).toEqual([1, 1, 2, 3]);
-      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
       expect(await userIds(db.selectExactlyOne('accounts', owned, byOwner))).toEqual([1, 1, 2, 3]);
     });
 
@@ -1561,12 +1554,9 @@ describe('copy()', () => {
     expect((copied as db.NotExactlyOneError).query).toBe(q);
   });
 
-  it('a copy of selectExactlyOne keeps LIMIT 1, so checks one row only, with selectExactlyOneChecksForSecondRow', async () => {
-    // the copy compiles as a nested query does (#261): a second row is never asked for
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    const [original, copied] = await originalAndCopy(db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }));
-    expect((original as db.NotExactlyOneError).message).toBe('One result expected but more returned (hint: check `.query.compile()` on this Error)');
-    expect(copied).toEqual({ id: 2 });
+  it('a copy of selectExactlyOne gives the first of two rows, as the query it was copied from', async () => {
+    expect(await originalAndCopy(db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } })))
+      .toEqual([{ id: 2 }, { id: 2 }]);
   });
 
   it('a copy of insert([]) still sends nothing and gives []', async () => {

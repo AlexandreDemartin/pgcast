@@ -78,17 +78,15 @@ describe('withCTEs', () => {
       .toEqual({ text: 'WITH "added" AS (SELECT NULL::json AS result WHERE false) SELECT count(*) FROM added', values: [] });
   });
 
-  it('selectExactlyOne() asks for a second row at the top level with selectExactlyOneChecksForSecondRow, as alone', () => {
-    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+  it('selectExactlyOne() keeps LIMIT 1 at the top level, as alone, and nested', () => {
     const one = db.selectExactlyOne('users', all);
     expect(db.withCTEs({ recent }, one).compile()).toEqual({
       text: `${recentSQL} SELECT to_json("users".*) AS result FROM "users" LIMIT $2`,
-      values: [1, 2],
+      values: [1, 1],
     });
-    expect(db.withCTEs({}, one).compile()).toEqual({ text: 'SELECT to_json("users".*) AS result FROM "users" LIMIT $1', values: [2] });
-    // nested, LIMIT 1, as the shortcut nested; prepared on request, the name goes with the top-level text
+    expect(db.withCTEs({}, one).compile()).toEqual({ text: 'SELECT to_json("users".*) AS result FROM "users" LIMIT $1', values: [1] });
     expect(db.select('accounts', all, { lateral: { u: db.withCTEs({ recent }, one) } }).compile().values).toEqual([1, 1]);
-    expect(db.withCTEs({ recent }, one).prepared('one_with').compile()).toMatchObject({ values: [1, 2], name: 'one_with' });
+    expect(db.withCTEs({ recent }, one).prepared('one_with').compile()).toMatchObject({ values: [1, 1], name: 'one_with' });
   });
 
   it('select(): the main query is its rows query, a CTE keeps its json_agg', () => {
