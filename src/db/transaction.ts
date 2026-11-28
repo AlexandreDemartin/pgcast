@@ -610,8 +610,9 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  * `FETCH FORWARD <batchSize> FROM pgcast_cursor_<n>` until a `FETCH` returns
  * no row, then `CLOSE pgcast_cursor_<n>`.
  *
- * - `query.runResultTransform` receives each non-empty `FETCH` result, including
- *   its command tag. A `select()` keeps its `json_agg`, as nested: one row, one batch.
+ * - A `select()` uses its aggregate copy for the fetch: one row, one batch.
+ *   Other queries apply their current `runResultTransform` to each non-empty
+ *   `FETCH` result, including its command tag.
  * - A plain select reads the snapshot visible at `DECLARE`. Under `READ COMMITTED`,
  *   [a locking select](https://pgcast.dev/cursors#work-inside-the-loop) with
  *   `FOR UPDATE` can fetch a newer version of a row. A transaction retry
@@ -686,6 +687,8 @@ async function* cursorBatches<RunResult>(
 
   const inner = query.copy();  // before a number is taken, which a copy() that throws would leave taken
 
+  const batchQuery = query['aggregateResultTransform'] ? inner : query;
+
   // the lowest free number, not a depth: two loops at once, then a third, each get a name no running one holds
   const held = cursorNumbers.get(txnClient) ?? new Set<number>();
   let n = 1;
@@ -716,7 +719,7 @@ async function* cursorBatches<RunResult>(
       await fetch.run(txnClient);
       const fetched = response!;
       if (fetched.rows.length === 0) return;
-      yield query.runResultTransform(fetched) as RunResult;
+      yield batchQuery.runResultTransform(fetched) as RunResult;
     }
 
   } finally {
