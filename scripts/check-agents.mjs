@@ -70,7 +70,7 @@ if (errors.length > 0) {
 }
 console.log(`✓ ${skills.length} skills, ${readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).length} agents, AGENTS.md § Architecture, CHANGELOG.md § Deprecated and entries, ${reportPath} summary`);
 
-const tests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs', 'scripts/check-architecture.test.mjs',
+const tests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs', '.claude/hooks/handover.test.mjs', 'scripts/check-architecture.test.mjs',
   'scripts/check-changelog-entries.test.mjs', 'scripts/check-deprecations.test.mjs', 'scripts/check-report.test.mjs',
   'scripts/check-skills.test.mjs', 'scripts/release-folder.test.mjs'],
   {stdio: 'inherit'});
