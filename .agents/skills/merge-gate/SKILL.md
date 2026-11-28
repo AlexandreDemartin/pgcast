@@ -13,7 +13,7 @@ The owner's attention goes where the risk is (Fowler, "Ship / Show / Ask"). The 
 |---|---|---|---|
 | `low` | **Ship** | green CI | — |
 | `normal` | **Show** | blockers fixed, green CI | listed in the milestone summary; the owner reads it then |
-| `high` | **Ask** | label `needs-owner`, review and verify comments posted, blockers fixed, green CI; the owner's standing delegation answers the Ask | its choices under **Decided alone** |
+| `high` | **Ask** | label `needs-owner`, round comment posted and its blockers verified as fixed, green CI; the owner's standing delegation answers the Ask | its choices under **Decided alone** |
 
 - Green CI: **CI passed** on the last commit, after `gh pr ready`, and **PR body** green (skill `ci-gate`).
 - **`master` moved** since that run: `git fetch`, then `git merge-base --is-ancestor origin/master <head>` (a `git pull` that says "up to date" proves nothing; a stacked layer, against `origin/<base>`, before its review too: #539, #546); if behind, merge `origin/master` (skill `pr-shape` § Commits) and let CI run again. Checks across pages (anchors, pending names, a shared docs schema) and generated counts hold only on the merged result.
