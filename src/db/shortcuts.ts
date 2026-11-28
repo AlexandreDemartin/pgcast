@@ -179,9 +179,10 @@ const rowsResult = (qr: { rows: any[] }) => qr.rows.map(r => r.result);
 // Mark the transform of the nested form, which copy() keeps. A select's aggregate is always json,
 // even if the caller changes the rows transform. Caller SQL borrowing a transform stays as written (isQuery):
 // a json read inside a sql child, compared as written, needs the caller's to_jsonb() (42883 otherwise). An aggregate,
-// and a selectOne() or selectExactlyOne() built with distinct: true, are not json and carry no mark. A copy() of a json
-// read with its literals or expressions overridden keeps the mark, so it is compared as jsonb, and its values come back
-// as jsonb gives them (7::bigint as 7, a timestamptz as a string); a copy of an unmarked one, as written.
+// and a selectOne() or selectExactlyOne() built with distinct: true, or whose passed-through lateral is not json, are
+// not json and carry no mark. A copy() of a json read with its literals or expressions overridden keeps the mark, so
+// it is compared as jsonb, and its values come back as jsonb gives them (7::bigint as 7, a timestamptz as a string); a
+// copy of an unmarked one, as written.
 const jsonResult = Symbol('jsonResult');
 type JSONResult = { [jsonResult]?: boolean };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
