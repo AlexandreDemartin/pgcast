@@ -1613,6 +1613,27 @@ describe('null as options, or as an options key', () => {
   });
 });
 
+describe('returning or columns given as no array, past the type', () => {
+  it('a string: .run() rejects with 42703 on its first character, as in Zapatos 6.6.1, never a throw at the call', async () => {
+    const id = 'id' as any, row = { email: 'eve@example.com', display_name: 'Eve' };
+    for (const build of [
+      () => db.insert('users', row, { returning: id }),
+      () => db.upsert('users', row, 'email', { returning: id }),
+      () => db.update('users', { display_name: 'X' }, { id: 1 }, { returning: id }),
+      () => db.deletes('users', { id: 3 }, { returning: id }),
+      () => db.select('users', all, { columns: id }),
+      () => db.selectOne('users', all, { columns: id }),
+      () => db.select('users', all, { columns: id, distinct: true }),
+    ]) expect(await fails(build())).toEqual({ code: '42703', message: 'column "i" does not exist' });
+    expect(await scalar(`SELECT count(*)::int AS v FROM users WHERE email = 'eve@example.com' OR display_name = 'X'`)).toBe(0);
+  });
+
+  it('an object with no length: an empty object, as in Zapatos 6.6.1', async () => {
+    expect(await run(db.insert('users', { email: 'eve@example.com', display_name: 'Eve' }, { returning: {} as any }))).toEqual({});
+    expect(await run(db.selectOne('users', { id: 1 }, { columns: {} as any }))).toEqual({});
+  });
+});
+
 describe('a shortcut as an insert(), upsert() or update() value, a scalar subquery (#656)', () => {
   // 6.6.1 wrote it bare, `VALUES (SELECT …)` and `ROW(SELECT …)`, which Postgres refuses (42601)
   const
