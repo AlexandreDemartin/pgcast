@@ -572,7 +572,7 @@ Appliqué par `run()` à ce que renvoie `pg`. `qr` est typé `pg.QueryResult`, m
 
 </CastPanel>
 
-Un fragment imbriqué fournit son SQL. Seule la transformation du fragment exécuté s’applique. À partir de la 8.0.0. Pour un [`select()`](/fr/select#select) exécuté seul ou comme requête principale de `withCTEs()`, votre transformation reçoit une ligne par résultat. Par défaut, `qr.rows.map(r => r.result)` les rassemble en un tableau ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)).
+Un fragment imbriqué fournit son SQL. Seul le fragment qui l’englobe transforme le résultat. À partir de la 8.0.0. Pour un [`select()`](/fr/select#select) exécuté seul ou comme requête principale de `withCTEs()`, votre transformation reçoit une ligne par résultat. Par défaut, `qr.rows.map(r => r.result)` les rassemble en un tableau ([migration vers la 8.0](/fr/switching#from-8-0-topLevelSelectAsRows)).
 
 ### `prepared()` {#prepared}
 
@@ -588,7 +588,7 @@ Les valeurs sont des paramètres, pas une partie du texte : un seul nom sert do
 
 Un nom désigne un seul texte : sur une connexion qui a préparé `'p'`, `pg` rejette un fragment d’un autre texte nommé `'p'` avec « <span lang="en">Prepared statements must be unique - 'p' was used for a different statement</span> ».
 
-Un template, un `lateral` ou des `extras` peuvent hériter du nom d’un `select()` préparé qu’ils imbriquent. Pour exécuter les deux textes sur la même connexion, donnez un nom distinct à la requête englobante.
+Une requête de sélection préparée peut transmettre son nom au template, au lateral ou à la requête d’extras qui l’imbrique. Pour exécuter les deux textes SQL sur la même connexion, donnez son propre nom à la requête englobante.
 
 ### `copy()` {#copy}
 
@@ -596,11 +596,11 @@ Un template, un `lateral` ou des `extras` peuvent hériter du nom d’un `select
 fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?, noop?, noopResult? }): SQLFragment<RunResult, Constraint>
 ```
 
-Un nouveau fragment sur les mêmes littéraux et expressions. Si le fragment n’a qu’une forme SQL, il garde `runResultTransform`, `parentTable`, `preparedName`, `noop` et `noopResult`, sauf ceux que donne `override`. Un raccourci copié se résout donc en ce que donne le raccourci, comme le dit son type : `count('films', all).copy().run(pool)` donne `4` sur le schéma de la doc, là où Zapatos 6.6.1 donnait à la copie la transformation par défaut, donc les lignes : `[{ result: '4' }]`.
+La copie est un nouveau fragment qui reprend les mêmes littéraux et expressions. Si la requête n’a qu’une forme SQL, la copie conserve `runResultTransform`, `parentTable`, `preparedName`, `noop` et `noopResult`, sauf les propriétés fournies dans `override`. La promesse d’un raccourci copié se résout donc avec le même résultat que celle du raccourci d’origine, comme l’indique son type. Ainsi, `count('films', all).copy().run(pool)` donne `4` sur le schéma de la doc, là où Zapatos 6.6.1 appliquait à la copie la transformation par défaut et renvoyait les lignes `[{ result: '4' }]`.
 
 Une copie se compile comme un fragment imbriqué. Sans `withTies`, une copie de `selectExactlyOne()` garde `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). La promesse d’une copie exécutée seule est rejetée en l’absence de lignes. Avec la vérification et `withTies` activés, une deuxième ligne ex æquo entraîne aussi le rejet de la promesse. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent.
 
-À partir de la 8.0.0. Une copie de `select()`, y compris comme requête principale de `withCTEs()`, exécute son `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', db.all).copy() --> et extrait le tableau de l’unique ligne. Vous pouvez définir une transformation sur cette copie. Si le `select()` est préparé, la copie reçoit son propre nom et le garde à chaque exécution. Pour le choisir, écrivez `q.copy({ preparedName: 'films_agg' })`<!-- tsc: (q => …)(db.select('films', db.all).prepared('films_p')) -->.
+À partir de la 8.0.0. Une copie de `select()`, y compris quand la sélection est la requête principale de `withCTEs()`, exécute son `coalesce(json_agg(result), '[]')`<!-- probe: db.select('films', db.all).copy() --> et extrait le tableau de l’unique ligne. Vous pouvez définir une transformation sur cette copie. Si la requête de sélection est préparée, la copie reçoit son propre nom et le conserve d’une exécution à l’autre. Pour le choisir, écrivez `q.copy({ preparedName: 'films_agg' })`<!-- tsc: (q => …)(db.select('films', db.all).prepared('films_p')) -->.
 
 ## `withCTEs()` {#withCTEs}
 
