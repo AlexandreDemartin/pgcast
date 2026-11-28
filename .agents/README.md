@@ -16,8 +16,8 @@ Each element exists once, where the tools read it natively.
 | Skill | Subject |
 |---|---|
 | `run-step` | Orchestrate a step, sub-issue of a GitHub Epic (`gh issue view`): issue body, **Risk**, sequence, briefs, end of chapter |
-| `plan-and-proofs` | The plan comment on the issue; the PR body, its **Proofs** and **Decided alone** |
-| `review-comments` | Conventional Comments, one comment per round, verify comment, `→ fixed in <sha>` |
+| `plan-and-proofs` | Two layers, the owner's read and the detail folded; the plan comment on the issue; the PR body, its **Proof**, **Evidence** and **Decided alone** |
+| `review-comments` | Conventional Comments, one comment per round, its table and fold, the verify that edits it |
 | `merge-gate` | Ship / Show / Ask by risk, `needs-owner`, squash, stacks, clean-up |
 | `ci-gate` | Draft PR while iterating, `gh pr ready`, docs only, **CI passed** check, exceptional `[skip ci]`, rerun |
 | `pr-shape` | Size, splitting, stacking, title, branch and commits of a PR, after Zapatos's commits |
