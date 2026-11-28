@@ -1020,6 +1020,20 @@ describe('shortcut options', () => {
       .toMatch(/ RETURNING json_build_object\(\$3::text, now\(\), '\$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END\) AS result$/);
   });
 
+  it('a hostile string as columns or returning, past the type: one quoted identifier per character, each key a parameter', () => {
+    // read by index, as Zapatos 6.6.1's mapWithSeparator() read it (#958): no character closes its quotes
+    const
+      input = `"';--/*$1\\\0` as any,
+      names = '"""", "\'", ";", "-", "-", "/", "*", "$", "1", "\\", "<NUL>"'.split(', '),
+      pairs = (first: number) => names.map((n, i) => `$${first + i}::text, ${n}`).join(', '),
+      deletes = db.deletes('users', { id: 1 }, { returning: input }).compile(),
+      select = db.select('users', all, { columns: input }).compile();
+    expect(visible(deletes.text)).toBe(`DELETE FROM "users" WHERE ("id" = $1) RETURNING json_build_object(${pairs(2)}) AS result`);
+    expect(deletes.values).toEqual([1, ...input]);
+    expect(visible(select.text)).toBe(`SELECT json_build_object(${pairs(1)}) AS result FROM "users"`);
+    expect(select.values).toEqual([...input]);
+  });
+
   it('order.by', () => {
     expect(matrix(v => db.select('users', all, { order: { by: v, direction: 'ASC' } } as any))).toMatchInlineSnapshot(`
       {

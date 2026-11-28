@@ -1867,3 +1867,24 @@ it('runs a select with punctuation in its alias and filter in both forms', async
     }
   }
 });
+
+describe('a hostile string as columns or returning, past the type', () => {
+  it('is one statement, its characters one column each: run() rejects with 42703 on the first, as in Zapatos 6.6.1', async () => {
+    // read by index, as 6.6.1's mapWithSeparator() read it (#958); each key is a parameter, so pg sends one statement
+    const input = 'x"; DELETE FROM users; --' as any, users = async () => (await t.client.query('SELECT count(*)::int AS n FROM users')).rows[0].n;
+    const before = await users();
+    for (const query of [
+      db.select('users', all, { columns: input }),
+      db.insert('users', { email: 'eve@example.com', display_name: 'Eve' }, { returning: input }),
+      db.deletes('users', { id: 3 }, { returning: input }),
+    ]) {
+      expect(query.compile().values.length).toBeGreaterThan(0);
+      expect(await pgError(t.client, () => query.run(t.client))).toEqual({ code: '42703', message: 'column "x" does not exist' });
+      expect(await users()).toBe(before);
+    }
+    // over 50 characters, 50 keys, refused while compiling, before any query
+    await expect(db.select('users', all, { columns: `x"; ${update}; --` as any }).run(t.client))
+      .rejects.toThrow('This row is built with one `json_build_object()`, which Postgres limits to 100 arguments: its 63 keys');
+    expect(await adaName()).toBe('Ada');
+  });
+});
